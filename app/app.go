@@ -2,6 +2,7 @@ package dsync
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/adiom-data/dsync/app/options"
 	"github.com/adiom-data/dsync/build"
@@ -29,9 +30,10 @@ func NewApp() *cli.App {
 
 func runDsync(c *cli.Context) error {
 	o := options.NewFromCLIContext(c)
-	logger.Setup()
+	lo := logger.Options{Verbosity: o.Verbosity, LogFile: o.LogFile}
 
-	fmt.Printf("%+v\n", o)
+	logger.Setup(lo)
+	slog.Debug(fmt.Sprintf("%+v", o))
 
 	return nil
 }
