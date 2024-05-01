@@ -13,7 +13,7 @@ type FlowOptions struct {
 
 type Coordinator interface {
 	// General
-	Setup(s Statestore)
+	Setup(t Transport, s Statestore)
 	Teardown()
 
 	// Connector

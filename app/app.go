@@ -7,6 +7,7 @@ import (
 	"github.com/adiom-data/dsync/app/options"
 	"github.com/adiom-data/dsync/build"
 	"github.com/adiom-data/dsync/logger"
+	"github.com/adiom-data/dsync/runner"
 	"github.com/urfave/cli/v2"
 )
 
@@ -33,7 +34,12 @@ func runDsync(c *cli.Context) error {
 	lo := logger.Options{Verbosity: o.Verbosity}
 
 	logger.Setup(lo)
-	slog.Debug(fmt.Sprintf("%+v", o))
+	slog.Debug(fmt.Sprintf("Parsed flags: %+v", o))
+
+	r := runner.RunnerLocal{}
+	r.Setup()
+	r.Run(c.Context)
+	r.Teardown()
 
 	return nil
 }

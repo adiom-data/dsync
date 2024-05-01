@@ -11,9 +11,9 @@ type ConnectorCapabilities struct {
 
 type Connector interface {
 	// General
-	Setup()
+	Setup(t Transport)
 	Teardown()
 
 	// Coordinator
-	SetParameters(capActual ConnectorCapabilities)
+	SetParameters(reqCap ConnectorCapabilities)
 }
