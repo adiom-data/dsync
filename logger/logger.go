@@ -7,7 +7,6 @@ import (
 
 type Options struct {
 	Verbosity string
-	LogFile   string
 }
 
 func Setup(o Options) {

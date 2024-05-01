@@ -30,7 +30,7 @@ func NewApp() *cli.App {
 
 func runDsync(c *cli.Context) error {
 	o := options.NewFromCLIContext(c)
-	lo := logger.Options{Verbosity: o.Verbosity, LogFile: o.LogFile}
+	lo := logger.Options{Verbosity: o.Verbosity}
 
 	logger.Setup(lo)
 	slog.Debug(fmt.Sprintf("%+v", o))

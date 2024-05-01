@@ -34,10 +34,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				return nil
 			},
 		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:  "logFile",
-			Usage: "write logs to a file",
-		}),
 		&cli.StringFlag{
 			Name:  "config",
 			Usage: "specify the path of the config file",
