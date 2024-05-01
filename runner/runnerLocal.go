@@ -20,8 +20,7 @@ type RunnerLocal struct {
 	trans      iface.Transport
 	statestore iface.Statestore
 	coord      iface.Coordinator
-
-	src, dst iface.Connector
+	src, dst   iface.Connector
 }
 
 func (r *RunnerLocal) Setup() {
