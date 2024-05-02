@@ -1,6 +1,6 @@
 package iface
 
 type Transport interface {
-	// Receives the coordinator endpoint
-	GetCoordinatorEndpoint(location string) CoordinatorIConnectorSignal
+	// Gives the coordinator endpoint as a signalling interface
+	GetCoordinatorEndpoint(location string) (CoordinatorIConnectorSignal, error)
 }

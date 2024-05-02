@@ -15,6 +15,8 @@ type MongoConnector struct {
 	client   *mongo.Client
 	ctx      context.Context
 
+	t iface.Transport
+
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
 }
@@ -36,6 +38,7 @@ func NewMongoConnector(settings MongoConnectorSettings) *MongoConnector {
 
 func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.ctx = ctx
+	mc.t = t
 
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(mc.ctx, mc.settings.serverConnectTimeout)
