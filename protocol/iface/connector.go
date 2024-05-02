@@ -3,7 +3,8 @@ package iface
 import "context"
 
 type ConnectorType struct {
-	DbType string
+	DbType  string
+	Version string
 }
 
 type ConnectorCapabilities struct {

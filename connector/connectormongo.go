@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -13,6 +14,9 @@ type MongoConnector struct {
 	settings MongoConnectorSettings
 	client   *mongo.Client
 	ctx      context.Context
+
+	connectorType         iface.ConnectorType
+	connectorCapabilities iface.ConnectorCapabilities
 }
 
 type MongoConnectorSettings struct {
@@ -50,6 +54,19 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	if err != nil {
 		return err
 	}
+
+	// Get version of the MongoDB server
+	var commandResult bson.M
+	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{"serverStatus", 1}}).Decode(&commandResult)
+	if err != nil {
+		return err
+	}
+	version := commandResult["version"]
+
+	// Instantiate ConnectorType
+	mc.connectorType = iface.ConnectorType{DbType: "MongoDB", Version: version.(string)}
+	// Instantiate ConnectorCapabilities
+	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
 
 	return nil
 }
