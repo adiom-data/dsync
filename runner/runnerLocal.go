@@ -36,8 +36,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r.src = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	r.dst = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
-	r.trans = &transport.TransportLocal{}
-	r.coord = &coordinator.SimpleCoordinator{}
+	r.coord = coordinator.NewSimpleCoordinator()
+	r.trans = transport.NewTransportLocal(r.coord)
 
 	return r
 }

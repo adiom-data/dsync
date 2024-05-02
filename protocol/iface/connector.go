@@ -12,11 +12,15 @@ type ConnectorCapabilities struct {
 	Sink   bool
 }
 
+// General Connector Interface
 type Connector interface {
-	// General
 	Setup(ctx context.Context, t Transport) error
 	Teardown()
 
-	// Coordinator
+	ConnectorICoordinatorSignal
+}
+
+// Singalling Connector Interface for use by Coordinator
+type ConnectorICoordinatorSignal interface {
 	SetParameters(reqCap ConnectorCapabilities)
 }

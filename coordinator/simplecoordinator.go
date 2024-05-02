@@ -8,6 +8,11 @@ type SimpleCoordinator struct {
 	// Implement the necessary fields here
 }
 
+func NewSimpleCoordinator() *SimpleCoordinator {
+	// Implement the NewSimpleCoordinator function
+	return &SimpleCoordinator{}
+}
+
 func (c *SimpleCoordinator) Setup(t iface.Transport, s iface.Statestore) {
 	// Implement the Setup method
 }
@@ -16,7 +21,7 @@ func (c *SimpleCoordinator) Teardown() {
 	// Implement the Teardown method
 }
 
-func (c *SimpleCoordinator) RegisterConnector(ctype iface.ConnectorType, ccap iface.ConnectorCapabilities) iface.ConnectorID {
+func (c *SimpleCoordinator) RegisterConnector(ctype iface.ConnectorType, ccap iface.ConnectorCapabilities, cep iface.ConnectorICoordinatorSignal) iface.ConnectorID {
 	// Implement the RegisterConnector method
 	return iface.ConnectorID{}
 }
