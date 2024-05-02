@@ -1,5 +1,7 @@
 package iface
 
+import "context"
+
 type ConnectorID struct {
 	ID string
 }
@@ -14,7 +16,8 @@ type FlowOptions struct {
 // General coordinator interface
 type Coordinator interface {
 	// General
-	Setup(t Transport, s Statestore)
+	Setup(ctx context.Context, t Transport, s Statestore)
+	Run() error
 	Teardown()
 
 	// User
@@ -28,6 +31,6 @@ type Coordinator interface {
 // Singalling coordinator interface for use by connectors
 type CoordinatorIConnectorSignal interface {
 	// Register a connector with type, capabilities, and endpoint for its signalling interface
-	RegisterConnector(ctype ConnectorType, ccap ConnectorCapabilities, cep ConnectorICoordinatorSignal) ConnectorID
+	RegisterConnector(ctype ConnectorType, ccap ConnectorCapabilities, cep ConnectorICoordinatorSignal) (ConnectorID, error)
 	DelistConnector(ConnectorID)
 }

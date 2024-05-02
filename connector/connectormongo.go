@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -15,7 +17,8 @@ type MongoConnector struct {
 	client   *mongo.Client
 	ctx      context.Context
 
-	t iface.Transport
+	t  iface.Transport
+	id iface.ConnectorID
 
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
@@ -78,6 +81,24 @@ func (mc *MongoConnector) Teardown() {
 	if mc.client != nil {
 		mc.client.Disconnect(mc.ctx)
 	}
+}
+
+func (mc *MongoConnector) Run() error {
+	// Get the coordinator endpoint
+	coord, err := mc.t.GetCoordinatorEndpoint("local")
+	if err != nil {
+		return errors.New("Failed to get coordinator endpoint: " + err.Error())
+	}
+
+	// Register the connector
+	mc.id, err = coord.RegisterConnector(mc.connectorType, mc.connectorCapabilities, mc)
+	if err != nil {
+		return errors.New("Failed registering the connector: " + err.Error())
+	}
+
+	slog.Info("MongoConnector is running... " + mc.id.ID)
+
+	return nil
 }
 
 func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {

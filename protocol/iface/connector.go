@@ -15,6 +15,7 @@ type ConnectorCapabilities struct {
 // General Connector Interface
 type Connector interface {
 	Setup(ctx context.Context, t Transport) error
+	Run() error
 	Teardown()
 
 	ConnectorICoordinatorSignal

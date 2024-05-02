@@ -3,7 +3,7 @@ package runner
 import (
 	"context"
 	"log/slog"
-	"time"
+	"sync"
 
 	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/coordinator"
@@ -54,7 +54,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 		return err
 	}
 
-	r.coord.Setup(r.trans, r.statestore)
+	r.coord.Setup(r.ctx, r.trans, r.statestore)
 
 	err = r.src.Setup(r.ctx, r.trans)
 	if err != nil {
@@ -75,9 +75,26 @@ func (r *RunnerLocal) Run() {
 	slog.Debug("RunnerLocal Run")
 
 	// Implement the run logic here
-	sleep, cancel := context.WithTimeout(r.ctx, time.Second*10)
-	defer cancel()
-	<-sleep.Done()
+
+	// create waitgroup
+	waitGroup := sync.WaitGroup{}
+	// add the components to the waitgroup
+	waitGroup.Add(3)
+	// start the components
+	go func() {
+		defer waitGroup.Done()
+		r.coord.Run()
+	}()
+	go func() {
+		defer waitGroup.Done()
+		r.src.Run()
+	}()
+	go func() {
+		defer waitGroup.Done()
+		r.dst.Run()
+	}()
+	//wait for the components to finish
+	waitGroup.Wait()
 }
 
 func (r *RunnerLocal) Teardown() {
