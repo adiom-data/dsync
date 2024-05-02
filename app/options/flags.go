@@ -34,9 +34,28 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				return nil
 			},
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     "source",
+			Usage:    "Source connection string",
+			Aliases:  []string{"s"},
+			Required: true,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     "destination",
+			Usage:    "Destination connection string",
+			Aliases:  []string{"d"},
+			Required: true,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     "metadata",
+			Usage:    "Metadata store connection string",
+			Aliases:  []string{"m"},
+			Required: true,
+		}),
 		&cli.StringFlag{
-			Name:  "config",
-			Usage: "specify the path of the config file",
+			Name:    "config",
+			Aliases: []string{"c"},
+			Usage:   "specify the path of the config file",
 		},
 		cli.VersionFlag,
 	}

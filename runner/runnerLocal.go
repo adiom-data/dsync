@@ -21,30 +21,61 @@ type RunnerLocal struct {
 	statestore iface.Statestore
 	coord      iface.Coordinator
 	src, dst   iface.Connector
+
+	ctx context.Context
 }
 
-func (r *RunnerLocal) Setup() {
-	slog.Debug("RunnerLocal Setup")
+type RunnerLocalSettings struct {
+	SrcConnString        string
+	DstConnString        string
+	StateStoreConnString string
+}
 
-	//Create objects
+func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
+	r := &RunnerLocal{}
+	r.src = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	r.dst = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	r.trans = &transport.TransportLocal{}
 	r.coord = &coordinator.SimpleCoordinator{}
-	r.statestore = &statestore.MongoStateStore{}
-	r.src = &connector.MongoConnector{}
-	r.dst = &connector.MongoConnector{}
 
-	//Initialize in sequence
-	r.statestore.Setup()
-	r.coord.Setup(r.trans, r.statestore)
-	r.src.Setup(r.trans)
-	r.dst.Setup(r.trans)
+	return r
 }
 
-func (r *RunnerLocal) Run(ctx context.Context) {
+func (r *RunnerLocal) Setup(ctx context.Context) error {
+	slog.Debug("RunnerLocal Setup")
+
+	r.ctx = ctx
+
+	//Initialize in sequence
+	err := r.statestore.Setup(r.ctx)
+	if err != nil {
+		slog.Error("RunnerLocal Setup statestore", err)
+		return err
+	}
+
+	r.coord.Setup(r.trans, r.statestore)
+
+	err = r.src.Setup(r.ctx, r.trans)
+	if err != nil {
+		slog.Error("RunnerLocal Setup src", err)
+		return err
+	}
+
+	err = r.dst.Setup(r.ctx, r.trans)
+	if err != nil {
+		slog.Error("RunnerLocal Setup dst", err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *RunnerLocal) Run() {
 	slog.Debug("RunnerLocal Run")
 
 	// Implement the run logic here
-	sleep, cancel := context.WithTimeout(ctx, time.Second*10)
+	sleep, cancel := context.WithTimeout(r.ctx, time.Second*10)
 	defer cancel()
 	<-sleep.Done()
 }

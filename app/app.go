@@ -34,11 +34,17 @@ func runDsync(c *cli.Context) error {
 	lo := logger.Options{Verbosity: o.Verbosity}
 
 	logger.Setup(lo)
-	slog.Debug(fmt.Sprintf("Parsed flags: %+v", o))
+	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
-	r := runner.RunnerLocal{}
-	r.Setup()
-	r.Run(c.Context)
+	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
+		SrcConnString:        o.SrcConnString,
+		DstConnString:        o.DstConnString,
+		StateStoreConnString: o.StateStoreConnString,
+	})
+	err := r.Setup(c.Context)
+	if err == nil {
+		r.Run()
+	}
 	r.Teardown()
 
 	return nil

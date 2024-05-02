@@ -1,16 +1,63 @@
 package connector
 
-import "github.com/adiom-data/dsync/protocol/iface"
+import (
+	"context"
+	"time"
+
+	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
 
 type MongoConnector struct {
+	settings MongoConnectorSettings
+	client   *mongo.Client
+	ctx      context.Context
 }
 
-func (mc *MongoConnector) Setup(t iface.Transport) {
-	// Perform setup logic specific to MongoConnector
+type MongoConnectorSettings struct {
+	ConnectionString string
+
+	serverConnectTimeout time.Duration
+	pingTimeout          time.Duration
+}
+
+func NewMongoConnector(settings MongoConnectorSettings) *MongoConnector {
+	// Set default values
+	settings.serverConnectTimeout = 10 * time.Second
+	settings.pingTimeout = 2 * time.Second
+
+	return &MongoConnector{settings: settings}
+}
+
+func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
+	mc.ctx = ctx
+
+	// Connect to the MongoDB instance
+	ctxConnect, cancel := context.WithTimeout(mc.ctx, mc.settings.serverConnectTimeout)
+	defer cancel()
+	clientOptions := options.Client().ApplyURI(mc.settings.ConnectionString)
+	client, err := mongo.Connect(ctxConnect, clientOptions)
+	if err != nil {
+		return err
+	}
+	mc.client = client
+
+	// Check the connection
+	ctxPing, cancel := context.WithTimeout(mc.ctx, mc.settings.pingTimeout)
+	defer cancel()
+	err = mc.client.Ping(ctxPing, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (mc *MongoConnector) Teardown() {
-	// Perform teardown logic specific to MongoConnector
+	if mc.client != nil {
+		mc.client.Disconnect(mc.ctx)
+	}
 }
 
 func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {

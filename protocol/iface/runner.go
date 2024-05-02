@@ -4,7 +4,7 @@ import "context"
 
 type Runner interface {
 	// General
-	Setup()
-	Run(ctx context.Context)
+	Setup(ctx context.Context) error
+	Run()
 	Teardown()
 }

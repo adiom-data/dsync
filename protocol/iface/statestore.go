@@ -1,7 +1,9 @@
 package iface
 
+import "context"
+
 type Statestore interface {
 	// General
-	Setup()
+	Setup(ctx context.Context) error
 	Teardown()
 }
