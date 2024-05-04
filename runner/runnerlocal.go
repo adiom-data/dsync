@@ -93,6 +93,12 @@ func (r *RunnerLocal) Run() {
 		defer waitGroup.Done()
 		r.dst.Run()
 	}()
+
+	// create a flow
+	flowID := r.coord.FlowCreate(r.src.GetID(), r.dst.GetID(), iface.FlowOptions{})
+	// start the flow
+	r.coord.FlowStart(flowID)
+
 	//wait for the components to finish
 	waitGroup.Wait()
 }

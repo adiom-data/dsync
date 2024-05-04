@@ -33,4 +33,6 @@ type CoordinatorIConnectorSignal interface {
 	// Register a connector with type, capabilities, and endpoint for its signalling interface
 	RegisterConnector(ctype ConnectorType, ccap ConnectorCapabilities, cep ConnectorICoordinatorSignal) (ConnectorID, error)
 	DelistConnector(ConnectorID)
+
+	//TODO: Done event? (for a specific job)
 }
