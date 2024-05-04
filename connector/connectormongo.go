@@ -39,6 +39,10 @@ func NewMongoConnector(settings MongoConnectorSettings) *MongoConnector {
 	return &MongoConnector{settings: settings}
 }
 
+func (mc *MongoConnector) GetID() iface.ConnectorID {
+	return mc.id
+}
+
 func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.ctx = ctx
 	mc.t = t
@@ -63,7 +67,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 
 	// Get version of the MongoDB server
 	var commandResult bson.M
-	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{"serverStatus", 1}}).Decode(&commandResult)
+	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{Key: "serverStatus", Value: 1}}).Decode(&commandResult)
 	if err != nil {
 		return err
 	}
