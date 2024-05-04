@@ -21,6 +21,8 @@ type Coordinator interface {
 	Teardown()
 
 	// User
+	GetConnectors() []ConnectorDetails
+
 	FlowCreate(src ConnectorID, dst ConnectorID, o FlowOptions) FlowID
 	FlowStart(fid FlowID)
 	FlowStop(fid FlowID)
@@ -28,10 +30,17 @@ type Coordinator interface {
 	CoordinatorIConnectorSignal
 }
 
+type ConnectorDetails struct {
+	Id   ConnectorID
+	Desc string
+	Type ConnectorType
+	Cap  ConnectorCapabilities
+}
+
 // Singalling coordinator interface for use by connectors
 type CoordinatorIConnectorSignal interface {
 	// Register a connector with type, capabilities, and endpoint for its signalling interface
-	RegisterConnector(ctype ConnectorType, ccap ConnectorCapabilities, cep ConnectorICoordinatorSignal) (ConnectorID, error)
+	RegisterConnector(details ConnectorDetails, cep ConnectorICoordinatorSignal) (ConnectorID, error)
 	DelistConnector(ConnectorID)
 
 	//TODO: Done event? (for a specific job)

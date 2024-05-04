@@ -13,6 +13,8 @@ import (
 )
 
 type MongoConnector struct {
+	desc string
+
 	settings MongoConnectorSettings
 	client   *mongo.Client
 	ctx      context.Context
@@ -31,16 +33,12 @@ type MongoConnectorSettings struct {
 	pingTimeout          time.Duration
 }
 
-func NewMongoConnector(settings MongoConnectorSettings) *MongoConnector {
+func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
 	// Set default values
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 
-	return &MongoConnector{settings: settings}
-}
-
-func (mc *MongoConnector) GetID() iface.ConnectorID {
-	return mc.id
+	return &MongoConnector{desc: desc, settings: settings}
 }
 
 func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
@@ -78,6 +76,20 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorCapabilities
 	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
 
+	// Get the coordinator endpoint
+	coord, err := mc.t.GetCoordinatorEndpoint("local")
+	if err != nil {
+		return errors.New("Failed to get coordinator endpoint: " + err.Error())
+	}
+
+	// Create a new connector details structure
+	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities}
+	// Register the connector
+	mc.id, err = coord.RegisterConnector(connectorDetails, mc)
+	if err != nil {
+		return errors.New("Failed registering the connector: " + err.Error())
+	}
+
 	return nil
 }
 
@@ -88,18 +100,6 @@ func (mc *MongoConnector) Teardown() {
 }
 
 func (mc *MongoConnector) Run() error {
-	// Get the coordinator endpoint
-	coord, err := mc.t.GetCoordinatorEndpoint("local")
-	if err != nil {
-		return errors.New("Failed to get coordinator endpoint: " + err.Error())
-	}
-
-	// Register the connector
-	mc.id, err = coord.RegisterConnector(mc.connectorType, mc.connectorCapabilities, mc)
-	if err != nil {
-		return errors.New("Failed registering the connector: " + err.Error())
-	}
-
 	slog.Info("MongoConnector is running... " + mc.id.ID)
 
 	return nil

@@ -18,8 +18,6 @@ type Connector interface {
 	Run() error
 	Teardown()
 
-	GetID() ConnectorID
-
 	ConnectorICoordinatorSignal
 }
 

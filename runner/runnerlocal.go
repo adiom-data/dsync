@@ -31,10 +31,15 @@ type RunnerLocalSettings struct {
 	StateStoreConnString string
 }
 
+const (
+	sourceName      = "Source"
+	destinationName = "Destination"
+)
+
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.src = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
-	r.dst = connector.NewMongoConnector(connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+	r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	r.dst = connector.NewMongoConnector(destinationName, connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	r.coord = coordinator.NewSimpleCoordinator()
 	r.trans = transport.NewTransportLocal(r.coord)
@@ -94,8 +99,32 @@ func (r *RunnerLocal) Run() {
 		r.dst.Run()
 	}()
 
+	// get available connectors from the coordinator
+	connectors := r.coord.GetConnectors()
+	// print the available connectors
+	slog.Debug("Connectors: ", connectors)
+
+	// find connector ids based on their descriptions
+	var srcId, dstId iface.ConnectorID
+	for _, connectorDetails := range connectors {
+		if connectorDetails.Desc == sourceName {
+			srcId = connectorDetails.Id
+		} else if connectorDetails.Desc == destinationName {
+			dstId = connectorDetails.Id
+		}
+	}
+
+	if (srcId == iface.ConnectorID{}) {
+		slog.Error("Source connector not found")
+		return
+	}
+	if (dstId == iface.ConnectorID{}) {
+		slog.Error("Source connector not found")
+		return
+	}
+
 	// create a flow
-	flowID := r.coord.FlowCreate(r.src.GetID(), r.dst.GetID(), iface.FlowOptions{})
+	flowID := r.coord.FlowCreate(srcId, dstId, iface.FlowOptions{})
 	// start the flow
 	r.coord.FlowStart(flowID)
 
