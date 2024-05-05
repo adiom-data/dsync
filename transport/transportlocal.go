@@ -16,7 +16,14 @@ func NewTransportLocal(coordEP iface.CoordinatorIConnectorSignal) *TransportLoca
 
 func (t *TransportLocal) GetCoordinatorEndpoint(location string) (iface.CoordinatorIConnectorSignal, error) {
 	if location != "local" {
-		return nil, errors.New("Local transport only supports local location")
+		return nil, errors.New("local transport only supports the 'local' location")
 	}
 	return t.coordEP, nil
+}
+
+func (t *TransportLocal) CreateDataChannel() (iface.DataChannel, error) {
+	return iface.DataChannel{}, nil
+}
+
+func (t *TransportLocal) CloseDataChannel(id string) {
 }

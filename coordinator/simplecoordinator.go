@@ -13,9 +13,14 @@ import (
 type SimpleCoordinator struct {
 	// Implement the necessary fields here
 	ctx context.Context
+	t   iface.Transport
+	s   iface.Statestore
 
 	connectors    map[iface.ConnectorID]ConnectorDetailsWithEp
 	mu_connectors sync.RWMutex // to make the map thread-safe
+
+	flows    map[iface.FlowID]FlowDetails
+	mu_flows sync.RWMutex // to make the map thread-safe
 }
 
 func NewSimpleCoordinator() *SimpleCoordinator {
@@ -26,6 +31,14 @@ func NewSimpleCoordinator() *SimpleCoordinator {
 // *****
 // Thread-safe methods to work with items in the connectors map
 // *****
+
+// gets a connector by id
+func (c *SimpleCoordinator) getConnector(cid iface.ConnectorID) (ConnectorDetailsWithEp, bool) {
+	c.mu_connectors.RLock()
+	defer c.mu_connectors.RUnlock()
+	connector, ok := c.connectors[cid]
+	return connector, ok
+}
 
 // deletes a connector from the map
 func (c *SimpleCoordinator) delConnector(cid iface.ConnectorID) {
@@ -66,12 +79,45 @@ func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
 }
 
 // *****
+// Thread-safe methods to work with items in the flows map
+// *****
+
+// adds a flow and returns the ID
+func (c *SimpleCoordinator) addFlow(details FlowDetails) iface.FlowID {
+	c.mu_flows.Lock()
+	defer c.mu_flows.Unlock()
+
+	var fid iface.FlowID
+
+	for {
+		fid = generateFlowID()
+		if _, ok := c.flows[fid]; !ok {
+			break
+		}
+	}
+
+	details.FlowID = fid // set the ID in the details for easier operations later
+	c.flows[fid] = details
+
+	return fid
+}
+
+// removes a flow from the map
+func (c *SimpleCoordinator) delFlow(fid iface.FlowID) {
+	c.mu_flows.Lock()
+	defer c.mu_flows.Unlock()
+	delete(c.flows, fid)
+}
+
+// *****
 // Implement the Coordinator interface methods
 // *****
 
 func (c *SimpleCoordinator) Setup(ctx context.Context, t iface.Transport, s iface.Statestore) {
 	// Implement the Setup method
 	c.ctx = ctx
+	c.t = t
+	c.s = s
 }
 
 func (c *SimpleCoordinator) Run() error {
@@ -109,9 +155,24 @@ func (c *SimpleCoordinator) DelistConnector(cid iface.ConnectorID) {
 	c.delConnector(cid)
 }
 
-func (c *SimpleCoordinator) FlowCreate(src iface.ConnectorID, dst iface.ConnectorID, o iface.FlowOptions) iface.FlowID {
-	// Implement the FlowCreate method
-	return iface.FlowID{}
+func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error) {
+	// Check flow type and error out if not unidirectional
+	if o.Type != iface.UnidirectionalFlowType {
+		return iface.FlowID{}, fmt.Errorf("only unidirectional flows are supported")
+	}
+
+	dc, err := c.t.CreateDataChannel()
+	if err != nil {
+		return iface.FlowID{}, fmt.Errorf("failed to create data channel: %v", err)
+	}
+
+	fdet := FlowDetails{
+		Options:     o,
+		DataChannel: dc,
+	}
+	fid := c.addFlow(fdet)
+
+	return fid, nil
 }
 
 func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {

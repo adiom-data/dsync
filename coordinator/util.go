@@ -14,3 +14,14 @@ func generateConnectorID() iface.ConnectorID {
 	id := uuid.New()
 	return iface.ConnectorID{ID: id.String()}
 }
+
+type FlowDetails struct {
+	FlowID      iface.FlowID
+	Options     iface.FlowOptions
+	DataChannel iface.DataChannel
+}
+
+func generateFlowID() iface.FlowID {
+	id := uuid.New()
+	return iface.FlowID{ID: id.String()}
+}

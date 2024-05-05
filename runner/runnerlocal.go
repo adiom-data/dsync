@@ -124,9 +124,18 @@ func (r *RunnerLocal) Run() {
 	}
 
 	// create a flow
-	flowID := r.coord.FlowCreate(srcId, dstId, iface.FlowOptions{})
-	// start the flow
-	r.coord.FlowStart(flowID)
+	flowOptions := iface.FlowOptions{
+		SrcId: srcId,
+		DstId: dstId,
+		Type:  iface.UnidirectionalFlowType,
+	}
+	flowID, err := r.coord.FlowCreate(flowOptions)
+	if err != nil {
+		slog.Error("Failed to create flow", err)
+	} else {
+		// start the flow
+		r.coord.FlowStart(flowID)
+	}
 
 	//wait for the components to finish
 	waitGroup.Wait()

@@ -6,13 +6,6 @@ type ConnectorID struct {
 	ID string
 }
 
-type FlowID struct {
-	ID string
-}
-
-type FlowOptions struct {
-}
-
 // General coordinator interface
 type Coordinator interface {
 	// General
@@ -23,7 +16,7 @@ type Coordinator interface {
 	// User
 	GetConnectors() []ConnectorDetails
 
-	FlowCreate(src ConnectorID, dst ConnectorID, o FlowOptions) FlowID
+	FlowCreate(o FlowOptions) (FlowID, error)
 	FlowStart(fid FlowID)
 	FlowStop(fid FlowID)
 
