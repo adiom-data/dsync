@@ -25,7 +25,7 @@ type SimpleCoordinator struct {
 
 func NewSimpleCoordinator() *SimpleCoordinator {
 	// Implement the NewSimpleCoordinator function
-	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp)}
+	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]FlowDetails)}
 }
 
 // *****
@@ -180,6 +180,8 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	}
 	fid := c.addFlow(fdet)
 
+	slog.Debug("Created flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
+
 	return fid, nil
 }
 
@@ -192,13 +194,16 @@ func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
 }
 
 func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
+
+	slog.Debug("Destroying flow with ID: " + fmt.Sprintf("%v", fid))
+
 	// Get the flow details
 	flowDet, err := c.getFlow(fid)
 	if !err {
 		slog.Error("Flow not found", fid)
 	}
 	// close the data channel
-	c.t.CloseDataChannel(flowDet.DataChannel.ID)
+	c.t.CloseDataChannel(flowDet.DataChannel)
 	// remove the flow from the map
 	c.delFlow(fid)
 }

@@ -22,8 +22,11 @@ func (t *TransportLocal) GetCoordinatorEndpoint(location string) (iface.Coordina
 }
 
 func (t *TransportLocal) CreateDataChannel() (iface.DataChannel, error) {
-	return iface.DataChannel{}, nil
+	channel := make(chan iface.DataMessage)
+	DataChannel := iface.DataChannel{Writer: channel, Reader: channel}
+	return DataChannel, nil
 }
 
-func (t *TransportLocal) CloseDataChannel(id string) {
+func (t *TransportLocal) CloseDataChannel(dc iface.DataChannel) {
+	close(dc.Writer) // Reader is the same
 }

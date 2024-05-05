@@ -135,6 +135,10 @@ func (r *RunnerLocal) Run() {
 	} else {
 		// start the flow
 		r.coord.FlowStart(flowID)
+		// stop the flow
+		r.coord.FlowStop(flowID)
+		// destroy the flow
+		r.coord.FlowDestroy(flowID)
 	}
 
 	//wait for the components to finish

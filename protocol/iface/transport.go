@@ -3,8 +3,7 @@ package iface
 type DataMessage struct {
 }
 
-type DataChannel struct { // Unique identifier for a channel
-	ID     string
+type DataChannel struct {
 	Writer chan DataMessage
 	Reader chan DataMessage
 }
@@ -17,5 +16,5 @@ type Transport interface {
 	CreateDataChannel() (DataChannel, error)
 
 	// Closes a data channel
-	CloseDataChannel(id string)
+	CloseDataChannel(DataChannel)
 }
