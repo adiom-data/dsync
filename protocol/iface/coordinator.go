@@ -19,6 +19,7 @@ type Coordinator interface {
 	FlowCreate(o FlowOptions) (FlowID, error)
 	FlowStart(fid FlowID)
 	FlowStop(fid FlowID)
+	FlowDestroy(fid FlowID)
 
 	CoordinatorIConnectorSignal
 }

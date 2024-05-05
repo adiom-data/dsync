@@ -82,6 +82,14 @@ func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
 // Thread-safe methods to work with items in the flows map
 // *****
 
+// gets a flow by id
+func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (FlowDetails, bool) {
+	c.mu_flows.RLock()
+	defer c.mu_flows.RUnlock()
+	flow, ok := c.flows[fid]
+	return flow, ok
+}
+
 // adds a flow and returns the ID
 func (c *SimpleCoordinator) addFlow(details FlowDetails) iface.FlowID {
 	c.mu_flows.Lock()
@@ -181,4 +189,16 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
 
 func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
 	// Implement the FlowStop method
+}
+
+func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
+	// Get the flow details
+	flowDet, err := c.getFlow(fid)
+	if !err {
+		slog.Error("Flow not found", fid)
+	}
+	// close the data channel
+	c.t.CloseDataChannel(flowDet.DataChannel.ID)
+	// remove the flow from the map
+	c.delFlow(fid)
 }
