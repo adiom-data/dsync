@@ -16,9 +16,12 @@ func generateConnectorID() iface.ConnectorID {
 }
 
 type FlowDetails struct {
-	FlowID      iface.FlowID
-	Options     iface.FlowOptions
+	FlowID  iface.FlowID
+	Options iface.FlowOptions
+
 	DataChannel iface.DataChannel
+
+	DoneNotificationChannels []chan struct{}
 }
 
 func generateFlowID() iface.FlowID {

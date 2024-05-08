@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -24,6 +25,8 @@ type MongoConnector struct {
 
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
+
+	coord iface.CoordinatorIConnectorSignal
 }
 
 type MongoConnectorSettings struct {
@@ -81,6 +84,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	if err != nil {
 		return errors.New("Failed to get coordinator endpoint: " + err.Error())
 	}
+	mc.coord = coord
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities}
@@ -109,5 +113,36 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
-func (mc *MongoConnector) StartReadToChannel(dataChannel chan<- iface.DataMessage)    {}
-func (mc *MongoConnector) StartWriteFromChannel(dataChannel chan<- iface.DataMessage) {}
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel chan<- iface.DataMessage) {
+	go func() {
+		select {
+		case <-mc.ctx.Done():
+			return
+		case <-time.After(10 * time.Second):
+			// continue with the rest of the code
+		}
+
+		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
+		err := mc.coord.NotifyDone(flowId, mc.id)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
+		}
+	}()
+}
+
+func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel chan<- iface.DataMessage) {
+	go func() {
+		select {
+		case <-mc.ctx.Done():
+			return
+		case <-time.After(15 * time.Second):
+			// continue with the rest of the code
+		}
+
+		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
+		err := mc.coord.NotifyDone(flowId, mc.id)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", mc.id, flowId, err))
+		}
+	}()
+}

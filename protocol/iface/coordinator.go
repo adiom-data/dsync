@@ -38,4 +38,6 @@ type CoordinatorIConnectorSignal interface {
 	DelistConnector(ConnectorID)
 
 	//TODO: Done event? (for a specific job)
+	//TODO should this have a flow id?
+	NotifyDone(flowId FlowID, conn ConnectorID) error
 }

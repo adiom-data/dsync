@@ -135,6 +135,7 @@ func (r *RunnerLocal) Run() {
 	} else {
 		// start the flow
 		r.coord.FlowStart(flowID)
+		//TODO: wait for the flow to finish and maybe no need to stop it explicitly
 		// stop the flow
 		r.coord.FlowStop(flowID)
 		// destroy the flow

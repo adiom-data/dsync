@@ -174,9 +174,14 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 		return iface.FlowID{}, fmt.Errorf("failed to create data channel: %v", err)
 	}
 
+	doneChannels := make([]chan struct{}, 2)
+	doneChannels[0] = make(chan struct{})
+	doneChannels[1] = make(chan struct{})
+
 	fdet := FlowDetails{
-		Options:     o,
-		DataChannel: dc,
+		Options:                  o,
+		DataChannel:              dc,
+		DoneNotificationChannels: doneChannels,
 	}
 	fid := c.addFlow(fdet)
 
@@ -185,8 +190,9 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	return fid, nil
 }
 
+// TODO: make this async
 func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
-	// Implement the FlowStart method
+	slog.Info("Starting flow with ID: " + fmt.Sprintf("%v", fid))
 
 	// Get the flow details
 	flowDet, err := c.getFlow(fid)
@@ -207,10 +213,26 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
 	// TODO: Determine shared capabilities and set parameters on src and dst connectors
 
 	// Tell source connector to start reading into the data channel
-	src.Endpoint.StartReadToChannel(flowDet.DataChannel.Reader)
+	src.Endpoint.StartReadToChannel(fid, flowDet.DataChannel.Reader)
 	// Tell destination connector to start writing from the channel
-	dst.Endpoint.StartWriteFromChannel(flowDet.DataChannel.Writer)
-	// TODO: Wait until both src and dst signal that they are done
+	dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannel.Writer)
+	// Wait until both src and dst signal that they are done
+	// Exit of the context has been cancelled
+	slog.Debug("Waiting for source to finish. Flow ID: " + fmt.Sprintf("%v", fid))
+	select {
+	case <-flowDet.DoneNotificationChannels[0]:
+		slog.Debug("Source finished. Flow ID: " + fmt.Sprintf("%v", fid))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
+	slog.Debug("Waiting for destination to finish. Flow ID: " + fmt.Sprintf("%v", fid))
+	select {
+	case <-flowDet.DoneNotificationChannels[1]:
+		slog.Debug("Destination finished. Flow ID: " + fmt.Sprintf("%v", fid))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
+	slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is done")
 }
 
 func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
@@ -228,6 +250,36 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	}
 	// close the data channel
 	c.t.CloseDataChannel(flowDet.DataChannel)
+
+	// close done notification channels - not needed
+	// for _, ch := range flowDet.DoneNotificationChannels {
+	// 	close(ch)
+	// }
+
 	// remove the flow from the map
 	c.delFlow(fid)
+}
+
+func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	// Check if the connector corresponds to the source
+	if flowDet.Options.SrcId == conn {
+		// Close the first notification channel
+		close(flowDet.DoneNotificationChannels[0])
+		return nil
+	}
+
+	// Check if the connector corresponds to the destination
+	if flowDet.Options.DstId == conn {
+		// Close the second notification channel
+		close(flowDet.DoneNotificationChannels[1])
+		return nil
+	}
+
+	return fmt.Errorf("connector not part of the flow")
 }

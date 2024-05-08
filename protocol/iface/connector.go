@@ -26,6 +26,7 @@ type ConnectorICoordinatorSignal interface {
 	SetParameters(reqCap ConnectorCapabilities) // Set the capabilities requested by the Coordinator
 
 	//TODO: these should get the actual channel pointers from the transport layer
-	StartReadToChannel(dataChannel chan<- DataMessage)    // Read data into the provided channel (async)
-	StartWriteFromChannel(dataChannel chan<- DataMessage) // Write data from the provided channel (async)
+	//TODO: shoud these have flow id?
+	StartReadToChannel(flowId FlowID, dataChannel chan<- DataMessage)    // Read data into the provided channel (async)
+	StartWriteFromChannel(flowId FlowID, dataChannel chan<- DataMessage) // Write data from the provided channel (async)
 }
