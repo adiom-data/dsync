@@ -187,6 +187,30 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 
 func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
 	// Implement the FlowStart method
+
+	// Get the flow details
+	flowDet, err := c.getFlow(fid)
+	if !err {
+		slog.Error("Flow not found", fid)
+	}
+
+	// Get the source and destination connectors
+	src, ok := c.getConnector(flowDet.Options.SrcId)
+	if !ok {
+		slog.Error("Source connector not found", flowDet.Options.SrcId)
+	}
+	dst, ok := c.getConnector(flowDet.Options.DstId)
+	if !ok {
+		slog.Error("Destination connector not found", flowDet.Options.DstId)
+	}
+
+	// TODO: Determine shared capabilities and set parameters on src and dst connectors
+
+	// Tell source connector to start reading into the data channel
+	src.Endpoint.StartReadToChannel(flowDet.DataChannel.Reader)
+	// Tell destination connector to start writing from the channel
+	dst.Endpoint.StartWriteFromChannel(flowDet.DataChannel.Writer)
+	// TODO: Wait until both src and dst signal that they are done
 }
 
 func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {

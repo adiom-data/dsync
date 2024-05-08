@@ -108,3 +108,6 @@ func (mc *MongoConnector) Run() error {
 func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
+
+func (mc *MongoConnector) StartReadToChannel(dataChannel chan<- iface.DataMessage)    {}
+func (mc *MongoConnector) StartWriteFromChannel(dataChannel chan<- iface.DataMessage) {}
