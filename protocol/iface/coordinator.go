@@ -10,7 +10,6 @@ type ConnectorID struct {
 type Coordinator interface {
 	// General
 	Setup(ctx context.Context, t Transport, s Statestore)
-	Run() error
 	Teardown()
 
 	// User

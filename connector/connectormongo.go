@@ -94,6 +94,8 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
+	slog.Info("MongoConnector has been configured with ID " + mc.id.ID)
+
 	return nil
 }
 
@@ -101,12 +103,6 @@ func (mc *MongoConnector) Teardown() {
 	if mc.client != nil {
 		mc.client.Disconnect(mc.ctx)
 	}
-}
-
-func (mc *MongoConnector) Run() error {
-	slog.Info("MongoConnector is running... " + mc.id.ID)
-
-	return nil
 }
 
 func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {

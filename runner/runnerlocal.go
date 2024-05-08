@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"log/slog"
-	"sync"
 
 	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/coordinator"
@@ -79,26 +78,6 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 func (r *RunnerLocal) Run() {
 	slog.Debug("RunnerLocal Run")
 
-	// Implement the run logic here
-
-	// create waitgroup
-	waitGroup := sync.WaitGroup{}
-	// add the components to the waitgroup
-	waitGroup.Add(3)
-	// start the components
-	go func() {
-		defer waitGroup.Done()
-		r.coord.Run()
-	}()
-	go func() {
-		defer waitGroup.Done()
-		r.src.Run()
-	}()
-	go func() {
-		defer waitGroup.Done()
-		r.dst.Run()
-	}()
-
 	// get available connectors from the coordinator
 	connectors := r.coord.GetConnectors()
 	// print the available connectors
@@ -140,9 +119,6 @@ func (r *RunnerLocal) Run() {
 	r.coord.WaitForFlowDone(flowID)
 	// destroy the flow
 	r.coord.FlowDestroy(flowID)
-
-	//wait for the components to finish
-	waitGroup.Wait()
 }
 
 func (r *RunnerLocal) Teardown() {

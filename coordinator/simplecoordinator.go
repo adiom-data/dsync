@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 )
@@ -126,14 +125,6 @@ func (c *SimpleCoordinator) Setup(ctx context.Context, t iface.Transport, s ifac
 	c.ctx = ctx
 	c.t = t
 	c.s = s
-}
-
-func (c *SimpleCoordinator) Run() error {
-	slog.Info("SimpleCoordinator is running...")
-	sleep, cancel := context.WithTimeout(c.ctx, time.Second*10)
-	defer cancel()
-	<-sleep.Done()
-	return nil
 }
 
 func (c *SimpleCoordinator) Teardown() {
