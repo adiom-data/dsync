@@ -20,6 +20,7 @@ type Coordinator interface {
 	FlowStart(fid FlowID)
 	FlowStop(fid FlowID)
 	FlowDestroy(fid FlowID)
+	WaitForFlowDone(flowId FlowID) error // Wait for the flow to be done
 
 	CoordinatorIConnectorSignal
 }
@@ -37,7 +38,6 @@ type CoordinatorIConnectorSignal interface {
 	RegisterConnector(details ConnectorDetails, cep ConnectorICoordinatorSignal) (ConnectorID, error)
 	DelistConnector(ConnectorID)
 
-	//TODO: Done event? (for a specific job)
-	//TODO should this have a flow id?
+	// Done event (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
 }

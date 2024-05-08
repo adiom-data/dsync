@@ -22,6 +22,8 @@ type FlowDetails struct {
 	DataChannels []iface.DataChannelID
 
 	DoneNotificationChannels []chan struct{}
+
+	flowDone chan struct{}
 }
 
 func generateFlowID() iface.FlowID {

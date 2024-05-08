@@ -132,15 +132,14 @@ func (r *RunnerLocal) Run() {
 	flowID, err := r.coord.FlowCreate(flowOptions)
 	if err != nil {
 		slog.Error("Failed to create flow", err)
-	} else {
-		// start the flow
-		r.coord.FlowStart(flowID)
-		//TODO: wait for the flow to finish and maybe no need to stop it explicitly
-		// stop the flow
-		r.coord.FlowStop(flowID)
-		// destroy the flow
-		r.coord.FlowDestroy(flowID)
+		return
 	}
+	// start the flow
+	r.coord.FlowStart(flowID)
+	// wait for the flow to finish
+	r.coord.WaitForFlowDone(flowID)
+	// destroy the flow
+	r.coord.FlowDestroy(flowID)
 
 	//wait for the components to finish
 	waitGroup.Wait()
