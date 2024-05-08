@@ -169,10 +169,17 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 		return iface.FlowID{}, fmt.Errorf("only unidirectional flows are supported")
 	}
 
-	dc, err := c.t.CreateDataChannel()
+	// for unidirectional flows we need two data channels
+	// 0 corresponds to the source and 1 to the destination
+	// here we're getting away with a trick to short circuit using a single channel
+	// TODO: use different channels for source and destination
+	dc0, err := c.t.CreateDataChannel()
 	if err != nil {
-		return iface.FlowID{}, fmt.Errorf("failed to create data channel: %v", err)
+		return iface.FlowID{}, fmt.Errorf("failed to create data channel 0: %v", err)
 	}
+	dataChannels := make([]iface.DataChannelID, 2)
+	dataChannels[0] = dc0
+	dataChannels[1] = dc0
 
 	doneChannels := make([]chan struct{}, 2)
 	doneChannels[0] = make(chan struct{})
@@ -180,7 +187,7 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 
 	fdet := FlowDetails{
 		Options:                  o,
-		DataChannel:              dc,
+		DataChannels:             dataChannels,
 		DoneNotificationChannels: doneChannels,
 	}
 	fid := c.addFlow(fdet)
@@ -213,9 +220,9 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
 	// TODO: Determine shared capabilities and set parameters on src and dst connectors
 
 	// Tell source connector to start reading into the data channel
-	src.Endpoint.StartReadToChannel(fid, flowDet.DataChannel.Reader)
+	src.Endpoint.StartReadToChannel(fid, flowDet.DataChannels[0])
 	// Tell destination connector to start writing from the channel
-	dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannel.Writer)
+	dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannels[1])
 	// Wait until both src and dst signal that they are done
 	// Exit of the context has been cancelled
 	slog.Debug("Waiting for source to finish. Flow ID: " + fmt.Sprintf("%v", fid))
@@ -248,8 +255,10 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	if !err {
 		slog.Error("Flow not found", fid)
 	}
-	// close the data channel
-	c.t.CloseDataChannel(flowDet.DataChannel)
+	// close the data channels
+	for _, ch := range flowDet.DataChannels {
+		c.t.CloseDataChannel(ch)
+	}
 
 	// close done notification channels - not needed
 	// for _, ch := range flowDet.DoneNotificationChannels {

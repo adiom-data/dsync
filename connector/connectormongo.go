@@ -113,7 +113,7 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel chan<- iface.DataMessage) {
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) {
 	go func() {
 		select {
 		case <-mc.ctx.Done():
@@ -130,7 +130,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel ch
 	}()
 }
 
-func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel chan<- iface.DataMessage) {
+func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) {
 	go func() {
 		select {
 		case <-mc.ctx.Done():

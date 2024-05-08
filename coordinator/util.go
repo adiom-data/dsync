@@ -19,7 +19,7 @@ type FlowDetails struct {
 	FlowID  iface.FlowID
 	Options iface.FlowOptions
 
-	DataChannel iface.DataChannel
+	DataChannels []iface.DataChannelID
 
 	DoneNotificationChannels []chan struct{}
 }

@@ -3,9 +3,8 @@ package iface
 type DataMessage struct {
 }
 
-type DataChannel struct {
-	Writer chan DataMessage
-	Reader chan DataMessage
+type DataChannelID struct {
+	ID string
 }
 
 type Transport interface {
@@ -13,8 +12,11 @@ type Transport interface {
 	GetCoordinatorEndpoint(location string) (CoordinatorIConnectorSignal, error)
 
 	// Creates a data channel
-	CreateDataChannel() (DataChannel, error)
+	CreateDataChannel() (DataChannelID, error)
+
+	// Gets a data channel endpoint by ID
+	GetDataChannelEndpoint(DataChannelID) (chan DataMessage, error)
 
 	// Closes a data channel
-	CloseDataChannel(DataChannel)
+	CloseDataChannel(DataChannelID)
 }
