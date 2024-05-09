@@ -220,7 +220,6 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		slog.Error("Failed to start writing to the destination", err)
 		return err
 	}
-	//TODO: what happens if the source started but the destination failed to start?
 
 	slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is running")
 

@@ -133,6 +133,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
 
+		close(dataChannel) //send a signal downstream that we are done sending data //TODO: is this the right way to do it?
+
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id)
 		if err != nil {
@@ -144,21 +146,39 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 }
 
 func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	// Get data channel from transport interface based on the provided ID
-	// dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
-	// if err != nil {
-	// 	slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
-	// 	return err
+	collection := mc.client.Database("test").Collection("theaters") //TODO: make this configurable
+
+	// select {
+	// case <-mc.ctx.Done():
+	// 	return nil
+	// case <-time.After(15 * time.Second):
+	// 	return fmt.Errorf("timeout waiting for data")
 	// }
-	<-time.After(5 * time.Second)
-	return fmt.Errorf("random error")
+
+	// Get data channel from transport interface based on the provided ID
+	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
+		return err
+	}
 
 	go func() {
-		select {
-		case <-mc.ctx.Done():
-			return
-		case <-time.After(15 * time.Second):
-			// continue with the rest of the code
+		for loop := true; loop; {
+			select {
+			case <-mc.ctx.Done():
+				return
+			case dataMsg, ok := <-dataChannel:
+				if !ok {
+					// channel is closed which is a signal for us to stop
+					loop = false
+					break
+				}
+				data := *dataMsg.Data
+				_, err := collection.InsertOne(mc.ctx, bson.Raw(data))
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
+				}
+			}
 		}
 
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
