@@ -127,7 +127,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
 			data := []byte(rawData)
-			dataChannel <- iface.DataMessage{Data: &data}
+			dataChannel <- iface.DataMessage{Data: &data} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
@@ -143,7 +143,16 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 	return nil
 }
 
-func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) error {
+func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+	// Get data channel from transport interface based on the provided ID
+	// dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
+	// if err != nil {
+	// 	slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
+	// 	return err
+	// }
+	<-time.After(5 * time.Second)
+	return fmt.Errorf("random error")
+
 	go func() {
 		select {
 		case <-mc.ctx.Done():

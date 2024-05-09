@@ -9,7 +9,10 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}"
+            "program": "${fileDirname}",
+            "args": ["-s", "mongodb+srv://admin:powerbook17&@source.ff549kv.mongodb.net/",
+            "-d", "mongodb+srv://admin:powerbook17&@source.ff549kv.mongodb.net/",
+            "-m","mongodb+srv://admin:powerbook17&@source.ff549kv.mongodb.net/"]
         }
     ]
 }
