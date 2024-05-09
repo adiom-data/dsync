@@ -114,9 +114,13 @@ func (r *RunnerLocal) Run() {
 		return
 	}
 	// start the flow
-	r.coord.FlowStart(flowID)
-	// wait for the flow to finish
-	r.coord.WaitForFlowDone(flowID)
+	err = r.coord.FlowStart(flowID)
+	if err != nil {
+		slog.Error("Failed to start flow", err)
+	} else {
+		// wait for the flow to finish
+		r.coord.WaitForFlowDone(flowID)
+	}
 	// destroy the flow
 	r.coord.FlowDestroy(flowID)
 }

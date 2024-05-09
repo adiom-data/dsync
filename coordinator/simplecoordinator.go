@@ -189,31 +189,38 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	return fid, nil
 }
 
-func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
+func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	slog.Info("Starting flow with ID: " + fmt.Sprintf("%v", fid))
 
 	// Get the flow details
-	flowDet, err := c.getFlow(fid)
-	if !err {
-		slog.Error("Flow not found", fid)
+	flowDet, ok := c.getFlow(fid)
+	if !ok {
+		return fmt.Errorf("flow %v not found", fid)
 	}
 
 	// Get the source and destination connectors
 	src, ok := c.getConnector(flowDet.Options.SrcId)
 	if !ok {
-		slog.Error("Source connector not found", flowDet.Options.SrcId)
+		return fmt.Errorf("source connector %v not found", flowDet.Options.SrcId)
 	}
 	dst, ok := c.getConnector(flowDet.Options.DstId)
 	if !ok {
-		slog.Error("Destination connector not found", flowDet.Options.DstId)
+		return fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
 	}
 
 	// TODO: Determine shared capabilities and set parameters on src and dst connectors
 
 	// Tell source connector to start reading into the data channel
-	src.Endpoint.StartReadToChannel(fid, flowDet.DataChannels[0])
+	if err := src.Endpoint.StartReadToChannel(fid, flowDet.DataChannels[0]); err != nil {
+		slog.Error("Failed to start reading from source", err)
+		return err
+	}
 	// Tell destination connector to start writing from the channel
-	dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannels[1])
+	if err := dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannels[1]); err != nil {
+		slog.Error("Failed to start writing to the destination", err)
+		return err
+	}
+	//TODO: what happens if the source started but the destination failed to start?
 
 	slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is running")
 
@@ -237,6 +244,8 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) {
 		slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is done")
 		close(flowDet.flowDone)
 	}()
+
+	return nil
 }
 
 func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
@@ -253,7 +262,7 @@ func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
 }
 
 func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
-	// Implement the FlowStop method
+	//TODO: Implement the FlowStop method
 }
 
 func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {

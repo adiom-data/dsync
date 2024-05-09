@@ -16,7 +16,7 @@ type Coordinator interface {
 	GetConnectors() []ConnectorDetails
 
 	FlowCreate(o FlowOptions) (FlowID, error)
-	FlowStart(fid FlowID)
+	FlowStart(fid FlowID) error
 	FlowStop(fid FlowID)
 	FlowDestroy(fid FlowID)
 	WaitForFlowDone(flowId FlowID) error // Wait for the flow to be done

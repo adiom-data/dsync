@@ -56,7 +56,7 @@ func (t *TransportLocal) CloseDataChannel(dcid iface.DataChannelID) {
 	if _, ok := t.dataChannels[dcid]; !ok {
 		return
 	}
-	close(t.dataChannels[dcid])
+	//close(t.dataChannels[dcid]) //unneccesary since we have a different signalling mechanism
 	delete(t.dataChannels, dcid)
 }
 

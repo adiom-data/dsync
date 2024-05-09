@@ -1,6 +1,7 @@
 package iface
 
 type DataMessage struct {
+	Data *[]byte
 }
 
 type DataChannelID struct {

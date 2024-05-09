@@ -109,13 +109,28 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) {
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+	collection := mc.client.Database("sample_mflix").Collection("theaters") //TODO: make this configurable
+	cursor, err := collection.Find(mc.ctx, bson.D{})
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+		return err
+	}
+	// Get data channel from transport interface based on the provided ID
+	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
+		return err
+	}
 	go func() {
-		select {
-		case <-mc.ctx.Done():
-			return
-		case <-time.After(10 * time.Second):
-			// continue with the rest of the code
+		defer cursor.Close(mc.ctx)
+		for cursor.Next(mc.ctx) {
+			rawData := cursor.Current
+			data := []byte(rawData)
+			dataChannel <- iface.DataMessage{Data: &data}
+		}
+		if err := cursor.Err(); err != nil {
+			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
 
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
@@ -124,9 +139,11 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannel if
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
+
+	return nil
 }
 
-func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) {
+func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel iface.DataChannelID) error {
 	go func() {
 		select {
 		case <-mc.ctx.Done():
@@ -141,4 +158,6 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
+
+	return nil
 }

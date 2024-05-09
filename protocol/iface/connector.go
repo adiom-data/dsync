@@ -24,6 +24,6 @@ type Connector interface {
 type ConnectorICoordinatorSignal interface {
 	SetParameters(reqCap ConnectorCapabilities) // Set the capabilities requested by the Coordinator
 
-	StartReadToChannel(flowId FlowID, dataChannel DataChannelID)    // Read data into the provided channel (async)
-	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) // Write data from the provided channel (async)
+	StartReadToChannel(flowId FlowID, dataChannel DataChannelID) error    // Read data into the provided channel (async)
+	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error // Write data from the provided channel (async)
 }
