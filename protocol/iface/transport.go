@@ -11,14 +11,14 @@ type DataMessage struct {
 	Data *[]byte
 
 	// header
-	OpType uint //Maybe this should be renamed MutationType in the future
+	OpType uint //TODO: Maybe this should be renamed MutationType
 	Loc    Location
 }
 
 const (
 	OpType_Reserved = iota
 	OpType_Insert
-	OpType_Update
+	OpType_Update //TODO: don't think we know what this is as its very specific to mongo rather than general CRDTs
 	OpType_Delete
 )
 

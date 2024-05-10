@@ -139,12 +139,47 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		return err
 	}
 
+	//TODO: This and the writer should be logging progress
+
+	// kick off the change stream reader
+	go func() {
+		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{})
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
+		}
+		defer changeStream.Close(mc.ctx)
+
+		for changeStream.Next(mc.ctx) {
+			event := changeStream.Current
+			eventCopy := make(bson.Raw, len(event))
+			copy(eventCopy, event)
+			data := []byte(eventCopy)
+
+			var change bson.M
+			if err := changeStream.Decode(&change); err != nil {
+				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
+				continue
+			}
+
+			//convert change event to data message (use fullDocumentLookup to get the full document)
+			//send the data message
+
+			// Process the change event
+			// TODO: Handle the change event according to your requirements
+		}
+
+		if err := changeStream.Err(); err != nil {
+			slog.Error(fmt.Sprintf("Change stream error: %v", err))
+		}
+	}()
+
+	// kick off the initial sync
 	go func() {
 		loc := iface.Location{Database: db, Collection: col}
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
-			data := []byte(rawData)
+			data := []byte(rawData)                                                              //TODO: this should probably be serialized in Avro or something in the future?
 			dataChannel <- iface.DataMessage{Data: &data, OpType: iface.OpType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
@@ -159,6 +194,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
+
+	//TODO: have a separate routine to wait for these and then notify the coordinator?
+	//TODO: Should we also pass an error to the coord notification if applicable?
 
 	return nil
 }
