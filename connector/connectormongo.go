@@ -164,8 +164,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 }
 
 func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	client := mc.client.Database("test").Collection("theaters") //TODO: make this configurable
-
 	// select {
 	// case <-mc.ctx.Done():
 	// 	return nil
@@ -192,7 +190,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 					break
 				}
 				// Process the data message
-				mc.processDataMessage(dataMsg, collection) //TODO: handle errors
+				mc.processDataMessage(dataMsg) //TODO: handle errors
 			}
 		}
 

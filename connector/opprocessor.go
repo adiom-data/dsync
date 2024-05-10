@@ -6,11 +6,17 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage, collection *mongo.Collection) error {
+func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	data := *dataMsg.Data
+	dbName := dataMsg.Loc.Database
+	colName := dataMsg.Loc.Collection
+
+	slog.Info(fmt.Sprintf("Overwriting db '%v' with test value 'test'", dbName))
+	dbName = "test"
+
+	collection := mc.client.Database(dbName).Collection(colName)
 
 	switch dataMsg.OpType {
 	case iface.OpType_Insert:
