@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/adiom-data/dsync/connector"
@@ -86,7 +87,7 @@ func (r *RunnerLocal) Run() {
 	// get available connectors from the coordinator
 	connectors := r.coord.GetConnectors()
 	// print the available connectors
-	slog.Debug("Connectors: ", connectors)
+	slog.Debug(fmt.Sprintf("Connectors: %v", connectors))
 
 	// find connector ids based on their descriptions
 	var srcId, dstId iface.ConnectorID

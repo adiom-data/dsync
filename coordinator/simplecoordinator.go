@@ -272,7 +272,7 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	// Get the flow details
 	flowDet, err := c.getFlow(fid)
 	if !err {
-		slog.Error("Flow not found", fid)
+		slog.Error(fmt.Sprintf("Flow %v not found", fid))
 	}
 	// close the data channels
 	for _, ch := range flowDet.DataChannels {

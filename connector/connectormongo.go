@@ -119,7 +119,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		// Split the namespace into database and collection
 		namespaceParts := strings.Split(options.Namespace, ".")
 		if len(namespaceParts) != 2 {
-			return errors.New("Invalid namespace format")
+			return errors.New("invalid namespace format")
 		}
 		db = namespaceParts[0]
 		col = namespaceParts[1]
