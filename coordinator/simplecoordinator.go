@@ -209,9 +209,10 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	}
 
 	// TODO: Determine shared capabilities and set parameters on src and dst connectors
+	// or maybe that should go into the FlowCreate method
 
 	// Tell source connector to start reading into the data channel
-	if err := src.Endpoint.StartReadToChannel(fid, flowDet.DataChannels[0]); err != nil {
+	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.DataChannels[0]); err != nil {
 		slog.Error("Failed to start reading from source", err)
 		return err
 	}

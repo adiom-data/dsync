@@ -12,6 +12,11 @@ type ConnectorCapabilities struct {
 	Sink   bool
 }
 
+// Pass options to use to the connector
+type ConnectorOptions struct {
+	Namespace string
+}
+
 // General Connector Interface
 type Connector interface {
 	Setup(ctx context.Context, t Transport) error
@@ -24,6 +29,6 @@ type Connector interface {
 type ConnectorICoordinatorSignal interface {
 	SetParameters(reqCap ConnectorCapabilities) // Set the capabilities requested by the Coordinator
 
-	StartReadToChannel(flowId FlowID, dataChannel DataChannelID) error    // Read data into the provided channel (async)
-	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error // Write data from the provided channel (async)
+	StartReadToChannel(flowId FlowID, options ConnectorOptions, dataChannel DataChannelID) error // Read data into the provided channel (async)
+	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                        // Write data from the provided channel (async)
 }

@@ -52,6 +52,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Aliases:  []string{"m"},
 			Required: true,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:    "namespace",
+			Usage:   "Namespace 'database.collection' to sync from on the source",
+			Aliases: []string{"ns", "nsFrom"},
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},

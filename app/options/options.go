@@ -10,6 +10,8 @@ type Options struct {
 	SrcConnString        string
 	DstConnString        string
 	StateStoreConnString string
+
+	NamespaceFrom string
 }
 
 func NewFromCLIContext(c *cli.Context) Options {
@@ -19,6 +21,7 @@ func NewFromCLIContext(c *cli.Context) Options {
 	o.SrcConnString = c.String("source")
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
+	o.NamespaceFrom = c.String("namespace")
 
 	return o
 }

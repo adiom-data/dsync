@@ -8,7 +8,8 @@ type FlowOptions struct {
 	Type uint
 
 	// for unidirectional flows
-	SrcId, DstId ConnectorID
+	SrcId, DstId        ConnectorID
+	SrcConnectorOptions ConnectorOptions
 }
 
 const (

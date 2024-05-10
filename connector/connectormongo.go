@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -109,8 +110,23 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	collection := mc.client.Database("sample_mflix").Collection("theaters") //TODO: make this configurable
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+	var db, col string
+	if options.Namespace == "" {
+		db = "sample_mflix"
+		col = "theaters"
+	} else {
+		// Split the namespace into database and collection
+		namespaceParts := strings.Split(options.Namespace, ".")
+		if len(namespaceParts) != 2 {
+			return errors.New("Invalid namespace format")
+		}
+		db = namespaceParts[0]
+		col = namespaceParts[1]
+	}
+
+	collection := mc.client.Database(db).Collection(col)
+
 	cursor, err := collection.Find(mc.ctx, bson.D{})
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
@@ -122,12 +138,14 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
 		return err
 	}
+
 	go func() {
+		loc := iface.Location{Database: db, Collection: col}
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
 			data := []byte(rawData)
-			dataChannel <- iface.DataMessage{Data: &data, OpType: iface.OpType_Insert} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+			dataChannel <- iface.DataMessage{Data: &data, OpType: iface.OpType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
@@ -146,7 +164,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 }
 
 func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	collection := mc.client.Database("test").Collection("theaters") //TODO: make this configurable
+	client := mc.client.Database("test").Collection("theaters") //TODO: make this configurable
 
 	// select {
 	// case <-mc.ctx.Done():

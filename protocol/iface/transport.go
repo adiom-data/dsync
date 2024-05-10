@@ -1,8 +1,18 @@
 package iface
 
+// TODO: should this be more abstract? (e.g. an array)
+type Location struct {
+	Database   string
+	Collection string
+}
+
 type DataMessage struct {
-	Data   *[]byte
-	OpType uint
+	// payload
+	Data *[]byte
+
+	// header
+	OpType uint //Maybe this should be renamed MutationType in the future
+	Loc    Location
 }
 
 const (

@@ -16,6 +16,8 @@ import (
 // Sets up all the components to run locally in a single binary
 
 type RunnerLocal struct {
+	settings RunnerLocalSettings
+
 	trans      iface.Transport
 	statestore iface.Statestore
 	coord      iface.Coordinator
@@ -28,6 +30,8 @@ type RunnerLocalSettings struct {
 	SrcConnString        string
 	DstConnString        string
 	StateStoreConnString string
+
+	NsFromString string
 }
 
 const (
@@ -42,6 +46,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	r.coord = coordinator.NewSimpleCoordinator()
 	r.trans = transport.NewTransportLocal(r.coord)
+	r.settings = settings
 
 	return r
 }
@@ -104,9 +109,10 @@ func (r *RunnerLocal) Run() {
 
 	// create a flow
 	flowOptions := iface.FlowOptions{
-		SrcId: srcId,
-		DstId: dstId,
-		Type:  iface.UnidirectionalFlowType,
+		SrcId:               srcId,
+		DstId:               dstId,
+		Type:                iface.UnidirectionalFlowType,
+		SrcConnectorOptions: iface.ConnectorOptions{Namespace: r.settings.NsFromString},
 	}
 	flowID, err := r.coord.FlowCreate(flowOptions)
 	if err != nil {
