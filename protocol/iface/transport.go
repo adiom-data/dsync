@@ -1,8 +1,16 @@
 package iface
 
 type DataMessage struct {
-	Data *[]byte
+	Data   *[]byte
+	OpType uint
 }
+
+const (
+	OpType_Reserved = iota
+	OpType_Insert
+	OpType_Update
+	OpType_Delete
+)
 
 type DataChannelID struct {
 	ID string

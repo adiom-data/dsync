@@ -127,7 +127,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, dataChannelId 
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
 			data := []byte(rawData)
-			dataChannel <- iface.DataMessage{Data: &data} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+			dataChannel <- iface.DataMessage{Data: &data, OpType: iface.OpType_Insert} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
@@ -173,11 +173,8 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 					loop = false
 					break
 				}
-				data := *dataMsg.Data
-				_, err := collection.InsertOne(mc.ctx, bson.Raw(data))
-				if err != nil {
-					slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
-				}
+				// Process the data message
+				mc.processDataMessage(dataMsg, collection) //TODO: handle errors
 			}
 		}
 
