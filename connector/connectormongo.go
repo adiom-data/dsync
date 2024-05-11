@@ -164,11 +164,13 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 
-			//convert change event to data message (use fullDocumentLookup to get the full document)
+			dataMsg, err := mc.convertChangeStreamEventToDataMessage(change)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
+				continue
+			}
 			//send the data message
-
-			// Process the change event
-			// TODO: Handle the change event according to your requirements
+			dataChannel <- dataMsg
 		}
 
 		if err := changeStream.Err(); err != nil {
