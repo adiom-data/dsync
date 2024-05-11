@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoConnector struct {
@@ -143,17 +144,19 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 	// kick off the change stream reader
 	go func() {
-		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{})
+		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{
+			{{"$match", bson.D{{"ns.db", db}, {"ns.coll", col}}}},
+		}, moptions.ChangeStream().SetFullDocument("updateLookup"))
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
 		defer changeStream.Close(mc.ctx)
 
 		for changeStream.Next(mc.ctx) {
-			event := changeStream.Current
-			eventCopy := make(bson.Raw, len(event))
-			copy(eventCopy, event)
-			data := []byte(eventCopy)
+			// event := changeStream.Current
+			// eventCopy := make(bson.Raw, len(event))
+			// copy(eventCopy, event)
+			// data := []byte(eventCopy)
 
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
@@ -179,7 +182,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
-			data := []byte(rawData)                                                                          //TODO: this should probably be serialized in Avro or something in the future?
+			data := []byte(rawData)                                                                          //TODO: this should probably be serialized in Avro, Protobuf or something in the future?
 			dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {

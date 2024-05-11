@@ -8,11 +8,12 @@ type Location struct {
 
 type DataMessage struct {
 	// payload (CRDT state)
-	Data *[]byte
+	Data *[]byte //TODO: should be in Avro or Protobuf format
 
 	// header
-	MutationType uint //TODO: Maybe this should be renamed MutationType
-	Loc          Location
+	MutationType uint     //required
+	Loc          Location //required
+	Id           *[]byte  //required except for inserts (for efficiency)
 }
 
 const (
