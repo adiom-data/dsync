@@ -18,15 +18,15 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 
 	collection := mc.client.Database(dbName).Collection(colName)
 
-	switch dataMsg.OpType {
-	case iface.OpType_Insert:
+	switch dataMsg.MutationType {
+	case iface.MutationType_Insert:
 		_, err := collection.InsertOne(mc.ctx, bson.Raw(data))
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
 			return err
 		}
 	default:
-		return fmt.Errorf("unsupported operation type: %v", dataMsg.OpType)
+		return fmt.Errorf("unsupported operation type: %v", dataMsg.MutationType)
 	}
 
 	return nil

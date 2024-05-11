@@ -179,8 +179,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
-			data := []byte(rawData)                                                              //TODO: this should probably be serialized in Avro or something in the future?
-			dataChannel <- iface.DataMessage{Data: &data, OpType: iface.OpType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+			data := []byte(rawData)                                                                          //TODO: this should probably be serialized in Avro or something in the future?
+			dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))

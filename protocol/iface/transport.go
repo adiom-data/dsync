@@ -7,19 +7,19 @@ type Location struct {
 }
 
 type DataMessage struct {
-	// payload
+	// payload (CRDT state)
 	Data *[]byte
 
 	// header
-	OpType uint //TODO: Maybe this should be renamed MutationType
-	Loc    Location
+	MutationType uint //TODO: Maybe this should be renamed MutationType
+	Loc          Location
 }
 
 const (
-	OpType_Reserved = iota
-	OpType_Insert
-	OpType_Update //TODO: don't think we know what this is as its very specific to mongo rather than general CRDTs
-	OpType_Delete
+	MutationType_Reserved = iota
+	MutationType_Insert
+	MutationType_Update //TODO: don't think we know what this is as its very specific to mongo rather than general CRDTs
+	MutationType_Delete
 )
 
 type DataChannelID struct {
