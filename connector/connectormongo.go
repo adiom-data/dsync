@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -113,7 +114,7 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
 	var db, col string
-	if options.Namespace == "" {
+	if options.Namespace == "" { //TODO: need to be all the namespaces or just error out?
 		db = "sample_mflix"
 		col = "theaters"
 	} else {
@@ -140,10 +141,16 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		return err
 	}
 
+	// Create a waitgroup to wait for the change stream reader and the initial sync to finish
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	//TODO: This and the writer should be logging progress
 
 	// kick off the change stream reader
 	go func() {
+		defer wg.Done()
+
 		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{
 			{{"$match", bson.D{{"ns.db", db}, {"ns.coll", col}}}},
 		}, moptions.ChangeStream().SetFullDocument("updateLookup"))
@@ -180,6 +187,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 	// kick off the initial sync
 	go func() {
+		defer wg.Done()
 		loc := iface.Location{Database: db, Collection: col}
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
@@ -190,18 +198,20 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
+	}()
+
+	// wait for both the change stream reader and the initial sync to finish
+	go func() {
+		wg.Wait()
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO: is this the right way to do it?
 
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
-		err := mc.coord.NotifyDone(flowId, mc.id)
+		err := mc.coord.NotifyDone(flowId, mc.id) //TODO: Should we also pass an error to the coord notification if applicable?
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
-
-	//TODO: have a separate routine to wait for these and then notify the coordinator?
-	//TODO: Should we also pass an error to the coord notification if applicable?
 
 	return nil
 }
