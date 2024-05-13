@@ -27,6 +27,14 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 			slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
 			return err
 		}
+	case iface.MutationType_Update:
+		idType := bsontype.Type(dataMsg.IdType)
+		data := *dataMsg.Data
+		_, err := collection.ReplaceOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}, bson.Raw(data))
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to update document in the collection: %v", err))
+			return err
+		}
 	case iface.MutationType_Delete:
 		idType := bsontype.Type(dataMsg.IdType)
 		_, err := collection.DeleteOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}})

@@ -27,6 +27,22 @@ func (mc *MongoConnector) convertChangeStreamEventToDataMessage(change bson.M) (
 			return iface.DataMessage{}, fmt.Errorf("failed to marshal full document: %v", err)
 		}
 		dataMsg = iface.DataMessage{Loc: loc, Data: &fullDocumentRaw, MutationType: iface.MutationType_Insert}
+	case "update":
+		// get the id of the document that was changed
+		id := change["documentKey"].(bson.M)["_id"]
+		// convert id to raw bson
+		idType, idVal, err := bson.MarshalValue(id)
+		if err != nil {
+			return iface.DataMessage{}, fmt.Errorf("failed to marshal _id: %v", err)
+		}
+		// get the full state of the document after the change
+		fullDocument := change["fullDocument"].(bson.M)
+		// convert fulldocument to BSON.Raw
+		fullDocumentRaw, err := bson.Marshal(fullDocument)
+		if err != nil {
+			return iface.DataMessage{}, fmt.Errorf("failed to marshal full document: %v", err)
+		}
+		dataMsg = iface.DataMessage{Loc: loc, Id: &idVal, IdType: byte(idType), Data: &fullDocumentRaw, MutationType: iface.MutationType_Update}
 	case "delete":
 		// get the id of the document that was deleted
 		id := change["documentKey"].(bson.M)["_id"]
