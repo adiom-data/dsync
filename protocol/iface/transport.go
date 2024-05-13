@@ -14,6 +14,7 @@ type DataMessage struct {
 	MutationType uint     //required
 	Loc          Location //required
 	Id           *[]byte  //required except for inserts (for efficiency)
+	IdType       byte     //required when Id is present
 }
 
 const (
