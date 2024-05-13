@@ -6,9 +6,10 @@ type Location struct {
 	Collection string
 }
 
+// TODO: byte[] should be in Avro or Protobuf format (maybe subject to negotiation based on capabilities - like a preference list advertized by a connector)
 type DataMessage struct {
 	// payload (CRDT state)
-	Data *[]byte //TODO: should be in Avro or Protobuf format
+	Data *[]byte
 
 	// header
 	MutationType uint     //required
