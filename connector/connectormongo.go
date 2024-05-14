@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -141,15 +140,17 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		return err
 	}
 
-	// Create a waitgroup to wait for the change stream reader and the initial sync to finish
-	var wg sync.WaitGroup
-	wg.Add(2)
+	// Declare two channels to wait for the change stream reader and the initial sync to finish
+	changeStreamDone := make(chan struct{})
+	initialSyncDone := make(chan struct{})
 
 	//TODO: This and the writer should be logging progress
 
 	// kick off the change stream reader
 	go func() {
-		defer wg.Done()
+		//wait for the initial sync to finish
+		<-initialSyncDone
+		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
 
 		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{
 			{{"$match", bson.D{{"ns.db", db}, {"ns.coll", col}}}},
@@ -183,11 +184,14 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		if err := changeStream.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Change stream error: %v", err))
 		}
+
+		changeStreamDone <- struct{}{}
 	}()
 
 	// kick off the initial sync
 	go func() {
-		defer wg.Done()
+		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
+
 		loc := iface.Location{Database: db, Collection: col}
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
@@ -198,11 +202,14 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
+
+		initialSyncDone <- struct{}{}
 	}()
 
 	// wait for both the change stream reader and the initial sync to finish
 	go func() {
-		wg.Wait()
+		<-initialSyncDone
+		<-changeStreamDone
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO: is this the right way to do it?
 
