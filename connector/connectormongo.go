@@ -144,17 +144,25 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
 
+	changeStreamStartTs, err := getLastOpTime(mc.ctx, mc.client)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get last operation time: %v", err))
+		return err
+	}
+
 	//TODO: This and the writer should be logging progress
 
 	// kick off the change stream reader
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
+		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, *changeStreamStartTs))
+
+		opts := moptions.ChangeStream().SetStartAtOperationTime(changeStreamStartTs).SetFullDocument("updateLookup")
 
 		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{
 			{{"$match", bson.D{{"ns.db", db}, {"ns.coll", col}}}},
-		}, moptions.ChangeStream().SetFullDocument("updateLookup"))
+		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
