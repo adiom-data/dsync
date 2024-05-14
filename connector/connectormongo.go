@@ -185,7 +185,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			slog.Error(fmt.Sprintf("Change stream error: %v", err))
 		}
 
-		changeStreamDone <- struct{}{}
+		close(changeStreamDone)
 	}()
 
 	// kick off the initial sync
@@ -203,7 +203,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
 
-		initialSyncDone <- struct{}{}
+		close(initialSyncDone)
 	}()
 
 	// wait for both the change stream reader and the initial sync to finish
