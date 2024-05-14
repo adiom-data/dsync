@@ -144,9 +144,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
 
-	changeStreamStartTs, err := getLastOpTime(mc.ctx, mc.client)
+	changeStreamStartResumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get last operation time: %v", err))
+		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 		return err
 	}
 
@@ -156,13 +156,16 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, *changeStreamStartTs))
+		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, changeStreamStartResumeToken))
 
-		opts := moptions.ChangeStream().SetStartAtOperationTime(changeStreamStartTs).SetFullDocument("updateLookup")
+		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
 
-		changeStream, err := collection.Watch(mc.ctx, mongo.Pipeline{
-			{{"$match", bson.D{{"ns.db", db}, {"ns.coll", col}}}},
-		}, opts)
+		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
+			{{"$match", bson.D{{"$or", bson.A{
+				bson.D{{"ns.db", db}, {"ns.coll", col}},
+				bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}},
+			}}}}},
+		}, opts) //TODO: we need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
@@ -177,6 +180,10 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
+				continue
+			}
+
+			if mc.shouldIgnoreChangeStreamEvent(change) {
 				continue
 			}
 

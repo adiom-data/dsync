@@ -8,6 +8,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+func (mc *MongoConnector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
+	db := change["ns"].(bson.M)["db"].(string)
+	col := change["ns"].(bson.M)["coll"].(string)
+
+	//We need to filter out the dummy collection
+	//TODO: is it the best way to do it?
+	if (db == dummyDB) && (col == dummyCol) {
+		return true
+	}
+
+	return false
+}
+
 func (mc *MongoConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
 	slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
