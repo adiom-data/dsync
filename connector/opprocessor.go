@@ -13,10 +13,6 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
 
-	//slog.Info(fmt.Sprintf("Overwriting db '%v' with test value 'test'", dbName))
-	//TODO: remove this
-	dbName = "test"
-
 	collection := mc.client.Database(dbName).Collection(colName)
 
 	switch dataMsg.MutationType {
