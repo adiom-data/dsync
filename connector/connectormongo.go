@@ -153,7 +153,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		return err
 	}
 
-	//TODO: This and the writer should be logging progress
 	type ReaderProgress struct {
 		initialSyncDocs    uint
 		changeStreamEvents uint
@@ -195,7 +194,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				bson.D{{"ns.db", db}, {"ns.coll", col}},
 				bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}},
 			}}}}},
-		}, opts) //TODO: Reevaluate. We need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
+		}, opts) //TODO: Reevaluate how we do this. We need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
@@ -279,6 +278,30 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 		return err
 	}
 
+	type WriterProgress struct {
+		dataMessages uint
+	}
+
+	writerProgress := WriterProgress{
+		dataMessages: 0,
+	}
+
+	// start printing progress
+	go func() {
+		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
+		defer ticker.Stop()
+		for {
+
+			select {
+			case <-mc.ctx.Done():
+				return
+			case <-ticker.C:
+				// Print writer progress
+				slog.Info(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages))
+			}
+		}
+	}()
+
 	go func() {
 		for loop := true; loop; {
 			select {
@@ -291,6 +314,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 					break
 				}
 				// Process the data message
+				writerProgress.dataMessages++
 				err = mc.processDataMessage(dataMsg)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
