@@ -144,6 +144,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
 
+	// Retrive the latest resume token before we start reading anything
+	// We will use the resume token to start the change stream
 	changeStreamStartResumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
@@ -156,6 +158,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
+		defer close(changeStreamDone)
+
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, changeStreamStartResumeToken))
 
 		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
@@ -165,18 +169,15 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				bson.D{{"ns.db", db}, {"ns.coll", col}},
 				bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}},
 			}}}}},
-		}, opts) //TODO: we need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
+		}, opts) //TODO: Reevaluate. We need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
 		defer changeStream.Close(mc.ctx)
 
+		//TODO: create status object and print it out peridically
+		//eventsProcessed := 0
 		for changeStream.Next(mc.ctx) {
-			// event := changeStream.Current
-			// eventCopy := make(bson.Raw, len(event))
-			// copy(eventCopy, event)
-			// data := []byte(eventCopy)
-
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
@@ -186,6 +187,11 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			if mc.shouldIgnoreChangeStreamEvent(change) {
 				continue
 			}
+
+			// eventsProcessed++
+			// if eventsProcessed%10 == 0 {
+			// 	slog.Info(fmt.Sprintf("Events processed: %d", eventsProcessed))
+			// }
 
 			dataMsg, err := mc.convertChangeStreamEventToDataMessage(change)
 			if err != nil {
@@ -199,26 +205,24 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		if err := changeStream.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Change stream error: %v", err))
 		}
-
-		close(changeStreamDone)
 	}()
 
 	// kick off the initial sync
 	go func() {
+		defer close(initialSyncDone)
+
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
 		loc := iface.Location{Database: db, Collection: col}
 		defer cursor.Close(mc.ctx)
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
-			data := []byte(rawData)                                                                          //TODO: this should probably be serialized in Avro, Protobuf or something in the future?
+			data := []byte(rawData)
 			dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
 			slog.Error(fmt.Sprintf("Cursor error: %v", err))
 		}
-
-		close(initialSyncDone)
 	}()
 
 	// wait for both the change stream reader and the initial sync to finish
@@ -265,7 +269,10 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 					break
 				}
 				// Process the data message
-				mc.processDataMessage(dataMsg) //TODO: handle errors
+				err = mc.processDataMessage(dataMsg)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+				}
 			}
 		}
 

@@ -21,7 +21,7 @@ type DataMessage struct {
 const (
 	MutationType_Reserved = iota
 	MutationType_Insert
-	MutationType_Update //TODO: don't think we know what this is as its very specific to mongo rather than general CRDTs
+	MutationType_Update
 	MutationType_Delete
 )
 

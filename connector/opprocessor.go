@@ -14,7 +14,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	colName := dataMsg.Loc.Collection
 
 	//slog.Info(fmt.Sprintf("Overwriting db '%v' with test value 'test'", dbName))
-	//XXX: remove this
+	//TODO: remove this
 	dbName = "test"
 
 	collection := mc.client.Database(dbName).Collection(colName)
