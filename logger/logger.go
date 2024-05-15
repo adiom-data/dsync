@@ -3,6 +3,9 @@ package logger
 import (
 	"log/slog"
 	"os"
+
+	"github.com/lmittmann/tint"
+	"github.com/mattn/go-isatty"
 )
 
 type Options struct {
@@ -25,11 +28,13 @@ func Setup(o Options) {
 		level = slog.LevelDebug // default to DEBUG if verbosity is not recognized
 	}
 
-	opts := &slog.HandlerOptions{
-		Level: level,
-	}
-	handler := slog.NewTextHandler(os.Stdout, opts)
+	w := os.Stderr
+	logger := slog.New(
+		tint.NewHandler(w, &tint.Options{
+			NoColor: !isatty.IsTerminal(w.Fd()),
+			Level:   level,
+		}),
+	)
 
-	logger := slog.New(handler)
 	slog.SetDefault(logger)
 }
