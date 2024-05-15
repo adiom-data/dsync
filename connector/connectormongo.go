@@ -111,6 +111,7 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
+// TODO: this should be split to a separate class and/or functions
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
 	var db, col string
 	if options.Namespace == "" { //TODO: need to be all the namespaces or just error out?
@@ -153,6 +154,31 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	}
 
 	//TODO: This and the writer should be logging progress
+	type ReaderProgress struct {
+		initialSyncDocs    uint
+		changeStreamEvents uint
+	}
+
+	readerProgress := ReaderProgress{
+		initialSyncDocs:    0,
+		changeStreamEvents: 0,
+	}
+
+	// start printing progress
+	go func() {
+		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
+		defer ticker.Stop()
+		for {
+
+			select {
+			case <-mc.ctx.Done():
+				return
+			case <-ticker.C:
+				// Print reader progress
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d, Change Stream Events - %d", readerProgress.initialSyncDocs, readerProgress.changeStreamEvents))
+			}
+		}
+	}()
 
 	// kick off the change stream reader
 	go func() {
@@ -175,8 +201,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 		defer changeStream.Close(mc.ctx)
 
-		//TODO: create status object and print it out peridically
-		//eventsProcessed := 0
 		for changeStream.Next(mc.ctx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
@@ -188,10 +212,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 
-			// eventsProcessed++
-			// if eventsProcessed%10 == 0 {
-			// 	slog.Info(fmt.Sprintf("Events processed: %d", eventsProcessed))
-			// }
+			readerProgress.changeStreamEvents++
 
 			dataMsg, err := mc.convertChangeStreamEventToDataMessage(change)
 			if err != nil {
@@ -218,6 +239,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		for cursor.Next(mc.ctx) {
 			rawData := cursor.Current
 			data := []byte(rawData)
+			readerProgress.initialSyncDocs++
 			dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 		}
 		if err := cursor.Err(); err != nil {
