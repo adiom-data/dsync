@@ -112,21 +112,6 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 
 // TODO: this should be split to a separate class and/or functions
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
-	//print options.Namespace
-	slog.Debug(fmt.Sprintf("StartReadToChannel: %v", options.Namespace))
-	var db, col string
-	// if options.Namespace == "" { //TODO: need to be all the namespaces or just error out?
-	// 	db = "sample_mflix"
-	// 	col = "theaters"
-	// } else {
-	// 	// Split the namespace into database and collection
-	// 	namespaceParts := strings.Split(options.Namespace, ".")
-	// 	if len(namespaceParts) != 2 {
-	// 		return errors.New("invalid namespace format")
-	// 	}
-	// 	db = namespaceParts[0]
-	// 	col = namespaceParts[1]
-	// }
 	tasks, err := mc.createInitialCopyTasks(options.Namespace)
 	if err != nil {
 		return err
@@ -134,6 +119,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
+
+	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
+	var db, col string
 
 	collection := mc.client.Database(db).Collection(col)
 

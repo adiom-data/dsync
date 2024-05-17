@@ -2,6 +2,7 @@ package connector
 
 import (
 	"log/slog"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 var (
 	// System databases that we don't want to copy
 	ExcludedDBList = []string{"local", "config", "admin", dummyDB}
+	// System collections that we don't want to copy (regex pattern)
+	ExcludedSystemCollPattern = "^system[.]"
 )
 
 type DataCopyTask struct {
@@ -40,44 +43,56 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		}
 	}
 
-	slog.Debug("Databases to resolve: ", dbsToResolve)
 	slog.Debug("Fully qualified namespaces: ", fqns)
+	slog.Debug("Databases to resolve: ", dbsToResolve)
 
-	return nil, nil
+	//create copy tasks for fully qualified namespaces
+	var tasks []DataCopyTask
+	for _, fqn := range fqns {
+		tasks = append(tasks, DataCopyTask{Namespace: fqn})
+	}
+
+	//iterate over unresolved databases and get all collections
+	for _, db := range dbsToResolve {
+		colls, err := mc.getAllCollections(db)
+		if err != nil {
+			return nil, err
+		}
+		//create tasks for these
+		for _, coll := range colls {
+			tasks = append(tasks, DataCopyTask{Namespace: db + "." + coll})
+		}
+	}
+
+	return tasks, nil
 }
 
+// get all database names except system databases
 func (mc *MongoConnector) getAllDatabases() ([]string, error) {
-	var response bson.Raw
-	request := bson.D{{"listDatabases", 1}}
-
-	err := mc.client.Database("admin").RunCommand(mc.ctx, request).Decode(&response)
+	dbNames, err := mc.client.ListDatabaseNames(mc.ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
 
-	dbsRaw, lookupErr := response.LookupErr("databases")
-	if lookupErr != nil {
-		return nil, lookupErr
-	}
+	dbs := slices.DeleteFunc(dbNames, func(d string) bool {
+		return slices.Contains(ExcludedDBList, d)
+	})
 
-	// we need this one to deserialize the response from the listDatabases command
-	type dbSpec struct {
-		Name       string
-		SizeOnDisk int64
-		Empty      bool
-	}
-	var dbSpecs []*dbSpec
-	if err := dbsRaw.Unmarshal(&dbSpecs); err != nil {
+	return dbs, nil
+}
+
+// get all collections in a database except system collections
+func (mc *MongoConnector) getAllCollections(dbName string) ([]string, error) {
+	collectionsAll, err := mc.client.Database(dbName).ListCollectionNames(mc.ctx, bson.M{})
+	if err != nil {
 		return nil, err
 	}
 
-	var dbs []string
-	for _, dbSpec := range dbSpecs {
-		// Do not copy the excluded system databases
-		if !slices.Contains(ExcludedDBList, dbSpec.Name) {
-			dbs = append(dbs, dbSpec.Name)
-		}
-	}
+	//remove all system collections that match the pattern
+	r, _ := regexp.Compile(ExcludedSystemCollPattern)
+	collections := slices.DeleteFunc(collectionsAll, func(n string) bool {
+		return r.Match([]byte(n))
+	})
 
-	return dbs, nil
+	return collections, nil
 }
