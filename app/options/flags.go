@@ -18,6 +18,19 @@ var (
 	allowedVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 )
 
+type ListFlag struct {
+	Values []string
+}
+
+func (k *ListFlag) Set(value string) error {
+	k.Values = strings.Split(value, ",")
+	return nil
+}
+
+func (k *ListFlag) String() string {
+	return strings.Join(k.Values, ",")
+}
+
 // Define all CLI options as Flags
 // Additionally, return BeforeFunc for parsing a config file
 func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
@@ -52,10 +65,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Aliases:  []string{"m"},
 			Required: true,
 		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
+		altsrc.NewGenericFlag(&cli.GenericFlag{
 			Name:    "namespace",
-			Usage:   "Namespace 'database.collection' to sync from on the source",
+			Usage:   "List of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
 			Aliases: []string{"ns", "nsFrom"},
+			Value:   &ListFlag{},
 		}),
 		&cli.StringFlag{
 			Name:    "config",

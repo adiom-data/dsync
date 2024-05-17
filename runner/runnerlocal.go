@@ -32,7 +32,7 @@ type RunnerLocalSettings struct {
 	DstConnString        string
 	StateStoreConnString string
 
-	NsFromString string
+	NsFromString []string
 }
 
 const (

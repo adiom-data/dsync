@@ -14,7 +14,7 @@ type ConnectorCapabilities struct {
 
 // Pass options to use to the connector
 type ConnectorOptions struct {
-	Namespace string
+	Namespace []string
 }
 
 // General Connector Interface
