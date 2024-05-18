@@ -122,6 +122,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
 	var db, col string
+	db = "sample_mflix" //XXX: hardcoded for now. remove me!
+	col = "users"
 
 	collection := mc.client.Database(db).Collection(col)
 

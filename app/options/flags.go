@@ -23,6 +23,8 @@ type ListFlag struct {
 }
 
 func (k *ListFlag) Set(value string) error {
+	//remove spaces
+	value = strings.ReplaceAll(value, " ", "")
 	k.Values = strings.Split(value, ",")
 	return nil
 }
