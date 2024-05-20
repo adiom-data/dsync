@@ -230,7 +230,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		for _, task := range tasks {
 			slog.Debug(fmt.Sprintf("Processing task: %v", task))
 
-			var db, col string
 			collection := mc.client.Database(db).Collection(col)
 
 			cursor, err := collection.Find(mc.ctx, bson.D{})

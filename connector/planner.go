@@ -17,12 +17,14 @@ var (
 )
 
 type DataCopyTask struct {
-	Namespace string
+	Db  string
+	Col string
 }
 
 func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCopyTask, error) {
 	var dbsToResolve []string //database names that we need to resolve
-	var fqns []string         //fully qualified namespaces ('db.collection')
+
+	var tasks []DataCopyTask
 
 	if namespaces == nil {
 		var err error
@@ -35,22 +37,16 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		// if it has a dot, then it is a fully qualified namespace
 		// otherwise, it is a database name to resolve
 		for _, ns := range namespaces {
-			if strings.Contains(ns, ".") {
-				fqns = append(fqns, ns)
+			db, col, isFQN := strings.Cut(ns, ".")
+			if isFQN {
+				tasks = append(tasks, DataCopyTask{Db: db, Col: col})
 			} else {
 				dbsToResolve = append(dbsToResolve, ns)
 			}
 		}
 	}
 
-	slog.Debug("Fully qualified namespaces: ", fqns)
 	slog.Debug("Databases to resolve: ", dbsToResolve)
-
-	//create copy tasks for fully qualified namespaces
-	var tasks []DataCopyTask
-	for _, fqn := range fqns {
-		tasks = append(tasks, DataCopyTask{Namespace: fqn})
-	}
 
 	//iterate over unresolved databases and get all collections
 	for _, db := range dbsToResolve {
@@ -60,7 +56,7 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		}
 		//create tasks for these
 		for _, coll := range colls {
-			tasks = append(tasks, DataCopyTask{Namespace: db + "." + coll})
+			tasks = append(tasks, DataCopyTask{Db: db, Col: coll})
 		}
 	}
 
@@ -96,3 +92,5 @@ func (mc *MongoConnector) getAllCollections(dbName string) ([]string, error) {
 
 	return collections, nil
 }
+
+func createChangeStreamNamespaceFilter()
