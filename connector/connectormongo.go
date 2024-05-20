@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -34,14 +35,16 @@ type MongoConnector struct {
 type MongoConnectorSettings struct {
 	ConnectionString string
 
-	serverConnectTimeout time.Duration
-	pingTimeout          time.Duration
+	serverConnectTimeout          time.Duration
+	pingTimeout                   time.Duration
+	initialSyncNumParallelCopiers int
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
 	// Set default values
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
+	settings.initialSyncNumParallelCopiers = 4
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -149,7 +152,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		tasksCompleted     uint
 	}
 
-	readerProgress := ReaderProgress{ //XXX: should we handle overflow?
+	readerProgress := ReaderProgress{ //XXX: should we handle overflow? Also, should we use atomic types?
 		initialSyncDocs:    0,
 		changeStreamEvents: 0,
 		tasksTotal:         uint(len(tasks)),
@@ -239,32 +242,52 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
-		//iterate over all the tasks
-		for _, task := range tasks {
-			slog.Debug(fmt.Sprintf("Processing task: %v", task))
-			db := task.Db
-			col := task.Col
+		//create a channel to distribute tasks to copiers
+		taskChannel := make(chan DataCopyTask)
+		//create a wait group to wait for all copiers to finish
+		var wg sync.WaitGroup
+		wg.Add(mc.settings.initialSyncNumParallelCopiers)
 
-			collection := mc.client.Database(db).Collection(col)
-
-			cursor, err := collection.Find(mc.ctx, bson.D{})
-			if err != nil {
-				slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
-				continue
-			}
-			loc := iface.Location{Database: db, Collection: col}
-			defer cursor.Close(mc.ctx)
-			for cursor.Next(mc.ctx) {
-				rawData := cursor.Current
-				data := []byte(rawData)
-				readerProgress.initialSyncDocs++
-				dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
-			}
-			if err := cursor.Err(); err != nil {
-				slog.Error(fmt.Sprintf("Cursor error: %v", err))
-			}
-			readerProgress.tasksCompleted++
+		//start 4 copiers
+		for i := 0; i < mc.settings.initialSyncNumParallelCopiers; i++ {
+			go func() {
+				defer wg.Done()
+				for task := range taskChannel {
+					slog.Debug(fmt.Sprintf("Processing task: %v", task))
+					db := task.Db
+					col := task.Col
+					collection := mc.client.Database(db).Collection(col)
+					cursor, err := collection.Find(mc.ctx, bson.D{})
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+						continue
+					}
+					loc := iface.Location{Database: db, Collection: col}
+					for cursor.Next(mc.ctx) {
+						rawData := cursor.Current
+						data := []byte(rawData)
+						readerProgress.initialSyncDocs++
+						dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+					}
+					if err := cursor.Err(); err != nil {
+						slog.Error(fmt.Sprintf("Cursor error: %v", err))
+					}
+					cursor.Close(mc.ctx)
+					readerProgress.tasksCompleted++
+					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
+				}
+			}()
 		}
+
+		//iterate over all the tasks and distribute them to copiers
+		for _, task := range tasks {
+			taskChannel <- task
+		}
+		//close the task channel to signal copiers that there are no more tasks
+		close(taskChannel)
+
+		//wait for all copiers to finish
+		wg.Wait()
 	}()
 
 	// wait for both the change stream reader and the initial sync to finish
@@ -304,7 +327,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}
 
 	writerProgress := WriterProgress{
-		dataMessages: 0, //XXX: should we handle overflow?
+		dataMessages: 0, //XXX: should we handle overflow? Also, should we use atomic types?
 	}
 
 	// start printing progress
