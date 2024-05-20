@@ -263,11 +263,24 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						continue
 					}
 					loc := iface.Location{Database: db, Collection: col}
+					var dataBatch [][]byte
+					var batch_idx int
 					for cursor.Next(mc.ctx) {
+						if dataBatch == nil {
+							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
+							batch_idx = 0
+						}
 						rawData := cursor.Current
 						data := []byte(rawData)
 						readerProgress.initialSyncDocs++
-						dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+
+						dataBatch[batch_idx] = data
+						batch_idx++
+
+						if cursor.RemainingBatchLength() == 0 { //no more left in the batch
+							dataChannel <- iface.DataMessage{DataBatch: &dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+							dataBatch = nil
+						}
 					}
 					if err := cursor.Err(); err != nil {
 						slog.Error(fmt.Sprintf("Cursor error: %v", err))

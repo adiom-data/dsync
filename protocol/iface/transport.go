@@ -10,6 +10,8 @@ type Location struct {
 type DataMessage struct {
 	// payload (CRDT state)
 	Data *[]byte
+	// special case payload for inserts to allow the reader to send the whole batch for a single location (for efficiency)
+	DataBatch *[][]byte
 
 	// header
 	MutationType uint     //required
@@ -21,6 +23,7 @@ type DataMessage struct {
 const (
 	MutationType_Reserved = iota
 	MutationType_Insert
+	MutationType_InsertBatch
 	MutationType_Update
 	MutationType_Delete
 )
