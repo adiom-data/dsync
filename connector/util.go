@@ -37,7 +37,7 @@ func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timest
 const (
 	dummyDB                      string = "adiom-internal"
 	dummyCol                     string = "dummy"
-	progressReportingIntervalSec        = 10
+	progressReportingIntervalSec        = 5
 )
 
 func insertDummyRecord(ctx context.Context, client *mongo.Client) error {

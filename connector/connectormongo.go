@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -148,7 +149,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		tasksCompleted     uint
 	}
 
-	readerProgress := ReaderProgress{
+	readerProgress := ReaderProgress{ //XXX: should we handle overflow?
 		initialSyncDocs:    0,
 		changeStreamEvents: 0,
 		tasksTotal:         uint(len(tasks)),
@@ -159,15 +160,22 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	go func() {
 		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
 		defer ticker.Stop()
+		startTime := time.Now()
+		operations := uint(0)
 		for {
-
 			select {
 			case <-mc.ctx.Done():
 				return
 			case <-ticker.C:
+				elapsedTime := time.Since(startTime).Seconds()
+				operations_delta := readerProgress.initialSyncDocs + readerProgress.changeStreamEvents - operations
+				opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 				// Print reader progress
-				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d",
-					readerProgress.initialSyncDocs, readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents))
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
+					readerProgress.initialSyncDocs, readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+
+				startTime = time.Now()
+				operations = readerProgress.initialSyncDocs + readerProgress.changeStreamEvents
 			}
 		}
 	}()
@@ -296,7 +304,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}
 
 	writerProgress := WriterProgress{
-		dataMessages: 0,
+		dataMessages: 0, //XXX: should we handle overflow?
 	}
 
 	// start printing progress
