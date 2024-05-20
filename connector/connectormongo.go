@@ -121,17 +121,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	}
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
-	var db, col string
-	db = "sample_mflix" //XXX: hardcoded for now. remove me!
-	col = "users"
 
-	collection := mc.client.Database(db).Collection(col)
-
-	cursor, err := collection.Find(mc.ctx, bson.D{})
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
-		return err
-	}
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
@@ -154,11 +144,15 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	type ReaderProgress struct {
 		initialSyncDocs    uint
 		changeStreamEvents uint
+		tasksTotal         uint
+		tasksCompleted     uint
 	}
 
 	readerProgress := ReaderProgress{
 		initialSyncDocs:    0,
 		changeStreamEvents: 0,
+		tasksTotal:         uint(len(tasks)),
+		tasksCompleted:     0,
 	}
 
 	// start printing progress
@@ -172,7 +166,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				return
 			case <-ticker.C:
 				// Print reader progress
-				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d, Change Stream Events - %d", readerProgress.initialSyncDocs, readerProgress.changeStreamEvents))
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d",
+					readerProgress.initialSyncDocs, readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents))
 			}
 		}
 	}()
@@ -231,16 +226,30 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
-		loc := iface.Location{Database: db, Collection: col}
-		defer cursor.Close(mc.ctx)
-		for cursor.Next(mc.ctx) {
-			rawData := cursor.Current
-			data := []byte(rawData)
-			readerProgress.initialSyncDocs++
-			dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
-		}
-		if err := cursor.Err(); err != nil {
-			slog.Error(fmt.Sprintf("Cursor error: %v", err))
+		//iterate over all the tasks
+		for _, task := range tasks {
+			slog.Debug(fmt.Sprintf("Processing task: %v", task))
+
+			var db, col string
+			collection := mc.client.Database(db).Collection(col)
+
+			cursor, err := collection.Find(mc.ctx, bson.D{})
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+				continue
+			}
+			loc := iface.Location{Database: db, Collection: col}
+			defer cursor.Close(mc.ctx)
+			for cursor.Next(mc.ctx) {
+				rawData := cursor.Current
+				data := []byte(rawData)
+				readerProgress.initialSyncDocs++
+				dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+			}
+			if err := cursor.Err(); err != nil {
+				slog.Error(fmt.Sprintf("Cursor error: %v", err))
+			}
+			readerProgress.tasksCompleted++
 		}
 	}()
 
