@@ -7,13 +7,19 @@ import (
 	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
 	// System databases that we don't want to copy
-	ExcludedDBList = []string{"local", "config", "admin", dummyDB}
+	ExcludedDBListForIC = []string{"local", "config", "admin", dummyDB}
 	// System collections that we don't want to copy (regex pattern)
 	ExcludedSystemCollPattern = "^system[.]"
+
+	//XXX: these need to use negative lookahead to make change stream work with shared tier Mongo (although it seems they rewrite the whole thing in a funny way that doesn't work)
+	//XXX: dummyDB business is not excluded as a hack to get the resume token from the change stream
+	ExcludedDBPatternCS         = `^(?!local$|config$|admin$)`
+	ExcludedSystemCollPatternCS = `^(?!system.)`
 )
 
 type DataCopyTask struct {
@@ -71,7 +77,7 @@ func (mc *MongoConnector) getAllDatabases() ([]string, error) {
 	}
 
 	dbs := slices.DeleteFunc(dbNames, func(d string) bool {
-		return slices.Contains(ExcludedDBList, d)
+		return slices.Contains(ExcludedDBListForIC, d)
 	})
 
 	return dbs, nil
@@ -100,7 +106,15 @@ func createChangeStreamNamespaceFilterFromTasks(tasks []DataCopyTask) bson.D {
 		filters = append(filters, bson.D{{"ns.db", task.Db}, {"ns.coll", task.Col}})
 	}
 	// add dummyDB and dummyCol to the filter so that we can track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
-	//TODO: reevaluate the approach
+	//TODO: reevaluate the overall approach here
 	filters = append(filters, bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}})
 	return bson.D{{"$or", filters}}
+}
+
+// create a change stream filter that covers all namespaces except system
+func createChangeStreamNamespaceFilter() bson.D {
+	return bson.D{{"$and", []bson.D{
+		{{"ns.db", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedDBPatternCS}}}}},
+		{{"ns.coll", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedSystemCollPatternCS}}}}},
+	}}}
 }

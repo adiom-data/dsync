@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	VersionStr   = "0.1-alpha"
+	VersionStr   = "0.2-alpha"
 	CopyrightStr = "Adiom Inc., 2024"
 )
 

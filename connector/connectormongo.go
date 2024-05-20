@@ -181,13 +181,20 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, changeStreamStartResumeToken))
 
 		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
-		nsFilter := createChangeStreamNamespaceFilterFromTasks(tasks) //TODO: consider using an optimized version when we're copying all namespaces (otherwise not going to work with DDL and when we have too many namespaces)
+		var nsFilter bson.D
+		if options.Namespace != nil { //means namespace filtering was requested
+			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
+		} else {
+			nsFilter = createChangeStreamNamespaceFilter()
+		}
 		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
+
 		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
+			return
 		}
 		defer changeStream.Close(mc.ctx)
 
