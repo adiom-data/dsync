@@ -93,4 +93,14 @@ func (mc *MongoConnector) getAllCollections(dbName string) ([]string, error) {
 	return collections, nil
 }
 
-func createChangeStreamNamespaceFilter()
+// creates a filter for the change stream to include only the specified namespaces
+func createChangeStreamNamespaceFilterFromTasks(tasks []DataCopyTask) bson.D {
+	var filters []bson.D
+	for _, task := range tasks {
+		filters = append(filters, bson.D{{"ns.db", task.Db}, {"ns.coll", task.Col}})
+	}
+	// add dummyDB and dummyCol to the filter so that we can track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
+	//TODO: reevaluate the approach
+	filters = append(filters, bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}})
+	return bson.D{{"$or", filters}}
+}

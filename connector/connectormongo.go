@@ -181,13 +181,11 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, changeStreamStartResumeToken))
 
 		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
-
+		nsFilter := createChangeStreamNamespaceFilterFromTasks(tasks) //TODO: consider using an optimized version when we're copying all namespaces (otherwise not going to work with DDL and when we have too many namespaces)
+		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
-			{{"$match", bson.D{{"$or", bson.A{
-				bson.D{{"ns.db", db}, {"ns.coll", col}},
-				bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}},
-			}}}}},
-		}, opts) //TODO: Reevaluate how we do this. We need to track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
+			{{"$match", nsFilter}},
+		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		}
@@ -229,6 +227,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		//iterate over all the tasks
 		for _, task := range tasks {
 			slog.Debug(fmt.Sprintf("Processing task: %v", task))
+			db := task.Db
+			col := task.Col
 
 			collection := mc.client.Database(db).Collection(col)
 
