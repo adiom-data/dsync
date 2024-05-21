@@ -278,7 +278,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						batch_idx++
 
 						if cursor.RemainingBatchLength() == 0 { //no more left in the batch
-							dataChannel <- iface.DataMessage{DataBatch: &dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+							dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 							dataBatch = nil
 						}
 					}
