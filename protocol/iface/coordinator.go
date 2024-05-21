@@ -19,7 +19,8 @@ type Coordinator interface {
 	FlowStart(fid FlowID) error
 	FlowStop(fid FlowID)
 	FlowDestroy(fid FlowID)
-	WaitForFlowDone(flowId FlowID) error // Wait for the flow to be done
+	WaitForFlowDone(flowId FlowID) error                                        // Wait for the flow to be done
+	PerformFlowIntegrityCheck(fid FlowID) (FlowDataIntegrityCheckResult, error) // Perform an integrity check on the flow (synchronous)
 
 	CoordinatorIConnectorSignal
 }

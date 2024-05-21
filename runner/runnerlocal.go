@@ -125,8 +125,16 @@ func (r *RunnerLocal) Run() {
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
-		slog.Debug("Verify requested")
-		//TODO: Implement verification
+		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
+		if err != nil {
+			slog.Error("Failed to perform flow integrity check", err)
+		} else {
+			if integrityCheckRes.Passed {
+				slog.Info("Data integrity check: OK")
+			} else {
+				slog.Error("Data integrity check: FAIL")
+			}
+		}
 	} else {
 		// start the flow
 		err = r.coord.FlowStart(flowID)
@@ -136,9 +144,9 @@ func (r *RunnerLocal) Run() {
 			// wait for the flow to finish
 			r.coord.WaitForFlowDone(flowID)
 		}
-		// destroy the flow
-		r.coord.FlowDestroy(flowID)
 	}
+	// destroy the flow
+	r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
 }
 
 func (r *RunnerLocal) Teardown() {

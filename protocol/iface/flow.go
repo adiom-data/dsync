@@ -16,3 +16,7 @@ const (
 	UnidirectionalFlowType = iota
 	BidirectionalFlowType
 )
+
+type FlowDataIntegrityCheckResult struct {
+	Passed bool
+}

@@ -311,3 +311,8 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 
 	return fmt.Errorf("connector not part of the flow")
 }
+
+func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
+	//TODO: Implement the PerformFlowIntegrityCheck method
+	return iface.FlowDataIntegrityCheckResult{}, nil
+}
