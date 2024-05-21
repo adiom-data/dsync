@@ -12,6 +12,8 @@ type Options struct {
 	StateStoreConnString string
 
 	NamespaceFrom []string
+
+	Verify bool
 }
 
 func NewFromCLIContext(c *cli.Context) Options {
@@ -22,6 +24,7 @@ func NewFromCLIContext(c *cli.Context) Options {
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
+	o.Verify = c.Bool("verify")
 
 	return o
 }

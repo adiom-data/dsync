@@ -33,6 +33,8 @@ type RunnerLocalSettings struct {
 	StateStoreConnString string
 
 	NsFromString []string
+
+	VerifyRequestedFlag bool
 }
 
 const (
@@ -120,16 +122,23 @@ func (r *RunnerLocal) Run() {
 		slog.Error("Failed to create flow", err)
 		return
 	}
-	// start the flow
-	err = r.coord.FlowStart(flowID)
-	if err != nil {
-		slog.Error("Failed to start flow", err)
+
+	//don't start the flow if the verify flag is set
+	if r.settings.VerifyRequestedFlag {
+		slog.Debug("Verify requested")
+		//TODO: Implement verification
 	} else {
-		// wait for the flow to finish
-		r.coord.WaitForFlowDone(flowID)
+		// start the flow
+		err = r.coord.FlowStart(flowID)
+		if err != nil {
+			slog.Error("Failed to start flow", err)
+		} else {
+			// wait for the flow to finish
+			r.coord.WaitForFlowDone(flowID)
+		}
+		// destroy the flow
+		r.coord.FlowDestroy(flowID)
 	}
-	// destroy the flow
-	r.coord.FlowDestroy(flowID)
 }
 
 func (r *RunnerLocal) Teardown() {

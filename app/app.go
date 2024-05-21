@@ -41,6 +41,7 @@ func runDsync(c *cli.Context) error {
 		DstConnString:        o.DstConnString,
 		StateStoreConnString: o.StateStoreConnString,
 		NsFromString:         o.NamespaceFrom,
+		VerifyRequestedFlag:  o.Verify,
 	})
 	err := r.Setup(c.Context)
 	if err == nil {

@@ -73,6 +73,10 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Aliases: []string{"ns", "nsFrom"},
 			Value:   &ListFlag{},
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "verify",
+			Usage: "Perform a data integrity check for an existing flow",
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
