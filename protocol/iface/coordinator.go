@@ -40,4 +40,7 @@ type CoordinatorIConnectorSignal interface {
 
 	// Done event (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
+
+	// Data integrity check completion event (for a connector to share results that they finished the integrity check)
+	NotifyDataIntegrityCheckDone(flowId FlowID, conn ConnectorID, res ConnectorDataIntegrityCheckResponse) error
 }

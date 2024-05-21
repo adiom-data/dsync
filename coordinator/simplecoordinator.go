@@ -176,11 +176,16 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	doneChannels[0] = make(chan struct{})
 	doneChannels[1] = make(chan struct{})
 
+	integrityCheckChannels := make([]chan iface.ConnectorDataIntegrityCheckResponse, 2)
+	integrityCheckChannels[0] = make(chan iface.ConnectorDataIntegrityCheckResponse)
+	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResponse)
+
 	fdet := FlowDetails{
-		Options:                  o,
-		DataChannels:             dataChannels,
-		DoneNotificationChannels: doneChannels,
-		flowDone:                 make(chan struct{}),
+		Options:                    o,
+		DataChannels:               dataChannels,
+		DoneNotificationChannels:   doneChannels,
+		IntegrityCheckDoneChannels: integrityCheckChannels,
+		flowDone:                   make(chan struct{}),
 	}
 	fid := c.addFlow(fdet)
 
@@ -313,6 +318,97 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 }
 
 func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
-	//TODO: Implement the PerformFlowIntegrityCheck method
-	return iface.FlowDataIntegrityCheckResult{}, nil
+	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
+
+	res := iface.FlowDataIntegrityCheckResult{}
+
+	// Get the flow details
+	flowDet, ok := c.getFlow(fid)
+	if !ok {
+		return res, fmt.Errorf("flow %v not found", fid)
+	}
+
+	// Get the source and destination connectors
+	src, ok := c.getConnector(flowDet.Options.SrcId)
+	if !ok {
+		return res, fmt.Errorf("source connector %v not found", flowDet.Options.SrcId)
+	}
+	dst, ok := c.getConnector(flowDet.Options.DstId)
+	if !ok {
+		return res, fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
+	}
+
+	// Wait for integrity check results asynchronously
+	slog.Debug("Waiting for integrity check results")
+	var resSource, resDestination iface.ConnectorDataIntegrityCheckResponse
+	done := make(chan struct{})
+	go func() {
+		select {
+		case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
+			slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
+		case <-c.ctx.Done():
+			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+		}
+		done <- struct{}{}
+	}()
+	go func() {
+		select {
+		case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
+			slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
+		case <-c.ctx.Done():
+			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+		}
+		done <- struct{}{}
+	}()
+
+	// Request integrity check results from connectors
+	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil {
+		slog.Error("Failed to request integrity check from source", err)
+	}
+	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}); err != nil { //TODO: should we have proper options here? (maybe even data validation-specific?)
+		slog.Error("Failed to request integrity check from destination", err)
+	}
+
+	// Wait for both results
+	<-done
+	<-done
+
+	if (resSource == iface.ConnectorDataIntegrityCheckResponse{}) || (resDestination == iface.ConnectorDataIntegrityCheckResponse{}) {
+		slog.Error("Integrity check results are empty")
+		return res, fmt.Errorf("integrity check results are empty")
+	}
+
+	if resSource.Checksum != resDestination.Checksum {
+		slog.Debug("Checksums don't match")
+		res.Passed = false
+	} else {
+		slog.Debug("Checksums match")
+		res.Passed = true
+	}
+
+	return res, nil
+}
+
+func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResponse) error {
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	// Check if the connector corresponds to the source
+	if flowDet.Options.SrcId == conn {
+		flowDet.IntegrityCheckDoneChannels[0] <- res
+		close(flowDet.DoneNotificationChannels[0]) //close the channel to indicate that we're done here
+		return nil
+	}
+
+	// Check if the connector corresponds to the destination
+	if flowDet.Options.DstId == conn {
+		flowDet.IntegrityCheckDoneChannels[1] <- res
+		close(flowDet.DoneNotificationChannels[1]) //close the channel to indicate that we're done here
+		return nil
+	}
+
+	return fmt.Errorf("connector not part of the flow")
 }

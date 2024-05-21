@@ -388,3 +388,10 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 
 	return nil
 }
+
+func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	//TODO: Implement RequestDataIntegrityCheck logic specific to MongoConnector
+	res := iface.ConnectorDataIntegrityCheckResponse{Checksum: "AAA"}
+	mc.coord.NotifyDataIntegrityCheckDone(flowId, mc.id, res)
+	return nil
+}

@@ -12,6 +12,11 @@ type ConnectorCapabilities struct {
 	Sink   bool
 }
 
+// XXX: not sure if it logically belongs here or to another iface file
+type ConnectorDataIntegrityCheckResponse struct {
+	Checksum string
+}
+
 // Pass options to use to the connector
 type ConnectorOptions struct {
 	Namespace []string
@@ -31,4 +36,6 @@ type ConnectorICoordinatorSignal interface {
 
 	StartReadToChannel(flowId FlowID, options ConnectorOptions, dataChannel DataChannelID) error // Read data into the provided channel (async)
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                        // Write data from the provided channel (async)
+
+	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions) error // Request a data integrity check (async)
 }
