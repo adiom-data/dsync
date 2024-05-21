@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
+// TODO: this should be parallelized with a batch assembly (e.g. per-namespace) and a worker pool
 func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
