@@ -390,8 +390,19 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 }
 
 func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO: Implement RequestDataIntegrityCheck logic specific to MongoConnector
-	res := iface.ConnectorDataIntegrityCheckResponse{Checksum: "AAA"}
+	//TODO: Implement some real logic here, otherwise it's just a stub for the demo
+
+	// get the number of records for the 'test.test' namespace
+	// couldn't use dbHash as it doesn't work on shared Mongo instances
+	db := "test"
+	col := "test"
+	collection := mc.client.Database(db).Collection(col)
+	count, err := collection.CountDocuments(mc.ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+
+	res := iface.ConnectorDataIntegrityCheckResponse{Count: count, Success: true}
 	mc.coord.NotifyDataIntegrityCheckDone(flowId, mc.id, res)
 	return nil
 }

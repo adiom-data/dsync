@@ -15,6 +15,9 @@ type ConnectorCapabilities struct {
 // XXX: not sure if it logically belongs here or to another iface file
 type ConnectorDataIntegrityCheckResponse struct {
 	Checksum string
+	Count    int64
+
+	Success bool
 }
 
 // Pass options to use to the connector

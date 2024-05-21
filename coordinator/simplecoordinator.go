@@ -364,9 +364,11 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	// Request integrity check results from connectors
 	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil {
 		slog.Error("Failed to request integrity check from source", err)
+		return res, err
 	}
 	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}); err != nil { //TODO: should we have proper options here? (maybe even data validation-specific?)
 		slog.Error("Failed to request integrity check from destination", err)
+		return res, err
 	}
 
 	// Wait for both results
@@ -374,11 +376,11 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	<-done
 
 	if (resSource == iface.ConnectorDataIntegrityCheckResponse{}) || (resDestination == iface.ConnectorDataIntegrityCheckResponse{}) {
-		slog.Error("Integrity check results are empty")
+		slog.Debug("Integrity check results are empty")
 		return res, fmt.Errorf("integrity check results are empty")
 	}
 
-	if resSource.Checksum != resDestination.Checksum {
+	if resSource != resDestination {
 		slog.Debug("Checksums don't match")
 		res.Passed = false
 	} else {
