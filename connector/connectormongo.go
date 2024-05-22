@@ -38,6 +38,7 @@ type MongoConnectorSettings struct {
 	serverConnectTimeout          time.Duration
 	pingTimeout                   time.Duration
 	initialSyncNumParallelCopiers int
+	writerMaxBatchSize            int //0 means no limit (in # of documents)
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -45,6 +46,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
+	settings.writerMaxBatchSize = 5000
 
 	return &MongoConnector{desc: desc, settings: settings}
 }

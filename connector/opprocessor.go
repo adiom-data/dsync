@@ -33,10 +33,37 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 			dataBatchBson[i] = bson.Raw(dataBatch[i])
 		}
 
-		_, err := collection.InsertMany(mc.ctx, dataBatchBson)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
-			return err
+		//XXX: ugly hack to deal with rate limiting in Cosmos but probably also good for controlling impact on the dst
+		// we split in subbatches of mc.settings.writerMaxBatchSize if it's not 0
+		if (mc.settings.writerMaxBatchSize <= 0) || (len(dataBatch) <= mc.settings.writerMaxBatchSize) {
+			_, err := collection.InsertMany(mc.ctx, dataBatchBson)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
+				return err
+			}
+		} else {
+			slog.Debug(fmt.Sprintf("Splitting the batch because it's bigger than max size set: %v", mc.settings.writerMaxBatchSize))
+			batchSizeLeft := len(dataBatch)
+			idx := 0
+			for batchSizeLeft > mc.settings.writerMaxBatchSize {
+				slog.Debug(fmt.Sprintf("Inserting subbatch of %v documents (idx %v) into collection %v.%v", mc.settings.writerMaxBatchSize, idx, dbName, colName))
+				batchPart := dataBatchBson[idx : idx+mc.settings.writerMaxBatchSize]
+				_, err := collection.InsertMany(mc.ctx, batchPart)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
+					return err
+				}
+				batchSizeLeft -= mc.settings.writerMaxBatchSize
+				idx += mc.settings.writerMaxBatchSize
+			}
+			if batchSizeLeft > 0 {
+				slog.Debug(fmt.Sprintf("Inserting subbatch(tail-end) of %v documents (idx %v) into collection %v.%v", len(dataBatchBson[idx:]), idx, dbName, colName))
+				_, err := collection.InsertMany(mc.ctx, dataBatchBson[idx:])
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
+					return err
+				}
+			}
 		}
 	case iface.MutationType_Update:
 		idType := bsontype.Type(dataMsg.IdType)
