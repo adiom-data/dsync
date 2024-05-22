@@ -46,7 +46,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 5000
+	settings.writerMaxBatchSize = 0
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
