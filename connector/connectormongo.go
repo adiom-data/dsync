@@ -73,14 +73,14 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 
 	// Get version of the MongoDB server
 	var commandResult bson.M
-	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{Key: "serverStatus", Value: 1}}).Decode(&commandResult)
+	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{Key: "buildInfo", Value: 1}}).Decode(&commandResult)
 	if err != nil {
 		return err
 	}
 	version := commandResult["version"]
 
 	// Instantiate ConnectorType
-	mc.connectorType = iface.ConnectorType{DbType: "MongoDB", Version: version.(string)}
+	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
 	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
 

@@ -5,6 +5,7 @@ import "context"
 type ConnectorType struct {
 	DbType  string
 	Version string
+	Spec    string
 }
 
 type ConnectorCapabilities struct {

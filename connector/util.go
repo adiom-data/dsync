@@ -35,6 +35,9 @@ func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timest
 */
 
 const (
+	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
+	connectorSpec   string = "Generic" // We're generic in the sense that we work with Cosmos, shared tier, etc.
+
 	dummyDB                      string = "adiom-internal"
 	dummyCol                     string = "dummy"
 	progressReportingIntervalSec        = 5
