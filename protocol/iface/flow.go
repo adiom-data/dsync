@@ -20,3 +20,8 @@ const (
 type FlowDataIntegrityCheckResult struct {
 	Passed bool
 }
+
+type FlowStatus struct {
+	//For uni-directional flows
+	SrcStatus, DstStatus ConnectorStatus
+}

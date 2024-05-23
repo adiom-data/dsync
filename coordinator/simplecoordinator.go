@@ -261,7 +261,7 @@ func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
 	}
 
 	// Wait for the flow to be done
-	<-flowDet.flowDone
+	<-flowDet.flowDone //TODO: should we just return the channel?
 
 	return nil
 }
@@ -413,4 +413,9 @@ func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, co
 	}
 
 	return fmt.Errorf("connector not part of the flow")
+}
+
+func (c *SimpleCoordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
+	// Implement the GetFlowStatus method
+	return iface.FlowStatus{}, nil
 }

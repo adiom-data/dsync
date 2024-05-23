@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/coordinator"
@@ -35,6 +36,8 @@ type RunnerLocalSettings struct {
 	NsFromString []string
 
 	VerifyRequestedFlag bool
+
+	flowStatusReportingIntervalSecs time.Duration
 }
 
 const (
@@ -58,6 +61,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 	slog.Debug("RunnerLocal Setup")
 
 	r.ctx = ctx
+	r.settings.flowStatusReportingIntervalSecs = 10
 
 	//Initialize in sequence
 	err := r.statestore.Setup(r.ctx)
@@ -122,6 +126,8 @@ func (r *RunnerLocal) Run() {
 		slog.Error("Failed to create flow", err)
 		return
 	}
+	// destroy the flow (commented out to avoid the 'flow not found' error on ^C for now)
+	//defer r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
@@ -135,18 +141,37 @@ func (r *RunnerLocal) Run() {
 				slog.Error("Data integrity check: FAIL")
 			}
 		}
-	} else {
-		// start the flow
-		err = r.coord.FlowStart(flowID)
-		if err != nil {
-			slog.Error("Failed to start flow", err)
-		} else {
-			// wait for the flow to finish
-			r.coord.WaitForFlowDone(flowID)
-		}
+		return
 	}
-	// destroy the flow (commented out to avoid the 'flow not found' error on ^C for now)
-	//r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
+	// start the flow
+	err = r.coord.FlowStart(flowID)
+	if err != nil {
+		slog.Error("Failed to start flow", err)
+		return
+	}
+	// periodically print the flow status for visibility
+	//XXX: not sure if this is the best way to do it
+	go func() {
+		go func() {
+			for {
+				select {
+				case <-r.ctx.Done():
+					return
+				default:
+					flowStatus, err := r.coord.GetFlowStatus(flowID)
+					if err != nil {
+						slog.Error("Failed to get flow status", err)
+						break
+					}
+					slog.Info(fmt.Sprintf("Flow status: %v", flowStatus))
+					time.Sleep(r.settings.flowStatusReportingIntervalSecs * time.Second)
+				}
+			}
+		}()
+	}()
+
+	// wait for the flow to finish
+	r.coord.WaitForFlowDone(flowID)
 }
 
 func (r *RunnerLocal) Teardown() {

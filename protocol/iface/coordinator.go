@@ -21,6 +21,7 @@ type Coordinator interface {
 	FlowDestroy(fid FlowID)
 	WaitForFlowDone(flowId FlowID) error                                        // Wait for the flow to be done
 	PerformFlowIntegrityCheck(fid FlowID) (FlowDataIntegrityCheckResult, error) // Perform an integrity check on the flow (synchronous)
+	GetFlowStatus(fid FlowID) (FlowStatus, error)                               // Get the status of the flow
 
 	CoordinatorIConnectorSignal
 }
