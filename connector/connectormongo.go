@@ -191,6 +191,50 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 	}()
 
+	// kick off LSN tracking
+	// TODO: implement this proper - this is a very BAD, bad placeholder.
+	go func() {
+		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.id, flowId))
+		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken)
+		var nsFilter bson.D
+		if options.Namespace != nil { //means namespace filtering was requested
+			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
+		} else {
+			nsFilter = createChangeStreamNamespaceFilter()
+		}
+
+		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
+			{{"$match", nsFilter}},
+		}, opts)
+		if err != nil {
+			slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
+			return
+		}
+		defer changeStream.Close(mc.ctx)
+
+		for changeStream.Next(mc.ctx) {
+			var change bson.M
+			if err := changeStream.Decode(&change); err != nil {
+				slog.Error(fmt.Sprintf("LSN tracker: Failed to decode change stream event: %v", err))
+				continue
+			}
+
+			if mc.shouldIgnoreChangeStreamEvent(change) {
+				continue
+			}
+
+			mc.status.WriteLSN++
+		}
+
+		if err := changeStream.Err(); err != nil {
+			if mc.ctx.Err() == context.Canceled {
+				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
+			} else {
+				slog.Error(fmt.Sprintf("Change stream error: %v", err))
+			}
+		}
+	}()
+
 	// kick off the change stream reader
 	go func() {
 		//wait for the initial sync to finish
@@ -232,6 +276,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			}
 
 			readerProgress.changeStreamEvents++
+			lsn++
 
 			dataMsg, err := mc.convertChangeStreamEventToDataMessage(change)
 			if err != nil {
@@ -239,7 +284,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 			//send the data message
-			lsn++
+			time.Sleep(time.Second) //XXX: to simulate lag
 			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg
 		}
