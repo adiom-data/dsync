@@ -31,6 +31,8 @@ type MongoConnector struct {
 
 	coord iface.CoordinatorIConnectorSignal
 
+	//TODO: this should be per-flow (as well as the other bunch of things)
+	// ducktaping for now
 	status iface.ConnectorStatus
 }
 
@@ -88,7 +90,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorCapabilities
 	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
 	// Instantiate ConnectorStatus
-	mc.status = iface.ConnectorStatus{WriteLSN: -1}
+	mc.status = iface.ConnectorStatus{WriteLSN: 0}
 
 	// Get the coordinator endpoint
 	coord, err := mc.t.GetCoordinatorEndpoint("local")
@@ -195,6 +197,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
+		var lsn uint64 = 0
+
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
 		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, changeStreamStartResumeToken))
 
@@ -235,6 +239,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 			//send the data message
+			lsn++
+			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg
 		}
 
