@@ -191,7 +191,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
-		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s (start@ %v)", mc.id, flowId, changeStreamStartResumeToken))
+		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
+		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, changeStreamStartResumeToken))
 
 		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
 		var nsFilter bson.D
@@ -234,7 +235,11 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 
 		if err := changeStream.Err(); err != nil {
-			slog.Error(fmt.Sprintf("Change stream error: %v", err))
+			if mc.ctx.Err() == context.Canceled {
+				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
+			} else {
+				slog.Error(fmt.Sprintf("Change stream error: %v", err))
+			}
 		}
 	}()
 

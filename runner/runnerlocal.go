@@ -145,8 +145,8 @@ func (r *RunnerLocal) Run() {
 			r.coord.WaitForFlowDone(flowID)
 		}
 	}
-	// destroy the flow
-	r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
+	// destroy the flow (commented out to avoid the 'flow not found' error on ^C for now)
+	//r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
 }
 
 func (r *RunnerLocal) Teardown() {
