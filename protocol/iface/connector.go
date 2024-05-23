@@ -47,4 +47,6 @@ type ConnectorICoordinatorSignal interface {
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                        // Write data from the provided channel (async)
 
 	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions) error // Request a data integrity check (async)
+
+	GetConnectorStatus(flowId FlowID) ConnectorStatus // Immediate and non-blocking
 }

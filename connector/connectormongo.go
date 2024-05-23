@@ -413,3 +413,7 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options
 	mc.coord.NotifyDataIntegrityCheckDone(flowId, mc.id, res)
 	return nil
 }
+
+func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+	return iface.ConnectorStatus{WriteLSN: 1}
+}

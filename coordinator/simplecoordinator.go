@@ -416,6 +416,49 @@ func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, co
 }
 
 func (c *SimpleCoordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
-	// Implement the GetFlowStatus method
-	return iface.FlowStatus{}, nil
+	res := iface.FlowStatus{}
+
+	// Get the flow details
+	flowDet, ok := c.getFlow(fid)
+	if !ok {
+		return res, fmt.Errorf("flow %v not found", fid)
+	}
+
+	// Get the source and destination connectors
+	src, ok := c.getConnector(flowDet.Options.SrcId)
+	if !ok {
+		return res, fmt.Errorf("source connector %v not found", flowDet.Options.SrcId)
+	}
+	dst, ok := c.getConnector(flowDet.Options.DstId)
+	if !ok {
+		return res, fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
+	}
+
+	// Get latest status update from connectors
+	flowDet.flowStatus.SrcStatus = src.Endpoint.GetConnectorStatus(fid)
+	flowDet.flowStatus.DstStatus = dst.Endpoint.GetConnectorStatus(fid)
+
+	return flowDet.flowStatus, nil
+}
+
+func (c *SimpleCoordinator) UpdateConnectorStatus(flowId iface.FlowID, conn iface.ConnectorID, status iface.ConnectorStatus) error {
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	// Check if the connector corresponds to the source
+	if flowDet.Options.SrcId == conn {
+		flowDet.flowStatus.SrcStatus = status
+		return nil
+	}
+
+	// Check if the connector corresponds to the destination
+	if flowDet.Options.DstId == conn {
+		flowDet.flowStatus.DstStatus = status
+		return nil
+	}
+
+	return fmt.Errorf("connector not part of the flow")
 }
