@@ -30,6 +30,8 @@ type MongoConnector struct {
 	connectorCapabilities iface.ConnectorCapabilities
 
 	coord iface.CoordinatorIConnectorSignal
+
+	status iface.ConnectorStatus
 }
 
 type MongoConnectorSettings struct {
@@ -85,6 +87,8 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
 	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
+	// Instantiate ConnectorStatus
+	mc.status = iface.ConnectorStatus{WriteLSN: -1}
 
 	// Get the coordinator endpoint
 	coord, err := mc.t.GetCoordinatorEndpoint("local")
@@ -415,5 +419,5 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options
 }
 
 func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
-	return iface.ConnectorStatus{WriteLSN: 1}
+	return mc.status
 }

@@ -37,7 +37,7 @@ type RunnerLocalSettings struct {
 
 	VerifyRequestedFlag bool
 
-	flowStatusReportingIntervalSecs time.Duration
+	FlowStatusReportingIntervalSecs time.Duration
 }
 
 const (
@@ -61,7 +61,6 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 	slog.Debug("RunnerLocal Setup")
 
 	r.ctx = ctx
-	r.settings.flowStatusReportingIntervalSecs = 10
 
 	//Initialize in sequence
 	err := r.statestore.Setup(r.ctx)
@@ -164,7 +163,7 @@ func (r *RunnerLocal) Run() {
 						break
 					}
 					slog.Info(fmt.Sprintf("Flow status: %v", flowStatus))
-					time.Sleep(r.settings.flowStatusReportingIntervalSecs * time.Second)
+					time.Sleep(r.settings.FlowStatusReportingIntervalSecs * time.Second)
 				}
 			}
 		}()

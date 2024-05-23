@@ -22,7 +22,7 @@ type ConnectorDataIntegrityCheckResponse struct {
 }
 
 type ConnectorStatus struct {
-	// last sequence number for writes.
+	// last sequence number for writes. Value below zero means that we aren't ready
 	WriteLSN int64 //XXX: For the source, it's the last write sequence number read from the change stream. For the destination - last one that was written
 }
 

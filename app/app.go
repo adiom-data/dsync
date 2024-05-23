@@ -37,11 +37,12 @@ func runDsync(c *cli.Context) error {
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
-		SrcConnString:        o.SrcConnString,
-		DstConnString:        o.DstConnString,
-		StateStoreConnString: o.StateStoreConnString,
-		NsFromString:         o.NamespaceFrom,
-		VerifyRequestedFlag:  o.Verify,
+		SrcConnString:                   o.SrcConnString,
+		DstConnString:                   o.DstConnString,
+		StateStoreConnString:            o.StateStoreConnString,
+		NsFromString:                    o.NamespaceFrom,
+		VerifyRequestedFlag:             o.Verify,
+		FlowStatusReportingIntervalSecs: 10,
 	})
 	err := r.Setup(c.Context)
 	if err == nil {
