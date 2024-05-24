@@ -40,7 +40,7 @@ const (
 
 	dummyDB                      string = "adiom-internal"
 	dummyCol                     string = "dummy"
-	progressReportingIntervalSec        = 5
+	progressReportingIntervalSec        = 10
 )
 
 func insertDummyRecord(ctx context.Context, client *mongo.Client) error {

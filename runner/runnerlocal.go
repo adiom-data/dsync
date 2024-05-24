@@ -162,7 +162,14 @@ func (r *RunnerLocal) Run() {
 						slog.Error("Failed to get flow status", err)
 						break
 					}
-					slog.Info(fmt.Sprintf("Flow status: %v", flowStatus))
+					slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))
+					if flowStatus.SrcStatus.CDCActive {
+						eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
+						if eventsDiff < 0 {
+							eventsDiff = 0
+						}
+						slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
+					}
 					time.Sleep(r.settings.FlowStatusReportingIntervalSecs * time.Second)
 				}
 			}

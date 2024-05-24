@@ -241,7 +241,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
-		var lsn uint64 = 0
+		var lsn int64 = 0
 
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
 		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, changeStreamStartResumeToken))
@@ -264,6 +264,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 		defer changeStream.Close(mc.ctx)
 
+		mc.status.CDCActive = true
+
 		for changeStream.Next(mc.ctx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
@@ -284,7 +286,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 			//send the data message
-			time.Sleep(time.Second) //XXX: to simulate lag
 			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg
 		}
@@ -416,7 +417,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 				return
 			case <-ticker.C:
 				// Print writer progress
-				slog.Info(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages))
+				slog.Debug(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages))
 			}
 		}
 	}()

@@ -18,7 +18,7 @@ type DataMessage struct {
 	Loc          Location //required
 	Id           *[]byte  //required except for inserts (for efficiency)
 	IdType       byte     //required when Id is present
-	SeqNum       uint64   //optional field to provide a global ordering of messages
+	SeqNum       int64    //optional field to provide a global ordering of messages
 }
 
 const (
