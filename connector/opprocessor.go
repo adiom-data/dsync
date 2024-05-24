@@ -84,7 +84,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 		return fmt.Errorf("unsupported operation type: %v", dataMsg.MutationType)
 	}
 
-	mc.status.WriteLSN = dataMsg.SeqNum //XXX: this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
+	mc.status.WriteLSN = max(dataMsg.SeqNum, mc.status.WriteLSN) //XXX: this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
 
 	return nil
 }

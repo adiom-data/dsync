@@ -43,6 +43,7 @@ type MongoConnectorSettings struct {
 	pingTimeout                   time.Duration
 	initialSyncNumParallelCopiers int
 	writerMaxBatchSize            int //0 means no limit (in # of documents)
+	numParallelWriters            int
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -51,6 +52,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
+	settings.numParallelWriters = 4
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -427,24 +429,32 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}()
 
 	go func() {
-		for loop := true; loop; {
-			select {
-			case <-mc.ctx.Done():
-				return
-			case dataMsg, ok := <-dataChannel:
-				if !ok {
-					// channel is closed which is a signal for us to stop
-					loop = false
-					break
+		var wg sync.WaitGroup
+		for i := 0; i < mc.settings.numParallelWriters; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for loop := true; loop; {
+					select {
+					case <-mc.ctx.Done():
+						return
+					case dataMsg, ok := <-dataChannel:
+						if !ok {
+							// channel is closed which is a signal for us to stop
+							loop = false
+							break
+						}
+						// Process the data message
+						writerProgress.dataMessages++
+						err = mc.processDataMessage(dataMsg)
+						if err != nil {
+							slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+						}
+					}
 				}
-				// Process the data message
-				writerProgress.dataMessages++
-				err = mc.processDataMessage(dataMsg)
-				if err != nil {
-					slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
-				}
-			}
+			}()
 		}
+		wg.Wait()
 
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id)
