@@ -285,6 +285,10 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
 				continue
 			}
+			if dataMsg.MutationType == iface.MutationType_Reserved { //TODO: find a better way to do this
+				slog.Debug(fmt.Sprintf("Skipping the event: %v", change))
+				continue
+			}
 			//send the data message
 			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg

@@ -49,6 +49,10 @@ func (mc *MongoConnector) convertChangeStreamEventToDataMessage(change bson.M) (
 			return iface.DataMessage{}, fmt.Errorf("failed to marshal _id: %v", err)
 		}
 		// get the full state of the document after the change
+		if change["fullDocument"] == nil {
+			//TODO: find a better way to report this
+			return iface.DataMessage{MutationType: iface.MutationType_Reserved}, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
+		}
 		fullDocument := change["fullDocument"].(bson.M)
 		// convert fulldocument to BSON.Raw
 		fullDocumentRaw, err := bson.Marshal(fullDocument)

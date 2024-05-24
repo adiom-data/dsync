@@ -19,7 +19,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	switch dataMsg.MutationType {
 	case iface.MutationType_Insert:
 		data := *dataMsg.Data
-		_, err := collection.InsertOne(mc.ctx, bson.Raw(data))
+		_, err := collection.InsertOne(mc.ctx, bson.Raw(data)) //TODO: For this and other inserts we need to handle duplicate key exceptions
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
 			return err
