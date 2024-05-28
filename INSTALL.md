@@ -11,12 +11,14 @@ Could be Atlas or local. If the source is local, you need to start it as a repli
 # Quickstart
 
 1) Checkout git and build
+```
 git clone https://github.com/adiom-data/dsync.git
 cd dsync
 go build
+```
 
-1) Install mongodb 
-2) Start two local mongodb instances
+2) Install mongodb 
+3) Start two local mongodb instances
 ```
 mkdir ~/temp
 cd ~/temp
@@ -24,12 +26,12 @@ mkdir data1 data2
 mongod --dbpath data1 --logpath mongod1.log --replSet data1 --fork --port 27017
 mongod --dbpath data2 --logpath mongod2.log --replSet data2 --fork --port 27018
 ```
-3) Save connection strings in env variables
+4) Save connection strings in env variables
 ```
 export MDB_LOCAL1=mongodb://localhost:27017
 export MDB_LOCAL2=mongodb://localhost:27018
 ```
-4) Connect to each and initialize it as a replica set
+5) Connect to each and initialize it as a replica set
 ```
 mongosh $MDB_LOCAL1
 rs.initiate()
@@ -38,16 +40,16 @@ rs.initiate()
 mongosh $MDB_LOCAL2
 rs.initiate()
 ```
-5) Import data 
+6) Import data 
 ```
 curl -O https://atlas-education.s3.amazonaws.com/sampledata.archive
 mongorestore --archive=Downloads/sampledata.archive
 ```
-6) Start the sync
+7) Start the sync
 ```
 ./dsync -s $MDB_LOCAL1 -d $MDB_LOCAL2 -m $MDB_LOCAL1 --verbosity INFO
 ```
-7) (Optionally) If you want to start load on the source. Note that you will need Java 11 for this JAR (java --version)
+8) (Optionally) If you want to start load on the source. Note that you will need Java 11 for this JAR (java --version)
 ```
 java -jar SimRunner/SimRunner.jar SimRunner/adiom-load.json
 ```
