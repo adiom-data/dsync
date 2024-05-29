@@ -19,3 +19,12 @@
 
 # Go workspace file
 go.work
+
+# Binary
+dsync
+
+# Log files
+*.log
+
+# Some MAC stuff
+.DS_Store
