@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/adiom-data/dsync/app/options"
-	"github.com/adiom-data/dsync/build"
+	"github.com/adiom-data/dsync/internal/app/options"
+	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
 	"github.com/adiom-data/dsync/runner"
 	"github.com/urfave/cli/v2"
