@@ -52,7 +52,7 @@ mongorestore --archive=sampledata.archive
 8) (Optionally) If you want to start load on the source. Note that you will need Java 11 for this JAR (java --version)
 If you don't have Java 11, you may need to build [SimRunner](https://github.com/schambon/SimRunner) yourself or it will be giving weird errors
 ```
-java -jar SimRunner/SimRunner.jar SimRunner/adiom-load.json
+java -jar tools/SimRunner/SimRunner.jar tools/SimRunner/adiom-load.json
 ```
 
 # Cleanup
