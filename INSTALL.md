@@ -3,7 +3,7 @@ Simple "go build" should work
 
 # How to run
 1) You will need two MongoDB databases - one for the source and one for the destination. 
-Could be Atlas or local. If the source is local, you need to start it as a replica set to ensure that it supports change streams.
+Could be MongoDB Atlas or local. If the source is local, you need to start it as a replica set to ensure that it supports change streams.
 2) It's good to have some data to play around with on the source, but the destination should be empty barring any system namespaces (e.g. admin.*, local.*, system.*)
 3) Then you can run the "dsync" app
 4) Optionally, you may also want to generate some load on the source (I use SimRunner for this)
