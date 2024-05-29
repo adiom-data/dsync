@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	dsync "github.com/adiom-data/dsync/app"
+	dsync "github.com/adiom-data/dsync/internal/app"
 )
 
 func main() {
