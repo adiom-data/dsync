@@ -1,0 +1,8 @@
+# Core Principles 
+
+* Isolation and abstraction
+Entities only use interfaces of others. Imagine implementations distributed as separate packages
+* Remote readiness
+Assume that components can run remotely - don't exchange pointers or references to locally allocated objects
+* Async-first
+Anything that may possibly block should be executed asynchronously - no inline blocking calls
