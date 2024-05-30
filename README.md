@@ -2,15 +2,6 @@ Welcome to Adiom Documentation!
 
 Our focus is on building backend data infrastructure and solving the data mobility problem through design of an open protocol for data exchange and a modular software architecture.
 
-Core Principles:
-
-* Isolation and abstraction
-Entities only use interfaces of others. Imagine implementations distributed as separate packages
-* Remote readiness
-Assume that components can run remotely - don't exchange pointers or references to locally allocated objects
-* Async-first
-Anything that may possibly block should be executed asynchronously - no inline blocking calls
-
 # Introduction to Dsync
 
 Dsync is a one-way data migration tool between MongoDB databases, and overtime will extend to other databases including Azure Cosmos, bidirectional communication, and complex flows. Given source and destination databases, the tool completes an initial sync transferring all data from the source database to the destination database. After the initial sync, it continuosly monitors the source database for any changes and updates the destination database accordingly.
@@ -84,10 +75,4 @@ var dbs = db.getMongo().getDBNames()
 for (var i in dbs) { db = db.getMongo().getDB(dbs[i]); print("dropping db " + db.getName()); (!['admin','config','local'].includes(db.getName())) && db.dropDatabase(); }
 ```
 
-# Code Contributions
 
-Stable Master workflow
-* Use feature branch with Pull Request for new work
-* Resolve all merge conflicts before submitting branch
-* Only fast forward pull requests accepted
-* Use Meaningful Commit Messages!
