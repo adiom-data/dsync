@@ -37,19 +37,10 @@ We use a modular software architecture, consisting of independent and isolated c
 ### Classes
 The architecture consists of various classes that implement the above interfaces, as shown in the class diagram. 
 
-#### MongoConnector Class
-* Implements the *Connector* interface and represents a connection to a MongoDB database
-* Has attributes for a local transport connection and a coordinator to manage the data flow from one database to another
-* Can set capabalities to be a connection to a source database or destination database
-* Has additional methods that allow retrieval of all databases and collections excluding system data, as well as methods to read and process the change stream, performing database operations (insert, updates, and delete)
-#### SimpleCoordinator Class
-* Implements the *Coordinator* interface and has attributes for a Transport, State Store, and maps for the connectors and data flows.
-* Has additional methods to get, add, and delete connectors and flows to their corresponding maps by Id, allowing for a thread safe architecture.
-* Manages and coordinates data flows via Data Channels.
+We have the following classes:
+- **MongoConnector**  is a *Connector* implementation that connects to MongoDB databases and implements reading the Change Stream and writing changes to databases.
+- **SimpleCoordinator** is a *Coordinator* implementation and manages data flow between the connectors. 
+- **LocalTransport** is a *Transport* implementation using Go channels.
+- **RunnerLocal** is a *Runner* implementation which uses the above classes to run dsync locally, using *SimpleCoordinator* to start a data flow between source and destination *MongoConnectors*.
 
-#### LocalTransport Class
-* Implements the *Transport* interface and has class attributes including a coordinator endpoint and a thread safe map of Data Channels.
-#### LocalRunner Class
-* Implements the *Runner* interface, and connects the *MongoConnector*, *SimpleCoordinator*, and *LocalTransport* classes together as shown in the diagram
-* Has attributes for source and destination connectors, a coordinator, a transport, and a state store, which are initialized with their corresponding classes, and during setup, the runner sets up each of the components individually. Likewise, during cleanup, the runner teardowns each component individually.
-* Executes the data migration via the run method: the runner uses the coordinator to create and start a flow between the source and destination connectors, and waits for it to complete.
+We have the **CLIApp** wrapper class which uses an instance of *RunnerLocal* to run *Dsync* on the command line. 
