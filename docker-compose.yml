@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  mongo1:
+    hostname: mongo1
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - data1:/data/db
+      - ./scripts/start-mongo.sh:/start-mongo.sh
+    environment:
+      - REPL_SET_NAME=data1
+    command: ["/start-mongo.sh"]
+    healthcheck:
+      test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  mongo2:
+    hostname: mongo2
+    restart: on-failure
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - data2:/data/db
+      - ./scripts/start-mongo.sh:/start-mongo.sh
+    environment:
+      - REPL_SET_NAME=data2
+    command: ["/start-mongo.sh"]
+    healthcheck:
+      test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  dsync:
+    build: .
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+    volumes:
+      - ./scripts/wait-for-mongo.sh:/wait-for-mongo.sh
+    command: ["/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27017/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO"]
+
+volumes:
+  data1:
+  data2:
