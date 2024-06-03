@@ -1,6 +1,9 @@
-# Protocol Diagram
+# Execution Flow
 
-Here we show in depth the protocol for dsync and the various errors that you may encounter. 
+Here we show in depth the execution flow for dsync and the various errors that you may encounter. 
 See the [Architecture docs](Architecture.md) for more information on individual classes and interfaces.
-![Protocol](../diagrams/ProtocolDiagram.png)
+![Execution Flow](../diagrams/ExecutionFlow.png)
+
+# Communication Flow
+![Communication Diagram](../diagrams/CommunicationDiagram.png)
 
