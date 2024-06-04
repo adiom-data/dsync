@@ -163,7 +163,7 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	// for unidirectional flows we need two data channels
 	// 0 corresponds to the source and 1 to the destination
 	// here we're getting away with a trick to short circuit using a single channel
-	// TODO: use different channels for source and destination (could be a thing to negotiate between connectors)
+	// TODO (AK, 6/2024): use different channels for source and destination (could be a thing to negotiate between connectors)
 	dc0, err := c.t.CreateDataChannel()
 	if err != nil {
 		return iface.FlowID{}, fmt.Errorf("failed to create data channel 0: %v", err)
@@ -213,7 +213,7 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		return fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
 	}
 
-	// TODO: Determine shared capabilities and set parameters on src and dst connectors
+	// TODO (AK, 6/2024): Determine shared capabilities and set parameters on src and dst connectors
 	// or maybe that should go into the FlowCreate method
 
 	// Tell source connector to start reading into the data channel
@@ -261,13 +261,13 @@ func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
 	}
 
 	// Wait for the flow to be done
-	<-flowDet.flowDone //TODO: should we just return the channel?
+	<-flowDet.flowDone //TODO (AK, 6/2024): should we just return the channel?
 
 	return nil
 }
 
 func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
-	//TODO: Implement the FlowStop method
+	//TODO (AK, 6/2024): Implement the FlowStop method
 }
 
 func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
@@ -366,7 +366,7 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 		slog.Error("Failed to request integrity check from source", err)
 		return res, err
 	}
-	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}); err != nil { //TODO: should we have proper options here? (maybe even data validation-specific?)
+	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
 		slog.Error("Failed to request integrity check from destination", err)
 		return res, err
 	}

@@ -31,7 +31,7 @@ type MongoConnector struct {
 
 	coord iface.CoordinatorIConnectorSignal
 
-	//TODO: this should be per-flow (as well as the other bunch of things)
+	//TODO (AK, 6/2024): this should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
 	status iface.ConnectorStatus
 }
@@ -124,7 +124,7 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	// Implement SetParameters logic specific to MongoConnector
 }
 
-// TODO: this should be split to a separate class and/or functions
+// TODO (AK, 6/2024): this should be split to a separate class and/or functions
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
 	tasks, err := mc.createInitialCopyTasks(options.Namespace)
 	if err != nil {
@@ -162,7 +162,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		tasksCompleted     uint
 	}
 
-	readerProgress := ReaderProgress{ //XXX: should we handle overflow? Also, should we use atomic types?
+	readerProgress := ReaderProgress{ //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 		initialSyncDocs:    0,
 		changeStreamEvents: 0,
 		tasksTotal:         uint(len(tasks)),
@@ -194,7 +194,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	}()
 
 	// kick off LSN tracking
-	// TODO: implement this proper - this is a very BAD, bad placeholder.
+	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
 	go func() {
 		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.id, flowId))
 		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken)
@@ -287,7 +287,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
 				continue
 			}
-			if dataMsg.MutationType == iface.MutationType_Reserved { //TODO: find a better way to do this
+			if dataMsg.MutationType == iface.MutationType_Reserved { //TODO (AK, 6/2024): find a better way to indicate that we need to skip this event
 				slog.Debug(fmt.Sprintf("Skipping the event: %v", change))
 				continue
 			}
@@ -347,7 +347,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						batch_idx++
 
 						if cursor.RemainingBatchLength() == 0 { //no more left in the batch
-							dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc} //TODO: is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+							dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc}
+							//TODO (AK, 6/2024): is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 							dataBatch = nil
 						}
 					}
@@ -377,10 +378,10 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		<-changeStreamDone
 
-		close(dataChannel) //send a signal downstream that we are done sending data //TODO: is this the right way to do it?
+		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
-		err := mc.coord.NotifyDone(flowId, mc.id) //TODO: Should we also pass an error to the coord notification if applicable?
+		err := mc.coord.NotifyDone(flowId, mc.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
 		}
@@ -409,7 +410,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}
 
 	writerProgress := WriterProgress{
-		dataMessages: 0, //XXX: should we handle overflow? Also, should we use atomic types?
+		dataMessages: 0, //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 	}
 
 	// start printing progress
@@ -467,7 +468,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 }
 
 func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO: Implement some real logic here, otherwise it's just a stub for the demo
+	//TODO (AK, 6/2024): Implement some real logic here, otherwise it's just a stub for the demo
 
 	// get the number of records for the 'test.test' namespace
 	// couldn't use dbHash as it doesn't work on shared Mongo instances

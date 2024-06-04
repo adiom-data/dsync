@@ -13,7 +13,7 @@ func (mc *MongoConnector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
 	col := change["ns"].(bson.M)["coll"].(string)
 
 	//We need to filter out the dummy collection
-	//TODO: is it the best way to do it?
+	//TODO (AK, 6/2024): is it the best way to do it?
 	if (db == dummyDB) && (col == dummyCol) {
 		return true
 	}
@@ -50,7 +50,7 @@ func (mc *MongoConnector) convertChangeStreamEventToDataMessage(change bson.M) (
 		}
 		// get the full state of the document after the change
 		if change["fullDocument"] == nil {
-			//TODO: find a better way to report this
+			//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
 			return iface.DataMessage{MutationType: iface.MutationType_Reserved}, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
 		}
 		fullDocument := change["fullDocument"].(bson.M)

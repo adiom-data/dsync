@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-//XXX: this is not going to work on anything but a dedicated Mongo cluster
+//XXX (AK, 6/2024): this is not going to work on anything but a dedicated Mongo cluster
 /*
 func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timestamp, error) {
 	appendOplogNoteCmd := bson.D{
@@ -62,7 +62,7 @@ func insertDummyRecord(ctx context.Context, client *mongo.Client) error {
 
 func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, error) {
 	slog.Debug("Getting latest resume token...")
-	changeStream, err := client.Watch(ctx, mongo.Pipeline{}) //TODO: We should limit this to the dummy collection
+	changeStream, err := client.Watch(ctx, mongo.Pipeline{}) //TODO (AK, 6/2024): We should limit this to just the dummy collection or we can catch something that we don't want :)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}

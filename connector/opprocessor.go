@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
-// TODO: this should be parallelized with a batch assembly (e.g. per-namespace) and a worker pool
+// TODO (AK, 6/2024): this should be parallelized with a batch assembly (e.g. per-namespace) and a worker pool
 func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
@@ -19,7 +19,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	switch dataMsg.MutationType {
 	case iface.MutationType_Insert:
 		data := *dataMsg.Data
-		_, err := collection.InsertOne(mc.ctx, bson.Raw(data)) //TODO: For this and other inserts we need to handle duplicate key exceptions
+		_, err := collection.InsertOne(mc.ctx, bson.Raw(data)) //TODO (AK, 6/2024): For this and other inserts we need to handle duplicate key exceptions
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
 			return err
@@ -33,7 +33,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 			dataBatchBson[i] = bson.Raw(dataBatch[i])
 		}
 
-		//XXX: ugly hack to deal with rate limiting in Cosmos but probably also good for controlling impact on the dst
+		//XXX (AK, 6/2024): ugly hack to deal with rate limiting in Cosmos but might also be good for controlling impact on the dst
 		// we split in subbatches of mc.settings.writerMaxBatchSize if it's not 0
 		if (mc.settings.writerMaxBatchSize <= 0) || (len(dataBatch) <= mc.settings.writerMaxBatchSize) {
 			_, err := collection.InsertMany(mc.ctx, dataBatchBson)
@@ -84,7 +84,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 		return fmt.Errorf("unsupported operation type: %v", dataMsg.MutationType)
 	}
 
-	mc.status.WriteLSN = max(dataMsg.SeqNum, mc.status.WriteLSN) //XXX: this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
+	mc.status.WriteLSN = max(dataMsg.SeqNum, mc.status.WriteLSN) //XX (AK, 6/2024): this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
 
 	return nil
 }
