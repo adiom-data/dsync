@@ -126,7 +126,8 @@ func (r *RunnerLocal) Run() {
 		return
 	}
 	// destroy the flow (commented out to avoid the 'flow not found' error on ^C for now)
-	//defer r.coord.FlowDestroy(flowID) //XXX: We should probably stop the flow instead of destroying it, but it's a prototype so...
+	//defer r.coord.FlowDestroy(flowID)
+	//XXX (AK, 6/2024): We should probably stop the flow instead of destroying it, but it's a prototype so...
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
@@ -149,7 +150,7 @@ func (r *RunnerLocal) Run() {
 		return
 	}
 	// periodically print the flow status for visibility
-	//XXX: not sure if this is the best way to do it
+	//XXX (AK, 6/2024): not sure if this is the best way to do it
 	go func() {
 		go func() {
 			for {

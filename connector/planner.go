@@ -16,8 +16,8 @@ var (
 	// System collections that we don't want to copy (regex pattern)
 	ExcludedSystemCollPattern = "^system[.]"
 
-	//XXX: these need to use negative lookahead to make change stream work with shared tier Mongo (although it seems they rewrite the whole thing in a funny way that doesn't work)
-	//XXX: dummyDB business is not excluded as a hack to get the resume token from the change stream
+	//XXX (AK, 6/2024): these need to use negative lookahead to make change stream work with shared tier Mongo (although it seems they rewrite the whole thing in a funny way that doesn't work)
+	//XXX (AK, 6/2024): dummyDB business is not excluded as a hack to get the resume token from the change stream
 	ExcludedDBPatternCS         = `^(?!local$|config$|admin$)`
 	ExcludedSystemCollPatternCS = `^(?!system.)`
 )
@@ -106,7 +106,6 @@ func createChangeStreamNamespaceFilterFromTasks(tasks []DataCopyTask) bson.D {
 		filters = append(filters, bson.D{{"ns.db", task.Db}, {"ns.coll", task.Col}})
 	}
 	// add dummyDB and dummyCol to the filter so that we can track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
-	//TODO: reevaluate the overall approach here
 	filters = append(filters, bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}})
 	return bson.D{{"$or", filters}}
 }

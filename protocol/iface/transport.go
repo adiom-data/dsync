@@ -1,12 +1,11 @@
 package iface
 
-// TODO: should this be more abstract? (e.g. an array)
 type Location struct {
 	Database   string
 	Collection string
 }
 
-// TODO: byte[] should be in Avro or Protobuf format (maybe subject to negotiation based on capabilities - like a preference list advertized by a connector)
+// TODO (AK, 6/2024): byte[] should be in Avro or Protobuf format (maybe subject to negotiation based on capabilities - like a preference list advertized by a connector)
 type DataMessage struct {
 	// payload (CRDT state)
 	Data *[]byte

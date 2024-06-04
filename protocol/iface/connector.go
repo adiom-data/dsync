@@ -13,7 +13,7 @@ type ConnectorCapabilities struct {
 	Sink   bool
 }
 
-// XXX: not sure if it logically belongs here or to another iface file
+// XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
 type ConnectorDataIntegrityCheckResponse struct {
 	Checksum string
 	Count    int64
@@ -23,8 +23,13 @@ type ConnectorDataIntegrityCheckResponse struct {
 
 type ConnectorStatus struct {
 	// last sequence number for writes
-	WriteLSN  int64 //XXX: For the source, it's the last write sequence number read from the change stream. For the destination - last one that was written
-	CDCActive bool  //XXX: For the source, it's whether the change stream is active
+	/**
+	For the source, it's the last write sequence number read from the change stream
+	For the destination, indicates last one that was written
+	*/
+	WriteLSN int64
+	// For the source, indicates whether the change stream is active
+	CDCActive bool
 }
 
 // Pass options to use to the connector
