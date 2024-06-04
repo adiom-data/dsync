@@ -48,7 +48,13 @@ const (
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
 	r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
-	r.dst = connector.NewMongoConnector(destinationName, connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+	//null write?
+	nullWrite := settings.DstConnString == "/dev/null"
+	if nullWrite {
+		r.dst = connector.NewNullConnector(destinationName, settings.DstConnString)
+	} else {
+		r.dst = connector.NewMongoConnector(destinationName, connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+	}
 	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	r.coord = coordinator.NewSimpleCoordinator()
 	r.trans = transport.NewTransportLocal(r.coord)
