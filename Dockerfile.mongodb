@@ -1,7 +1,0 @@
-FROM mongo:latest
-
-ENV REPLICA_SET_NAME=data1
-
-EXPOSE 27017
-
-CMD ["mongod", "--replSet", "$REPLICA_SET_NAME", "--bind_ip_all"]
