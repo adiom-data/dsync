@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -156,39 +157,40 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	}
 
 	type ReaderProgress struct {
-		initialSyncDocs    uint
-		changeStreamEvents uint
-		tasksTotal         uint
-		tasksCompleted     uint
+		initialSyncDocs    atomic.Uint64
+		changeStreamEvents uint64
+		tasksTotal         uint64
+		tasksCompleted     uint64
 	}
 
 	readerProgress := ReaderProgress{ //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
-		initialSyncDocs:    0,
 		changeStreamEvents: 0,
-		tasksTotal:         uint(len(tasks)),
+		tasksTotal:         uint64(len(tasks)),
 		tasksCompleted:     0,
 	}
+
+	readerProgress.initialSyncDocs.Store(0)
 
 	// start printing progress
 	go func() {
 		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
 		defer ticker.Stop()
 		startTime := time.Now()
-		operations := uint(0)
+		operations := uint64(0)
 		for {
 			select {
 			case <-mc.ctx.Done():
 				return
 			case <-ticker.C:
 				elapsedTime := time.Since(startTime).Seconds()
-				operations_delta := readerProgress.initialSyncDocs + readerProgress.changeStreamEvents - operations
+				operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
 				opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 				// Print reader progress
 				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-					readerProgress.initialSyncDocs, readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
 
 				startTime = time.Now()
-				operations = readerProgress.initialSyncDocs + readerProgress.changeStreamEvents
+				operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents
 			}
 		}
 	}()
@@ -279,7 +281,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				continue
 			}
 
-			readerProgress.changeStreamEvents++
+			readerProgress.changeStreamEvents++ //XXX Should we do atomic add here as well, shared variable multiple threads
 			lsn++
 
 			dataMsg, err := mc.convertChangeStreamEventToDataMessage(change)
@@ -341,7 +343,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						}
 						rawData := cursor.Current
 						data := []byte(rawData)
-						readerProgress.initialSyncDocs++
+						readerProgress.initialSyncDocs.Add(1)
 
 						dataBatch[batch_idx] = data
 						batch_idx++
@@ -356,7 +358,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						slog.Error(fmt.Sprintf("Cursor error: %v", err))
 					}
 					cursor.Close(mc.ctx)
-					readerProgress.tasksCompleted++
+					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 				}
 			}()
@@ -446,7 +448,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 							break
 						}
 						// Process the data message
-						writerProgress.dataMessages++
+						writerProgress.dataMessages++ //XXX Possible concurrency issue here as well, atomic add?
 						err = mc.processDataMessage(dataMsg)
 						if err != nil {
 							slog.Error(fmt.Sprintf("Failed to process data message: %v", err))

@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -57,6 +58,7 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 
 func (nc *NullWriteConnector) Teardown() {
 	// does nothing, no server connections to close
+	slog.Info(fmt.Sprintf("Null Write Connector %s is completed", nc.id))
 }
 
 func (nc *NullWriteConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
@@ -70,6 +72,35 @@ func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options if
 
 func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	//write null to destination
+	dataChannel, err := nc.t.GetDataChannelEndpoint(dataChannelId)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
+		return err
+	}
+
+	type WriterProgress struct {
+		dataMessages uint
+	}
+
+	writerProgress := WriterProgress{
+		dataMessages: 0, //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
+	}
+
+	for loop := true; loop; {
+		select {
+		case <-nc.ctx.Done():
+			loop = false
+		case dataMsg, ok := <-dataChannel:
+			if !ok {
+				// channel is closed which is a signal for us to stop
+				loop = false
+				break
+			}
+			// Process the data message
+			writerProgress.dataMessages++
+			nc.status.WriteLSN = max(dataMsg.SeqNum, nc.status.WriteLSN)
+		}
+	}
 	return nil
 }
 
