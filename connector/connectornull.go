@@ -5,35 +5,38 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
 type NullWriteConnector struct {
-	desc             string
-	ConnectionString string
-	ctx              context.Context
+	desc string
+	ctx  context.Context
 
-	t     iface.Transport
-	id    iface.ConnectorID
-	coord iface.CoordinatorIConnectorSignal
-
+	t                     iface.Transport
+	id                    iface.ConnectorID
+	coord                 iface.CoordinatorIConnectorSignal
+	connectorType         iface.ConnectorType
+	connectorCapabilities iface.ConnectorCapabilities
 	//TODO (AK, 6/2024): this should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
 	status iface.ConnectorStatus
 }
 
-func NewNullConnector(desc string, connectionString string) *NullWriteConnector {
+func NewNullConnector(desc string) *NullWriteConnector {
 	return &NullWriteConnector{
-		desc:             desc,
-		ConnectionString: connectionString,
+		desc: desc,
 	}
 }
 
 func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) error {
 	nc.ctx = ctx
 	nc.t = t
-
+	// Instantiate ConnectorType
+	nc.connectorType = iface.ConnectorType{DbType: "/dev/null"}
+	// Instantiate ConnectorCapabilities
+	nc.connectorCapabilities = iface.ConnectorCapabilities{Source: false, Sink: true}
 	//Instantiate ConnectorStatus
 	nc.status = iface.ConnectorStatus{WriteLSN: 0}
 	// Get the coordinator endpoint
@@ -44,7 +47,7 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 	nc.coord = coord
 
 	// Create a new connector details structure
-	connectorDetails := iface.ConnectorDetails{Desc: nc.desc}
+	connectorDetails := iface.ConnectorDetails{Desc: nc.desc, Type: nc.connectorType, Cap: nc.connectorCapabilities}
 	// Register the connector
 	nc.id, err = coord.RegisterConnector(connectorDetails, nc)
 	if err != nil {
@@ -86,6 +89,21 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 		dataMessages: 0, //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 	}
 
+	// start printing progress
+	go func() {
+		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
+		defer ticker.Stop()
+		for {
+
+			select {
+			case <-nc.ctx.Done():
+				return
+			case <-ticker.C:
+				// Print writer progress
+				slog.Debug(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages))
+			}
+		}
+	}()
 	for loop := true; loop; {
 		select {
 		case <-nc.ctx.Done():
