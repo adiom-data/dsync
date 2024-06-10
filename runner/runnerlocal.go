@@ -51,7 +51,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
-		r.dst = connector.NewNullConnector(destinationName, settings.DstConnString)
+		r.dst = connector.NewNullConnector(destinationName)
 	} else {
 		r.dst = connector.NewMongoConnector(destinationName, connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	}
