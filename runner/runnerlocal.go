@@ -47,7 +47,12 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	nullRead := settings.SrcConnString == "/dev/random"
+	if nullRead {
+		r.src = connector.NewNullReadConnector(sourceName, connector.RandomConnectorSettings{})
+	} else {
+		r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
