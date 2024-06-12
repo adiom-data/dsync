@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/brianvoe/gofakeit/v7"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type NullReadConnector struct {
@@ -43,6 +45,7 @@ type RandomConnectorSettings struct {
 	numInitialDocumentsPerCollection int
 	numFields                        int
 	docSize                          uint
+	probabilities                    []float64
 }
 
 func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullReadConnector {
@@ -51,10 +54,12 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
-	settings.numDatabases = 1
-	settings.numCollectionsPerDatabase = 1
-	settings.numInitialDocumentsPerCollection = 1000
+	settings.numDatabases = 10
+	settings.numCollectionsPerDatabase = 2
+	settings.numInitialDocumentsPerCollection = 500
 	settings.numFields = 10
+	settings.docSize = 15
+	settings.probabilities = []float64{1.0, 0.0, 0.0, 0.0}
 
 	return &NullReadConnector{desc: desc, settings: settings}
 }
@@ -114,6 +119,7 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 	// Declare two channels to wait for the change stream reader and the initial sync to finish
 	//changeStreamGenerationDone := make(chan struct{}) , change stream not implemented yet
 	initialGenerationDone := make(chan struct{})
+	changeStreamGenerationDone := make(chan struct{})
 
 	type ReaderProgress struct {
 		initialSyncDocs    atomic.Uint64
@@ -154,14 +160,11 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 		}
 	}()
 
-	// lsn tracking
-
 	// Start the initial generation
-
 	go func() {
 		defer close(initialGenerationDone)
 
-		slog.Info(fmt.Sprintf("Null Read Connector %s is starting initial data generation for flow %s", mc.id, flowId))
+		slog.Info(fmt.Sprintf("Null Read Connector %s is starting initial data generation for flow %s", rc.id, flowId))
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan DataCopyTask)
 		//create a wait group to wait for all copiers to finish
@@ -176,8 +179,20 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 					db := task.Db
 					col := task.Col
 					loc := iface.Location{Database: db, Collection: col}
-					//need to generate random documents
-
+					//need to generate random documents, inserting one by one, batch will probably be faster
+					for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ {
+						id := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents //XXX: Possible overflow eventually
+						doc := generateRandomDocument(rc.settings.numFields, rc.settings.docSize, id)
+						dataMsg, err := generateDataMessage(loc, doc)
+						if err != nil {
+							slog.Error(fmt.Sprintf("Failed to generate data message: %v", err))
+							continue
+						}
+						dataChannel <- dataMsg
+						readerProgress.initialSyncDocs.Add(1)
+					}
+					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 				}
 			}()
 		}
@@ -192,9 +207,49 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 		wg.Wait()
 	}()
 
-	// Wait for initial generation to finish
+	// Start the change stream generation
 	go func() {
 		<-initialGenerationDone
+		defer close(changeStreamGenerationDone)
+
+		var lsn int64 = 0
+		slog.Info(fmt.Sprintf("Null Read Connector %s is starting change stream generation for flow %s", rc.id, flowId))
+		//namespace filtering in the future?
+		rc.status.CDCActive = true
+		//continuos change stream generator every few seconds?
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-rc.ctx.Done():
+				return
+			case <-ticker.C:
+				//generate random operation
+				currId := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents
+				operation, err := generateOperation(rc.settings.probabilities)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to generate operation: %v", err))
+					continue
+				}
+				dataMsg, err := rc.generateChangeStreamEvent(operation, currId) //XXX: ID logic will not work with insertBatch, will need to change
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to generate change stream event: %v", err))
+					continue
+				}
+				readerProgress.changeStreamEvents++ //XXX Should we do atomic add here as well, shared variable multiple threads
+				lsn++
+				rc.status.WriteLSN++
+				dataMsg.SeqNum = lsn
+				dataChannel <- dataMsg
+			}
+		}
+
+	}()
+
+	// Wait for initial generation and change stream generation to finish
+	go func() {
+		<-initialGenerationDone
+		<-changeStreamGenerationDone
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
@@ -237,20 +292,25 @@ func (rc *NullReadConnector) CreateInitialGenerationTasks() []DataCopyTask {
 	return tasks
 }
 
-func generateRandomDocument(numFields int, docSize uint) map[string]interface{} {
+func generateRandomDocument(numFields int, docSize uint, id uint64) map[string]interface{} {
 	doc := make(map[string]interface{})
+	doc["_id"] = id
 	for i := 1; i <= numFields; i++ {
 		doc[fmt.Sprintf("field%d", i)] = gofakeit.LetterN(docSize)
 	}
 	return doc
 }
 
-func generateDataMessage(loc iface.Location, doc map[string]interface{}) iface.DataMessage {
-	return iface.DataMessage{
-		Loc: loc,
-		//Data: doc,
-		MutationType: iface.MutationType_Insert,
+func generateDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
+	data, err := bson.Marshal(doc)
+	if err != nil {
+		return iface.DataMessage{}, fmt.Errorf("failed to marshal map to bson: %v", err)
 	}
+	return iface.DataMessage{
+		Loc:          loc,
+		Data:         &data,
+		MutationType: iface.MutationType_Insert,
+	}, nil
 }
 
 func generateDataMessageBatch(loc iface.Location, docs []map[string]interface{}) iface.DataMessage {
@@ -259,4 +319,46 @@ func generateDataMessageBatch(loc iface.Location, docs []map[string]interface{})
 		//DataBatch: docs,
 		MutationType: iface.MutationType_InsertBatch,
 	}
+}
+
+func (rc *NullReadConnector) generateChangeStreamEvent(operation string, latestId uint64) (iface.DataMessage, error) {
+	switch operation {
+	case "insert":
+		//generate namespace
+		db := gofakeit.Number(1, rc.settings.numDatabases)
+		col := gofakeit.Number(1, rc.settings.numCollectionsPerDatabase)
+		loc := iface.Location{Database: fmt.Sprintf("db%d", db), Collection: fmt.Sprintf("col%d", col)}
+		doc := generateRandomDocument(rc.settings.numFields, rc.settings.docSize, latestId+1)
+		slog.Debug(fmt.Sprintf("Generated insert change stream event: %v, with location %v", doc, loc))
+		return generateDataMessage(loc, doc)
+	case "insertBatch":
+	//insert batch change
+	case "update":
+	//update change
+	case "delete":
+		//delete change
+	}
+	return iface.DataMessage{}, errors.New("Failed to generate change stream event")
+}
+
+func generateOperation(probs []float64) (string, error) {
+	//generate random operation based on probabilities
+	options := []string{"insert", "insertBatch", "update", "delete"}
+	totalProb := 0.0
+	for _, prob := range probs {
+		totalProb += prob
+	}
+	if totalProb != 1.0 {
+		fmt.Println("Error: Probabilities must sum to 1.0")
+		return "", errors.New("Probabilities must sum to 1.0")
+	}
+	r := rand.Float64()
+	sum := 0.0
+	for i, prob := range probs {
+		sum += prob
+		if r < sum {
+			return options[i], nil
+		}
+	}
+	return "", errors.New("Failed to generate operation")
 }
