@@ -1,26 +1,29 @@
 package test
 
 import (
-	"testing"
-
-	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 /**
-Defines a generic test suite for implementations of the connector interface
-Implementations will have their own tests that hook into this suite
-*/
+* Defines a generic test suite for implementations of the connector interface
+* Implementations will have their own tests that hook into this suite
+ */
 
 type ConnectorTestSuite struct {
 	suite.Suite
 	connector iface.Connector
 }
 
+func NewConnectorTestSuite(connector iface.Connector) *ConnectorTestSuite {
+	suite := new(ConnectorTestSuite)
+	suite.connector = connector
+	return suite
+}
+
 func (suite *ConnectorTestSuite) SetupTest() {
-	suite.connector = connector.NewMongoConnector("", connector.MongoConnectorSettings{})
+	//suite.connector = connector.NewMongoConnector("", connector.MongoConnectorSettings{})
 }
 
 func (suite *ConnectorTestSuite) TestMongoConnector() {
@@ -60,8 +63,4 @@ func (suite *ConnectorTestSuite) TestMongoConnector() {
 	// // Test connector status
 	status := suite.connector.GetConnectorStatus(iface.FlowID{})
 	assert.NotNil(suite.T(), status)
-}
-
-func TestConnectorSuite(t *testing.T) {
-	suite.Run(t, new(ConnectorTestSuite))
 }
