@@ -69,6 +69,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 
 	// Check if the connector supports source capabilities
 	if !caps.Source {
+		// Check that the method fails first
+		err := connector.StartReadToChannel(iface.FlowID{ID: "1234"}, iface.ConnectorOptions{}, iface.DataChannelID{ID: "4321"})
+		assert.Error(suite.T(), err, "Should fail to read data from a source if the connector does not support source capabilities")
 		suite.T().Skip("Skipping test because this connector does not support source capabilities")
 	}
 
@@ -152,6 +155,9 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	// Check if the connector supports sink capabilities
 	if !caps.Sink {
+		// Check that the method fails first
+		err := connector.StartWriteFromChannel(iface.FlowID{ID: "2234"}, iface.DataChannelID{ID: "4321"})
+		assert.Error(suite.T(), err, "Should fail to write data to a sink if the connector does not support sink capabilities")
 		suite.T().Skip("Skipping test because this connector does not support sink capabilities")
 	}
 
