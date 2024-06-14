@@ -13,4 +13,4 @@ cd protocol/iface
 mockery --output ./mocks --name Coordinator
 mockery --output ./mocks --name Transport
 ```
-For an example of creating a test for a connector, see [Mongo Connector test](connector/connectormongo_test.go)
+For an example of creating a test for a connector, see [Mongo Connector test](../connector/connectormongo_test.go)

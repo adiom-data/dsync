@@ -23,9 +23,9 @@ Could be MongoDB Atlas or local. If the source is local, you need to start it as
 
 # How to Test
 
-To run all tests:
+To run all tests (will take under a minute or so):
 ```
-go test ./...
+go test -v ./...
 ```
 
 To test a specific connector (e.g. the null writer):

@@ -2,6 +2,8 @@ package test
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -165,7 +167,10 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	// Start a go routine to write to the data channel
 	go func() {
-		loc := iface.Location{Database: "test", Collection: "testX"}
+		// Generate a random number between 1 and 999 to use as a collection name
+		// XXX: this is a hack to avoid seeing dup key errors for now
+		randomNumber := rand.Intn(999) + 1
+		loc := iface.Location{Database: "test", Collection: fmt.Sprintf("test%d", randomNumber)}
 		lsn := int64(0)
 		// write a number of messages to the channel
 		for i := 0; i < messageIterCount; i++ {
