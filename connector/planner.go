@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -52,7 +53,19 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		}
 	}
 
-	slog.Debug("Databases to resolve: ", strings.Join(dbsToResolve, ", "), "")
+	slog.Debug(fmt.Sprintf("Databases to resolve: %v", dbsToResolve))
+
+	//iterate over unresolved databases and get all collections
+	for _, db := range dbsToResolve {
+		colls, err := mc.getAllCollections(db)
+		if err != nil {
+			return nil, err
+		}
+		//create tasks for these
+		for _, coll := range colls {
+			tasks = append(tasks, DataCopyTask{Db: db, Col: coll})
+		}
+	}
 
 	return tasks, nil
 }

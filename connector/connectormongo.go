@@ -32,9 +32,11 @@ type MongoConnector struct {
 
 	coord iface.CoordinatorIConnectorSignal
 
-	//TODO (AK, 6/2024): this should be per-flow (as well as the other bunch of things)
+	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status iface.ConnectorStatus
+	status         iface.ConnectorStatus
+	flowCtx        context.Context
+	flowCancelFunc context.CancelFunc
 }
 
 type MongoConnectorSettings struct {
@@ -127,6 +129,9 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+	// create new context so that the flow can be cancelled gracefully if needed
+	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
+
 	tasks, err := mc.createInitialCopyTasks(options.Namespace)
 	if err != nil {
 		return err
@@ -150,7 +155,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 	// Retrive the latest resume token before we start reading anything
 	// We will use the resume token to start the change stream
-	changeStreamStartResumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
+	changeStreamStartResumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 		return err
@@ -179,7 +184,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		operations := uint64(0)
 		for {
 			select {
-			case <-mc.ctx.Done():
+			case <-mc.flowCtx.Done():
 				return
 			case <-ticker.C:
 				elapsedTime := time.Since(startTime).Seconds()
@@ -207,16 +212,16 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			nsFilter = createChangeStreamNamespaceFilter()
 		}
 
-		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
+		changeStream, err := mc.client.Watch(mc.flowCtx, mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
 			return
 		}
-		defer changeStream.Close(mc.ctx)
+		defer changeStream.Close(mc.flowCtx)
 
-		for changeStream.Next(mc.ctx) {
+		for changeStream.Next(mc.flowCtx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("LSN tracker: Failed to decode change stream event: %v", err))
@@ -231,7 +236,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if mc.ctx.Err() == context.Canceled {
+			if mc.flowCtx.Err() == context.Canceled {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -259,18 +264,18 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 
-		changeStream, err := mc.client.Watch(mc.ctx, mongo.Pipeline{
+		changeStream, err := mc.client.Watch(mc.flowCtx, mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 			return
 		}
-		defer changeStream.Close(mc.ctx)
+		defer changeStream.Close(mc.flowCtx)
 
 		mc.status.CDCActive = true
 
-		for changeStream.Next(mc.ctx) {
+		for changeStream.Next(mc.flowCtx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
@@ -299,7 +304,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if mc.ctx.Err() == context.Canceled {
+			if mc.flowCtx.Err() == context.Canceled {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -328,7 +333,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					db := task.Db
 					col := task.Col
 					collection := mc.client.Database(db).Collection(col)
-					cursor, err := collection.Find(mc.ctx, bson.D{})
+					cursor, err := collection.Find(mc.flowCtx, bson.D{})
 					if err != nil {
 						slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
 						continue
@@ -336,7 +341,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					loc := iface.Location{Database: db, Collection: col}
 					var dataBatch [][]byte
 					var batch_idx int
-					for cursor.Next(mc.ctx) {
+					for cursor.Next(mc.flowCtx) {
 						if dataBatch == nil {
 							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
 							batch_idx = 0
@@ -357,7 +362,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					if err := cursor.Err(); err != nil {
 						slog.Error(fmt.Sprintf("Cursor error: %v", err))
 					}
-					cursor.Close(mc.ctx)
+					cursor.Close(mc.flowCtx)
 					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 				}
@@ -393,12 +398,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 }
 
 func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	// select {
-	// case <-mc.ctx.Done():
-	// 	return nil
-	// case <-time.After(15 * time.Second):
-	// 	return fmt.Errorf("timeout waiting for data")
-	// }
+	// create new context so that the flow can be cancelled gracefully if needed
+	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
@@ -422,7 +423,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 		for {
 
 			select {
-			case <-mc.ctx.Done():
+			case <-mc.flowCtx.Done():
 				return
 			case <-ticker.C:
 				// Print writer progress
@@ -439,7 +440,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 				defer wg.Done()
 				for loop := true; loop; {
 					select {
-					case <-mc.ctx.Done():
+					case <-mc.flowCtx.Done():
 						return
 					case dataMsg, ok := <-dataChannel:
 						if !ok {
