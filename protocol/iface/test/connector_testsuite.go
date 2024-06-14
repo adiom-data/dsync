@@ -51,8 +51,8 @@ func (suite *ConnectorTestSuite) SetupSuite() {
 	// transport should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
-	testConnectorID := "1234"
-	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(iface.ConnectorID{ID: testConnectorID}, nil).Run(func(args mock.Arguments) {
+	testConnectorID := iface.ConnectorID{ID: "1234"}
+	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
 		// Store advertised connector capabilities to skip irrelevant tests
 		suite.caps = args.Get(0).(iface.ConnectorDetails).Cap // Perform a type assertion here
 	})
@@ -77,11 +77,14 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	}
 
 	// Do some prep
+	testConnectorID := iface.ConnectorID{ID: "1234"}
 	flowID := iface.FlowID{ID: "1234"}
 	dataChannelID := iface.DataChannelID{ID: "4321"}
 	dataChannel := make(chan iface.DataMessage)
 	options := iface.ConnectorOptions{}
 	suite.t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
+	suite.c.On("NotifyDone", flowID, testConnectorID).Return(nil)
+	messageCount := 0
 
 	// Start a go routine to read from the data channel until it's closed
 	go func() {
@@ -90,21 +93,35 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 			if !ok {
 				break
 			}
+			messageCount++
 		}
 	}()
 
 	// Test reading all data from a source
+	// We'll run this with a timeout to make sure it's non-blocking
 	err := RunWithTimeout(suite.T(), suite.connector, func(receiver interface{}, args ...interface{}) error {
 		return receiver.(iface.Connector).StartReadToChannel(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), args[2].(iface.DataChannelID))
 	}, NonBlockingTimeout,
 		flowID, options, dataChannelID)
 	assert.NoError(suite.T(), err)
 
-	// We should have gotten the data in the channel
-	// And a notification should have been sent to the coordinator that we're done
-
-	//sleep for 10 seconds
+	// Sleep for a bit
+	suite.T().Log("Sleeping for 10 seconds to allow the connector to read data")
 	time.Sleep(10 * time.Second)
+
+	// The connector should still be running right now and reading data - let's interrupt it
+	err = RunWithTimeout(suite.T(), suite.connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
+	}, NonBlockingTimeout, flowID)
+	assert.NoError(suite.T(), err)
+
+	// Sleep for 1 second to ensure that the interruption took effect
+	time.Sleep(1 * time.Second)
+
+	// We should have gotten some data in the channel
+	assert.Greater(suite.T(), messageCount, 0)
+	// A notification should have been sent to the coordinator that the job is done
+	suite.c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
 }
 
 func (suite *ConnectorTestSuite) TestMongoConnector() {
