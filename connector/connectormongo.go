@@ -491,3 +491,8 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options
 func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return mc.status
 }
+
+func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
+	mc.flowCancelFunc()
+	return nil
+}
