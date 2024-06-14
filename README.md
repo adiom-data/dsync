@@ -21,6 +21,17 @@ Could be MongoDB Atlas or local. If the source is local, you need to start it as
 3) Then you can run the "dsync" app
 4) Optionally, you may also want to generate some load on the source (I use SimRunner for this)
 
+# How to Test
+
+To run all tests:
+```
+go test ./...
+```
+
+To test a specific connector (e.g. the null writer):
+```
+go test -v -timeout 30s -run ^TestNullConnectorSuite$ github.com/adiom-data/dsync/connector
+```
 # Quickstart
 
 1) Install [MongoDB](https://www.mongodb.com/docs/manual/administration/install-community/) 
