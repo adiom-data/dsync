@@ -28,6 +28,7 @@ func RunWithTimeout(t *testing.T, receiver interface{}, method GenericMethod, ti
 		// Method completed within the timeout
 	case <-time.After(timeout):
 		t.Errorf("Method is blocking for too long (timeout: %s)", timeout)
+		t.FailNow()
 	}
 
 	return err
