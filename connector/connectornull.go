@@ -129,3 +129,7 @@ func (nc *NullWriteConnector) RequestDataIntegrityCheck(flowId iface.FlowID, opt
 func (nc *NullWriteConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return nc.status
 }
+func (nc *NullWriteConnector) Interrupt(flowId iface.FlowID) error {
+	//TODO: Put code here
+	return nil
+}

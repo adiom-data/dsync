@@ -51,6 +51,7 @@ type ConnectorICoordinatorSignal interface {
 
 	StartReadToChannel(flowId FlowID, options ConnectorOptions, dataChannel DataChannelID) error // Read data into the provided channel (async)
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                        // Write data from the provided channel (async)
+	Interrupt(flowId FlowID) error                                                               // Interrupt the flow (async)
 
 	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions) error // Request a data integrity check (async)
 
