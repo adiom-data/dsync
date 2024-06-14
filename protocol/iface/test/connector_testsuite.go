@@ -23,14 +23,13 @@ type ConnectorTestSuite struct {
 }
 
 func NewConnectorTestSuite(connectorFunc func() iface.Connector) *ConnectorTestSuite {
-	// lo := logger.Options{Verbosity: "DEBUG"}
-	// logger.Setup(lo)
-
 	suite := new(ConnectorTestSuite)
 	suite.connectorFactoryFunc = connectorFunc
 	return suite
 }
 
+// We are creating new connector instances for each test, so we don't need to do anything here
+// We do this partially because our connectors don't support multi-flow setups and aren't thread-safe at all
 func (suite *ConnectorTestSuite) SetupSuite() {
 }
 
