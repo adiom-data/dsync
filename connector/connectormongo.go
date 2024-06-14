@@ -93,7 +93,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
-	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true}
+	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true}
 	// Instantiate ConnectorStatus
 	mc.status = iface.ConnectorStatus{WriteLSN: 0}
 

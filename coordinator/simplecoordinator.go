@@ -338,6 +338,10 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 		return res, fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
 	}
 
+	if !src.Details.Cap.IntegrityCheck || !dst.Details.Cap.IntegrityCheck {
+		return res, fmt.Errorf("one or both connectors don't support integrity checks")
+	}
+
 	// Wait for integrity check results asynchronously
 	slog.Debug("Waiting for integrity check results")
 	var resSource, resDestination iface.ConnectorDataIntegrityCheckResponse

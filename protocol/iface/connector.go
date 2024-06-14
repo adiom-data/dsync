@@ -9,8 +9,9 @@ type ConnectorType struct {
 }
 
 type ConnectorCapabilities struct {
-	Source bool
-	Sink   bool
+	Source         bool
+	Sink           bool
+	IntegrityCheck bool
 }
 
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
