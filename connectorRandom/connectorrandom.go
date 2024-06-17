@@ -41,10 +41,13 @@ type RandomConnectorSettings struct {
 	numInitialDocumentsPerCollection int  //must be at least 1
 	numFields                        int  //number of fields in each document, must be at least 1
 	docSize                          uint //size of field values in number of chars/bytes, must be at least 1
-
+	maxDocsPerCollection             int  //maximum number of documents per collection, cap the change stream
+	changeStreamDuration             int  //duration of change stream in seconds
 	//list of size 4, representing probabilities of change stream operations in order: insert, insertBatch, update, delete
 	//sum of probabilities must add to 1.0
 	probabilities []float64
+
+	docMap map[iface.Location]map[int]bool //map of locations to map of document IDs
 }
 
 func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullReadConnector {
@@ -59,8 +62,11 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 	settings.numInitialDocumentsPerCollection = 500
 	settings.numFields = 10
 	settings.docSize = 15 //
+	settings.maxDocsPerCollection = 1000
 
-	settings.probabilities = []float64{0.5, 0.5, 0.0, 0.0}
+	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
+
+	settings.docMap = make(map[iface.Location]map[int]bool)
 
 	return &NullReadConnector{desc: desc, settings: settings}
 }
