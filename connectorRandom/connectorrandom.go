@@ -47,7 +47,7 @@ type RandomConnectorSettings struct {
 	//sum of probabilities must add to 1.0
 	probabilities []float64
 
-	docMap map[iface.Location]map[int]bool //map of locations to map of document IDs
+	docMap map[iface.Location]IndexMap //map of locations to map of document IDs
 }
 
 func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullReadConnector {
@@ -66,7 +66,7 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
 
-	settings.docMap = make(map[iface.Location]map[int]bool)
+	settings.docMap = make(map[iface.Location]IndexMap)
 
 	return &NullReadConnector{desc: desc, settings: settings}
 }
