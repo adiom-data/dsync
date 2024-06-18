@@ -18,8 +18,9 @@ type NullReadConnector struct {
 	settings RandomConnectorSettings
 	ctx      context.Context
 
-	t  iface.Transport
-	id iface.ConnectorID
+	t      iface.Transport
+	id     iface.ConnectorID
+	docMap map[iface.Location]*IndexMap //map of locations to map of document IDs
 
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
@@ -46,16 +47,12 @@ type RandomConnectorSettings struct {
 	//list of size 4, representing probabilities of change stream operations in order: insert, insertBatch, update, delete
 	//sum of probabilities must add to 1.0
 	probabilities []float64
-
-	docMap map[iface.Location]IndexMap //map of locations to map of document IDs
 }
 
 func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullReadConnector {
 	// Set default values
 
 	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 0
-	settings.numParallelWriters = 4
 
 	settings.numDatabases = 10
 	settings.numCollectionsPerDatabase = 2
@@ -65,8 +62,6 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 	settings.maxDocsPerCollection = 1000
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
-
-	settings.docMap = make(map[iface.Location]IndexMap)
 
 	return &NullReadConnector{desc: desc, settings: settings}
 }
@@ -82,6 +77,8 @@ func (rc *NullReadConnector) Setup(ctx context.Context, t iface.Transport) error
 	rc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: false}
 	// Instantiate ConnectorStatus
 	rc.status = iface.ConnectorStatus{WriteLSN: 0}
+	// Instantiate docMap
+	rc.docMap = make(map[iface.Location]*IndexMap)
 
 	// Get the coordinator endpoint
 	coord, err := rc.t.GetCoordinatorEndpoint("local")

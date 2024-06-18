@@ -32,7 +32,7 @@ func (rc *NullReadConnector) ProcessDataGenerationTask(task DataCopyTask, channe
 	loc := iface.Location{Database: task.Db, Collection: task.Col}
 	for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ {
 		doc := rc.generateRandomDocument()
-		dataMsg, err := rc.generateDataMessage(loc, doc)
+		dataMsg, err := rc.SingleInsertDataMessage(loc, doc)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to generate data message: %v", err))
 			continue
@@ -54,7 +54,7 @@ func (rc *NullReadConnector) ProcessDataGenerationTaskBatch(task DataCopyTask, c
 		readerProgress.initialSyncDocs.Add(1)
 	}
 	//generate data message batch with array of docs
-	dataMsg, err := rc.generateDataMessageBatch(loc, docs)
+	dataMsg, err := rc.BatchInsertDataMessage(loc, docs)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to generate data message: %v", err))
 	}
@@ -86,13 +86,13 @@ func (rc *NullReadConnector) generateRandomDocument() map[string]interface{} {
 	return doc
 }
 
-func (rc *NullReadConnector) generateDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
-	docMap, exists := rc.settings.docMap[loc]
+func (rc *NullReadConnector) SingleInsertDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
+	docMap, exists := rc.docMap[loc]
 	if !exists {
-		docMap = *NewIndexMap()
-		rc.settings.docMap[loc] = docMap
+		rc.docMap[loc] = NewIndexMap()
+		docMap = rc.docMap[loc]
 	}
-	id := docMap.AddRandomIndex()
+	id := docMap.AddRandomID()
 	doc["_id"] = id
 	data, err := bson.Marshal(doc)
 	if err != nil {
@@ -105,18 +105,18 @@ func (rc *NullReadConnector) generateDataMessage(loc iface.Location, doc map[str
 	}, nil
 }
 
-func (rc *NullReadConnector) generateDataMessageBatch(loc iface.Location, docs []map[string]interface{}) (iface.DataMessage, error) {
+func (rc *NullReadConnector) BatchInsertDataMessage(loc iface.Location, docs []map[string]interface{}) (iface.DataMessage, error) {
 	var dataBatch [][]byte
 	var err error
 	dataBatch = make([][]byte, len(docs))
 
-	docMap, exists := rc.settings.docMap[loc]
+	docMap, exists := rc.docMap[loc]
 	if !exists {
-		docMap = *NewIndexMap()
-		rc.settings.docMap[loc] = docMap
+		rc.docMap[loc] = NewIndexMap()
+		docMap = rc.docMap[loc]
 	}
 	for i, doc := range docs {
-		id := docMap.AddRandomIndex()
+		id := docMap.AddRandomID()
 		doc["_id"] = id
 		dataBatch[i], err = bson.Marshal(doc)
 		if err != nil {
@@ -135,7 +135,6 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 	db := gofakeit.Number(1, rc.settings.numDatabases)
 	col := gofakeit.Number(1, rc.settings.numCollectionsPerDatabase)
 	loc := iface.Location{Database: fmt.Sprintf("db%d", db), Collection: fmt.Sprintf("col%d", col)}
-	slog.Debug(fmt.Sprintf("number of docs in col: %d", rc.settings.docMap[loc].numDocs))
 
 	switch operation {
 
@@ -143,7 +142,7 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 		doc := rc.generateRandomDocument()
 		rc.incrementProgress(readerProgress, lsn)
 		slog.Debug(fmt.Sprintf("Generated insert change stream event: %v, with location %v", doc, loc))
-		return rc.generateDataMessage(loc, doc)
+		return rc.SingleInsertDataMessage(loc, doc)
 
 	case "insertBatch":
 		var docs []map[string]interface{}
@@ -151,11 +150,11 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 			docs = append(docs, rc.generateRandomDocument())
 			rc.incrementProgress(readerProgress, lsn)
 		}
-		return rc.generateDataMessageBatch(loc, docs)
+		return rc.BatchInsertDataMessage(loc, docs)
 
 	case "update":
-		docMap := rc.settings.docMap[loc]
-		id := docMap.GetRandomKey()
+		docMap := rc.docMap[loc]
+		id := docMap.GetRandomIndex()
 		doc := rc.generateRandomDocument()
 		doc["_id"] = id
 		data, _ := bson.Marshal(doc)
@@ -165,8 +164,8 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 		return iface.DataMessage{Loc: loc, Data: &data, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Update}, nil
 
 	case "delete":
-		docMap := rc.settings.docMap[loc]
-		id := docMap.Delete()
+		docMap := rc.docMap[loc]
+		id := docMap.DeleteRandomKey()
 		idType, idVal, _ := bson.MarshalValue(id)
 		rc.incrementProgress(readerProgress, lsn)
 		slog.Debug(fmt.Sprintf("Generated delete change stream event: %v, with location %v", id, loc))
