@@ -256,3 +256,8 @@ func (rc *NullReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.Conne
 	//get connector status
 	return rc.status
 }
+
+func (rc *NullReadConnector) Interrupt(flowId iface.FlowID) error {
+	//TODO: implement for testing
+	return nil
+}
