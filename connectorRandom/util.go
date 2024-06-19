@@ -110,8 +110,8 @@ func (rc *NullReadConnector) BatchInsertDataMessage(loc iface.Location, docs []m
 	var err error
 	dataBatch = make([][]byte, len(docs))
 
-	docMap, exists := rc.docMap[loc]
-	if !exists {
+	docMap, exists := rc.docMap[loc] //Does this part need to be atomic? Current implementation only one thread works
+	if !exists {                     //with a particular location
 		rc.docMap[loc] = NewIndexMap()
 		docMap = rc.docMap[loc]
 	}
@@ -139,12 +139,22 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 	switch operation {
 
 	case "insert":
+		docMap := rc.docMap[loc]
+		if docMap.GetNumDocs() >= rc.settings.maxDocsPerCollection {
+			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert more, lsn %d", docMap.GetNumDocs(), *lsn))
+			return iface.DataMessage{}, nil
+		}
 		doc := rc.generateRandomDocument()
 		rc.incrementProgress(readerProgress, lsn)
-		slog.Debug(fmt.Sprintf("Generated insert change stream event: %v, with location %v", doc, loc))
+		slog.Debug(fmt.Sprintf("Generated insert change stream event in collection %v.%v", loc.Database, loc.Collection))
 		return rc.SingleInsertDataMessage(loc, doc)
 
 	case "insertBatch":
+		docMap := rc.docMap[loc]
+		if docMap.GetNumDocs() > rc.settings.maxDocsPerCollection-batch_size {
+			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert %d docs max reached, lsn %d", docMap.GetNumDocs(), batch_size, *lsn))
+			return iface.DataMessage{}, nil
+		}
 		var docs []map[string]interface{}
 		for i := 0; i < batch_size; i++ {
 			docs = append(docs, rc.generateRandomDocument())
@@ -154,13 +164,13 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 
 	case "update":
 		docMap := rc.docMap[loc]
-		id := docMap.GetRandomIndex()
+		id := docMap.GetRandomKey()
 		doc := rc.generateRandomDocument()
 		doc["_id"] = id
 		data, _ := bson.Marshal(doc)
 		idType, idVal, _ := bson.MarshalValue(id)
 		rc.incrementProgress(readerProgress, lsn)
-		slog.Debug(fmt.Sprintf("Generated update change stream event: %v, with location %v", doc, loc))
+		slog.Debug(fmt.Sprintf("Generated update change stream event with id %d in collection %v.%v", id, loc.Database, loc.Collection))
 		return iface.DataMessage{Loc: loc, Data: &data, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Update}, nil
 
 	case "delete":
@@ -168,7 +178,7 @@ func (rc *NullReadConnector) generateChangeStreamEvent(operation string, readerP
 		id := docMap.DeleteRandomKey()
 		idType, idVal, _ := bson.MarshalValue(id)
 		rc.incrementProgress(readerProgress, lsn)
-		slog.Debug(fmt.Sprintf("Generated delete change stream event: %v, with location %v", id, loc))
+		slog.Debug(fmt.Sprintf("Generated delete change stream event with id %d in collection %v.%v", id, loc.Database, loc.Collection))
 		return iface.DataMessage{Loc: loc, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Delete}, nil
 	}
 	return iface.DataMessage{}, fmt.Errorf("failed to generate change stream event, lsn %d", *lsn)

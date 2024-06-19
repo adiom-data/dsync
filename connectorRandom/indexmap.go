@@ -2,20 +2,26 @@ package connectorRandom
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
 
 type IndexMap struct {
-	IDSet     map[uint32]bool
-	indexToID []uint32
+	IDSet   map[uint32]bool
+	IDArray []uint32
+	mutex   sync.RWMutex
 }
 
 func NewIndexMap() *IndexMap {
-	return &IndexMap{IDSet: make(map[uint32]bool), indexToID: make([]uint32, 0)}
+	return &IndexMap{IDSet: make(map[uint32]bool), IDArray: make([]uint32, 0)}
 }
 
 func (im *IndexMap) AddRandomID() uint32 {
+	//Atomic
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+
 	id := gofakeit.Uint32()
 	_, exists := im.IDSet[id]
 
@@ -23,13 +29,14 @@ func (im *IndexMap) AddRandomID() uint32 {
 		id = gofakeit.Uint32()
 		_, exists = im.IDSet[id]
 	}
+
 	im.IDSet[id] = true
-	im.indexToID = append(im.indexToID, id)
+	im.IDArray = append(im.IDArray, id)
 	return id
 }
 
-func (im *IndexMap) GetRandomIndex() int {
-	len := len(im.indexToID)
+func (im *IndexMap) getRandomIndex_unsafe() int {
+	len := len(im.IDArray)
 	if len == 0 {
 		slog.Debug("IndexMap is empty")
 		return -1
@@ -38,13 +45,32 @@ func (im *IndexMap) GetRandomIndex() int {
 	return idx
 }
 
+func (im *IndexMap) GetRandomKey() uint32 {
+	//Atomic
+	im.mutex.RLock()
+	defer im.mutex.RUnlock()
+	idx := im.getRandomIndex_unsafe()
+	return im.IDArray[idx]
+}
+
 func (im *IndexMap) DeleteRandomKey() uint32 {
-	idx := im.GetRandomIndex()
-	key := im.indexToID[idx]
+	//Atomic
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+
+	idx := im.getRandomIndex_unsafe()
+	key := im.IDArray[idx]
 	delete(im.IDSet, key)
-	//delete from indexToID slice
-	len := len(im.indexToID)
-	im.indexToID[idx], im.indexToID[len-1] = im.indexToID[len-1], im.indexToID[idx]
-	im.indexToID = im.indexToID[:len-1]
+	//delete from IDArray slice
+	len := len(im.IDArray)
+	im.IDArray[idx], im.IDArray[len-1] = im.IDArray[len-1], im.IDArray[idx] //swap with last element to make delete O(1)
+	im.IDArray = im.IDArray[:len-1]
 	return key
+}
+
+func (im *IndexMap) GetNumDocs() int {
+	//Atomic
+	im.mutex.RLock()
+	defer im.mutex.RUnlock()
+	return len(im.IDArray)
 }

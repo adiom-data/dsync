@@ -33,9 +33,7 @@ type NullReadConnector struct {
 }
 
 type RandomConnectorSettings struct {
-	initialSyncNumParallelCopiers int
-	writerMaxBatchSize            int //0 means no limit (in # of documents)
-	numParallelWriters            int
+	initialSyncNumParallelCopiers int //number of parallel copiers for initial sync
 
 	numDatabases                     int  //must be at least 1
 	numCollectionsPerDatabase        int  //must be at least 1
@@ -60,6 +58,7 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 	settings.numFields = 10
 	settings.docSize = 15 //
 	settings.maxDocsPerCollection = 1000
+	settings.changeStreamDuration = 60
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
 
@@ -191,6 +190,9 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 	// Start the change stream generation
 	go func() {
 		<-initialGenerationDone
+		//timeout for changestream generation
+		ctx, cancel := context.WithTimeout(rc.ctx, time.Duration(rc.settings.changeStreamDuration)*time.Second)
+		defer cancel()
 		defer close(changeStreamGenerationDone)
 
 		var lsn int64 = 0
@@ -198,11 +200,11 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 		//namespace filtering in the future?
 		rc.status.CDCActive = true
 		//continuos change stream generator every few seconds?
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-rc.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
 				//generate random operation
