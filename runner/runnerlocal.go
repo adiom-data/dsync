@@ -50,7 +50,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
-		r.src = connectorRandom.NewNullReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
+		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
 	} else {
 		r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	}

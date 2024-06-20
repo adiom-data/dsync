@@ -47,7 +47,7 @@ type RandomConnectorSettings struct {
 	probabilities []float64
 }
 
-func NewNullReadConnector(desc string, settings RandomConnectorSettings) *RandomReadConnector {
+func NewRandomReadConnector(desc string, settings RandomConnectorSettings) *RandomReadConnector {
 	// Set default values
 
 	settings.numParallelGenerators = 4
