@@ -12,7 +12,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type NullReadConnector struct {
+type RandomReadConnector struct {
 	desc string
 
 	settings RandomConnectorSettings
@@ -33,7 +33,7 @@ type NullReadConnector struct {
 }
 
 type RandomConnectorSettings struct {
-	initialSyncNumParallelCopiers int //number of parallel copiers for initial sync
+	numParallelGenerators int //number of parallel data generators
 
 	numDatabases                     int  //must be at least 1
 	numCollectionsPerDatabase        int  //must be at least 1
@@ -47,10 +47,10 @@ type RandomConnectorSettings struct {
 	probabilities []float64
 }
 
-func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullReadConnector {
+func NewNullReadConnector(desc string, settings RandomConnectorSettings) *RandomReadConnector {
 	// Set default values
 
-	settings.initialSyncNumParallelCopiers = 4
+	settings.numParallelGenerators = 4
 
 	settings.numDatabases = 10
 	settings.numCollectionsPerDatabase = 2
@@ -62,10 +62,10 @@ func NewNullReadConnector(desc string, settings RandomConnectorSettings) *NullRe
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
 
-	return &NullReadConnector{desc: desc, settings: settings}
+	return &RandomReadConnector{desc: desc, settings: settings}
 }
 
-func (rc *NullReadConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) error {
 	//setup the connector
 	rc.ctx = ctx
 	rc.t = t
@@ -99,15 +99,15 @@ func (rc *NullReadConnector) Setup(ctx context.Context, t iface.Transport) error
 	return nil
 }
 
-func (rc *NullReadConnector) Teardown() {
+func (rc *RandomReadConnector) Teardown() {
 	//does nothing, no client to disconnect
 }
 
-func (rc *NullReadConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
+func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 	//not necessary always source
 }
 
-func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
 	tasks := rc.CreateInitialGenerationTasks()
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
@@ -165,9 +165,9 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 		taskChannel := make(chan DataCopyTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
-		wg.Add(rc.settings.initialSyncNumParallelCopiers)
+		wg.Add(rc.settings.numParallelGenerators)
 
-		for i := 0; i < rc.settings.initialSyncNumParallelCopiers; i++ {
+		for i := 0; i < rc.settings.numParallelGenerators; i++ {
 			go func() {
 				defer wg.Done()
 				for task := range taskChannel {
@@ -197,9 +197,11 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 
 		var lsn int64 = 0
 		slog.Info(fmt.Sprintf("Null Read Connector %s is starting change stream generation for flow %s", rc.id, flowId))
-		//namespace filtering in the future?
+		//SK: MongoConnector uses namespace filtering when copying over data during the initial sync and change stream, there is no data to filter, namespace filtering is not neccessary in the RandomReadConnecto
 		rc.status.CDCActive = true
-		//continuos change stream generator every few seconds?
+		//continuos change stream generator simulates a random change operation every second,
+		//either a single insert, batch insert, single update, or single delete.
+		//XXX: change stream currently uses one thread, should we parallelize it with multiple threads to generate more changes?
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -242,22 +244,22 @@ func (rc *NullReadConnector) StartReadToChannel(flowId iface.FlowID, options ifa
 	return nil
 }
 
-func (rc *NullReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (rc *RandomReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	//never writes to destination, errors
 	return errors.New("NullReadConnector does not write to destination")
 }
 
-func (rc *NullReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//no client, errors
 	return errors.New("NullReadConnector does not have a client to request data integrity check")
 }
 
-func (rc *NullReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	//get connector status
 	return rc.status
 }
 
-func (rc *NullReadConnector) Interrupt(flowId iface.FlowID) error {
+func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 	//TODO: implement for testing
 	return nil
 }
