@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/connector"
+	"github.com/adiom-data/dsync/connectorRandom"
 	"github.com/adiom-data/dsync/coordinator"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestore"
@@ -47,7 +48,12 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	nullRead := settings.SrcConnString == "/dev/random"
+	if nullRead {
+		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
+	} else {
+		r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
