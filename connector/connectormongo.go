@@ -409,13 +409,13 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}
 
 	type WriterProgress struct {
-		dataMessages uint
+		dataMessages atomic.Uint64
 	}
 
 	writerProgress := WriterProgress{
-		dataMessages: 0, //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
+		//XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 	}
-
+	writerProgress.dataMessages.Store(0)
 	// start printing progress
 	go func() {
 		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
@@ -427,7 +427,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 				return
 			case <-ticker.C:
 				// Print writer progress
-				slog.Debug(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages))
+				slog.Debug(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages.Load()))
 			}
 		}
 	}()
@@ -449,7 +449,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 							break
 						}
 						// Process the data message
-						writerProgress.dataMessages++ //XXX Possible concurrency issue here as well, atomic add?
+						writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
 						err = mc.processDataMessage(dataMsg)
 						if err != nil {
 							slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
