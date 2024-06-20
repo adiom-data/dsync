@@ -29,7 +29,9 @@ type RandomReadConnector struct {
 
 	//TODO (AK, 6/2024): this should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status iface.ConnectorStatus
+	status         iface.ConnectorStatus
+	flowctx        context.Context
+	flowCancelFunc context.CancelFunc
 }
 
 type RandomConnectorSettings struct {
@@ -108,6 +110,7 @@ func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities)
 }
 
 func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
 	tasks := rc.CreateInitialGenerationTasks()
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
@@ -140,7 +143,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 		operations := uint64(0)
 		for {
 			select {
-			case <-rc.ctx.Done():
+			case <-rc.flowctx.Done():
 				return
 			case <-ticker.C:
 				elapsedTime := time.Since(startTime).Seconds()
@@ -206,6 +209,8 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 		defer ticker.Stop()
 		for {
 			select {
+			case <-rc.flowctx.Done():
+				return
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
@@ -235,7 +240,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
-		slog.Info(fmt.Sprintf("Null Read Connector %s is done generating data for flow %s", rc.id, flowId))
+		slog.Info(fmt.Sprintf("Random Read Connector %s is done generating data for flow %s", rc.id, flowId))
 		err := rc.coord.NotifyDone(flowId, rc.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", rc.id, flowId, err))
@@ -261,5 +266,6 @@ func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.Con
 
 func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 	//TODO: implement for testing
+	rc.flowCancelFunc()
 	return nil
 }
