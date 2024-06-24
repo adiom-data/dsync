@@ -211,8 +211,6 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 			select {
 			case <-rc.flowctx.Done():
 				return
-			case <-ctx.Done():
-				return
 			case <-ticker.C:
 				//generate random operation
 				operation, err := rc.generateOperation()
