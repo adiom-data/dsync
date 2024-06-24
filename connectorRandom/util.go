@@ -197,6 +197,7 @@ func (rc *RandomReadConnector) generateChangeStreamEvent(operation string, reade
 			docs = append(docs, rc.generateRandomDocument())
 			rc.incrementProgress(readerProgress, lsn)
 		}
+		slog.Debug(fmt.Sprintf("Generated batch insert change stream event (%d inserts) in collection %v.%v", batch_size, loc.Database, loc.Collection))
 		return rc.BatchInsertDataMessage(loc, docs)
 
 	//update case generates an update data message with a random document by generating a random id from the IndexMap

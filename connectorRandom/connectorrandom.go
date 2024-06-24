@@ -194,7 +194,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 	go func() {
 		<-initialGenerationDone
 		//timeout for changestream generation
-		ctx, cancel := context.WithTimeout(rc.ctx, time.Duration(rc.settings.changeStreamDuration)*time.Second)
+		ctx, cancel := context.WithTimeout(rc.flowctx, time.Duration(rc.settings.changeStreamDuration)*time.Second)
 		defer cancel()
 		defer close(changeStreamGenerationDone)
 
@@ -209,7 +209,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 		defer ticker.Stop()
 		for {
 			select {
-			case <-rc.flowctx.Done():
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
 				//generate random operation
