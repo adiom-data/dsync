@@ -116,6 +116,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	case <-time.After(ReadPlanningTimeout):
 		// Timeout after read planning timeout
 		suite.T().Errorf("Timed out while waiting for the read plan")
+		suite.T().FailNow()
 	}
 
 	// Test reading all data from a source

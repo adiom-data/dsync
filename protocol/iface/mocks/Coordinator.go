@@ -159,6 +159,24 @@ func (_m *Coordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) e
 	return r0
 }
 
+// NotifyReadPlanningDone provides a mock function with given fields: flowId, conn, plan
+func (_m *Coordinator) NotifyReadPlanningDone(flowId iface.FlowID, conn iface.ConnectorID, plan iface.ConnectorReadPlan) error {
+	ret := _m.Called(flowId, conn, plan)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NotifyReadPlanningDone")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ConnectorReadPlan) error); ok {
+		r0 = rf(flowId, conn, plan)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PerformFlowIntegrityCheck provides a mock function with given fields: fid
 func (_m *Coordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
 	ret := _m.Called(fid)

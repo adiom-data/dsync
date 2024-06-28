@@ -225,7 +225,13 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 
 	// Wait for the read planning to be done
 	//XXX: we should probably make it async and have a timeout
-	<-flowDet.readPlanningDone
+	select {
+	case <-flowDet.readPlanningDone:
+		slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+		return fmt.Errorf("context cancelled while waiting for read planning to be done")
+	}
 	//print address of flowDet
 	slog.Debug(fmt.Sprintf("Flow details address: %p", &flowDet))
 
