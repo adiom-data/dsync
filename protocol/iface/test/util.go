@@ -8,6 +8,8 @@ import (
 const (
 	// Default timeout for running a method to assert that the method is non-blocking
 	NonBlockingTimeout = 100 * time.Millisecond
+	// Read planning timeout
+	ReadPlanningTimeout = 5 * time.Second
 )
 
 // GenericMethod represents a method that takes a receiver, variable arguments, and returns an error

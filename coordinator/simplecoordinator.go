@@ -18,13 +18,13 @@ type SimpleCoordinator struct {
 	connectors    map[iface.ConnectorID]ConnectorDetailsWithEp
 	mu_connectors sync.RWMutex // to make the map thread-safe
 
-	flows    map[iface.FlowID]FlowDetails
+	flows    map[iface.FlowID]*FlowDetails
 	mu_flows sync.RWMutex // to make the map thread-safe
 }
 
 func NewSimpleCoordinator() *SimpleCoordinator {
 	// Implement the NewSimpleCoordinator function
-	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]FlowDetails)}
+	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]*FlowDetails)}
 }
 
 // *****
@@ -82,7 +82,7 @@ func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
 // *****
 
 // gets a flow by id
-func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (FlowDetails, bool) {
+func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
 	c.mu_flows.RLock()
 	defer c.mu_flows.RUnlock()
 	flow, ok := c.flows[fid]
@@ -90,7 +90,7 @@ func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (FlowDetails, bool) {
 }
 
 // adds a flow and returns the ID
-func (c *SimpleCoordinator) addFlow(details FlowDetails) iface.FlowID {
+func (c *SimpleCoordinator) addFlow(details *FlowDetails) iface.FlowID {
 	c.mu_flows.Lock()
 	defer c.mu_flows.Unlock()
 
@@ -176,9 +176,9 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	doneChannels[0] = make(chan struct{})
 	doneChannels[1] = make(chan struct{})
 
-	integrityCheckChannels := make([]chan iface.ConnectorDataIntegrityCheckResponse, 2)
-	integrityCheckChannels[0] = make(chan iface.ConnectorDataIntegrityCheckResponse)
-	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResponse)
+	integrityCheckChannels := make([]chan iface.ConnectorDataIntegrityCheckResult, 2)
+	integrityCheckChannels[0] = make(chan iface.ConnectorDataIntegrityCheckResult, 1) //XXX: creating buffered channels for now to avoid blocking on writes
+	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResult, 1) //XXX: creating buffered channels for now to avoid blocking on writes
 
 	fdet := FlowDetails{
 		Options:                    o,
@@ -186,8 +186,9 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 		DoneNotificationChannels:   doneChannels,
 		IntegrityCheckDoneChannels: integrityCheckChannels,
 		flowDone:                   make(chan struct{}),
+		readPlanningDone:           make(chan struct{}),
 	}
-	fid := c.addFlow(fdet)
+	fid := c.addFlow(&fdet)
 
 	slog.Debug("Created flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
 
@@ -216,8 +217,24 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	// TODO (AK, 6/2024): Determine shared capabilities and set parameters on src and dst connectors
 	// or maybe that should go into the FlowCreate method
 
+	// Request the source connector to create a plan for reading
+	if err := src.Endpoint.RequestCreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
+		slog.Error("Failed to request read planning from source", err)
+		return err
+	}
+
+	// Wait for the read planning to be done
+	//XXX: we should probably make it async and have a timeout
+	select {
+	case <-flowDet.readPlanningDone:
+		slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+		return fmt.Errorf("context cancelled while waiting for read planning to be done")
+	}
+
 	// Tell source connector to start reading into the data channel
-	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.DataChannels[0]); err != nil {
+	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.ReadPlan, flowDet.DataChannels[0]); err != nil {
 		slog.Error("Failed to start reading from source", err)
 		return err
 	}
@@ -344,26 +361,7 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 
 	// Wait for integrity check results asynchronously
 	slog.Debug("Waiting for integrity check results")
-	var resSource, resDestination iface.ConnectorDataIntegrityCheckResponse
-	done := make(chan struct{})
-	go func() {
-		select {
-		case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
-			slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
-		done <- struct{}{}
-	}()
-	go func() {
-		select {
-		case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
-			slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
-		done <- struct{}{}
-	}()
+	var resSource, resDestination iface.ConnectorDataIntegrityCheckResult
 
 	// Request integrity check results from connectors
 	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil {
@@ -376,12 +374,27 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	}
 
 	// Wait for both results
-	<-done
-	<-done
+	select {
+	case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
+		slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
+	select {
+	case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
+		slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
 
-	if (resSource == iface.ConnectorDataIntegrityCheckResponse{}) || (resDestination == iface.ConnectorDataIntegrityCheckResponse{}) {
+	if (resSource == iface.ConnectorDataIntegrityCheckResult{}) || (resDestination == iface.ConnectorDataIntegrityCheckResult{}) {
 		slog.Debug("Integrity check results are empty")
 		return res, fmt.Errorf("integrity check results are empty")
+	}
+
+	if (!resSource.Success) || (!resDestination.Success) {
+		slog.Debug("Integrity check failure on either end")
+		return res, fmt.Errorf("integrity check failure on either end")
 	}
 
 	if resSource != resDestination {
@@ -395,7 +408,7 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	return res, nil
 }
 
-func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResponse) error {
+func (c *SimpleCoordinator) PostDataIntegrityCheckResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResult) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -404,15 +417,15 @@ func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, co
 
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
-		flowDet.IntegrityCheckDoneChannels[0] <- res
-		close(flowDet.DoneNotificationChannels[0]) //close the channel to indicate that we're done here
+		flowDet.IntegrityCheckDoneChannels[0] <- res //post the result to the channel
+		close(flowDet.DoneNotificationChannels[0])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 
 	// Check if the connector corresponds to the destination
 	if flowDet.Options.DstId == conn {
-		flowDet.IntegrityCheckDoneChannels[1] <- res
-		close(flowDet.DoneNotificationChannels[1]) //close the channel to indicate that we're done here
+		flowDet.IntegrityCheckDoneChannels[1] <- res //post the result to the channel
+		close(flowDet.DoneNotificationChannels[1])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 
@@ -465,4 +478,27 @@ func (c *SimpleCoordinator) UpdateConnectorStatus(flowId iface.FlowID, conn ifac
 	}
 
 	return fmt.Errorf("connector not part of the flow")
+}
+
+func (c *SimpleCoordinator) PostReadPlanningResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorReadPlanResult) error {
+	slog.Debug(fmt.Sprintf("Got read plan result from connector %v for flow %v", conn, flowId))
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	//sanity check that the connector is the source
+	if flowDet.Options.SrcId != conn {
+		return fmt.Errorf("connector not the source for the flow")
+	}
+
+	//check that the result was a success
+	if !res.Success {
+		return fmt.Errorf("read planning failed")
+	}
+
+	flowDet.ReadPlan = res.ReadPlan
+	close(flowDet.readPlanningDone) //close the channel to indicate that we got the plan
+	return nil
 }
