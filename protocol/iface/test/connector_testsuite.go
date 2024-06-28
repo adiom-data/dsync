@@ -70,7 +70,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	// Check if the connector supports source capabilities
 	if !caps.Source {
 		// Check that the method fails first
-		err := connector.StartReadToChannel(iface.FlowID{ID: "1234"}, iface.ConnectorOptions{}, iface.DataChannelID{ID: "4321"})
+		err := connector.StartReadToChannel(iface.FlowID{ID: "1234"}, iface.ConnectorOptions{}, iface.ConnectorReadPlan{}, iface.DataChannelID{ID: "4321"})
 		assert.Error(suite.T(), err, "Should fail to read data from a source if the connector does not support source capabilities")
 		suite.T().Skip("Skipping test because this connector does not support source capabilities")
 	}
@@ -95,12 +95,35 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 		}
 	}()
 
+	// Generate a read plan
+	// We'll need to implement a mock for the completion function to store the read plan
+	var readPlan iface.ConnectorReadPlan
+	readPlanComplete := make(chan struct{})
+	c.On("NotifyReadPlanningDone", flowID, testConnectorID, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		readPlan = args.Get(2).(iface.ConnectorReadPlan) // Perform a type assertion here
+		close(readPlanComplete)
+	})
+	// We'll run this with a timeout to make sure it's non-blocking
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.Connector).CreateReadPlan(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
+	}, NonBlockingTimeout,
+		flowID, options)
+	assert.NoError(suite.T(), err)
+	// wait for the read plan to be generated
+	select {
+	case <-readPlanComplete:
+		// Read plan is complete
+	case <-time.After(ReadPlanningTimeout):
+		// Timeout after read planning timeout
+		suite.T().Errorf("Timed out while waiting for the read plan")
+	}
+
 	// Test reading all data from a source
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.Connector).StartReadToChannel(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), args[2].(iface.DataChannelID))
+		return receiver.(iface.Connector).StartReadToChannel(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), args[2].(iface.ConnectorReadPlan), args[3].(iface.DataChannelID))
 	}, NonBlockingTimeout,
-		flowID, options, dataChannelID)
+		flowID, options, readPlan, dataChannelID)
 	assert.NoError(suite.T(), err)
 
 	// Sleep for a bit

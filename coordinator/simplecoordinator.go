@@ -18,13 +18,13 @@ type SimpleCoordinator struct {
 	connectors    map[iface.ConnectorID]ConnectorDetailsWithEp
 	mu_connectors sync.RWMutex // to make the map thread-safe
 
-	flows    map[iface.FlowID]FlowDetails
+	flows    map[iface.FlowID]*FlowDetails
 	mu_flows sync.RWMutex // to make the map thread-safe
 }
 
 func NewSimpleCoordinator() *SimpleCoordinator {
 	// Implement the NewSimpleCoordinator function
-	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]FlowDetails)}
+	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]*FlowDetails)}
 }
 
 // *****
@@ -82,7 +82,7 @@ func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
 // *****
 
 // gets a flow by id
-func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (FlowDetails, bool) {
+func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
 	c.mu_flows.RLock()
 	defer c.mu_flows.RUnlock()
 	flow, ok := c.flows[fid]
@@ -90,7 +90,7 @@ func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (FlowDetails, bool) {
 }
 
 // adds a flow and returns the ID
-func (c *SimpleCoordinator) addFlow(details FlowDetails) iface.FlowID {
+func (c *SimpleCoordinator) addFlow(details *FlowDetails) iface.FlowID {
 	c.mu_flows.Lock()
 	defer c.mu_flows.Unlock()
 
@@ -186,8 +186,9 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 		DoneNotificationChannels:   doneChannels,
 		IntegrityCheckDoneChannels: integrityCheckChannels,
 		flowDone:                   make(chan struct{}),
+		readPlanningDone:           make(chan struct{}),
 	}
-	fid := c.addFlow(fdet)
+	fid := c.addFlow(&fdet)
 
 	slog.Debug("Created flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
 
@@ -216,8 +217,20 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	// TODO (AK, 6/2024): Determine shared capabilities and set parameters on src and dst connectors
 	// or maybe that should go into the FlowCreate method
 
+	// Request the source connector to create a plan for reading
+	if err := src.Endpoint.CreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
+		slog.Error("Failed to request read planning from source", err)
+		return err
+	}
+
+	// Wait for the read planning to be done
+	//XXX: we should probably make it async and have a timeout
+	<-flowDet.readPlanningDone
+	//print address of flowDet
+	slog.Debug(fmt.Sprintf("Flow details address: %p", &flowDet))
+
 	// Tell source connector to start reading into the data channel
-	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.DataChannels[0]); err != nil {
+	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.ReadPlan, flowDet.DataChannels[0]); err != nil {
 		slog.Error("Failed to start reading from source", err)
 		return err
 	}
@@ -465,4 +478,18 @@ func (c *SimpleCoordinator) UpdateConnectorStatus(flowId iface.FlowID, conn ifac
 	}
 
 	return fmt.Errorf("connector not part of the flow")
+}
+
+func (c *SimpleCoordinator) NotifyReadPlanningDone(flowId iface.FlowID, conn iface.ConnectorID, plan iface.ConnectorReadPlan) error {
+	slog.Debug(fmt.Sprintf("Got read plan from connector %v for flow %v: %v", conn, flowId, plan))
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	flowDet.ReadPlan = plan
+	close(flowDet.readPlanningDone) //close the channel to indicate that we got the plan
+	slog.Debug(fmt.Sprintf("Flow details address: %p", &flowDet))
+	return nil
 }

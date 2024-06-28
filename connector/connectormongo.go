@@ -128,13 +128,14 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 
-	tasks, err := mc.createInitialCopyTasks(options.Namespace)
-	if err != nil {
-		return err
+	var tasks []DataCopyTask
+	tasks, ok := readPlan.Tasks.([]DataCopyTask)
+	if !ok {
+		return errors.New("failed to convert tasks to []DataCopyTask")
 	}
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -494,5 +495,21 @@ func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.Connecto
 
 func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
 	mc.flowCancelFunc()
+	return nil
+}
+
+func (mc *MongoConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	go func() {
+		tasks, err := mc.createInitialCopyTasks(options.Namespace)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
+			return
+		}
+		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		err = mc.coord.NotifyReadPlanningDone(flowId, mc.id, plan)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		}
+	}()
 	return nil
 }

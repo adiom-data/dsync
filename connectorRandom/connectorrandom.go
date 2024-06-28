@@ -109,7 +109,7 @@ func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities)
 	//not necessary always source
 }
 
-func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
 	tasks := rc.CreateInitialGenerationTasks()
 
@@ -265,5 +265,10 @@ func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.Con
 func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 	//TODO: implement for testing
 	rc.flowCancelFunc()
+	return nil
+}
+
+func (rc *RandomReadConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	//TODO: Put code here
 	return nil
 }
