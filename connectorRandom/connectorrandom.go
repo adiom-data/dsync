@@ -111,8 +111,14 @@ func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities)
 
 func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
-	tasks := rc.CreateInitialGenerationTasks() //XXX: we don't have a real read plan, so we generate tasks here
-
+	var tasks []DataCopyTask
+	tasks, ok := readPlan.Tasks.([]DataCopyTask)
+	if !ok {
+		return errors.New("failed to convert tasks to []DataCopyTask")
+	}
+	if len(tasks) == 0 {
+		return errors.New("no tasks to copy")
+	}
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
 
 	// Get data channel from transport interface based on the provided ID
@@ -269,6 +275,13 @@ func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 }
 
 func (rc *RandomReadConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO: Put code here
+	go func() {
+		tasks := rc.CreateInitialGenerationTasks()
+		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		err := rc.coord.NotifyReadPlanningDone(flowId, rc.id, plan)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		}
+	}()
 	return nil
 }
