@@ -99,8 +99,10 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	// We'll need to implement a mock for the completion function to store the read plan
 	var readPlan iface.ConnectorReadPlan
 	readPlanComplete := make(chan struct{})
-	c.On("NotifyReadPlanningDone", flowID, testConnectorID, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		readPlan = args.Get(2).(iface.ConnectorReadPlan) // Perform a type assertion here
+	c.On("PostReadPlanningResult", flowID, testConnectorID, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		readPlanRes := args.Get(2).(iface.ConnectorReadPlanResult) // Perform a type assertion here
+		assert.True(suite.T(), readPlanRes.Success, "Read planning should have succeeded")
+		readPlan = readPlanRes.ReadPlan
 		close(readPlanComplete)
 	})
 	// We'll run this with a timeout to make sure it's non-blocking
@@ -291,7 +293,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheck() {
 	// Do some prep
 	flowID := iface.FlowID{ID: "3234"}
 	options := iface.ConnectorOptions{}
-	c.On("NotifyDataIntegrityCheckDone", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResponse")).Return(nil)
+	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil)
 
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
@@ -302,7 +304,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheck() {
 	assert.NoError(suite.T(), err)
 
 	// A notification should have been sent to the coordinator that the check is done
-	c.AssertCalled(suite.T(), "NotifyDataIntegrityCheckDone", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResponse"))
+	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 
 	connector.Teardown()
 }
