@@ -274,11 +274,11 @@ func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 	return nil
 }
 
-func (rc *RandomReadConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *RandomReadConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		tasks := rc.CreateInitialGenerationTasks()
 		plan := iface.ConnectorReadPlan{Tasks: tasks}
-		err := rc.coord.NotifyReadPlanningDone(flowId, rc.id, plan)
+		err := rc.coord.PostReadPlanningResult(flowId, rc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
 		}

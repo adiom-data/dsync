@@ -146,6 +146,6 @@ func (nc *NullWriteConnector) Interrupt(flowId iface.FlowID) error {
 	return nil
 }
 
-func (nc *NullWriteConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *NullWriteConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	return fmt.Errorf("null write connector does not make plans for reads")
 }

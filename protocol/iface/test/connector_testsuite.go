@@ -105,7 +105,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	})
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.Connector).CreateReadPlan(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
+		return receiver.(iface.Connector).RequestCreateReadPlan(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)

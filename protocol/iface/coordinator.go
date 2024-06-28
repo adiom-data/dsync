@@ -48,10 +48,10 @@ type CoordinatorIConnectorSignal interface {
 	NotifyDone(flowId FlowID, conn ConnectorID) error
 
 	// Planning completion event (for a connector to share the read plan)
-	NotifyReadPlanningDone(flowId FlowID, conn ConnectorID, plan ConnectorReadPlan) error
+	PostReadPlanningResult(flowId FlowID, conn ConnectorID, res ConnectorReadPlanResult) error
 
 	// Data integrity check completion event (for a connector to share results that they finished the integrity check)
-	NotifyDataIntegrityCheckDone(flowId FlowID, conn ConnectorID, res ConnectorDataIntegrityCheckResponse) error
+	PostDataIntegrityCheckResult(flowId FlowID, conn ConnectorID, res ConnectorDataIntegrityCheckResult) error
 
 	// Update the status of the connector
 	UpdateConnectorStatus(flowId FlowID, conn ConnectorID, status ConnectorStatus) error

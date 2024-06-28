@@ -484,8 +484,8 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options
 		return err
 	}
 
-	res := iface.ConnectorDataIntegrityCheckResponse{Count: count, Success: true}
-	mc.coord.NotifyDataIntegrityCheckDone(flowId, mc.id, res)
+	res := iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
+	mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
 	return nil
 }
 
@@ -498,7 +498,7 @@ func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
 	return nil
 }
 
-func (mc *MongoConnector) CreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		tasks, err := mc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
@@ -506,7 +506,7 @@ func (mc *MongoConnector) CreateReadPlan(flowId iface.FlowID, options iface.Conn
 			return
 		}
 		plan := iface.ConnectorReadPlan{Tasks: tasks}
-		err = mc.coord.NotifyReadPlanningDone(flowId, mc.id, plan)
+		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
 		}
