@@ -70,7 +70,7 @@ func (nc *NullWriteConnector) SetParameters(reqCap iface.ConnectorCapabilities) 
 	// not necessary always destination
 }
 
-func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// does nothing, no read from channel
 	return fmt.Errorf("null write connector does not support read from channel")
 }
@@ -144,4 +144,8 @@ func (nc *NullWriteConnector) Interrupt(flowId iface.FlowID) error {
 	//TODO: Put code here
 	nc.flowCancelFunc()
 	return nil
+}
+
+func (nc *NullWriteConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	return fmt.Errorf("null write connector does not make plans for reads")
 }

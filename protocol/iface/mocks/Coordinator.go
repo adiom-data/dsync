@@ -123,24 +123,6 @@ func (_m *Coordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error)
 	return r0, r1
 }
 
-// NotifyDataIntegrityCheckDone provides a mock function with given fields: flowId, conn, res
-func (_m *Coordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResponse) error {
-	ret := _m.Called(flowId, conn, res)
-
-	if len(ret) == 0 {
-		panic("no return value specified for NotifyDataIntegrityCheckDone")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ConnectorDataIntegrityCheckResponse) error); ok {
-		r0 = rf(flowId, conn, res)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NotifyDone provides a mock function with given fields: flowId, conn
 func (_m *Coordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
 	ret := _m.Called(flowId, conn)
@@ -185,6 +167,42 @@ func (_m *Coordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDa
 	}
 
 	return r0, r1
+}
+
+// PostDataIntegrityCheckResult provides a mock function with given fields: flowId, conn, res
+func (_m *Coordinator) PostDataIntegrityCheckResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResult) error {
+	ret := _m.Called(flowId, conn, res)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostDataIntegrityCheckResult")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ConnectorDataIntegrityCheckResult) error); ok {
+		r0 = rf(flowId, conn, res)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// PostReadPlanningResult provides a mock function with given fields: flowId, conn, res
+func (_m *Coordinator) PostReadPlanningResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorReadPlanResult) error {
+	ret := _m.Called(flowId, conn, res)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostReadPlanningResult")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ConnectorReadPlanResult) error); ok {
+		r0 = rf(flowId, conn, res)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // RegisterConnector provides a mock function with given fields: details, cep

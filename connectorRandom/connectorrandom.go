@@ -96,7 +96,7 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("NullReadConnector has been configured with ID " + rc.id.ID)
+	slog.Info("RandomReadConnector has been configured with ID " + rc.id.ID)
 
 	return nil
 }
@@ -109,10 +109,16 @@ func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities)
 	//not necessary always source
 }
 
-func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
-	tasks := rc.CreateInitialGenerationTasks()
-
+	var tasks []DataCopyTask
+	tasks, ok := readPlan.Tasks.([]DataCopyTask)
+	if !ok {
+		return errors.New("failed to convert tasks to []DataCopyTask")
+	}
+	if len(tasks) == 0 {
+		return errors.New("no tasks to copy")
+	}
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
 
 	// Get data channel from transport interface based on the provided ID
@@ -150,7 +156,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 				operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
 				opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 				// Print reader progress
-				slog.Info(fmt.Sprintf("Random Reader Progress: Initial Docs Generation - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
+				slog.Info(fmt.Sprintf("RandomReaderConnector Progress: Initial Docs Generation - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
 					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted.Load(), readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
 
 				startTime = time.Now()
@@ -238,7 +244,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
-		slog.Info(fmt.Sprintf("Random Read Connector %s is done generating data for flow %s", rc.id, flowId))
+		slog.Info(fmt.Sprintf("RandomReadConnector %s is done generating data for flow %s", rc.id, flowId))
 		err := rc.coord.NotifyDone(flowId, rc.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", rc.id, flowId, err))
@@ -249,12 +255,12 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 
 func (rc *RandomReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	//never writes to destination, errors
-	return errors.New("NullReadConnector does not write to destination")
+	return errors.New("RandomReadConnector does not write to destination")
 }
 
 func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//no client, errors
-	return errors.New("NullReadConnector does not have a client to request data integrity check")
+	return errors.New("RandomReadConnector does not have a client to request data integrity check")
 }
 
 func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
@@ -265,5 +271,17 @@ func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.Con
 func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
 	//TODO: implement for testing
 	rc.flowCancelFunc()
+	return nil
+}
+
+func (rc *RandomReadConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	go func() {
+		tasks := rc.CreateInitialGenerationTasks()
+		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		err := rc.coord.PostReadPlanningResult(flowId, rc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		}
+	}()
 	return nil
 }

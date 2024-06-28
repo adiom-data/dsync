@@ -128,13 +128,14 @@ func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, dataChannelId iface.DataChannelID) error {
+func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 
-	tasks, err := mc.createInitialCopyTasks(options.Namespace)
-	if err != nil {
-		return err
+	var tasks []DataCopyTask
+	tasks, ok := readPlan.Tasks.([]DataCopyTask)
+	if !ok {
+		return errors.New("failed to convert tasks to []DataCopyTask")
 	}
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -471,7 +472,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 }
 
 func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO (AK, 6/2024): Implement some real logic here, otherwise it's just a stub for the demo
+	//TODO (AK, 6/2024): Implement some real async logic here, otherwise it's just a stub for the demo
 
 	// get the number of records for the 'test.test' namespace
 	// couldn't use dbHash as it doesn't work on shared Mongo instances
@@ -483,8 +484,8 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options
 		return err
 	}
 
-	res := iface.ConnectorDataIntegrityCheckResponse{Count: count, Success: true}
-	mc.coord.NotifyDataIntegrityCheckDone(flowId, mc.id, res)
+	res := iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
+	mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
 	return nil
 }
 
@@ -494,5 +495,21 @@ func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.Connecto
 
 func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
 	mc.flowCancelFunc()
+	return nil
+}
+
+func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+	go func() {
+		tasks, err := mc.createInitialCopyTasks(options.Namespace)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
+			return
+		}
+		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		}
+	}()
 	return nil
 }
