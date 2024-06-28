@@ -177,8 +177,8 @@ func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error
 	doneChannels[1] = make(chan struct{})
 
 	integrityCheckChannels := make([]chan iface.ConnectorDataIntegrityCheckResponse, 2)
-	integrityCheckChannels[0] = make(chan iface.ConnectorDataIntegrityCheckResponse)
-	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResponse)
+	integrityCheckChannels[0] = make(chan iface.ConnectorDataIntegrityCheckResponse, 1) //XXX: creating buffered channels for now to avoid blocking on writes
+	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResponse, 1) //XXX: creating buffered channels for now to avoid blocking on writes
 
 	fdet := FlowDetails{
 		Options:                    o,
@@ -364,25 +364,6 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	// Wait for integrity check results asynchronously
 	slog.Debug("Waiting for integrity check results")
 	var resSource, resDestination iface.ConnectorDataIntegrityCheckResponse
-	done := make(chan struct{})
-	go func() {
-		select {
-		case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
-			slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
-		done <- struct{}{}
-	}()
-	go func() {
-		select {
-		case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
-			slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
-		done <- struct{}{}
-	}()
 
 	// Request integrity check results from connectors
 	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil {
@@ -395,12 +376,27 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	}
 
 	// Wait for both results
-	<-done
-	<-done
+	select {
+	case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
+		slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
+	select {
+	case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
+		slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
+	case <-c.ctx.Done():
+		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+	}
 
 	if (resSource == iface.ConnectorDataIntegrityCheckResponse{}) || (resDestination == iface.ConnectorDataIntegrityCheckResponse{}) {
 		slog.Debug("Integrity check results are empty")
 		return res, fmt.Errorf("integrity check results are empty")
+	}
+
+	if (!resSource.Success) || (!resDestination.Success) {
+		slog.Debug("Integrity check failure on either end")
+		return res, fmt.Errorf("integrity check failure on either end")
 	}
 
 	if resSource != resDestination {
@@ -423,15 +419,15 @@ func (c *SimpleCoordinator) NotifyDataIntegrityCheckDone(flowId iface.FlowID, co
 
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
-		flowDet.IntegrityCheckDoneChannels[0] <- res
-		close(flowDet.DoneNotificationChannels[0]) //close the channel to indicate that we're done here
+		flowDet.IntegrityCheckDoneChannels[0] <- res //post the result to the channel
+		close(flowDet.DoneNotificationChannels[0])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 
 	// Check if the connector corresponds to the destination
 	if flowDet.Options.DstId == conn {
-		flowDet.IntegrityCheckDoneChannels[1] <- res
-		close(flowDet.DoneNotificationChannels[1]) //close the channel to indicate that we're done here
+		flowDet.IntegrityCheckDoneChannels[1] <- res //post the result to the channel
+		close(flowDet.DoneNotificationChannels[1])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 

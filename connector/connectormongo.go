@@ -472,7 +472,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 }
 
 func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO (AK, 6/2024): Implement some real logic here, otherwise it's just a stub for the demo
+	//TODO (AK, 6/2024): Implement some real async logic here, otherwise it's just a stub for the demo
 
 	// get the number of records for the 'test.test' namespace
 	// couldn't use dbHash as it doesn't work on shared Mongo instances
