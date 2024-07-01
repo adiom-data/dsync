@@ -1,4 +1,4 @@
-package runner
+package runnerLocal
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/adiom-data/dsync/connector/connectorNull"
 	"github.com/adiom-data/dsync/connector/connectorRandom"
-	"github.com/adiom-data/dsync/coordinator"
+	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/statestore"
-	"github.com/adiom-data/dsync/transport"
+	"github.com/adiom-data/dsync/statestore/statestoreMongo"
+	"github.com/adiom-data/dsync/transport/transportLocal"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -62,9 +62,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	} else {
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	}
-	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
-	r.coord = coordinator.NewSimpleCoordinator()
-	r.trans = transport.NewTransportLocal(r.coord)
+	r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+	r.coord = coordinatorSimple.NewSimpleCoordinator()
+	r.trans = transportLocal.NewTransportLocal(r.coord)
 	r.settings = settings
 
 	return r

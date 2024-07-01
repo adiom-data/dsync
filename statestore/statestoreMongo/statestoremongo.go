@@ -1,4 +1,4 @@
-package statestore
+package statestoreMongo
 
 import (
 	"context"
