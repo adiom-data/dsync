@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Copyright (C) 2024 Adiom, Inc.
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
 
 echo "Detected hostname: $HOSTNAME"
 
