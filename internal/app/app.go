@@ -7,7 +7,7 @@ import (
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
-	"github.com/adiom-data/dsync/runner"
+	runner "github.com/adiom-data/dsync/runner/runnerLocal"
 	"github.com/urfave/cli/v2"
 )
 

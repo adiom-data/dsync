@@ -1,4 +1,4 @@
-package connector
+package connectorNull
 
 import (
 	"testing"

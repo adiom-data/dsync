@@ -1,4 +1,4 @@
-package coordinator
+package coordinatorSimple
 
 import (
 	"github.com/adiom-data/dsync/protocol/iface"
