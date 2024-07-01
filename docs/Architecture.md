@@ -11,7 +11,7 @@ Anything that may possibly block should be executed asynchronously - no inline b
 
 We use a modular software architecture, consisting of independent and isolated components. The high level overview of our strategy is to have two independent Connectors, where one reads from the source database to a data channel, and the other writes from the data channel to the destination database. We use coordinator and transport components to create and manage the data channel between the connectors.
 
-![Class Diagram](../diagrams/high_level_class_diagram.png)
+![Class Diagram](diagrams/high_level_class_diagram.png)
 # Building Blocks
 
 ### Interfaces
