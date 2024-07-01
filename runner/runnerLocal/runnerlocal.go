@@ -1,4 +1,4 @@
-package runner
+package runnerLocal
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/adiom-data/dsync/connector"
-	"github.com/adiom-data/dsync/connectorRandom"
-	"github.com/adiom-data/dsync/coordinator"
+	"github.com/adiom-data/dsync/connector/connectorMongo"
+	"github.com/adiom-data/dsync/connector/connectorNull"
+	"github.com/adiom-data/dsync/connector/connectorRandom"
+	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/statestore"
-	"github.com/adiom-data/dsync/transport"
+	"github.com/adiom-data/dsync/statestore/statestoreMongo"
+	"github.com/adiom-data/dsync/transport/transportLocal"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -52,18 +53,18 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
 	} else {
-		r.src = connector.NewMongoConnector(sourceName, connector.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
-		r.dst = connector.NewNullConnector(destinationName)
+		r.dst = connectorNull.NewNullConnector(destinationName)
 	} else {
-		r.dst = connector.NewMongoConnector(destinationName, connector.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+		r.dst = connectorMongo.NewMongoConnector(destinationName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	}
-	r.statestore = statestore.NewMongoStateStore(statestore.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
-	r.coord = coordinator.NewSimpleCoordinator()
-	r.trans = transport.NewTransportLocal(r.coord)
+	r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+	r.coord = coordinatorSimple.NewSimpleCoordinator()
+	r.trans = transportLocal.NewTransportLocal(r.coord)
 	r.settings = settings
 
 	return r
