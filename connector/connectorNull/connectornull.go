@@ -1,4 +1,4 @@
-package connector
+package connectorNull
 
 import (
 	"context"
@@ -26,6 +26,11 @@ type NullWriteConnector struct {
 	flowCancelFunc context.CancelFunc
 }
 
+const (
+	connectorDBType              = "/dev/null"
+	progressReportingIntervalSec = 10
+)
+
 func NewNullConnector(desc string) *NullWriteConnector {
 	return &NullWriteConnector{
 		desc: desc,
@@ -36,7 +41,7 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 	nc.ctx = ctx
 	nc.t = t
 	// Instantiate ConnectorType
-	nc.connectorType = iface.ConnectorType{DbType: "/dev/null"}
+	nc.connectorType = iface.ConnectorType{DbType: connectorDBType}
 	// Instantiate ConnectorCapabilities
 	nc.connectorCapabilities = iface.ConnectorCapabilities{Source: false, Sink: true, IntegrityCheck: false}
 	//Instantiate ConnectorStatus
