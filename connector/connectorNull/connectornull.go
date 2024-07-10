@@ -66,7 +66,7 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("NullWriteConnector has been configured with ID " + nc.id.ID)
+	slog.Info("NullWriteConnector has been configured with ID " + (string)(nc.id))
 
 	return nil
 }

@@ -120,7 +120,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("MongoConnector has been configured with ID " + mc.id.ID)
+	slog.Info("MongoConnector has been configured with ID " + (string)(mc.id))
 
 	return nil
 }

@@ -33,9 +33,7 @@ const (
 	MutationType_Delete
 )
 
-type DataChannelID struct {
-	ID string
-}
+type DataChannelID string
 
 type Transport interface {
 	// Gives the coordinator endpoint as a signalling interface

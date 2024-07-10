@@ -59,9 +59,9 @@ func (c *SimpleCoordinator) addConnector(connector ConnectorDetailsWithEp) iface
 	var cid iface.ConnectorID
 
 	// If details.Id is not empty, means that the connector is being re-registered
-	if connector.Details.Id.ID != "" {
+	if connector.Details.Id != "" {
 		//TODO: check if the connector is already in the map - this would be an error
-		slog.Debug("Re-registering connector with ID: " + connector.Details.Id.ID)
+		slog.Debug("Re-registering connector with ID: " + (string)(connector.Details.Id))
 		cid = connector.Details.Id
 	} else {
 		// we need to generate a new unique ID
@@ -149,7 +149,7 @@ func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, ce
 
 	// Add the connector to the list
 	cid := c.addConnector(ConnectorDetailsWithEp{Details: details, Endpoint: cep})
-	slog.Debug("assigned connector ID: " + cid.ID)
+	slog.Debug("assigned connector ID: " + (string)(cid))
 
 	// Implement the RegisterConnector method
 	return cid, nil
@@ -165,7 +165,7 @@ func (c *SimpleCoordinator) DelistConnector(cid iface.ConnectorID) {
 func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 	// Check flow type and error out if not unidirectional
 	if o.Type != iface.UnidirectionalFlowType {
-		return iface.FlowID{}, fmt.Errorf("only unidirectional flows are supported")
+		return iface.FlowID(""), fmt.Errorf("only unidirectional flows are supported")
 	}
 
 	// for unidirectional flows we need two data channels
@@ -174,7 +174,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	// TODO (AK, 6/2024): use different channels for source and destination (could be a thing to negotiate between connectors)
 	dc0, err := c.t.CreateDataChannel()
 	if err != nil {
-		return iface.FlowID{}, fmt.Errorf("failed to create data channel 0: %v", err)
+		return iface.FlowID(""), fmt.Errorf("failed to create data channel 0: %v", err)
 	}
 	dataChannels := make([]iface.DataChannelID, 2)
 	dataChannels[0] = dc0

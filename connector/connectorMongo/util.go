@@ -95,5 +95,5 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
 	}
-	return iface.ConnectorID{ID: strconv.FormatUint(id, 16)}
+	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }

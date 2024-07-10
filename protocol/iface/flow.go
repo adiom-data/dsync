@@ -5,9 +5,7 @@
  */
 package iface
 
-type FlowID struct {
-	ID string
-}
+type FlowID string
 
 type FlowOptions struct {
 	Type uint

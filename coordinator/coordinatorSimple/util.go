@@ -21,7 +21,7 @@ type ConnectorDetailsWithEp struct {
 
 func generateConnectorID() iface.ConnectorID {
 	id := uuid.New()
-	return iface.ConnectorID{ID: id.String()}
+	return iface.ConnectorID(id.String())
 }
 
 // name for the flow state store in metadata
@@ -50,5 +50,5 @@ func generateFlowID(o iface.FlowOptions) iface.FlowID {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
 	}
-	return iface.FlowID{ID: strconv.FormatUint(id, 16)}
+	return iface.FlowID(strconv.FormatUint(id, 16))
 }

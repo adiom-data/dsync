@@ -101,7 +101,7 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("RandomReadConnector has been configured with ID " + rc.id.ID)
+	slog.Info("RandomReadConnector has been configured with ID " + (string)(rc.id))
 
 	return nil
 }

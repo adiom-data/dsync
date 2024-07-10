@@ -122,11 +122,11 @@ func (r *RunnerLocal) Run() {
 		}
 	}
 
-	if (srcId == iface.ConnectorID{}) {
+	if srcId == iface.ConnectorID("") {
 		slog.Error("Source connector not found")
 		return
 	}
-	if (dstId == iface.ConnectorID{}) {
+	if dstId == iface.ConnectorID("") {
 		slog.Error("Source connector not found")
 		return
 	}

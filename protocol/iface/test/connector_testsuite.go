@@ -54,7 +54,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	// transport should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
-	testConnectorID := iface.ConnectorID{ID: "1"}
+	testConnectorID := iface.ConnectorID("1")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
 		// Store advertised connector capabilities to skip irrelevant tests
@@ -75,14 +75,14 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	// Check if the connector supports source capabilities
 	if !caps.Source {
 		// Check that the method fails first
-		err := connector.StartReadToChannel(iface.FlowID{ID: "1234"}, iface.ConnectorOptions{}, iface.ConnectorReadPlan{}, iface.DataChannelID{ID: "4321"})
+		err := connector.StartReadToChannel(iface.FlowID("1234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{}, iface.DataChannelID("4321"))
 		assert.Error(suite.T(), err, "Should fail to read data from a source if the connector does not support source capabilities")
 		suite.T().Skip("Skipping test because this connector does not support source capabilities")
 	}
 
 	// Do some prep
-	flowID := iface.FlowID{ID: "1234"}
-	dataChannelID := iface.DataChannelID{ID: "4321"}
+	flowID := iface.FlowID("1234")
+	dataChannelID := iface.DataChannelID("4321")
 	dataChannel := make(chan iface.DataMessage)
 	options := iface.ConnectorOptions{}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
@@ -166,7 +166,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	// transport should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
-	testConnectorID := iface.ConnectorID{ID: "2"}
+	testConnectorID := iface.ConnectorID("2")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
 		// Store advertised connector capabilities to skip irrelevant tests
@@ -187,14 +187,14 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	// Check if the connector supports sink capabilities
 	if !caps.Sink {
 		// Check that the method fails first
-		err := connector.StartWriteFromChannel(iface.FlowID{ID: "2234"}, iface.DataChannelID{ID: "4321"})
+		err := connector.StartWriteFromChannel(iface.FlowID("2234"), iface.DataChannelID("4321"))
 		assert.Error(suite.T(), err, "Should fail to write data to a sink if the connector does not support sink capabilities")
 		suite.T().Skip("Skipping test because this connector does not support sink capabilities")
 	}
 
 	// Do some prep
-	flowID := iface.FlowID{ID: "2234"}
-	dataChannelID := iface.DataChannelID{ID: "4321"}
+	flowID := iface.FlowID("2234")
+	dataChannelID := iface.DataChannelID("4321")
 	dataChannel := make(chan iface.DataMessage)
 	defer close(dataChannel)
 
@@ -269,7 +269,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheck() {
 	// transport should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
-	testConnectorID := iface.ConnectorID{ID: "3"}
+	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
 		// Store advertised connector capabilities to skip irrelevant tests
@@ -290,13 +290,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheck() {
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		err := connector.RequestDataIntegrityCheck(iface.FlowID{ID: "3234"}, iface.ConnectorOptions{})
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{})
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
 
 	// Do some prep
-	flowID := iface.FlowID{ID: "3234"}
+	flowID := iface.FlowID("3234")
 	options := iface.ConnectorOptions{}
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil)
 

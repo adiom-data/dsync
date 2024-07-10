@@ -7,9 +7,7 @@ package iface
 
 import "context"
 
-type ConnectorID struct {
-	ID string
-}
+type ConnectorID string
 
 // General coordinator interface
 type Coordinator interface {
