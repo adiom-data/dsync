@@ -25,7 +25,7 @@ func generateConnectorID() iface.ConnectorID {
 }
 
 // name for the flow state store in metadata
-const FLOW_STATE_METADATA_STORE = "flow-state"
+const FLOW_STATE_METADATA_STORE = "flow_state"
 
 type FlowDetails struct {
 	FlowID     iface.FlowID
