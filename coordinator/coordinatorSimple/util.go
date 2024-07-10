@@ -6,8 +6,12 @@
 package coordinatorSimple
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/google/uuid"
+	"github.com/mitchellh/hashstructure"
 )
 
 type ConnectorDetailsWithEp struct {
@@ -36,7 +40,12 @@ type FlowDetails struct {
 	readPlanningDone chan struct{}           //for source connector to let us know they're done with read planning
 }
 
-func generateFlowID() iface.FlowID {
-	id := uuid.New()
-	return iface.FlowID{ID: id.String()}
+// Generates static flow ID based on the flow options which should be unique across the board
+// XXX: is this the right place for this?
+func generateFlowID(o iface.FlowOptions) iface.FlowID {
+	id, err := hashstructure.Hash(o, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
+	}
+	return iface.FlowID{ID: strconv.FormatUint(id, 16)}
 }

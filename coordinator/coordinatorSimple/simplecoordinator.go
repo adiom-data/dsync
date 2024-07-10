@@ -51,21 +51,29 @@ func (c *SimpleCoordinator) delConnector(cid iface.ConnectorID) {
 	delete(c.connectors, cid)
 }
 
-// adds a connector with a unqiue ID and returns the ID
+// adds a connector with a unique ID and returns the ID
 func (c *SimpleCoordinator) addConnector(connector ConnectorDetailsWithEp) iface.ConnectorID {
 	c.mu_connectors.Lock()
 	defer c.mu_connectors.Unlock()
 
 	var cid iface.ConnectorID
 
-	for {
-		cid = generateConnectorID()
-		if _, ok := c.connectors[cid]; !ok {
-			break
+	// If details.Id is not empty, means that the connector is being re-registered
+	if connector.Details.Id.ID != "" {
+		//TODO: check if the connector is already in the map - this would be an error
+		slog.Debug("Re-registering connector with ID: " + connector.Details.Id.ID)
+		cid = connector.Details.Id
+	} else {
+		// we need to generate a new unique ID
+		for {
+			cid = generateConnectorID()
+			if _, ok := c.connectors[cid]; !ok {
+				break
+			}
 		}
+		connector.Details.Id = cid // set the ID in the details for easier operations later
 	}
 
-	connector.Details.Id = cid // set the ID in the details for easier operations later
 	c.connectors[cid] = connector
 
 	return cid
@@ -102,7 +110,7 @@ func (c *SimpleCoordinator) addFlow(details *FlowDetails) iface.FlowID {
 	var fid iface.FlowID
 
 	for {
-		fid = generateFlowID()
+		fid = generateFlowID(details.Options)
 		if _, ok := c.flows[fid]; !ok {
 			break
 		}
@@ -139,11 +147,6 @@ func (c *SimpleCoordinator) Teardown() {
 func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, cep iface.ConnectorICoordinatorSignal) (iface.ConnectorID, error) {
 	slog.Info("Registering connector with details: " + fmt.Sprintf("%v", details))
 
-	// Check that the details.Id is empty, otherwise error
-	if details.Id.ID != "" {
-		return iface.ConnectorID{}, fmt.Errorf("we don't support re-registering connectors yet")
-	}
-
 	// Add the connector to the list
 	cid := c.addConnector(ConnectorDetailsWithEp{Details: details, Endpoint: cep})
 	slog.Debug("assigned connector ID: " + cid.ID)
@@ -159,7 +162,7 @@ func (c *SimpleCoordinator) DelistConnector(cid iface.ConnectorID) {
 	c.delConnector(cid)
 }
 
-func (c *SimpleCoordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error) {
+func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 	// Check flow type and error out if not unidirectional
 	if o.Type != iface.UnidirectionalFlowType {
 		return iface.FlowID{}, fmt.Errorf("only unidirectional flows are supported")

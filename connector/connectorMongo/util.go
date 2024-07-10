@@ -9,7 +9,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -83,4 +86,14 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 	}
 
 	return resumeToken, nil
+}
+
+// Generates static connector ID based on connection string
+// XXX: is this the best place to do this?
+func generateConnectorID(connectionString string) iface.ConnectorID {
+	id, err := hashstructure.Hash(connectionString, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
+	}
+	return iface.ConnectorID{ID: strconv.FormatUint(id, 16)}
 }

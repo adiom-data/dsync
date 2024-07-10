@@ -70,7 +70,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:     "metadata",
 			Usage:    "Metadata store connection string",
 			Aliases:  []string{"m"},
-			Required: true,
+			Required: true, //TODO: make it optional
 		}),
 		altsrc.NewGenericFlag(&cli.GenericFlag{
 			Name:    "namespace",

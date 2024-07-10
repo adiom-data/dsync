@@ -20,10 +20,10 @@ type Coordinator interface {
 	// User
 	GetConnectors() []ConnectorDetails
 
-	FlowCreate(o FlowOptions) (FlowID, error)
-	FlowStart(fid FlowID) error
-	FlowStop(fid FlowID)
-	FlowDestroy(fid FlowID)
+	FlowGetOrCreate(o FlowOptions) (FlowID, error)                              // Get or create a flow if it doesn't exist
+	FlowStart(fid FlowID) error                                                 // Start the flow or resume it
+	FlowStop(fid FlowID)                                                        // Stop the flow
+	FlowDestroy(fid FlowID)                                                     // Destroy the flow and the associated metadata
 	WaitForFlowDone(flowId FlowID) error                                        // Wait for the flow to be done
 	PerformFlowIntegrityCheck(fid FlowID) (FlowDataIntegrityCheckResult, error) // Perform an integrity check on the flow (synchronous)
 	GetFlowStatus(fid FlowID) (FlowStatus, error)                               // Get the status of the flow

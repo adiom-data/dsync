@@ -138,7 +138,7 @@ func (r *RunnerLocal) Run() {
 		Type:                iface.UnidirectionalFlowType,
 		SrcConnectorOptions: iface.ConnectorOptions{Namespace: r.settings.NsFromString},
 	}
-	flowID, err := r.coord.FlowCreate(flowOptions)
+	flowID, err := r.coord.FlowGetOrCreate(flowOptions)
 	if err != nil {
 		slog.Error("Failed to create flow", err)
 		return

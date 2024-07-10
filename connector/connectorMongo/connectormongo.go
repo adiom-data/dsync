@@ -109,8 +109,11 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 	mc.coord = coord
 
+	// Generate connector ID for resumability purposes
+	id := generateConnectorID(mc.settings.ConnectionString)
+
 	// Create a new connector details structure
-	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities}
+	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities, Id: id}
 	// Register the connector
 	mc.id, err = coord.RegisterConnector(connectorDetails, mc)
 	if err != nil {
