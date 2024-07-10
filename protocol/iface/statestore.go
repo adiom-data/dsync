@@ -11,4 +11,9 @@ type Statestore interface {
 	// General
 	Setup(ctx context.Context) error
 	Teardown()
+
+	// Read plan persistence
+	//TODO: should we persist the whole flow state? (we may need an object for this)
+	//TODO: should this be more generic here and the specifics delegated to the coordinator impl?
+	FlowPlanPersist(FlowID, ConnectorReadPlan) error
 }

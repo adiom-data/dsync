@@ -236,6 +236,12 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	select {
 	case <-flowDet.readPlanningDone:
 		slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
+		err := c.s.FlowPlanPersist(fid, flowDet.ReadPlan)
+		if err != nil {
+			slog.Error("Failed to persist the flow plan", err)
+			return err
+		}
+		return fmt.Errorf("XXXX") //TODO: remove
 	case <-c.ctx.Done():
 		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("context cancelled while waiting for read planning to be done")
