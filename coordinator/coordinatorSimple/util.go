@@ -24,15 +24,18 @@ func generateConnectorID() iface.ConnectorID {
 	return iface.ConnectorID{ID: id.String()}
 }
 
+// name for the flow state store in metadata
+const FLOW_STATE_METADATA_STORE = "flow-state"
+
 type FlowDetails struct {
 	FlowID     iface.FlowID
 	Options    iface.FlowOptions
 	flowStatus iface.FlowStatus
 
-	DataChannels []iface.DataChannelID
+	dataChannels []iface.DataChannelID
 
-	DoneNotificationChannels   []chan struct{}                                //for connectors to let us know they're done with the flow
-	IntegrityCheckDoneChannels []chan iface.ConnectorDataIntegrityCheckResult //for connectors to post the results of the integrity check (this can be a continious stream in the future, hence a channel)
+	doneNotificationChannels   []chan struct{}                                //for connectors to let us know they're done with the flow
+	integrityCheckDoneChannels []chan iface.ConnectorDataIntegrityCheckResult //for connectors to post the results of the integrity check (this can be a continious stream in the future, hence a channel)
 
 	flowDone chan struct{} //for everyone else to know the flow is done
 

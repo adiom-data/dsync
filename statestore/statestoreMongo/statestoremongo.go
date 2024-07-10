@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -83,12 +82,12 @@ func (s *MongoStateStore) Teardown() {
 	}
 }
 
-func (s *MongoStateStore) GetStore(name string) *mongo.Collection {
+func (s *MongoStateStore) getStore(name string) *mongo.Collection {
 	return s.db.Collection(name)
 }
 
-func (s *MongoStateStore) FlowPlanPersist(fid iface.FlowID, plan iface.ConnectorReadPlan) error {
-	coll := s.GetStore("flow_plan")
-	_, err := coll.UpdateOne(s.ctx, bson.M{"_id": fid.ID}, bson.M{"$set": plan}, options.Update().SetUpsert(true))
+func (s *MongoStateStore) PersistObject(storeName string, id interface{}, obj interface{}) error {
+	coll := s.getStore(storeName)
+	_, err := coll.ReplaceOne(s.ctx, bson.M{"_id": id}, obj, options.Replace().SetUpsert(true))
 	return err
 }

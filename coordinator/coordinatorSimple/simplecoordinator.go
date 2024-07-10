@@ -190,9 +190,9 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 
 	fdet := FlowDetails{
 		Options:                    o,
-		DataChannels:               dataChannels,
-		DoneNotificationChannels:   doneChannels,
-		IntegrityCheckDoneChannels: integrityCheckChannels,
+		dataChannels:               dataChannels,
+		doneNotificationChannels:   doneChannels,
+		integrityCheckDoneChannels: integrityCheckChannels,
 		flowDone:                   make(chan struct{}),
 		readPlanningDone:           make(chan struct{}),
 	}
@@ -236,24 +236,23 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	select {
 	case <-flowDet.readPlanningDone:
 		slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
-		err := c.s.FlowPlanPersist(fid, flowDet.ReadPlan)
+		err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
 		if err != nil {
 			slog.Error("Failed to persist the flow plan", err)
 			return err
 		}
-		return fmt.Errorf("XXXX") //TODO: remove
 	case <-c.ctx.Done():
 		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("context cancelled while waiting for read planning to be done")
 	}
 
 	// Tell source connector to start reading into the data channel
-	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.ReadPlan, flowDet.DataChannels[0]); err != nil {
+	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.ReadPlan, flowDet.dataChannels[0]); err != nil {
 		slog.Error("Failed to start reading from source", err)
 		return err
 	}
 	// Tell destination connector to start writing from the channel
-	if err := dst.Endpoint.StartWriteFromChannel(fid, flowDet.DataChannels[1]); err != nil {
+	if err := dst.Endpoint.StartWriteFromChannel(fid, flowDet.dataChannels[1]); err != nil {
 		slog.Error("Failed to start writing to the destination", err)
 		return err
 	}
@@ -265,14 +264,14 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		// Exit if the context has been cancelled
 		slog.Debug("Waiting for source to finish. Flow ID: " + fmt.Sprintf("%v", fid))
 		select {
-		case <-flowDet.DoneNotificationChannels[0]:
+		case <-flowDet.doneNotificationChannels[0]:
 			slog.Debug("Source finished. Flow ID: " + fmt.Sprintf("%v", fid))
 		case <-c.ctx.Done():
 			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
 		}
 		slog.Debug("Waiting for destination to finish. Flow ID: " + fmt.Sprintf("%v", fid))
 		select {
-		case <-flowDet.DoneNotificationChannels[1]:
+		case <-flowDet.doneNotificationChannels[1]:
 			slog.Debug("Destination finished. Flow ID: " + fmt.Sprintf("%v", fid))
 		case <-c.ctx.Done():
 			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
@@ -311,7 +310,7 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 		slog.Error(fmt.Sprintf("Flow %v not found", fid))
 	}
 	// close the data channels
-	for _, ch := range flowDet.DataChannels {
+	for _, ch := range flowDet.dataChannels {
 		c.t.CloseDataChannel(ch)
 	}
 
@@ -334,14 +333,14 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
 		// Close the first notification channel
-		close(flowDet.DoneNotificationChannels[0])
+		close(flowDet.doneNotificationChannels[0])
 		return nil
 	}
 
 	// Check if the connector corresponds to the destination
 	if flowDet.Options.DstId == conn {
 		// Close the second notification channel
-		close(flowDet.DoneNotificationChannels[1])
+		close(flowDet.doneNotificationChannels[1])
 		return nil
 	}
 
@@ -389,13 +388,13 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 
 	// Wait for both results
 	select {
-	case resSource = <-flowDet.IntegrityCheckDoneChannels[0]:
+	case resSource = <-flowDet.integrityCheckDoneChannels[0]:
 		slog.Debug("Got integrity check result from source: " + fmt.Sprintf("%v", resSource))
 	case <-c.ctx.Done():
 		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
 	}
 	select {
-	case resDestination = <-flowDet.IntegrityCheckDoneChannels[1]:
+	case resDestination = <-flowDet.integrityCheckDoneChannels[1]:
 		slog.Debug("Got integrity check result from destination: " + fmt.Sprintf("%v", resDestination))
 	case <-c.ctx.Done():
 		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
@@ -431,15 +430,15 @@ func (c *SimpleCoordinator) PostDataIntegrityCheckResult(flowId iface.FlowID, co
 
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
-		flowDet.IntegrityCheckDoneChannels[0] <- res //post the result to the channel
-		close(flowDet.DoneNotificationChannels[0])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
+		flowDet.integrityCheckDoneChannels[0] <- res //post the result to the channel
+		close(flowDet.doneNotificationChannels[0])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 
 	// Check if the connector corresponds to the destination
 	if flowDet.Options.DstId == conn {
-		flowDet.IntegrityCheckDoneChannels[1] <- res //post the result to the channel
-		close(flowDet.DoneNotificationChannels[1])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
+		flowDet.integrityCheckDoneChannels[1] <- res //post the result to the channel
+		close(flowDet.doneNotificationChannels[1])   //close the notification channel to indicate that we're done here //XXX: not sure if we need this
 		return nil
 	}
 
