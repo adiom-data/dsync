@@ -9,9 +9,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
@@ -45,10 +47,14 @@ func NewMongoStateStore(settings MongoStateStoreSettings) *MongoStateStore {
 func (s *MongoStateStore) Setup(ctx context.Context) error {
 	s.ctx = ctx
 
+	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
+	tM := reflect.TypeOf(bson.M{})
+	reg := bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, tM).Build()
+
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
 	defer cancel()
-	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString)
+	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetRegistry(reg)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
@@ -90,4 +96,19 @@ func (s *MongoStateStore) PersistObject(storeName string, id interface{}, obj in
 	coll := s.getStore(storeName)
 	_, err := coll.ReplaceOne(s.ctx, bson.M{"_id": id}, obj, options.Replace().SetUpsert(true))
 	return err
+}
+
+func (s *MongoStateStore) RetrieveObject(storeName string, id interface{}, obj interface{}) error {
+	coll := s.getStore(storeName)
+	result := coll.FindOne(s.ctx, bson.M{"_id": id})
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	err := result.Decode(obj)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

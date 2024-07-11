@@ -163,6 +163,11 @@ func (c *SimpleCoordinator) DelistConnector(cid iface.ConnectorID) {
 }
 
 func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
+	// attempt to get the persistent flow state from the statestore
+	fid := generateFlowID(o)
+	fdet_temp := FlowDetails{}
+	err_persisted_state := c.s.RetrieveObject(FLOW_STATE_METADATA_STORE, fid, &fdet_temp)
+
 	// Check flow type and error out if not unidirectional
 	if o.Type != iface.UnidirectionalFlowType {
 		return iface.FlowID(""), fmt.Errorf("only unidirectional flows are supported")
@@ -196,9 +201,16 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 		flowDone:                   make(chan struct{}),
 		readPlanningDone:           make(chan struct{}),
 	}
-	fid := c.addFlow(&fdet)
+	// recover the plan, if available
+	if err_persisted_state == nil {
+		slog.Debug(fmt.Sprintf("Found an existing flow %+v", fdet_temp))
+		//XXX: do we need anything else?
+		fdet.ReadPlan = fdet_temp.ReadPlan
+	}
 
-	slog.Debug("Created flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
+	fid = c.addFlow(&fdet)
+
+	slog.Debug("Initialized flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
 
 	return fid, nil
 }
@@ -225,25 +237,30 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	// TODO (AK, 6/2024): Determine shared capabilities and set parameters on src and dst connectors
 	// or maybe that should go into the FlowCreate method
 
-	// Request the source connector to create a plan for reading
-	if err := src.Endpoint.RequestCreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
-		slog.Error("Failed to request read planning from source", err)
-		return err
-	}
-
-	// Wait for the read planning to be done
-	//XXX: we should probably make it async and have a timeout
-	select {
-	case <-flowDet.readPlanningDone:
-		slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
-		err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
-		if err != nil {
-			slog.Error("Failed to persist the flow plan", err)
+	// Check if we have the flow plan already
+	if flowDet.ReadPlan.Tasks != nil {
+		slog.Debug("Using the existing read plan. Flow ID: " + fmt.Sprintf("%v", fid))
+	} else {
+		// Request the source connector to create a plan for reading
+		if err := src.Endpoint.RequestCreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
+			slog.Error("Failed to request read planning from source", err)
 			return err
 		}
-	case <-c.ctx.Done():
-		slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		return fmt.Errorf("context cancelled while waiting for read planning to be done")
+
+		// Wait for the read planning to be done
+		//XXX: we should probably make it async and have a timeout
+		select {
+		case <-flowDet.readPlanningDone:
+			slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
+			err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
+			if err != nil {
+				slog.Error("Failed to persist the flow plan", err)
+				return err
+			}
+		case <-c.ctx.Done():
+			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
+			return fmt.Errorf("context cancelled while waiting for read planning to be done")
+		}
 	}
 
 	// Tell source connector to start reading into the data channel

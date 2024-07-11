@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/mitchellh/mapstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -143,13 +144,19 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	var tasks []DataCopyTask
 	tasks, ok := readPlan.Tasks.([]DataCopyTask)
 	if !ok {
-		return errors.New("failed to convert tasks to []DataCopyTask")
+		//we might be getting a []map[string]interface{} instead of []DataCopyTask
+		//XXX: is there a better way to serialize/deserialize the read plan?
+		slog.Debug("Failed to cast tasks to []DataCopyTask, attempting to decode")
+		err := mapstructure.Decode(readPlan.Tasks, &tasks)
+		if err != nil {
+			return errors.New("failed to convert tasks to []DataCopyTask: " + err.Error())
+		}
 	}
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
 
-	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
+	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
