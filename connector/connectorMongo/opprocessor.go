@@ -14,10 +14,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
-// TODO: this needs to be synchronized with the actual prcoessing of the data messages
+// TODO: this needs to be synchronized with the actual processing of the data messages
 func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
 	// print barrier message
 	slog.Debug(fmt.Sprintf("Received barrier message of type %v for id %v", barrierMsg.BarrierType, barrierMsg.BarrierTaskId))
+	// notify the coordinator that the task is done from our side
+	mc.coord.NotifyTaskDone(mc.flowId, mc.id, barrierMsg.BarrierTaskId)
 	return nil
 }
 

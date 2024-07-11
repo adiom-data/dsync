@@ -47,8 +47,11 @@ type CoordinatorIConnectorSignal interface {
 	RegisterConnector(details ConnectorDetails, cep ConnectorICoordinatorSignal) (ConnectorID, error)
 	DelistConnector(ConnectorID)
 
-	// Done event (for a connector to announce that they finished the flow)
+	// Done event for a flow (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
+
+	// Done event for a task (for a connector to announce that they finished a task)
+	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId uint) error
 
 	// Planning completion event (for a connector to share the read plan)
 	PostReadPlanningResult(flowId FlowID, conn ConnectorID, res ConnectorReadPlanResult) error

@@ -364,6 +364,41 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	return fmt.Errorf("connector not part of the flow")
 }
 
+func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId uint) error {
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	// Check if the connector corresponds to the source
+	if flowDet.Options.SrcId == conn {
+		slog.Debug("Task done notification from source connector for task ID: " + fmt.Sprintf("%v", taskId))
+		return nil
+	}
+
+	// Check if the connector corresponds to the destination
+	if flowDet.Options.DstId == conn {
+		slog.Debug("Task done notification from destination connector for task ID: " + fmt.Sprintf("%v", taskId))
+		// update the flow state to reflect the task completion
+		err := updateFlowTaskStatus(flowDet, taskId)
+		if err != nil {
+			return err
+		}
+
+		// persist the updated flow state
+		err = c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
+		if err != nil {
+			slog.Error("Failed to persist the flow plan", err)
+			return err
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("connector not part of the flow")
+}
+
 func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
 	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
 
