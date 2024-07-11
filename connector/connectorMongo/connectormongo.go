@@ -381,6 +381,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					cursor.Close(mc.flowCtx)
 					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
+					//send a barrier message to signal the end of the task
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: task.Id}
 				}
 			}()
 		}

@@ -29,6 +29,7 @@ var (
 )
 
 type DataCopyTask struct {
+	Id  uint //starts with 1 to distinguish from an unset value
 	Db  string
 	Col string
 }
@@ -37,6 +38,7 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 	var dbsToResolve []string //database names that we need to resolve
 
 	var tasks []DataCopyTask
+	taskId := uint(1)
 
 	if namespaces == nil {
 		var err error
@@ -51,7 +53,8 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		for _, ns := range namespaces {
 			db, col, isFQN := strings.Cut(ns, ".")
 			if isFQN {
-				tasks = append(tasks, DataCopyTask{Db: db, Col: col})
+				tasks = append(tasks, DataCopyTask{Db: db, Col: col, Id: taskId})
+				taskId++
 			} else {
 				dbsToResolve = append(dbsToResolve, ns)
 			}
@@ -68,7 +71,8 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		}
 		//create tasks for these
 		for _, coll := range colls {
-			tasks = append(tasks, DataCopyTask{Db: db, Col: coll})
+			tasks = append(tasks, DataCopyTask{Db: db, Col: coll, Id: taskId})
+			taskId++
 		}
 	}
 
