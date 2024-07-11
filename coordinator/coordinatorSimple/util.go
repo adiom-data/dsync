@@ -53,7 +53,7 @@ func generateFlowID(o iface.FlowOptions) iface.FlowID {
 	return iface.FlowID(strconv.FormatUint(id, 16))
 }
 
-func updateFlowTaskStatus(flowDet *FlowDetails, taskId uint) error {
+func updateFlowTaskStatus(flowDet *FlowDetails, taskId iface.ReadPlanTaskID) error {
 	//TODO: your code here
 	return nil
 }

@@ -38,8 +38,26 @@ type ConnectorDetails struct {
 
 // Abstraction for the read plan
 type ConnectorReadPlan struct {
-	Tasks interface{}
+	Tasks []ReadPlanTask
 }
+
+type ReadPlanTask struct {
+	Id     ReadPlanTaskID //should always start with 1 to avoid confusion with an uninitialized value
+	Status uint
+
+	//XXX: this should be interface{} - a connector-specific task definition (implementation-specific) but making simple for now
+	Def struct {
+		Db  string
+		Col string
+	}
+}
+
+type ReadPlanTaskID uint
+
+const (
+	ReadPlanTaskStatus_New = iota
+	ReadPlanTaskStatus_Completed
+)
 
 // Singalling coordinator interface for use by connectors
 type CoordinatorIConnectorSignal interface {
@@ -51,7 +69,7 @@ type CoordinatorIConnectorSignal interface {
 	NotifyDone(flowId FlowID, conn ConnectorID) error
 
 	// Done event for a task (for a connector to announce that they finished a task)
-	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId uint) error
+	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error
 
 	// Planning completion event (for a connector to share the read plan)
 	PostReadPlanningResult(flowId FlowID, conn ConnectorID, res ConnectorReadPlanResult) error

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/mitchellh/mapstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -143,17 +142,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 	mc.flowId = flowId
 
-	var tasks []DataCopyTask
-	tasks, ok := readPlan.Tasks.([]DataCopyTask)
-	if !ok {
-		//we might be getting a []map[string]interface{} instead of []DataCopyTask
-		//XXX: is there a better way to serialize/deserialize the read plan?
-		slog.Debug("Failed to cast tasks to []DataCopyTask, attempting to decode")
-		err := mapstructure.Decode(readPlan.Tasks, &tasks)
-		if err != nil {
-			return errors.New("failed to convert tasks to []DataCopyTask: " + err.Error())
-		}
-	}
+	tasks := readPlan.Tasks
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
@@ -337,7 +326,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
 		//create a channel to distribute tasks to copiers
-		taskChannel := make(chan DataCopyTask)
+		taskChannel := make(chan iface.ReadPlanTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
 		wg.Add(mc.settings.initialSyncNumParallelCopiers)
@@ -348,8 +337,8 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
-					db := task.Db
-					col := task.Col
+					db := task.Def.Db
+					col := task.Def.Col
 					collection := mc.client.Database(db).Collection(col)
 					cursor, err := collection.Find(mc.flowCtx, bson.D{})
 					if err != nil {
@@ -386,7 +375,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					//notify the coordinator that the task is done from our side
 					mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
 					//send a barrier message to signal the end of the task
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: task.Id}
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
 				}
 			}()
 		}

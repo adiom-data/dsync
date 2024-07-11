@@ -364,7 +364,7 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId uint) error {
+func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {

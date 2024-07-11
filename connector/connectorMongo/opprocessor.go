@@ -19,7 +19,7 @@ func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) err
 	// print barrier message
 	slog.Debug(fmt.Sprintf("Received barrier message of type %v for id %v", barrierMsg.BarrierType, barrierMsg.BarrierTaskId))
 	// notify the coordinator that the task is done from our side
-	mc.coord.NotifyTaskDone(mc.flowId, mc.id, barrierMsg.BarrierTaskId)
+	mc.coord.NotifyTaskDone(mc.flowId, mc.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId))
 	return nil
 }
 
