@@ -102,24 +102,13 @@ func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
 	return flow, ok
 }
 
-// adds a flow and returns the ID
-func (c *SimpleCoordinator) addFlow(details *FlowDetails) iface.FlowID {
+// adds a flow that must already have the ID set (since it's static)
+func (c *SimpleCoordinator) addFlow(details *FlowDetails) {
 	c.mu_flows.Lock()
 	defer c.mu_flows.Unlock()
 
-	var fid iface.FlowID
-
-	for {
-		fid = generateFlowID(details.Options)
-		if _, ok := c.flows[fid]; !ok {
-			break
-		}
-	}
-
-	details.FlowID = fid // set the ID in the details for easier operations later
+	var fid iface.FlowID = details.FlowID
 	c.flows[fid] = details
-
-	return fid
 }
 
 // removes a flow from the map
@@ -194,6 +183,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	integrityCheckChannels[1] = make(chan iface.ConnectorDataIntegrityCheckResult, 1) //XXX: creating buffered channels for now to avoid blocking on writes
 
 	fdet := FlowDetails{
+		FlowID:                     fid,
 		Options:                    o,
 		dataChannels:               dataChannels,
 		doneNotificationChannels:   doneChannels,
@@ -204,11 +194,11 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	// recover the plan, if available
 	if err_persisted_state == nil {
 		slog.Debug(fmt.Sprintf("Found an existing flow %v", fdet_temp.FlowID))
-		//XXX: do we need anything else?
+		//XXX: do we need to recover anything else?
 		fdet.ReadPlan = fdet_temp.ReadPlan
 	}
 
-	fid = c.addFlow(&fdet)
+	c.addFlow(&fdet)
 
 	slog.Debug("Initialized flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
 
