@@ -381,7 +381,7 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 	if flowDet.Options.DstId == conn {
 		slog.Debug("Task done notification from destination connector for task ID: " + fmt.Sprintf("%v", taskId))
 		// update the flow state to reflect the task completion
-		err := updateFlowTaskStatus(flowDet, taskId)
+		err := updateFlowTaskStatus(flowDet, taskId, iface.ReadPlanTaskStatus_Completed)
 		if err != nil {
 			return err
 		}

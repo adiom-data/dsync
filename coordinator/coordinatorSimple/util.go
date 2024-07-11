@@ -53,7 +53,12 @@ func generateFlowID(o iface.FlowOptions) iface.FlowID {
 	return iface.FlowID(strconv.FormatUint(id, 16))
 }
 
-func updateFlowTaskStatus(flowDet *FlowDetails, taskId iface.ReadPlanTaskID) error {
-	//TODO: your code here
-	return nil
+func updateFlowTaskStatus(flowDet *FlowDetails, taskId iface.ReadPlanTaskID, taskStatus uint) error {
+	for i, task := range flowDet.ReadPlan.Tasks {
+		if task.Id == taskId {
+			flowDet.ReadPlan.Tasks[i].Status = taskStatus
+			return nil
+		}
+	}
+	return fmt.Errorf("task with ID %d not found", taskId)
 }
