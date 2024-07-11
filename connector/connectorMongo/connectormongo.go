@@ -382,7 +382,12 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 		//iterate over all the tasks and distribute them to copiers
 		for _, task := range tasks {
-			taskChannel <- task
+			if task.Status == iface.ReadPlanTaskStatus_Completed {
+				// the task is already completed, so we can just skip it
+				readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+			} else {
+				taskChannel <- task
+			}
 		}
 		//close the task channel to signal copiers that there are no more tasks
 		close(taskChannel)

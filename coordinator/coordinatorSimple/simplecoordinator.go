@@ -203,7 +203,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	}
 	// recover the plan, if available
 	if err_persisted_state == nil {
-		slog.Debug(fmt.Sprintf("Found an existing flow %+v", fdet_temp))
+		slog.Debug(fmt.Sprintf("Found an existing flow %v", fdet_temp.FlowID))
 		//XXX: do we need anything else?
 		fdet.ReadPlan = fdet_temp.ReadPlan
 	}
