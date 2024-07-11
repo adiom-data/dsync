@@ -466,11 +466,19 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 							loop = false
 							break
 						}
-						// Process the data message
-						writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
-						err = mc.processDataMessage(dataMsg)
-						if err != nil {
-							slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+						// Check if this is a barrier first
+						if dataMsg.MutationType == iface.MutationType_Barrier {
+							err = mc.handleBarrierMessage(dataMsg)
+							if err != nil {
+								slog.Error(fmt.Sprintf("Failed to handle barrier message: %v", err))
+							}
+						} else {
+							// Process the data message
+							writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
+							err = mc.processDataMessage(dataMsg)
+							if err != nil {
+								slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+							}
 						}
 					}
 				}

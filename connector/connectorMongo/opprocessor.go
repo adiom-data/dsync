@@ -14,6 +14,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
+// TODO: this needs to be synchronized with the actual prcoessing of the data messages
+func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
+	// print barrier message
+	slog.Debug(fmt.Sprintf("Received barrier message of type %v for id %v", barrierMsg.BarrierType, barrierMsg.BarrierTaskId))
+	return nil
+}
+
 // TODO (AK, 6/2024): this should be parallelized with a batch assembly (e.g. per-namespace) and a worker pool
 func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
