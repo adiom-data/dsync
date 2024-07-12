@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+
 package options
 
 import (
@@ -17,7 +18,7 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "DEBUG"
 
-var allowedVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
+var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 
 type ListFlag struct {
 	Values []string
@@ -39,11 +40,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 	flags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "verbosity",
-			Usage:       fmt.Sprintf("set the verbosity level (%s)", strings.Join(allowedVerbosities, ",")),
+			Usage:       fmt.Sprintf("set the verbosity level (%s)", strings.Join(validVerbosities, ",")),
 			Value:       DefaultVerbosity,
 			DefaultText: DefaultVerbosity,
 			Action: func(ctx *cli.Context, verbosity string) error {
-				if !slices.Contains(allowedVerbosities, verbosity) {
+				if !slices.Contains(validVerbosities, verbosity) {
 					return fmt.Errorf("unsupported verbosity setting %v", verbosity)
 				}
 				return nil
