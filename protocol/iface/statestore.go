@@ -18,4 +18,7 @@ type Statestore interface {
 
 	// Retrieves an object from a store by id
 	RetrieveObject(storeName string, id interface{}, obj interface{}) error
+
+	// Deletes an object from a store by id
+	DeleteObject(storeName string, id interface{}) error
 }

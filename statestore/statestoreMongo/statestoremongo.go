@@ -112,3 +112,9 @@ func (s *MongoStateStore) RetrieveObject(storeName string, id interface{}, obj i
 
 	return nil
 }
+
+func (s *MongoStateStore) DeleteObject(storeName string, id interface{}) error {
+	coll := s.getStore(storeName)
+	_, err := coll.DeleteOne(s.ctx, bson.M{"_id": id})
+	return err
+}

@@ -70,7 +70,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:     "metadata",
 			Usage:    "Metadata store connection string",
 			Aliases:  []string{"m"},
-			Required: true, //TODO: make it optional
+			Required: true,
 		}),
 		altsrc.NewGenericFlag(&cli.GenericFlag{
 			Name:    "namespace",
@@ -81,6 +81,10 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "verify",
 			Usage: "Perform a data integrity check for an existing flow",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "cleanup",
+			Usage: "Cleanup metadata for an existing flow",
 		}),
 		&cli.StringFlag{
 			Name:    "config",

@@ -198,7 +198,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	}
 	// recover the plan, if available
 	if err_persisted_state == nil {
-		slog.Debug(fmt.Sprintf("Found an existing flow %v", fdet_temp.FlowID))
+		slog.Info(fmt.Sprintf("Found an existing flow %v", fdet_temp.FlowID))
 		//XXX: do we need to recover anything else?
 		fdet.ReadPlan = fdet_temp.ReadPlan
 	}
@@ -329,8 +329,8 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	slog.Debug("Destroying flow with ID: " + fmt.Sprintf("%v", fid))
 
 	// Get the flow details
-	flowDet, err := c.getFlow(fid)
-	if !err {
+	flowDet, ok := c.getFlow(fid)
+	if !ok {
 		slog.Error(fmt.Sprintf("Flow %v not found", fid))
 	}
 	// close the data channels
@@ -345,6 +345,12 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 
 	// remove the flow from the map
 	c.delFlow(fid)
+
+	// remove the flow state from the statestore
+	err := c.s.DeleteObject(FLOW_STATE_METADATA_STORE, fid)
+	if err != nil {
+		slog.Error("Failed to delete flow state", ok)
+	}
 }
 
 func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
