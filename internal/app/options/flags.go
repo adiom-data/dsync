@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+
 package options
 
 import (
@@ -14,42 +15,37 @@ import (
 	"github.com/urfave/cli/v2/altsrc"
 )
 
-// Default values for the options when missing.
-const (
-	DefaultVerbosity = "DEBUG"
-)
+// DefaultVerbosity is the default verbosity level for the application.
+const DefaultVerbosity = "DEBUG"
 
-var (
-	allowedVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
-)
+var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 
 type ListFlag struct {
 	Values []string
 }
 
-func (k *ListFlag) Set(value string) error {
-	//remove spaces
+func (f *ListFlag) Set(value string) error {
 	value = strings.ReplaceAll(value, " ", "")
-	k.Values = strings.Split(value, ",")
+	f.Values = strings.Split(value, ",")
 	return nil
 }
 
-func (k *ListFlag) String() string {
-	return strings.Join(k.Values, ",")
+func (f *ListFlag) String() string {
+	return strings.Join(f.Values, ",")
 }
 
-// Define all CLI options as Flags
-// Additionally, return BeforeFunc for parsing a config file
+// GetFlagsAndBeforeFunc defines all CLI options as flags and returns
+// a BeforeFunc to parse a configuration file before any other actions.
 func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 	flags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "verbosity",
-			Usage:       fmt.Sprintf("set the verbosity level (%s)", strings.Join(allowedVerbosities, ",")),
+			Usage:       fmt.Sprintf("set the verbosity level (%s)", strings.Join(validVerbosities, ",")),
 			Value:       DefaultVerbosity,
 			DefaultText: DefaultVerbosity,
-			Action: func(ctx *cli.Context, v string) error {
-				if !slices.Contains(allowedVerbosities, v) {
-					return fmt.Errorf("unsupported verbosity setting %v", v)
+			Action: func(ctx *cli.Context, verbosity string) error {
+				if !slices.Contains(validVerbosities, verbosity) {
+					return fmt.Errorf("unsupported verbosity setting %v", verbosity)
 				}
 				return nil
 			},
@@ -85,7 +81,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
-			Usage:   "specify the path of the config file",
+			Usage:   "Specify the path of the config file",
 		},
 		cli.VersionFlag,
 	}
