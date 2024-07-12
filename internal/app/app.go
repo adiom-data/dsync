@@ -26,7 +26,7 @@ func NewApp() *cli.App {
 		Name:      "dsync",
 		Usage:     "Copies data from the source to the destination",
 		UsageText: "dsync [options]",
-		Version:   build.VersionStr,
+		Version:   build.VersionInfo(),
 		Copyright: build.CopyrightStr,
 		Action:    runDsync,
 	}

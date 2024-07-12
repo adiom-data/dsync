@@ -28,3 +28,6 @@ dsync
 
 # Some MAC stuff
 .DS_Store
+
+# Jetbrains IDE
+.idea
