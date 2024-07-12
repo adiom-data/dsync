@@ -18,7 +18,7 @@ var (
 // VersionInfo returns a version string for the application
 func VersionInfo() string {
 	return fmt.Sprintf(
-		"dsync, version %v",
+		"%v",
 		VersionStr,
 	)
 }
