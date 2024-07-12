@@ -5,7 +5,11 @@
  */
 package iface
 
-import "context"
+import (
+	"context"
+
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 type ConnectorID string
 
@@ -38,7 +42,8 @@ type ConnectorDetails struct {
 
 // Abstraction for the read plan
 type ConnectorReadPlan struct {
-	Tasks []ReadPlanTask
+	Tasks          []ReadPlanTask
+	CdcResumeToken bson.Raw // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar //XXX: we should also make this generic instead of tying to bson
 }
 
 type ReadPlanTask struct {

@@ -44,6 +44,7 @@ type MongoConnector struct {
 	flowCancelFunc       context.CancelFunc
 	flowId               iface.FlowID
 	flowConnCapabilities iface.ConnectorCapabilities
+	flowCDCResumeToken   bson.Raw
 }
 
 type MongoConnectorSettings struct {
@@ -149,6 +150,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
+	mc.flowCDCResumeToken = readPlan.CdcResumeToken
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
@@ -162,14 +164,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	// Declare two channels to wait for the change stream reader and the initial sync to finish
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
-
-	// Retrive the latest resume token before we start reading anything
-	// We will use the resume token to start the change stream
-	changeStreamStartResumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
-		return err
-	}
 
 	type ReaderProgress struct {
 		initialSyncDocs    atomic.Uint64
@@ -214,7 +208,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
 	go func() {
 		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.id, flowId))
-		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken)
+		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken)
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -263,9 +257,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		var lsn int64 = 0
 
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
-		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, changeStreamStartResumeToken))
+		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, mc.flowCDCResumeToken))
 
-		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
+		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken).SetFullDocument("updateLookup")
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -529,12 +523,22 @@ func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
 
 func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
+		// Retrieve the latest resume token before we start reading anything
+		// We will use the resume token to start the change stream
+		resumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
+			return
+		}
+
 		tasks, err := mc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
 			return
 		}
-		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		mc.flowCDCResumeToken = resumeToken
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: mc.flowCDCResumeToken}
+
 		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
