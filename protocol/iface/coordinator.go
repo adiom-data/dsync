@@ -7,8 +7,6 @@ package iface
 
 import (
 	"context"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type ConnectorID string
@@ -43,7 +41,7 @@ type ConnectorDetails struct {
 // Abstraction for the read plan
 type ConnectorReadPlan struct {
 	Tasks          []ReadPlanTask
-	CdcResumeToken bson.Raw // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar //XXX: we should also make this generic instead of tying to bson
+	CdcResumeToken []byte // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
 }
 
 type ReadPlanTask struct {
@@ -86,5 +84,5 @@ type CoordinatorIConnectorSignal interface {
 	UpdateConnectorStatus(flowId FlowID, conn ConnectorID, status ConnectorStatus) error
 
 	// Post new CDC resume token for a flow
-	UpdateCDCResumeToken(flowId FlowID, conn ConnectorID, resumeToken bson.Raw) error
+	UpdateCDCResumeToken(flowId FlowID, conn ConnectorID, resumeToken []byte) error
 }

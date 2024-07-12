@@ -65,7 +65,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
-	settings.cdcResumeTokenUpdateInterval = 5 * time.Second
+	settings.cdcResumeTokenUpdateInterval = 60 * time.Second
 
 	return &MongoConnector{desc: desc, settings: settings}
 }

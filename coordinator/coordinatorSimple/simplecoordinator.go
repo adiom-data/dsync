@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type SimpleCoordinator struct {
@@ -584,7 +583,7 @@ func (c *SimpleCoordinator) PostReadPlanningResult(flowId iface.FlowID, conn ifa
 	return nil
 }
 
-func (c *SimpleCoordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken bson.Raw) error {
+func (c *SimpleCoordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken []byte) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
