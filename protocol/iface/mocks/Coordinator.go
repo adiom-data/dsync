@@ -261,6 +261,24 @@ func (_m *Coordinator) Teardown() {
 	_m.Called()
 }
 
+// UpdateCDCResumeToken provides a mock function with given fields: flowId, conn, resumeToken
+func (_m *Coordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken []byte) error {
+	ret := _m.Called(flowId, conn, resumeToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCDCResumeToken")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, []byte) error); ok {
+		r0 = rf(flowId, conn, resumeToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateConnectorStatus provides a mock function with given fields: flowId, conn, status
 func (_m *Coordinator) UpdateConnectorStatus(flowId iface.FlowID, conn iface.ConnectorID, status iface.ConnectorStatus) error {
 	ret := _m.Called(flowId, conn, status)
