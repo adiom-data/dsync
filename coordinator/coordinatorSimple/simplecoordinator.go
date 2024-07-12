@@ -349,7 +349,7 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	// remove the flow state from the statestore
 	err := c.s.DeleteObject(FLOW_STATE_METADATA_STORE, fid)
 	if err != nil {
-		slog.Error("Failed to delete flow state", ok)
+		slog.Error("Failed to delete flow state", err)
 	}
 }
 
