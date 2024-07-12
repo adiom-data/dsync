@@ -18,7 +18,7 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "DEBUG"
 
-var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
+var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 type ListFlag struct {
 	Values []string
