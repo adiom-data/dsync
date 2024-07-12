@@ -76,7 +76,7 @@ func (nc *NullWriteConnector) Teardown() {
 	slog.Info(fmt.Sprintf("Null Write Connector %s is completed", nc.id))
 }
 
-func (nc *NullWriteConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
+func (nc *NullWriteConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// not necessary always destination
 }
 

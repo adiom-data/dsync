@@ -39,10 +39,11 @@ type MongoConnector struct {
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status         iface.ConnectorStatus
-	flowCtx        context.Context
-	flowCancelFunc context.CancelFunc
-	flowId         iface.FlowID
+	status               iface.ConnectorStatus
+	flowCtx              context.Context
+	flowCancelFunc       context.CancelFunc
+	flowId               iface.FlowID
+	flowConnCapabilities iface.ConnectorCapabilities
 }
 
 type MongoConnectorSettings struct {
@@ -99,7 +100,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
-	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true}
+	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	mc.status = iface.ConnectorStatus{WriteLSN: 0}
 
@@ -132,8 +133,10 @@ func (mc *MongoConnector) Teardown() {
 	}
 }
 
-func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
-	// Implement SetParameters logic specific to MongoConnector
+func (mc *MongoConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+	// this is what came for the flow
+	mc.flowConnCapabilities = reqCap
+	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", mc.id, flowId, reqCap))
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
@@ -375,7 +378,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					//notify the coordinator that the task is done from our side
 					mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
 					//send a barrier message to signal the end of the task
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
+					if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
+						dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
+					}
 				}
 			}()
 		}

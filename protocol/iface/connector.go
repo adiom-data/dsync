@@ -13,10 +13,14 @@ type ConnectorType struct {
 	Spec    string
 }
 
+// Supported mode of operation
+// If something is announced as true, it can be later turned off through the setParameters call
+// But if something is announced as not supported (false), it can't be turned on
 type ConnectorCapabilities struct {
 	Source         bool
 	Sink           bool
 	IntegrityCheck bool
+	Resumability   bool
 }
 
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
@@ -59,7 +63,7 @@ type Connector interface {
 
 // Signalling Connector Interface for use by Coordinator
 type ConnectorICoordinatorSignal interface {
-	SetParameters(reqCap ConnectorCapabilities) // Set the capabilities requested by the Coordinator
+	SetParameters(flowId FlowID, reqCap ConnectorCapabilities)
 
 	RequestCreateReadPlan(flowId FlowID, options ConnectorOptions) error                                                     // Request planning (async) //XXX: we could not do it explicitly and just post to coordinator lazily whenever we create the plan
 	StartReadToChannel(flowId FlowID, options ConnectorOptions, readPlan ConnectorReadPlan, dataChannel DataChannelID) error // Read data into the provided channel (async)

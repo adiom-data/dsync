@@ -7,6 +7,7 @@ package iface
 
 type FlowID string
 
+// Provided by the user and uniquely determines the flow
 type FlowOptions struct {
 	Type uint
 

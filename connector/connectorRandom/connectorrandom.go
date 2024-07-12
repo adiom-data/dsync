@@ -110,7 +110,7 @@ func (rc *RandomReadConnector) Teardown() {
 	//does nothing, no client to disconnect
 }
 
-func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
+func (rc *RandomReadConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	//not necessary always source
 }
 

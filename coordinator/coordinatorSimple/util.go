@@ -41,6 +41,8 @@ type FlowDetails struct {
 
 	ReadPlan         iface.ConnectorReadPlan //read plan for the flow
 	readPlanningDone chan struct{}           //for source connector to let us know they're done with read planning
+
+	Resumable bool
 }
 
 // Generates static flow ID based on the flow options which should be unique across the board

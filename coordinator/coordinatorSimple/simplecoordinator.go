@@ -162,6 +162,11 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 		return iface.FlowID(""), fmt.Errorf("only unidirectional flows are supported")
 	}
 
+	// Check if the source and destination connectors support the right modes
+	if err := c.validateConnectorCapabilitiesForFlow(o); err != nil {
+		return iface.FlowID(""), fmt.Errorf("connector capabilities validation failed: %v", err)
+	}
+
 	// for unidirectional flows we need two data channels
 	// 0 corresponds to the source and 1 to the destination
 	// here we're getting away with a trick to short circuit using a single channel
@@ -224,12 +229,22 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		return fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
 	}
 
-	// TODO (AK, 6/2024): Determine shared capabilities and set parameters on src and dst connectors
-	// or maybe that should go into the FlowCreate method
+	// Set parameters on the source and destination connectors otherwise they may not be aligned on what they're doing
+	flowCap := calcSharedCapabilities(src.Details.Cap, dst.Details.Cap)
+	slog.Debug("Shared capabilities for the flow: " + fmt.Sprintf("%+v", flowCap))
+	srcCapReq := calcReqCapabilities(src.Details.Cap, flowCap)
+	dstCapReq := calcReqCapabilities(dst.Details.Cap, flowCap)
+	src.Endpoint.SetParameters(fid, srcCapReq)
+	dst.Endpoint.SetParameters(fid, dstCapReq)
+	// Set resumability flag for the flow
+	flowDet.Resumable = flowCap.Resumability
 
-	// Check if we have the flow plan already
-	if flowDet.ReadPlan.Tasks != nil {
-		slog.Debug("Using the existing read plan. Flow ID: " + fmt.Sprintf("%v", fid))
+	// Check if we are resumable and have the flow plan already
+	if flowDet.ReadPlan.Tasks != nil && flowDet.Resumable {
+		slog.Debug("Using the existing read plan for a resumable flow. Flow ID: " + fmt.Sprintf("%v", fid))
+	} else if flowDet.ReadPlan.Tasks != nil {
+		slog.Error("Flow is not resumable but we have found the old plan. Please clean the metadata before restarting. Flow ID: " + fmt.Sprintf("%v", fid))
+		return fmt.Errorf("flow is not resumable but old plan")
 	} else {
 		// Request the source connector to create a plan for reading
 		if err := src.Endpoint.RequestCreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
@@ -242,10 +257,12 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		select {
 		case <-flowDet.readPlanningDone:
 			slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
-			err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
-			if err != nil {
-				slog.Error("Failed to persist the flow plan", err)
-				return err
+			if flowDet.Resumable {
+				err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
+				if err != nil {
+					slog.Error("Failed to persist the flow plan", err)
+					return err
+				}
 			}
 		case <-c.ctx.Done():
 			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
@@ -377,10 +394,12 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 		}
 
 		// persist the updated flow state
-		err = c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
-		if err != nil {
-			slog.Error("Failed to persist the flow plan", err)
-			return err
+		if flowDet.Resumable {
+			err = c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
+			if err != nil {
+				slog.Error("Failed to persist the flow plan", err)
+				return err
+			}
 		}
 
 		return nil
