@@ -5,6 +5,8 @@
  */
 package iface
 
+import "go.mongodb.org/mongo-driver/bson"
+
 type Location struct {
 	Database   string
 	Collection string
@@ -27,8 +29,9 @@ type DataMessage struct {
 	// header for barriers (task completion signals)
 	// combining them in a single struct to allow for a single channel for both data and barriers
 	// for barriers MutationType will be set to MutationType_Barrier
-	BarrierType   uint //required for barriers
-	BarrierTaskId uint //required for barriers
+	BarrierType           uint     //required for barriers
+	BarrierTaskId         uint     //required for barriers related to initial data copy
+	BarrierCdcResumeToken bson.Raw //required for barriers related to CDC
 }
 
 const (
@@ -44,6 +47,7 @@ const (
 const (
 	BarrierType_Reserved = iota
 	BarrierType_TaskComplete
+	BarrierType_CdcResumeTokenUpdate
 )
 
 // Special barrier message used for task completion signals over the data channel

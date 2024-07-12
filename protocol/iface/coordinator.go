@@ -84,4 +84,7 @@ type CoordinatorIConnectorSignal interface {
 
 	// Update the status of the connector
 	UpdateConnectorStatus(flowId FlowID, conn ConnectorID, status ConnectorStatus) error
+
+	// Post new CDC resume token for a flow
+	UpdateCDCResumeToken(flowId FlowID, conn ConnectorID, resumeToken bson.Raw) error
 }

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type SimpleCoordinator struct {
@@ -581,4 +582,37 @@ func (c *SimpleCoordinator) PostReadPlanningResult(flowId iface.FlowID, conn ifa
 	flowDet.ReadPlan = res.ReadPlan
 	close(flowDet.readPlanningDone) //close the channel to indicate that we got the plan
 	return nil
+}
+
+func (c *SimpleCoordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken bson.Raw) error {
+	// Get the flow details
+	flowDet, ok := c.getFlow(flowId)
+	if !ok {
+		return fmt.Errorf("flow not found")
+	}
+
+	// Check if the connector corresponds to the source
+	if flowDet.Options.SrcId == conn {
+		slog.Debug("Ignoring CDC resume token update from the source connector")
+		return nil
+	}
+
+	// Check if the connector corresponds to the destination
+	if flowDet.Options.DstId == conn {
+		slog.Debug("CDC resume token update from destination connector:" + fmt.Sprintf("%v", resumeToken))
+		flowDet.ReadPlan.CdcResumeToken = resumeToken
+
+		// persist the updated flow state
+		if flowDet.Resumable {
+			err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
+			if err != nil {
+				slog.Error("Failed to persist the flow plan", err)
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("connector not part of the flow")
 }

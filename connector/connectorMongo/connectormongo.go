@@ -55,6 +55,7 @@ type MongoConnectorSettings struct {
 	initialSyncNumParallelCopiers int
 	writerMaxBatchSize            int //0 means no limit (in # of documents)
 	numParallelWriters            int
+	cdcResumeTokenUpdateInterval  time.Duration
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -64,6 +65,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
+	settings.cdcResumeTokenUpdateInterval = 5 * time.Second
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -254,6 +256,23 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
+		// start sending periodic barrier messages with cdc resume token updates
+		go func() {
+			ticker := time.NewTicker(mc.settings.cdcResumeTokenUpdateInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-mc.flowCtx.Done():
+					return
+				case <-changeStreamDone:
+					return
+				case <-ticker.C:
+					// send a barrier message with the updated resume token
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: mc.flowCDCResumeToken}
+				}
+			}
+		}()
+
 		var lsn int64 = 0
 
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
@@ -305,6 +324,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			//send the data message
 			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg
+
+			//update the last seen resume token
+			mc.flowCDCResumeToken = changeStream.ResumeToken()
 		}
 
 		if err := changeStream.Err(); err != nil {

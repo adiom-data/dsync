@@ -19,10 +19,21 @@ import (
 
 // TODO: this needs to be synchronized with the actual processing of the data messages
 func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
-	// print barrier message
-	slog.Debug(fmt.Sprintf("Received barrier message of type %v for id %v", barrierMsg.BarrierType, barrierMsg.BarrierTaskId))
-	// notify the coordinator that the task is done from our side
-	mc.coord.NotifyTaskDone(mc.flowId, mc.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId))
+	switch barrierMsg.BarrierType {
+	case iface.BarrierType_TaskComplete:
+		// print barrier message
+		slog.Debug(fmt.Sprintf("Received barrier message of type %v for id %v", barrierMsg.BarrierType, barrierMsg.BarrierTaskId))
+		// notify the coordinator that the task is done from our side
+		mc.coord.NotifyTaskDone(mc.flowId, mc.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId))
+		return nil
+	case iface.BarrierType_CdcResumeTokenUpdate:
+		// print barrier message
+		slog.Debug(fmt.Sprintf("Received barrier message of type %v with cdc token %v", barrierMsg.BarrierType, barrierMsg.BarrierCdcResumeToken))
+		// notify the coordinator that the task is done from our side
+		mc.coord.UpdateCDCResumeToken(mc.flowId, mc.id, barrierMsg.BarrierCdcResumeToken)
+		return nil
+	}
+
 	return nil
 }
 
