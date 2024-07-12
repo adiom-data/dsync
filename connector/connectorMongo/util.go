@@ -46,7 +46,7 @@ const (
 	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
 	connectorSpec   string = "Generic" // We're generic in the sense that we work with Cosmos, shared tier, etc.
 
-	dummyDB                      string = "adiom-internal"
+	dummyDB                      string = "adiom-internal-dummy" //note that this must be different from the metadata DB - that one is excluded from copying, while this one isn't
 	dummyCol                     string = "dummy"
 	progressReportingIntervalSec        = 10
 )
