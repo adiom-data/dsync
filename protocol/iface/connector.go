@@ -63,7 +63,7 @@ type Connector interface {
 
 // Signalling Connector Interface for use by Coordinator
 type ConnectorICoordinatorSignal interface {
-	SetParameters(flowId FlowID, reqCap ConnectorCapabilities)
+	SetParameters(flowId FlowID, reqCap ConnectorCapabilities) // Set parameters for the flow //XXX: should this be allowed to return an error?
 
 	RequestCreateReadPlan(flowId FlowID, options ConnectorOptions) error                                                     // Request planning (async) //XXX: we could not do it explicitly and just post to coordinator lazily whenever we create the plan
 	StartReadToChannel(flowId FlowID, options ConnectorOptions, readPlan ConnectorReadPlan, dataChannel DataChannelID) error // Read data into the provided channel (async)
