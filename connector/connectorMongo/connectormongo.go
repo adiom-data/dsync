@@ -55,7 +55,7 @@ type MongoConnectorSettings struct {
 	initialSyncNumParallelCopiers int
 	writerMaxBatchSize            int //0 means no limit (in # of documents)
 	numParallelWriters            int
-	cdcResumeTokenUpdateInterval  time.Duration
+	CdcResumeTokenUpdateInterval  time.Duration
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -65,7 +65,9 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
-	settings.cdcResumeTokenUpdateInterval = 60 * time.Second
+	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
+		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
+	}
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -258,7 +260,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 
 		// start sending periodic barrier messages with cdc resume token updates
 		go func() {
-			ticker := time.NewTicker(mc.settings.cdcResumeTokenUpdateInterval)
+			ticker := time.NewTicker(mc.settings.CdcResumeTokenUpdateInterval)
 			defer ticker.Stop()
 			for {
 				select {

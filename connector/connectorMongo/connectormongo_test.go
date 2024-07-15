@@ -7,6 +7,7 @@ package connectorMongo
 
 import (
 	"testing"
+	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/test"
@@ -21,7 +22,7 @@ const (
 // Standard test suite for the connector interface
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
-		return NewMongoConnector("test", MongoConnectorSettings{ConnectionString: TestMongoConnectionString})
+		return NewMongoConnector("test", MongoConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 	})
 	suite.Run(t, tSuite)
 }
