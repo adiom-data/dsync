@@ -407,3 +407,197 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 
 	connector.Teardown()
 }
+
+/*
+* Check that a resumable writer signals to coordinator when a task complete barrier is received
+ */
+func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
+	ctx := context.Background()
+
+	// create mocks for the transport and coordinator
+	t := new(mocks.Transport)
+	c := new(mocks.Coordinator)
+
+	// transport should return the mock coordinator endpoint
+	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
+	// coordinator should return a connector ID on registration
+	testConnectorID := iface.ConnectorID("2")
+	var caps iface.ConnectorCapabilities
+	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
+		// Store advertised connector capabilities to skip irrelevant tests
+		caps = args.Get(0).(iface.ConnectorDetails).Cap // Perform a type assertion here
+	})
+
+	// create a new connector object
+	connector := suite.connectorFactoryFunc()
+
+	// setup the connector and make sure it returns no errors
+	err := connector.Setup(ctx, t)
+	assert.NoError(suite.T(), err)
+
+	// check that the mocked methods were called
+	t.AssertExpectations(suite.T())
+	c.AssertExpectations(suite.T())
+
+	// Check if the connector supports sink capabilities
+	if !caps.Sink {
+		// Check that the method fails first
+		err := connector.StartWriteFromChannel(iface.FlowID("2234"), iface.DataChannelID("4321"))
+		assert.Error(suite.T(), err, "Should fail to write data to a sink if the connector does not support sink capabilities")
+		suite.T().Skip("Skipping test because this connector does not support sink capabilities")
+	}
+
+	// Check if the connector supports resume capabilities
+	if !caps.Resumability {
+		//XXX: should we check that setting the capabilities fails?
+		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
+	}
+
+	// Do some prep
+	flowID := iface.FlowID("2234")
+	dataChannelID := iface.DataChannelID("4321")
+	dataChannel := make(chan iface.DataMessage)
+	defer close(dataChannel)
+	testTaskID := iface.ReadPlanTaskID(1)
+	taskDoneChannel := make(chan struct{})
+
+	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
+	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil).Run(func(args mock.Arguments) {
+		taskDoneChannel <- struct{}{}
+	})
+
+	// Start a go routine to write to the data channel
+	go func() {
+		dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: uint(testTaskID)}
+	}()
+
+	// Test writing to the sink
+	// We'll run this with a timeout to make sure it's non-blocking
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.Connector).StartWriteFromChannel(args[0].(iface.FlowID), args[1].(iface.DataChannelID))
+	}, NonBlockingTimeout,
+		flowID, dataChannelID)
+	assert.NoError(suite.T(), err)
+
+	// Wait to get a notification
+	select {
+	case <-taskDoneChannel:
+		// Read plan is complete
+	case <-time.After(EventReactionTimeout):
+		// Timeout
+		suite.T().Errorf("Timed out while waiting for task done notification")
+		suite.T().FailNow()
+	}
+
+	// The connector should still be running right now and writing data from the channel - let's interrupt it
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
+	}, NonBlockingTimeout, flowID)
+	assert.NoError(suite.T(), err)
+
+	// Sleep for 1 second to ensure that the interruption took effect
+	time.Sleep(1 * time.Second)
+
+	// A notification should have been sent to the coordinator that the task is done
+	c.AssertCalled(suite.T(), "NotifyTaskDone", flowID, testConnectorID, testTaskID)
+
+	connector.Teardown()
+}
+
+/*
+* Check that a resumable writer signals to coordinator when a cdc resume token barrier is received
+ */
+func (suite *ConnectorTestSuite) TestConnectorWriteResumeCDC() {
+	ctx := context.Background()
+
+	// create mocks for the transport and coordinator
+	t := new(mocks.Transport)
+	c := new(mocks.Coordinator)
+
+	// transport should return the mock coordinator endpoint
+	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
+	// coordinator should return a connector ID on registration
+	testConnectorID := iface.ConnectorID("2")
+	var caps iface.ConnectorCapabilities
+	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
+		// Store advertised connector capabilities to skip irrelevant tests
+		caps = args.Get(0).(iface.ConnectorDetails).Cap // Perform a type assertion here
+	})
+
+	// create a new connector object
+	connector := suite.connectorFactoryFunc()
+
+	// setup the connector and make sure it returns no errors
+	err := connector.Setup(ctx, t)
+	assert.NoError(suite.T(), err)
+
+	// check that the mocked methods were called
+	t.AssertExpectations(suite.T())
+	c.AssertExpectations(suite.T())
+
+	// Check if the connector supports sink capabilities
+	if !caps.Sink {
+		// Check that the method fails first
+		err := connector.StartWriteFromChannel(iface.FlowID("2234"), iface.DataChannelID("4321"))
+		assert.Error(suite.T(), err, "Should fail to write data to a sink if the connector does not support sink capabilities")
+		suite.T().Skip("Skipping test because this connector does not support sink capabilities")
+	}
+
+	// Check if the connector supports resume capabilities
+	if !caps.Resumability {
+		//XXX: should we check that setting the capabilities fails?
+		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
+	}
+
+	// Do some prep
+	flowID := iface.FlowID("2234")
+	dataChannelID := iface.DataChannelID("4321")
+	dataChannel := make(chan iface.DataMessage)
+	defer close(dataChannel)
+	testResumeToken := []byte("test")
+	cdcUpdateChannel := make(chan struct{})
+
+	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
+	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
+	c.On("UpdateCDCResumeToken", flowID, testConnectorID, testResumeToken).Return(nil).Run(func(args mock.Arguments) {
+		cdcUpdateChannel <- struct{}{}
+	})
+
+	// Start a go routine to write to the data channel
+	go func() {
+		dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: testResumeToken}
+	}()
+
+	// Test writing to the sink
+	// We'll run this with a timeout to make sure it's non-blocking
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.Connector).StartWriteFromChannel(args[0].(iface.FlowID), args[1].(iface.DataChannelID))
+	}, NonBlockingTimeout,
+		flowID, dataChannelID)
+	assert.NoError(suite.T(), err)
+
+	// Wait to get a notification
+	select {
+	case <-cdcUpdateChannel:
+		// Read plan is complete
+	case <-time.After(EventReactionTimeout):
+		// Timeout
+		suite.T().Errorf("Timed out while waiting for cdc resume token update notification")
+		suite.T().FailNow()
+	}
+
+	// The connector should still be running right now and writing data from the channel - let's interrupt it
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
+	}, NonBlockingTimeout, flowID)
+	assert.NoError(suite.T(), err)
+
+	// Sleep for 1 second to ensure that the interruption took effect
+	time.Sleep(1 * time.Second)
+
+	// A notification should have been sent to the coordinator that the task is done
+	c.AssertCalled(suite.T(), "UpdateCDCResumeToken", flowID, testConnectorID, testResumeToken)
+
+	connector.Teardown()
+}
