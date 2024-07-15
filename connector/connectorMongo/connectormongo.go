@@ -387,6 +387,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					}
 					if err := cursor.Err(); err != nil {
 						slog.Error(fmt.Sprintf("Cursor error: %v", err))
+						//XXX: should some of the following code be moved here?
 					}
 					cursor.Close(mc.flowCtx)
 					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
