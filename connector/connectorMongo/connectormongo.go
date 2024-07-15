@@ -361,7 +361,11 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					collection := mc.client.Database(db).Collection(col)
 					cursor, err := collection.Find(mc.flowCtx, bson.D{})
 					if err != nil {
-						slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+						if mc.flowCtx.Err() == context.Canceled {
+							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
+						} else {
+							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+						}
 						continue
 					}
 					loc := iface.Location{Database: db, Collection: col}
@@ -386,17 +390,21 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						}
 					}
 					if err := cursor.Err(); err != nil {
-						slog.Error(fmt.Sprintf("Cursor error: %v", err))
-						//XXX: should some of the following code be moved here?
-					}
-					cursor.Close(mc.flowCtx)
-					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
-					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
-					//notify the coordinator that the task is done from our side
-					mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
-					//send a barrier message to signal the end of the task
-					if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
-						dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
+						if mc.flowCtx.Err() == context.Canceled {
+							slog.Debug(fmt.Sprintf("Cursor error: %v, but the context was cancelled", err))
+						} else {
+							slog.Error(fmt.Sprintf("Cursor error: %v", err))
+						}
+					} else {
+						cursor.Close(mc.flowCtx)
+						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
+						//notify the coordinator that the task is done from our side
+						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
+						//send a barrier message to signal the end of the task
+						if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
+							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
+						}
 					}
 				}
 			}()
