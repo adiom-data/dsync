@@ -260,7 +260,7 @@ func (rc *RandomReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataCh
 	return errors.New("RandomReadConnector does not write to destination")
 }
 
-func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, readPlan iface.ConnectorReadPlan, options iface.ConnectorOptions) error {
 	//no client, errors
 	return errors.New("RandomReadConnector does not have a client to request data integrity check")
 }
