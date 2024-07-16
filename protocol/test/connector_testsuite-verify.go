@@ -236,6 +236,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
 
+	// Connect the test data store
+	dataStore := suite.datastoreFactoryFunc()
+	err = dataStore.Setup()
+	assert.NoError(suite.T(), err)
+
 	// Do some prep
 	flowID := iface.FlowID("3234")
 	options := iface.ConnectorOptions{}
@@ -279,9 +284,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	}
 
 	// introduce a change in the dataset
-	// TODO: Implement a way to introduce a change in the dataset
+	testRecord := map[string]string{
+		"a": "1234",
+	}
+	err = dataStore.InsertDummy("test", "test1234", testRecord)
+	assert.NoError(suite.T(), err)
 
-	// call the method again to check that the result is consistent
+	// call the data integrity check method again to check that the result is different
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
 		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
 	}, NonBlockingTimeout,
@@ -304,6 +313,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)
 
 	connector.Teardown()
+	dataStore.Teardown()
 }
 
 /*
@@ -390,7 +400,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	// alter the options
 	options.Namespace = []string{"test.test"}
 
-	// call the method again to check that the result is consistent
+	// call the method again to check that the result is different
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
 		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
 	}, NonBlockingTimeout,

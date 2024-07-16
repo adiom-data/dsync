@@ -9,7 +9,7 @@ package test
 // TestDataStore is an interface for the underlying data store used for testing
 // Used primarily for direct data manipulation in tests
 type TestDataStore interface {
-	Setup() error                       //instantiate and connect to the datastore
-	InsertDummy(data interface{}) error //insert a dummy record
-	Teardown() error                    //clean up and disconnect
+	Setup() error                                              //instantiate and connect to the datastore
+	InsertDummy(db string, col string, data interface{}) error //insert a dummy record
+	Teardown() error                                           //clean up and disconnect
 }
