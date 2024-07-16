@@ -60,6 +60,9 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	options := iface.ConnectorOptions{}
 	checkComplete := make(chan struct{})
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
+		// ensure the operation was a success
+		result := args.Get(2).(iface.ConnectorDataIntegrityCheckResult)
+		assert.True(suite.T(), result.Success, "Data integrity check should be successful")
 		// Notify that the check is complete
 		checkComplete <- struct{}{}
 	})
@@ -137,6 +140,9 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
 		// Check that the result is consistent
 		result := args.Get(2).(iface.ConnectorDataIntegrityCheckResult)
+		// ensure the operation was a success
+		assert.True(suite.T(), result.Success, "Data integrity check should be successful")
+
 		if phase == 0 {
 			// First phase, store the result
 			phase = 1
@@ -194,7 +200,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 /*
 * Check that the connector returns a different result when there were changes in between
  */
-func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference() {
+func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceChange() {
 	ctx := context.Background()
 
 	// create mocks for the transport and coordinator
@@ -240,6 +246,9 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
 		// Check that the result is consistent
 		result := args.Get(2).(iface.ConnectorDataIntegrityCheckResult)
+		// ensure the operation was a success
+		assert.True(suite.T(), result.Success, "Data integrity check should be successful")
+
 		if phase == 0 {
 			// First phase, store the result
 			phase = 1
@@ -271,6 +280,115 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 
 	// introduce a change in the dataset
 	// TODO: Implement a way to introduce a change in the dataset
+
+	// call the method again to check that the result is consistent
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+	}, NonBlockingTimeout,
+		flowID, options)
+	assert.NoError(suite.T(), err)
+
+	// wait for the check to be complete
+	select {
+	case <-checkComplete:
+		// check is complete
+	case <-time.After(DataIntegrityCheckTimeout):
+		// Timeout after data integrity check
+		suite.T().Errorf("Timed out while waiting for the second integrity check to complete")
+		suite.T().FailNow()
+	}
+
+	// A notification should have been sent to the coordinator that the check is done
+	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
+	// The result callback should've been called twice
+	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)
+
+	connector.Teardown()
+}
+
+/*
+* Check that the connector returns a different result for different namespace options
+ */
+func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceNamespace() {
+	ctx := context.Background()
+
+	// create mocks for the transport and coordinator
+	t := new(mocks.Transport)
+	c := new(mocks.Coordinator)
+
+	// transport should return the mock coordinator endpoint
+	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
+	// coordinator should return a connector ID on registration
+	testConnectorID := iface.ConnectorID("3")
+	var caps iface.ConnectorCapabilities
+	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
+		// Store advertised connector capabilities to skip irrelevant tests
+		caps = args.Get(0).(iface.ConnectorDetails).Cap // Perform a type assertion here
+	})
+
+	// create a new connector object
+	connector := suite.connectorFactoryFunc()
+
+	// setup the connector and make sure it returns no errors
+	err := connector.Setup(ctx, t)
+	assert.NoError(suite.T(), err)
+
+	// check that the mocked methods were called
+	t.AssertExpectations(suite.T())
+	c.AssertExpectations(suite.T())
+
+	// Check if the connector supports integrity check capabilities
+	if !caps.IntegrityCheck {
+		// Check that the method fails first
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{})
+		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
+		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
+	}
+
+	// Do some prep
+	flowID := iface.FlowID("3234")
+	options := iface.ConnectorOptions{}
+	phase := 0
+	checkComplete := make(chan struct{})
+
+	var checkResult iface.ConnectorDataIntegrityCheckResult
+	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
+		// Check that the result is consistent
+		result := args.Get(2).(iface.ConnectorDataIntegrityCheckResult)
+		// ensure the operation was a success
+		assert.True(suite.T(), result.Success, "Data integrity check should be successful")
+
+		if phase == 0 {
+			// First phase, store the result
+			phase = 1
+			checkResult = result
+		} else {
+			// Second phase, check that the result is the same
+			assert.NotEqual(suite.T(), checkResult, result, "Data integrity check result should be different for different namespace options")
+		}
+		checkComplete <- struct{}{}
+	})
+
+	// Test performing a data integrity check
+	// We'll run this with a timeout to make sure it's non-blocking
+	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+	}, NonBlockingTimeout,
+		flowID, options)
+	assert.NoError(suite.T(), err)
+
+	// wait for the check to be complete
+	select {
+	case <-checkComplete:
+		// check is complete
+	case <-time.After(DataIntegrityCheckTimeout):
+		// Timeout after data integrity check
+		suite.T().Errorf("Timed out while waiting for the first integrity check to complete")
+		suite.T().FailNow()
+	}
+
+	// alter the options
+	options.Namespace = []string{"test.test"}
 
 	// call the method again to check that the result is consistent
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
