@@ -8,6 +8,7 @@ package test
 
 import (
 	"context"
+	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
@@ -57,7 +58,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	// Do some prep
 	flowID := iface.FlowID("3234")
 	options := iface.ConnectorOptions{}
-	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil)
+	checkComplete := make(chan struct{})
+	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
+		// Notify that the check is complete
+		checkComplete <- struct{}{}
+	})
 
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
@@ -66,6 +71,16 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
+
+	// wait for the check to be complete
+	select {
+	case <-checkComplete:
+		// check is complete
+	case <-time.After(DataIntegrityCheckTimeout):
+		// Timeout after data integrity check
+		suite.T().Errorf("Timed out while waiting for the integrity check to complete")
+		suite.T().FailNow()
+	}
 
 	// A notification should have been sent to the coordinator that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
@@ -116,6 +131,8 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 	flowID := iface.FlowID("3234")
 	options := iface.ConnectorOptions{}
 	phase := 0
+	checkComplete := make(chan struct{})
+
 	var checkResult iface.ConnectorDataIntegrityCheckResult
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
 		// Check that the result is consistent
@@ -128,6 +145,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 			// Second phase, check that the result is the same
 			assert.Equal(suite.T(), checkResult, result, "Data integrity check result should be consistent for the same dataset")
 		}
+		checkComplete <- struct{}{}
 	})
 
 	// Test performing a data integrity check
@@ -138,12 +156,32 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 		flowID, options)
 	assert.NoError(suite.T(), err)
 
+	// wait for the check to be complete
+	select {
+	case <-checkComplete:
+		// check is complete
+	case <-time.After(DataIntegrityCheckTimeout):
+		// Timeout after data integrity check
+		suite.T().Errorf("Timed out while waiting for the first integrity check to complete")
+		suite.T().FailNow()
+	}
+
 	// call the method again to check that the result is consistent
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
 		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), iface.ConnectorReadPlan{}, args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
+
+	// wait for the check to be complete
+	select {
+	case <-checkComplete:
+		// check is complete
+	case <-time.After(DataIntegrityCheckTimeout):
+		// Timeout after data integrity check
+		suite.T().Errorf("Timed out while waiting for the second integrity check to complete")
+		suite.T().FailNow()
+	}
 
 	// A notification should have been sent to the coordinator that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))

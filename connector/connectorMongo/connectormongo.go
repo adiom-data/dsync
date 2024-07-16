@@ -532,16 +532,19 @@ func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, readPla
 
 	// get the number of records for the 'test.test' namespace
 	// couldn't use dbHash as it doesn't work on shared Mongo instances
-	db := "test"
-	col := "test"
-	collection := mc.client.Database(db).Collection(col)
-	count, err := collection.CountDocuments(mc.ctx, bson.D{})
-	if err != nil {
-		return err
-	}
-
-	res := iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
-	mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+	go func() {
+		var res iface.ConnectorDataIntegrityCheckResult
+		db := "test"
+		col := "test"
+		collection := mc.client.Database(db).Collection(col)
+		count, err := collection.CountDocuments(mc.ctx, bson.D{})
+		if err != nil {
+			res = iface.ConnectorDataIntegrityCheckResult{Success: false}
+		} else {
+			res = iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
+		}
+		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+	}()
 	return nil
 }
 
