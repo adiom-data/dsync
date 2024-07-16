@@ -527,7 +527,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	return nil
 }
 
-func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, readPlan iface.ConnectorReadPlan, options iface.ConnectorOptions) error {
+func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) error {
 	//TODO (AK, 6/2024): Implement some real async logic here, otherwise it's just a stub for the demo
 
 	// get the number of records for the 'test.test' namespace

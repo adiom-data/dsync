@@ -444,11 +444,11 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	var resSource, resDestination iface.ConnectorDataIntegrityCheckResult
 
 	// Request integrity check results from connectors
-	if err := src.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorReadPlan{}, flowDet.Options.SrcConnectorOptions); err != nil {
+	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions, iface.ConnectorReadPlan{}); err != nil {
 		slog.Error("Failed to request integrity check from source", err)
 		return res, err
 	}
-	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorReadPlan{}, iface.ConnectorOptions{}); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
+	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}, iface.ConnectorReadPlan{}); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
 		slog.Error("Failed to request integrity check from destination", err)
 		return res, err
 	}

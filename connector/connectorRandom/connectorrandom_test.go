@@ -17,6 +17,6 @@ import (
 func TestRandomConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
 		return NewRandomReadConnector("test", RandomConnectorSettings{})
-	})
+	}, nil)
 	suite.Run(t, tSuite)
 }

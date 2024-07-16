@@ -23,6 +23,6 @@ const (
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
 		return NewMongoConnector("test", MongoConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
-	})
+	}, nil)
 	suite.Run(t, tSuite)
 }

@@ -143,7 +143,7 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 	return nil
 }
 
-func (nc *NullWriteConnector) RequestDataIntegrityCheck(flowId iface.FlowID, readPlan iface.ConnectorReadPlan, options iface.ConnectorOptions) error {
+func (nc *NullWriteConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) error {
 	//does nothing, no data to check
 	return fmt.Errorf("null write connector does not support data integrity check")
 }

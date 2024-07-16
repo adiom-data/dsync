@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+
 package test
 
 import (
@@ -27,11 +28,13 @@ import (
 type ConnectorTestSuite struct {
 	suite.Suite
 	connectorFactoryFunc func() iface.Connector
+	datastoreFactoryFunc func() TestDataStore //optional and might be nil
 }
 
-func NewConnectorTestSuite(connectorFunc func() iface.Connector) *ConnectorTestSuite {
+func NewConnectorTestSuite(connectorFunc func() iface.Connector, datastoreFactoryFunc func() TestDataStore) *ConnectorTestSuite {
 	suite := new(ConnectorTestSuite)
 	suite.connectorFactoryFunc = connectorFunc
+	suite.datastoreFactoryFunc = datastoreFactoryFunc
 	return suite
 }
 
