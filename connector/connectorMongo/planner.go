@@ -12,31 +12,28 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
 	// System databases that we don't want to copy
-	ExcludedDBListForIC = []string{"local", "config", "admin", dummyDB}
+	ExcludedDBListForIC = []string{"local", "config", "admin", "adiom-internal", dummyDB}
 	// System collections that we don't want to copy (regex pattern)
 	ExcludedSystemCollPattern = "^system[.]"
 
 	//XXX (AK, 6/2024): these need to use negative lookahead to make change stream work with shared tier Mongo (although it seems they rewrite the whole thing in a funny way that doesn't work)
 	//XXX (AK, 6/2024): dummyDB business is not excluded as a hack to get the resume token from the change stream
-	ExcludedDBPatternCS         = `^(?!local$|config$|admin$)`
+	ExcludedDBPatternCS         = `^(?!local$|config$|admin$|adiom-internal$)`
 	ExcludedSystemCollPatternCS = `^(?!system.)`
 )
 
-type DataCopyTask struct {
-	Db  string
-	Col string
-}
-
-func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCopyTask, error) {
+func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPlanTask, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
-	var tasks []DataCopyTask
+	var tasks []iface.ReadPlanTask
+	taskId := iface.ReadPlanTaskID(1)
 
 	if namespaces == nil {
 		var err error
@@ -51,7 +48,12 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		for _, ns := range namespaces {
 			db, col, isFQN := strings.Cut(ns, ".")
 			if isFQN {
-				tasks = append(tasks, DataCopyTask{Db: db, Col: col})
+				task := iface.ReadPlanTask{Id: taskId}
+				task.Def.Db = db
+				task.Def.Col = col
+
+				tasks = append(tasks, task)
+				taskId++
 			} else {
 				dbsToResolve = append(dbsToResolve, ns)
 			}
@@ -68,7 +70,12 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]DataCop
 		}
 		//create tasks for these
 		for _, coll := range colls {
-			tasks = append(tasks, DataCopyTask{Db: db, Col: coll})
+			task := iface.ReadPlanTask{Id: taskId}
+			task.Def.Db = db
+			task.Def.Col = coll
+
+			tasks = append(tasks, task)
+			taskId++
 		}
 	}
 
@@ -106,10 +113,10 @@ func (mc *MongoConnector) getAllCollections(dbName string) ([]string, error) {
 }
 
 // creates a filter for the change stream to include only the specified namespaces
-func createChangeStreamNamespaceFilterFromTasks(tasks []DataCopyTask) bson.D {
+func createChangeStreamNamespaceFilterFromTasks(tasks []iface.ReadPlanTask) bson.D {
 	var filters []bson.D
 	for _, task := range tasks {
-		filters = append(filters, bson.D{{"ns.db", task.Db}, {"ns.coll", task.Col}})
+		filters = append(filters, bson.D{{"ns.db", task.Def.Db}, {"ns.coll", task.Def.Col}})
 	}
 	// add dummyDB and dummyCol to the filter so that we can track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
 	filters = append(filters, bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}})

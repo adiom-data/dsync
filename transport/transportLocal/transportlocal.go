@@ -22,7 +22,7 @@ type TransportLocal struct {
 
 func generateDataChannelID() iface.DataChannelID {
 	id := uuid.New()
-	return iface.DataChannelID{ID: id.String()}
+	return iface.DataChannelID(id.String())
 }
 
 func NewTransportLocal(coordEP iface.CoordinatorIConnectorSignal) *TransportLocal {
@@ -72,5 +72,5 @@ func (t *TransportLocal) GetDataChannelEndpoint(dcid iface.DataChannelID) (chan 
 	if channel, ok := t.dataChannels[dcid]; ok {
 		return channel, nil
 	}
-	return nil, errors.New("data channel not found for ID: " + dcid.ID)
+	return nil, errors.New("data channel not found for ID: " + (string)(dcid))
 }

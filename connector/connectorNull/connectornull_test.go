@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/protocol/iface/test"
+	"github.com/adiom-data/dsync/protocol/test"
 	"github.com/stretchr/testify/suite"
 )
 

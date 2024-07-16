@@ -18,7 +18,8 @@ type Options struct {
 
 	NamespaceFrom []string
 
-	Verify bool
+	Verify  bool
+	Cleanup bool
 }
 
 func NewFromCLIContext(c *cli.Context) Options {
@@ -30,6 +31,7 @@ func NewFromCLIContext(c *cli.Context) Options {
 	o.StateStoreConnString = c.String("metadata")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
+	o.Cleanup = c.Bool("cleanup")
 
 	return o
 }
