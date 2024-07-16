@@ -77,7 +77,7 @@ func (nc *NullWriteConnector) Teardown() {
 }
 
 func (nc *NullWriteConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
-	// not necessary always destination
+	// not necessary - Null write connector is always a destination connector and doesn't set parameters
 }
 
 func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {

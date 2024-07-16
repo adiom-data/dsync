@@ -25,7 +25,10 @@ func generateConnectorID() iface.ConnectorID {
 }
 
 // name for the flow state store in metadata
-const FLOW_STATE_METADATA_STORE = "flow_state"
+const flowStateMetadataStore = "flow_state"
+
+// hash base
+const hashBase = 16
 
 type FlowDetails struct {
 	FlowID     iface.FlowID
@@ -47,18 +50,18 @@ type FlowDetails struct {
 
 // Generates static flow ID based on the flow options which should be unique across the board
 // XXX: is this the right place for this?
-func generateFlowID(o iface.FlowOptions) iface.FlowID {
-	id, err := hashstructure.Hash(o, nil)
+func generateFlowID(options iface.FlowOptions) iface.FlowID {
+	id, err := hashstructure.Hash(options, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
 	}
-	return iface.FlowID(strconv.FormatUint(id, 16))
+	return iface.FlowID(strconv.FormatUint(id, hashBase))
 }
 
-func updateFlowTaskStatus(flowDet *FlowDetails, taskId iface.ReadPlanTaskID, taskStatus uint) error {
-	for i, task := range flowDet.ReadPlan.Tasks {
+func updateFlowTaskStatus(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID, taskStatus uint) error {
+	for i, task := range flowDetails.ReadPlan.Tasks {
 		if task.Id == taskId {
-			flowDet.ReadPlan.Tasks[i].Status = taskStatus
+			flowDetails.ReadPlan.Tasks[i].Status = taskStatus
 			return nil
 		}
 	}

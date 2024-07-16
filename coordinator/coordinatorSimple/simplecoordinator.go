@@ -155,7 +155,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	// attempt to get the persistent flow state from the statestore
 	fid := generateFlowID(o)
 	fdet_temp := FlowDetails{}
-	err_persisted_state := c.s.RetrieveObject(FLOW_STATE_METADATA_STORE, fid, &fdet_temp)
+	err_persisted_state := c.s.RetrieveObject(flowStateMetadataStore, fid, &fdet_temp)
 
 	// Check flow type and error out if not unidirectional
 	if o.Type != iface.UnidirectionalFlowType {
@@ -258,7 +258,7 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		case <-flowDet.readPlanningDone:
 			slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
 			if flowDet.Resumable {
-				err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, fid, flowDet)
+				err := c.s.PersistObject(flowStateMetadataStore, fid, flowDet)
 				if err != nil {
 					slog.Error("Failed to persist the flow plan", err)
 					return err
@@ -347,7 +347,7 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	c.delFlow(fid)
 
 	// remove the flow state from the statestore
-	err := c.s.DeleteObject(FLOW_STATE_METADATA_STORE, fid)
+	err := c.s.DeleteObject(flowStateMetadataStore, fid)
 	if err != nil {
 		slog.Error("Failed to delete flow state", err)
 	}
@@ -401,7 +401,7 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 
 		// persist the updated flow state
 		if flowDet.Resumable {
-			err = c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
+			err = c.s.PersistObject(flowStateMetadataStore, flowId, flowDet)
 			if err != nil {
 				slog.Error("Failed to persist the flow plan", err)
 				return err
@@ -603,7 +603,7 @@ func (c *SimpleCoordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface
 
 		// persist the updated flow state
 		if flowDet.Resumable {
-			err := c.s.PersistObject(FLOW_STATE_METADATA_STORE, flowId, flowDet)
+			err := c.s.PersistObject(flowStateMetadataStore, flowId, flowDet)
 			if err != nil {
 				slog.Error("Failed to persist the flow plan", err)
 				return err

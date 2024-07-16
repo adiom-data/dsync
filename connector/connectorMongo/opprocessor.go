@@ -7,6 +7,7 @@ package connectorMongo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -123,11 +124,13 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 	if bwErr != nil {
 		var bulkOverwrite []mongo.WriteModel
 
-		if bwErrWriteErrors, ok := bwErr.(mongo.BulkWriteException); ok {
+		// check if it's a bulk write exception
+		var bwErrWriteErrors mongo.BulkWriteException
+		if errors.As(bwErr, &bwErrWriteErrors) {
 			for _, we := range bwErrWriteErrors.WriteErrors {
 				if mongo.IsDuplicateKeyError(we.WriteError) {
 					doc := documents[we.Index]
-					id := doc.(bson.Raw).Lookup("_id") //we know it's there because there was a conflict on _id
+					id := doc.(bson.Raw).Lookup("_id") //we know it's there because there was a conflict on _id //XXX: should we check that it's the right type?
 					bulkOverwrite = append(bulkOverwrite, mongo.NewReplaceOneModel().SetFilter(bson.M{"_id": id}).SetReplacement(doc).SetUpsert(true))
 				} else {
 					slog.Error(fmt.Sprintf("Skipping failure to insert document into collection: %v", we.WriteError))

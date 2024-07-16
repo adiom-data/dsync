@@ -20,7 +20,7 @@ import (
 )
 
 // default db name if not set in the connection string
-const DEFAULT_DB_NAME = "adiom-internal"
+const defaultInternalDbName = "adiom-internal"
 
 type MongoStateStore struct {
 	settings MongoStateStoreSettings
@@ -52,8 +52,8 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 	reg := bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, tM).Build()
 
 	// Connect to the MongoDB instance
-	ctxConnect, cancel := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
-	defer cancel()
+	ctxConnect, cancelConnectCtx := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
+	defer cancelConnectCtx()
 	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetRegistry(reg)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
@@ -62,8 +62,8 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 	s.client = client
 
 	// Check the connection
-	ctxPing, cancel := context.WithTimeout(s.ctx, s.settings.pingTimeout)
-	defer cancel()
+	ctxPing, cancelPingCtx := context.WithTimeout(s.ctx, s.settings.pingTimeout)
+	defer cancelPingCtx()
 	err = s.client.Ping(ctxPing, nil)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 	// Set the working database
 	// No need to handle error as it would've failed before in the options parsing
 	cs, _ := connstring.ParseAndValidate(s.settings.ConnectionString)
-	db_name := DEFAULT_DB_NAME
+	db_name := defaultInternalDbName
 	if cs.Database != "" {
 		db_name = cs.Database
 	}

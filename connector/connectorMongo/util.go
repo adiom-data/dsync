@@ -77,7 +77,11 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 	defer changeStream.Close(ctx)
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
-	go insertDummyRecord(ctx, client)
+	go func() {
+		if err := insertDummyRecord(ctx, client); err != nil {
+			slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
+		}
+	}()
 
 	changeStream.Next(ctx)
 	resumeToken := changeStream.ResumeToken()

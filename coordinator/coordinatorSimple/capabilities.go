@@ -14,11 +14,14 @@ import (
 
 // Determine the shared capabilities between two connectors
 func calcSharedCapabilities(c1Caps iface.ConnectorCapabilities, c2Caps iface.ConnectorCapabilities) iface.ConnectorCapabilities {
-	// effectively a bitmask
+	// effectively a bitmask that will be later applied to individual connectors' capabilities
+
 	// XXX: is there a better way to do this? Maybe a real bitmask?
 	caps := iface.ConnectorCapabilities{true, true, true, true}
 
+	// Source and Sink are always true as they don't need to be shared
 	// we only care about resumability right now
+	//TODO: integrity check should follow the same path
 	caps.Resumability = c1Caps.Resumability && c2Caps.Resumability
 
 	return caps

@@ -12,13 +12,13 @@ type Statestore interface {
 	Setup(ctx context.Context) error
 	Teardown()
 
-	// Persists an object into a store
+	// PersistObject persists an object into a store
 	// Requires object id to be provided explicitly so we can overwrite existing objects
 	PersistObject(storeName string, id interface{}, obj interface{}) error
 
-	// Retrieves an object from a store by id
+	// RetrieveObject retrieves an object from a store by id
 	RetrieveObject(storeName string, id interface{}, obj interface{}) error
 
-	// Deletes an object from a store by id
+	// DeleteObject deletes an object from a store by id
 	DeleteObject(storeName string, id interface{}) error
 }
