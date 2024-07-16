@@ -31,3 +31,6 @@ dsync
 
 # Jetbrains IDE
 .idea
+
+# VS Code
+.vscode
