@@ -25,12 +25,12 @@ Could be MongoDB Atlas or local. If the source is local, you need to start it as
 
 To run all tests (will take under a minute or so):
 ```
-go test -v ./...
+go test ./...
 ```
 
 To test a specific connector (e.g. the null writer):
 ```
-go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestNullConnectorSuite$ github.com/adiom-data/dsync/connector
+go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestConnectorWriteResumeInitialCopy$ github.com/adiom-data/dsync/connector
 ```
 # Quickstart
 
@@ -73,6 +73,26 @@ If you don't have Java 11, you may need to build [SimRunner](https://github.com/
 ```
 java -jar tools/SimRunner/SimRunner.jar tools/SimRunner/adiom-load.json
 ```
+# Features
+## Supported connectors
+
+- Source: 
+    - MongoDB: Supports Atlas Dedicated, Atlas Serverless and Self-Managed installations.
+    - /dev/random: Generates a stream of random operations.
+- Destination: 
+    - MongoDB: Generic MongoDB API connector.
+    - /dev/null: Does exactly what you'd expect it to do.
+
+## Namespace filtering
+
+Can be enabled with ```--ns``` (see ```dsync --help```)
+
+## Data integrity check
+Can be enabled with ```--verify``` (see ```dsync --help```)
+
+## Resumability 
+Automatic resume on restart during initial data copy and CDC. See [docs](docs-dev/Resumability.md) on how it works.
+
 # Cleanup
 
 * Kill all running mongod processes
@@ -85,5 +105,8 @@ mongosh <URI>
 var dbs = db.getMongo().getDBNames()
 for (var i in dbs) { db = db.getMongo().getDB(dbs[i]); print("dropping db " + db.getName()); (!['admin','config','local'].includes(db.getName())) && db.dropDatabase(); }
 ```
-
+* Remove metadata associated with the flow
+```
+./dsync ... --cleanup
+```
 
