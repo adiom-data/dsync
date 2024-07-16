@@ -21,11 +21,6 @@ const (
 	batch_size                   = 100 // used for change stream batch inserts
 )
 
-type DataCopyTask struct {
-	Db  string
-	Col string
-}
-
 type ReaderProgress struct {
 	initialSyncDocs    atomic.Uint64
 	changeStreamEvents uint64
@@ -37,8 +32,8 @@ type ReaderProgress struct {
 	 	function processes a data generation task for the initial generation.
 		It generates random documents for the specified collection in the task and sends them as single data messages to the channel
 */
-func (rc *RandomReadConnector) ProcessDataGenerationTask(task DataCopyTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
-	loc := iface.Location{Database: task.Db, Collection: task.Col}
+func (rc *RandomReadConnector) ProcessDataGenerationTask(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
+	loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
 	//task is to generate the specified number of documents in rc.settings for the given collection
 	for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ {
 		//generate random document and send as single insert data message
@@ -59,8 +54,8 @@ func (rc *RandomReadConnector) ProcessDataGenerationTask(task DataCopyTask, chan
 	 	function processes a data generation task for the initial data generation.
 		It generates random documents for the specified collection in the task and sends them in a batch data messages to the channel
 */
-func (rc *RandomReadConnector) ProcessDataGenerationTaskBatch(task DataCopyTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
-	loc := iface.Location{Database: task.Db, Collection: task.Col}
+func (rc *RandomReadConnector) ProcessDataGenerationTaskBatch(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
+	loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
 	var docs []map[string]interface{}
 	//create slice of random documents
 	for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ { //Batch size is just number of docs per collection here
@@ -83,15 +78,15 @@ func (rc *RandomReadConnector) ProcessDataGenerationTaskBatch(task DataCopyTask,
 		a single task is generated for each collection in each database, number of tasks = numDatabases * numCollectionsPerDatabase
 		returns slice of DataCopyTasks
 */
-func (rc *RandomReadConnector) CreateInitialGenerationTasks() []DataCopyTask {
-	var tasks []DataCopyTask
+func (rc *RandomReadConnector) CreateInitialGenerationTasks() []iface.ReadPlanTask {
+	var tasks []iface.ReadPlanTask
 
 	for i := 1; i <= rc.settings.numDatabases; i++ {
 		for j := 1; j <= rc.settings.numCollectionsPerDatabase; j++ {
-			task := DataCopyTask{
-				Db:  fmt.Sprintf("db%d", i),
-				Col: fmt.Sprintf("col%d", j),
-			}
+			task := iface.ReadPlanTask{}
+			task.Def.Db = fmt.Sprintf("db%d", i)
+			task.Def.Col = fmt.Sprintf("col%d", j)
+
 			tasks = append(tasks, task)
 		}
 	}

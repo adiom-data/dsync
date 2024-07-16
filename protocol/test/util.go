@@ -15,6 +15,10 @@ const (
 	NonBlockingTimeout = 100 * time.Millisecond
 	// Read planning timeout
 	ReadPlanningTimeout = 5 * time.Second
+	// Flow completion timeout
+	FlowCompletionTimeout = 10 * time.Second
+	// Event reaction timeout
+	EventReactionTimeout = 5 * time.Second
 )
 
 // GenericMethod represents a method that takes a receiver, variable arguments, and returns an error

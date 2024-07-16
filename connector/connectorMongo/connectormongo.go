@@ -39,9 +39,12 @@ type MongoConnector struct {
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status         iface.ConnectorStatus
-	flowCtx        context.Context
-	flowCancelFunc context.CancelFunc
+	status               iface.ConnectorStatus
+	flowCtx              context.Context
+	flowCancelFunc       context.CancelFunc
+	flowId               iface.FlowID
+	flowConnCapabilities iface.ConnectorCapabilities
+	flowCDCResumeToken   bson.Raw
 }
 
 type MongoConnectorSettings struct {
@@ -52,6 +55,7 @@ type MongoConnectorSettings struct {
 	initialSyncNumParallelCopiers int
 	writerMaxBatchSize            int //0 means no limit (in # of documents)
 	numParallelWriters            int
+	CdcResumeTokenUpdateInterval  time.Duration
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -61,6 +65,9 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
+	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
+		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
+	}
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -98,7 +105,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
-	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true}
+	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	mc.status = iface.ConnectorStatus{WriteLSN: 0}
 
@@ -109,15 +116,18 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 	mc.coord = coord
 
+	// Generate connector ID for resumability purposes
+	id := generateConnectorID(mc.settings.ConnectionString)
+
 	// Create a new connector details structure
-	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities}
+	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities, Id: id}
 	// Register the connector
 	mc.id, err = coord.RegisterConnector(connectorDetails, mc)
 	if err != nil {
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("MongoConnector has been configured with ID " + mc.id.ID)
+	slog.Info("MongoConnector has been configured with ID " + (string)(mc.id))
 
 	return nil
 }
@@ -128,25 +138,25 @@ func (mc *MongoConnector) Teardown() {
 	}
 }
 
-func (mc *MongoConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
-	// Implement SetParameters logic specific to MongoConnector
+func (mc *MongoConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+	// this is what came for the flow
+	mc.flowConnCapabilities = reqCap
+	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", mc.id, flowId, reqCap))
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
 func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
+	mc.flowId = flowId
 
-	var tasks []DataCopyTask
-	tasks, ok := readPlan.Tasks.([]DataCopyTask)
-	if !ok {
-		return errors.New("failed to convert tasks to []DataCopyTask")
-	}
+	tasks := readPlan.Tasks
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
+	mc.flowCDCResumeToken = readPlan.CdcResumeToken
 
-	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
+	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
@@ -158,14 +168,6 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	// Declare two channels to wait for the change stream reader and the initial sync to finish
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
-
-	// Retrive the latest resume token before we start reading anything
-	// We will use the resume token to start the change stream
-	changeStreamStartResumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
-		return err
-	}
 
 	type ReaderProgress struct {
 		initialSyncDocs    atomic.Uint64
@@ -210,7 +212,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
 	go func() {
 		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.id, flowId))
-		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken)
+		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken)
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -256,12 +258,29 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
+		// start sending periodic barrier messages with cdc resume token updates
+		go func() {
+			ticker := time.NewTicker(mc.settings.CdcResumeTokenUpdateInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-mc.flowCtx.Done():
+					return
+				case <-changeStreamDone:
+					return
+				case <-ticker.C:
+					// send a barrier message with the updated resume token
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: mc.flowCDCResumeToken}
+				}
+			}
+		}()
+
 		var lsn int64 = 0
 
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
-		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, changeStreamStartResumeToken))
+		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, mc.flowCDCResumeToken))
 
-		opts := moptions.ChangeStream().SetStartAfter(changeStreamStartResumeToken).SetFullDocument("updateLookup")
+		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken).SetFullDocument("updateLookup")
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -307,6 +326,9 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 			//send the data message
 			dataMsg.SeqNum = lsn
 			dataChannel <- dataMsg
+
+			//update the last seen resume token
+			mc.flowCDCResumeToken = changeStream.ResumeToken()
 		}
 
 		if err := changeStream.Err(); err != nil {
@@ -325,7 +347,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
 		//create a channel to distribute tasks to copiers
-		taskChannel := make(chan DataCopyTask)
+		taskChannel := make(chan iface.ReadPlanTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
 		wg.Add(mc.settings.initialSyncNumParallelCopiers)
@@ -336,12 +358,16 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
-					db := task.Db
-					col := task.Col
+					db := task.Def.Db
+					col := task.Def.Col
 					collection := mc.client.Database(db).Collection(col)
 					cursor, err := collection.Find(mc.flowCtx, bson.D{})
 					if err != nil {
-						slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+						if mc.flowCtx.Err() == context.Canceled {
+							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
+						} else {
+							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
+						}
 						continue
 					}
 					loc := iface.Location{Database: db, Collection: col}
@@ -366,18 +392,34 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						}
 					}
 					if err := cursor.Err(); err != nil {
-						slog.Error(fmt.Sprintf("Cursor error: %v", err))
+						if mc.flowCtx.Err() == context.Canceled {
+							slog.Debug(fmt.Sprintf("Cursor error: %v, but the context was cancelled", err))
+						} else {
+							slog.Error(fmt.Sprintf("Cursor error: %v", err))
+						}
+					} else {
+						cursor.Close(mc.flowCtx)
+						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
+						//notify the coordinator that the task is done from our side
+						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
+						//send a barrier message to signal the end of the task
+						if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
+							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
+						}
 					}
-					cursor.Close(mc.flowCtx)
-					readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
-					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 				}
 			}()
 		}
 
 		//iterate over all the tasks and distribute them to copiers
 		for _, task := range tasks {
-			taskChannel <- task
+			if task.Status == iface.ReadPlanTaskStatus_Completed {
+				// the task is already completed, so we can just skip it
+				readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+			} else {
+				taskChannel <- task
+			}
 		}
 		//close the task channel to signal copiers that there are no more tasks
 		close(taskChannel)
@@ -406,6 +448,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
+	mc.flowId = flowId
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
@@ -454,11 +497,19 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 							loop = false
 							break
 						}
-						// Process the data message
-						writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
-						err = mc.processDataMessage(dataMsg)
-						if err != nil {
-							slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+						// Check if this is a barrier first
+						if dataMsg.MutationType == iface.MutationType_Barrier {
+							err = mc.handleBarrierMessage(dataMsg)
+							if err != nil {
+								slog.Error(fmt.Sprintf("Failed to handle barrier message: %v", err))
+							}
+						} else {
+							// Process the data message
+							writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
+							err = mc.processDataMessage(dataMsg)
+							if err != nil {
+								slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+							}
 						}
 					}
 				}
@@ -505,12 +556,22 @@ func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
 
 func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
+		// Retrieve the latest resume token before we start reading anything
+		// We will use the resume token to start the change stream
+		resumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
+			return
+		}
+
 		tasks, err := mc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
 			return
 		}
-		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		mc.flowCDCResumeToken = resumeToken
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: mc.flowCDCResumeToken}
+
 		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))

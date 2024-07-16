@@ -30,7 +30,7 @@ go test -v ./...
 
 To test a specific connector (e.g. the null writer):
 ```
-go test -v -timeout 30s -run ^TestNullConnectorSuite$ github.com/adiom-data/dsync/connector
+go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestNullConnectorSuite$ github.com/adiom-data/dsync/connector
 ```
 # Quickstart
 

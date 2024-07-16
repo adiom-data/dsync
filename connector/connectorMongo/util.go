@@ -9,7 +9,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -43,7 +46,7 @@ const (
 	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
 	connectorSpec   string = "Generic" // We're generic in the sense that we work with Cosmos, shared tier, etc.
 
-	dummyDB                      string = "adiom-internal"
+	dummyDB                      string = "adiom-internal-dummy" //note that this must be different from the metadata DB - that one is excluded from copying, while this one isn't
 	dummyCol                     string = "dummy"
 	progressReportingIntervalSec        = 10
 )
@@ -74,7 +77,11 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 	defer changeStream.Close(ctx)
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
-	go insertDummyRecord(ctx, client)
+	go func() {
+		if err := insertDummyRecord(ctx, client); err != nil {
+			slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
+		}
+	}()
 
 	changeStream.Next(ctx)
 	resumeToken := changeStream.ResumeToken()
@@ -83,4 +90,14 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 	}
 
 	return resumeToken, nil
+}
+
+// Generates static connector ID based on connection string
+// XXX: is this the best place to do this?
+func generateConnectorID(connectionString string) iface.ConnectorID {
+	id, err := hashstructure.Hash(connectionString, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
+	}
+	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }

@@ -42,7 +42,8 @@ type RunnerLocalSettings struct {
 
 	NsFromString []string
 
-	VerifyRequestedFlag bool
+	VerifyRequestedFlag  bool
+	CleanupRequestedFlag bool
 
 	FlowStatusReportingIntervalSecs time.Duration
 }
@@ -122,11 +123,11 @@ func (r *RunnerLocal) Run() {
 		}
 	}
 
-	if (srcId == iface.ConnectorID{}) {
+	if srcId == iface.ConnectorID("") {
 		slog.Error("Source connector not found")
 		return
 	}
-	if (dstId == iface.ConnectorID{}) {
+	if dstId == iface.ConnectorID("") {
 		slog.Error("Source connector not found")
 		return
 	}
@@ -138,7 +139,7 @@ func (r *RunnerLocal) Run() {
 		Type:                iface.UnidirectionalFlowType,
 		SrcConnectorOptions: iface.ConnectorOptions{Namespace: r.settings.NsFromString},
 	}
-	flowID, err := r.coord.FlowCreate(flowOptions)
+	flowID, err := r.coord.FlowGetOrCreate(flowOptions)
 	if err != nil {
 		slog.Error("Failed to create flow", err)
 		return
@@ -161,6 +162,14 @@ func (r *RunnerLocal) Run() {
 		}
 		return
 	}
+
+	// destory the flow if the cleanup flag is set
+	if r.settings.CleanupRequestedFlag {
+		slog.Info("Cleaning up metadata for the flow")
+		r.coord.FlowDestroy(flowID)
+		return
+	}
+
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {

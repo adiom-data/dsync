@@ -66,7 +66,7 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("NullWriteConnector has been configured with ID " + nc.id.ID)
+	slog.Info("NullWriteConnector has been configured with ID " + (string)(nc.id))
 
 	return nil
 }
@@ -76,8 +76,8 @@ func (nc *NullWriteConnector) Teardown() {
 	slog.Info(fmt.Sprintf("Null Write Connector %s is completed", nc.id))
 }
 
-func (nc *NullWriteConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
-	// not necessary always destination
+func (nc *NullWriteConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+	// not necessary - Null write connector is always a destination connector and doesn't set parameters
 }
 
 func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {

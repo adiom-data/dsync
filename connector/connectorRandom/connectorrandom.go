@@ -101,7 +101,7 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("RandomReadConnector has been configured with ID " + rc.id.ID)
+	slog.Info("RandomReadConnector has been configured with ID " + (string)(rc.id))
 
 	return nil
 }
@@ -110,17 +110,14 @@ func (rc *RandomReadConnector) Teardown() {
 	//does nothing, no client to disconnect
 }
 
-func (rc *RandomReadConnector) SetParameters(reqCap iface.ConnectorCapabilities) {
+func (rc *RandomReadConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	//not necessary always source
 }
 
 func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
-	var tasks []DataCopyTask
-	tasks, ok := readPlan.Tasks.([]DataCopyTask)
-	if !ok {
-		return errors.New("failed to convert tasks to []DataCopyTask")
-	}
+
+	tasks := readPlan.Tasks
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
@@ -176,7 +173,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 
 		slog.Info(fmt.Sprintf("Null Read Connector %s is starting initial data generation for flow %s", rc.id, flowId))
 		//create a channel to distribute tasks to copiers
-		taskChannel := make(chan DataCopyTask)
+		taskChannel := make(chan iface.ReadPlanTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
 		wg.Add(rc.settings.numParallelGenerators)

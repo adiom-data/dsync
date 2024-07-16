@@ -19,12 +19,17 @@ func (_m *Coordinator) DelistConnector(_a0 iface.ConnectorID) {
 	_m.Called(_a0)
 }
 
-// FlowCreate provides a mock function with given fields: o
-func (_m *Coordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error) {
+// FlowDestroy provides a mock function with given fields: fid
+func (_m *Coordinator) FlowDestroy(fid iface.FlowID) {
+	_m.Called(fid)
+}
+
+// FlowGetOrCreate provides a mock function with given fields: o
+func (_m *Coordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 	ret := _m.Called(o)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FlowCreate")
+		panic("no return value specified for FlowGetOrCreate")
 	}
 
 	var r0 iface.FlowID
@@ -45,11 +50,6 @@ func (_m *Coordinator) FlowCreate(o iface.FlowOptions) (iface.FlowID, error) {
 	}
 
 	return r0, r1
-}
-
-// FlowDestroy provides a mock function with given fields: fid
-func (_m *Coordinator) FlowDestroy(fid iface.FlowID) {
-	_m.Called(fid)
 }
 
 // FlowStart provides a mock function with given fields: fid
@@ -134,6 +134,24 @@ func (_m *Coordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) e
 	var r0 error
 	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID) error); ok {
 		r0 = rf(flowId, conn)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// NotifyTaskDone provides a mock function with given fields: flowId, conn, taskId
+func (_m *Coordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
+	ret := _m.Called(flowId, conn, taskId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NotifyTaskDone")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ReadPlanTaskID) error); ok {
+		r0 = rf(flowId, conn, taskId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -241,6 +259,24 @@ func (_m *Coordinator) Setup(ctx context.Context, t iface.Transport, s iface.Sta
 // Teardown provides a mock function with given fields:
 func (_m *Coordinator) Teardown() {
 	_m.Called()
+}
+
+// UpdateCDCResumeToken provides a mock function with given fields: flowId, conn, resumeToken
+func (_m *Coordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken []byte) error {
+	ret := _m.Called(flowId, conn, resumeToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCDCResumeToken")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, []byte) error); ok {
+		r0 = rf(flowId, conn, resumeToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateConnectorStatus provides a mock function with given fields: flowId, conn, status

@@ -17,12 +17,19 @@ type DataMessage struct {
 	// special case payload for inserts to allow the reader to send the whole batch for a single location (for efficiency)
 	DataBatch [][]byte
 
-	// header
+	// header for data messages
 	MutationType uint     //required
 	Loc          Location //required
 	Id           *[]byte  //required except for inserts (for efficiency)
 	IdType       byte     //required when Id is present
 	SeqNum       int64    //optional field to provide a global ordering of messages
+
+	// header for barriers (task completion signals)
+	// combining them in a single struct to allow for a single channel for both data and barriers
+	// for barriers MutationType will be set to MutationType_Barrier
+	BarrierType           uint   //required for barriers
+	BarrierTaskId         uint   //required for barriers related to initial data copy
+	BarrierCdcResumeToken []byte //required for barriers related to CDC
 }
 
 const (
@@ -31,11 +38,24 @@ const (
 	MutationType_InsertBatch
 	MutationType_Update
 	MutationType_Delete
+
+	MutationType_Barrier
 )
 
-type DataChannelID struct {
-	ID string
+const (
+	BarrierType_Reserved = iota
+	BarrierType_TaskComplete
+	BarrierType_CdcResumeTokenUpdate
+)
+
+// Special barrier message used for task completion signals over the data channel
+// Allows synchronization with data messages flow
+type BarrierMessage struct {
+	TaskId uint
+	Type   uint
 }
+
+type DataChannelID string
 
 type Transport interface {
 	// Gives the coordinator endpoint as a signalling interface
