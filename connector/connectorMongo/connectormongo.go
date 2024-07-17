@@ -50,12 +50,13 @@ type MongoConnector struct {
 type MongoConnectorSettings struct {
 	ConnectionString string
 
-	serverConnectTimeout          time.Duration
-	pingTimeout                   time.Duration
-	initialSyncNumParallelCopiers int
-	writerMaxBatchSize            int //0 means no limit (in # of documents)
-	numParallelWriters            int
-	CdcResumeTokenUpdateInterval  time.Duration
+	serverConnectTimeout           time.Duration
+	pingTimeout                    time.Duration
+	initialSyncNumParallelCopiers  int
+	writerMaxBatchSize             int //0 means no limit (in # of documents)
+	numParallelWriters             int
+	CdcResumeTokenUpdateInterval   time.Duration
+	numParallelIntegrityCheckTasks int
 }
 
 func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
@@ -68,6 +69,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
+	settings.numParallelIntegrityCheckTasks = 4
 
 	return &MongoConnector{desc: desc, settings: settings}
 }
@@ -528,23 +530,9 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 }
 
 func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) error {
-	//TODO (AK, 6/2024): Implement some real async logic here, otherwise it's just a stub for the demo
+	// need to make this async to honor the spec
+	go mc.doIntegrityCheck_sync(flowId, options, readPlan)
 
-	// get the number of records for the 'test.test' namespace
-	// couldn't use dbHash as it doesn't work on shared Mongo instances
-	go func() {
-		var res iface.ConnectorDataIntegrityCheckResult
-		db := "test"
-		col := "test"
-		collection := mc.client.Database(db).Collection(col)
-		count, err := collection.CountDocuments(mc.ctx, bson.D{})
-		if err != nil {
-			res = iface.ConnectorDataIntegrityCheckResult{Success: false}
-		} else {
-			res = iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
-		}
-		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
-	}()
 	return nil
 }
 
