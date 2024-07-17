@@ -134,7 +134,7 @@ func (c *SimpleCoordinator) Teardown() {
 }
 
 func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, cep iface.ConnectorICoordinatorSignal) (iface.ConnectorID, error) {
-	slog.Info("Registering connector with details: " + fmt.Sprintf("%v", details))
+	slog.Info("Registering connector with details: " + fmt.Sprintf("%+v", details))
 
 	// Add the connector to the list
 	cid := c.addConnector(ConnectorDetailsWithEp{Details: details, Endpoint: cep})

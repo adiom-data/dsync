@@ -16,7 +16,7 @@ import (
 )
 
 // DefaultVerbosity is the default verbosity level for the application.
-const DefaultVerbosity = "DEBUG"
+const DefaultVerbosity = "INFO"
 
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
