@@ -88,7 +88,7 @@ java -jar tools/SimRunner/SimRunner.jar tools/SimRunner/adiom-load.json
 Can be enabled with ```--ns``` (see ```dsync --help```)
 
 ## Data integrity check
-Can be enabled with ```--verify``` (see ```dsync --help```)
+Can be run separately using the ```--verify``` flag. See ```dsync --help``` for usage and [docs](docs-dev/Integrity.md) for internal details.
 
 ## Resumability 
 Automatic resume on restart during initial data copy and CDC. See [docs](docs-dev/Resumability.md) on how it works.

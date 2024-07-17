@@ -36,27 +36,6 @@ type nsCountResult struct {
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
 func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) {
-	// var res iface.ConnectorDataIntegrityCheckResult
-	// db := "test"
-	// col := "test"
-	// collection := mc.client.Database(db).Collection(col)
-	// count, err := collection.CountDocuments(mc.ctx, bson.D{})
-	// if err != nil {
-	// 	res = iface.ConnectorDataIntegrityCheckResult{Success: false}
-	// } else {
-	// 	res = iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
-	// }
-	// mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
-
-	// The algorithm is supposed to calculate a database-agnostic function of a dataset in a deterministic and unique way given the specific options
-	// As much as we can, we should be using functions and algorithms that are easily parallelizable and can be calculated server-side
-	// This algorithm is called ONSL ("Ordered Namespace List Count"):
-	// 1. Identfiy the namespaces of the dataset in the form of "db.collection", excluding any system namespaces. If there are no namespaces, return 0 count and an empty string as a digest
-	// 2. For each namespace, calculate the total number of documents
-	// 3. Arrange the namespaces in a lexicographical order
-	// 4. Create a string, concatenating the namespaces and respective counts in the form of "namespace:count" and using "," to join them
-	// 5. Calculate the SHA256 hash of the string and the total number of documents across all the namespaces
-
 	//XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult

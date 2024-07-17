@@ -478,10 +478,10 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	}
 
 	if resSource != resDestination {
-		slog.Debug("Checksums don't match")
+		slog.Debug("Results don't match")
 		res.Passed = false
 	} else {
-		slog.Debug("Checksums match")
+		slog.Debug("Results match")
 		res.Passed = true
 	}
 
