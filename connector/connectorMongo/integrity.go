@@ -57,7 +57,7 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 	// 4. Create a string, concatenating the namespaces and respective counts in the form of "namespace:count" and using "," to join them
 	// 5. Calculate the SHA256 hash of the string and the total number of documents across all the namespaces
 
-	//TODO: should we create new flowContext here?
+	//XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult
 	res.Success = false
@@ -77,6 +77,8 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
 		return
 	}
+
+	slog.Debug(fmt.Sprintf("Namespaces for validation: %v", namespaces))
 
 	// create a map to store the results
 	namespacesCountMap := make(map[string]int64)
