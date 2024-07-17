@@ -92,7 +92,6 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 	for i := 0; i < mc.settings.numParallelIntegrityCheckTasks; i++ {
 		go func() {
 			for ns := range taskChannel {
-				slog.Debug(fmt.Sprintf("Processing integrity check task: %v", ns))
 				collection := mc.client.Database(ns.db).Collection(ns.col)
 				count, err := collection.EstimatedDocumentCount(mc.ctx)
 				if err != nil {
@@ -181,8 +180,6 @@ func (mc *MongoConnector) getFQNamespaceList(namespacesFilter []string) ([]names
 			}
 		}
 	}
-
-	slog.Debug(fmt.Sprintf("Databases to resolve: %v", dbsToResolve))
 
 	//iterate over unresolved databases and get all collections
 	for _, db := range dbsToResolve {
