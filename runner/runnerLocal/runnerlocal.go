@@ -9,8 +9,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/adiom-data/dsync/connector/connectorCosmos"
 	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/adiom-data/dsync/connector/connectorNull"
 	"github.com/adiom-data/dsync/connector/connectorRandom"
@@ -56,8 +58,11 @@ const (
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
 	nullRead := settings.SrcConnString == "/dev/random"
+	cosmos := strings.Contains(settings.SrcConnString, "cosmos")
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
+	} else if cosmos {
+		r.src = connectorCosmos.NewCosmosConnector(sourceName, connectorCosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString})
 	} else {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	}
