@@ -8,13 +8,30 @@ package connectorMongo
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log/slog"
-	"sync"
-	"sync/atomic"
+	"sort"
+	"strings"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 )
+
+// XXX: should this be somewhere else?
+type namespace struct {
+	db  string
+	col string
+}
+
+func (ns namespace) String() string {
+	return ns.db + "." + ns.col
+}
+
+type nsCountResult struct {
+	ns    namespace
+	count int64
+	err   error
+}
 
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
@@ -31,53 +48,153 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 	// }
 	// mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
 
+	// The algorithm is supposed to calculate a database-agnostic function of a dataset in a deterministic and unique way given the specific options
+	// As much as we can, we should be using functions and algorithms that are easily parallelizable and can be calculated server-side
+	// This algorithm is called ONSL ("Ordered Namespace List Count"):
+	// 1. Identfiy the namespaces of the dataset in the form of "db.collection", excluding any system namespaces. If there are no namespaces, return 0 count and an empty string as a digest
+	// 2. For each namespace, calculate the total number of documents
+	// 3. Arrange the namespaces in a lexicographical order
+	// 4. Create a string, concatenating the namespaces and respective counts in the form of "namespace:count" and using "," to join them
+	// 5. Calculate the SHA256 hash of the string and the total number of documents across all the namespaces
+
+	//TODO: should we create new flowContext here?
+
 	var res iface.ConnectorDataIntegrityCheckResult
-	tasks := readPlan.Tasks
+	res.Success = false
+
+	// 1. Get the list of fully qualified namespaces
+	namespaces, err := mc.getFQNamespaceList(options.Namespace)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list: %v", err))
+		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+	}
+
+	// Quick exit if there are no namespaces
+	if len(namespaces) == 0 {
+		res.Success = true
+		res.Count = 0
+		res.Digest = ""
+		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+		return
+	}
+
+	// create a map to store the results
+	namespacesCountMap := make(map[string]int64)
+
+	// 2. Calculate the total number of documents for each namespace - we will parallelize this operation
 
 	// create a channel to distribute tasks
-	taskChannel := make(chan iface.ReadPlanTask)
-	// create a wait group to wait for all copiers to finish
-	var wg sync.WaitGroup
-	wg.Add(mc.settings.numParallelIntegrityCheckTasks)
+	taskChannel := make(chan namespace, len(namespaces))
+	// create a channel to collect the results
+	resultChannel := make(chan nsCountResult, len(namespaces))
 
 	// start 4 copiers
 	for i := 0; i < mc.settings.numParallelIntegrityCheckTasks; i++ {
 		go func() {
-			defer wg.Done()
-			for task := range taskChannel {
-				slog.Debug(fmt.Sprintf("Processing integrity check task: %v", task))
-				db := task.Def.Db
-				col := task.Def.Col
-				collection := mc.client.Database(db).Collection(col)
+			for ns := range taskChannel {
+				slog.Debug(fmt.Sprintf("Processing integrity check task: %v", ns))
+				collection := mc.client.Database(ns.db).Collection(ns.col)
 				count, err := collection.EstimatedDocumentCount(mc.ctx)
 				if err != nil {
-					if mc.flowCtx.Err() == context.Canceled {
+					if mc.ctx.Err() == context.Canceled {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
-						return
 					} else {
 						slog.Error(fmt.Sprintf("Failed to count documents: %v", err))
 					}
-					res.Success = false
-					mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
-					return
 				}
-				// atomically increment the counter
-				atomic.AddInt64(&res.Count, count)
+				resultChannel <- nsCountResult{ns: ns, count: count, err: err}
 			}
 		}()
 	}
 
-	// iterate over all the tasks and distribute them to checkers
-	for _, task := range tasks {
+	// iterate over all the namespaces and distribute them to workers
+	for _, task := range namespaces {
 		taskChannel <- task
 	}
-	// close the task channel to signal checkers that there are no more tasks
+	// close the task channel to signal workers that there are no more tasks
 	close(taskChannel)
 
-	// wait for all tasks to finish
-	wg.Wait()
+	// wait for all tasks to finish and collect the results
+	for i := 0; i < len(namespaces); i++ {
+		result := <-resultChannel //XXX: should there be a timeout here?
+		if result.err != nil {
+			slog.Error(fmt.Sprintf("Failed to count documents for namespace %s: %v", result.ns.String(), result.err))
+			mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+			return
+		} else {
+			namespacesCountMap[result.ns.String()] = result.count
+		}
+	}
+
+	// 3. Arrange the namespaces in a lexicographical order
+	sortedNamespaces := make([]string, 0, len(namespacesCountMap))
+	for ns := range namespacesCountMap {
+		sortedNamespaces = append(sortedNamespaces, ns)
+	}
+	sort.Strings(sortedNamespaces)
+
+	// 4. Create a string, concatenating the namespaces and respective counts in the form of "namespace:count" and using "," to join them
+	// also calculate the total number of documents across all the namespaces in the same loop
+	var concatenatedString string
+	totalCount := int64(0)
+	for _, ns := range sortedNamespaces {
+		count := namespacesCountMap[ns]
+		totalCount += count
+		concatenatedString += ns + ":" + fmt.Sprintf("%d", count) + ","
+	}
+	// remove the trailing comma
+	concatenatedString = concatenatedString[:len(concatenatedString)-1]
+
+	// 5. Calculate the SHA256 hash of the string
+	hash := sha256.Sum256([]byte(concatenatedString))
 
 	// post the result
 	res.Success = true
+	res.Count = totalCount
+	res.Digest = fmt.Sprintf("%x", hash)
+
 	mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+}
+
+// Returns a list of fully qualified namespaces
+func (mc *MongoConnector) getFQNamespaceList(namespacesFilter []string) ([]namespace, error) {
+	var dbsToResolve []string //database names that we need to resolve
+
+	var namespaces []namespace
+
+	if namespacesFilter == nil {
+		var err error
+		dbsToResolve, err = mc.getAllDatabases()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// iterate over provided namespaces
+		// if it has a dot, then it is a fully qualified namespace
+		// otherwise, it is a database name to resolve
+		for _, ns := range namespacesFilter {
+			db, col, isFQN := strings.Cut(ns, ".")
+			if isFQN {
+				namespaces = append(namespaces, namespace{db: db, col: col})
+			} else {
+				dbsToResolve = append(dbsToResolve, ns)
+			}
+		}
+	}
+
+	slog.Debug(fmt.Sprintf("Databases to resolve: %v", dbsToResolve))
+
+	//iterate over unresolved databases and get all collections
+	for _, db := range dbsToResolve {
+		colls, err := mc.getAllCollections(db)
+		if err != nil {
+			return nil, err
+		}
+		//create tasks for these
+		for _, coll := range colls {
+			namespaces = append(namespaces, namespace{db: db, col: coll})
+		}
+	}
+
+	return namespaces, nil
 }

@@ -25,8 +25,8 @@ type ConnectorCapabilities struct {
 
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
 type ConnectorDataIntegrityCheckResult struct {
-	Checksum string
-	Count    int64
+	Digest string
+	Count  int64
 
 	Success bool
 }

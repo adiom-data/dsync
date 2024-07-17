@@ -370,7 +370,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						} else {
 							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
 						}
-						continue
+						continue //XXX: what happens later with this task if we skip it?
 					}
 					loc := iface.Location{Database: db, Collection: col}
 					var dataBatch [][]byte
