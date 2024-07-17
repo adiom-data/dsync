@@ -35,7 +35,7 @@ type nsCountResult struct {
 
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
-func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) {
+func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) {
 	//XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult

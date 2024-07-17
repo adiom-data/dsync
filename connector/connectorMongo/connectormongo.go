@@ -529,9 +529,9 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	return nil
 }
 
-func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan) error {
+func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	// need to make this async to honor the spec
-	go mc.doIntegrityCheck_sync(flowId, options, readPlan)
+	go mc.doIntegrityCheck_sync(flowId, options)
 
 	return nil
 }

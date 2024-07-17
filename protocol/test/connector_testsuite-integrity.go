@@ -50,7 +50,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{})
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{})
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
@@ -70,7 +70,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -125,7 +125,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{})
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{})
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
@@ -157,7 +157,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -174,7 +174,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 
 	// call the method again to check that the result is consistent
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -231,7 +231,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{})
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{})
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
@@ -268,7 +268,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -292,7 +292,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 
 	// call the data integrity check method again to check that the result is different
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -350,7 +350,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{}, iface.ConnectorReadPlan{})
+		err := connector.RequestDataIntegrityCheck(iface.FlowID("3234"), iface.ConnectorOptions{})
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
@@ -382,7 +382,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	// Test performing a data integrity check
 	// We'll run this with a timeout to make sure it's non-blocking
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
@@ -402,7 +402,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 
 	// call the method again to check that the result is different
 	err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions), iface.ConnectorReadPlan{})
+		return receiver.(iface.ConnectorICoordinatorSignal).RequestDataIntegrityCheck(args[0].(iface.FlowID), args[1].(iface.ConnectorOptions))
 	}, NonBlockingTimeout,
 		flowID, options)
 	assert.NoError(suite.T(), err)
