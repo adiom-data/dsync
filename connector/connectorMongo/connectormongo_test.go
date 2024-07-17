@@ -70,3 +70,10 @@ func (m *MongoTestDataStore) Teardown() error {
 	m.client.Disconnect(context.TODO())
 	return nil
 }
+
+func (m *MongoTestDataStore) DeleteNamespace(dbName string, colName string) error {
+	db := m.client.Database(dbName)
+	coll := db.Collection(colName)
+	err := coll.Drop(context.TODO())
+	return err
+}

@@ -11,5 +11,6 @@ package test
 type TestDataStore interface {
 	Setup() error                                              //instantiate and connect to the datastore
 	InsertDummy(db string, col string, data interface{}) error //insert a dummy record
+	DeleteNamespace(db string, col string) error               //delete all records in a namespace
 	Teardown() error                                           //clean up and disconnect
 }
