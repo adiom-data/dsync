@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -119,7 +120,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.coord = coord
 
 	// Generate connector ID for resumability purposes
-	id := generateConnectorID(mc.settings.ConnectionString)
+	id := connector.GenerateConnectorID(mc.settings.ConnectionString)
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities, Id: id}

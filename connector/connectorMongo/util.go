@@ -43,9 +43,9 @@ func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timest
 */
 
 const (
-	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
-	connectorSpec   string = "Generic" // We're generic in the sense that we work with Cosmos, shared tier, etc.
-
+	connectorDBType string = "MongoDB"  // We're a MongoDB-compatible connector
+	connectorSpec   string = "Specific" // We're generic in the sense that we work with Cosmos, shared tier, etc.
+	// specific, not compatible with Cosmos DB
 	dummyDB                      string = "adiom-internal-dummy" //note that this must be different from the metadata DB - that one is excluded from copying, while this one isn't
 	dummyCol                     string = "dummy"
 	progressReportingIntervalSec        = 10
@@ -93,7 +93,7 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 }
 
 // Generates static connector ID based on connection string
-// XXX: is this the best place to do this?
+// XXX: is this the best place to do this? - move to overall connector util file
 func generateConnectorID(connectionString string) iface.ConnectorID {
 	id, err := hashstructure.Hash(connectionString, nil)
 	if err != nil {
