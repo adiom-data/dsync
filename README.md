@@ -17,9 +17,10 @@ go build
 
 1) You will need two MongoDB databases - one for the source and one for the destination. 
 Could be MongoDB Atlas or local. If the source is local, you need to start it as a replica set to ensure that it supports change streams.
-2) It's good to have some data to play around with on the source, but the destination should be empty barring any system namespaces (e.g. admin.*, local.*, system.*)
-3) Then you can run the "dsync" app
-4) Optionally, you may also want to generate some load on the source (I use SimRunner for this)
+   * Either can be used for storing the metadata, but conventionally it's the destination or a separate MongoDB instance.
+3) It's good to have some data to play around with on the source, but the destination should be empty barring any system namespaces (e.g. admin.*, local.*, system.*)
+4) Then you can run the "dsync" app
+5) Optionally, you may also want to generate some load on the source (I use SimRunner for this)
 
 # How to Test
 
@@ -64,7 +65,7 @@ mongorestore --archive=sampledata.archive
 ```
 7) Start the sync
 ```
-./dsync -s $MDB_LOCAL1 -d $MDB_LOCAL2 -m $MDB_LOCAL1 --verbosity INFO
+./dsync -s $MDB_LOCAL1 -d $MDB_LOCAL2 -m $MDB_LOCAL2 --verbosity INFO
 ```
 Now Dsync should be running! 
 
@@ -82,6 +83,8 @@ java -jar tools/SimRunner/SimRunner.jar tools/SimRunner/adiom-load.json
 - Destination: 
     - MongoDB: Generic MongoDB API connector.
     - /dev/null: Does exactly what you'd expect it to do.
+- Metadata store:
+    - Only MongoDB is supported (can be local, self-managed or Atlas)
 
 ## Namespace filtering
 
