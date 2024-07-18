@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -118,7 +117,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.coord = coord
 
 	// Generate connector ID for resumability purposes
-	id := connector.GenerateConnectorID(mc.settings.ConnectionString)
+	id := generateConnectorID(mc.settings.ConnectionString)
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities, Id: id}
@@ -559,7 +558,7 @@ func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options ifa
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		resumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
+		resumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 			return

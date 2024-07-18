@@ -45,6 +45,7 @@ func runDsync(c *cli.Context) error {
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
 		SrcConnString:                   o.SrcConnString,
 		DstConnString:                   o.DstConnString,
+		SrcType:                         o.Sourcetype,
 		StateStoreConnString:            o.StateStoreConnString,
 		NsFromString:                    o.NamespaceFrom,
 		VerifyRequestedFlag:             o.Verify,
