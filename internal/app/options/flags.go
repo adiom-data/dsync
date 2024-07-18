@@ -20,6 +20,8 @@ const DefaultVerbosity = "INFO"
 
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
+var validSources = []string{"MongoDB", "CosmosDB"}
+
 type ListFlag struct {
 	Values []string
 }
@@ -49,6 +51,17 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				}
 				return nil
 			},
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "sourcetype",
+			Usage: fmt.Sprintf("source database type (%s)", strings.Join(validSources, ",")),
+			Action: func(ctx *cli.Context, source string) error {
+				if !slices.Contains(validSources, source) {
+					return fmt.Errorf("unsupported verbosity setting %v", source)
+				}
+				return nil
+			},
+			Required: true,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "source",

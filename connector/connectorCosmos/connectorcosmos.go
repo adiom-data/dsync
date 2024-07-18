@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adiom-data/dsync/connector"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -39,12 +38,12 @@ type CosmosConnector struct {
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status               iface.ConnectorStatus
-	flowCtx              context.Context
-	flowCancelFunc       context.CancelFunc
-	flowId               iface.FlowID
-	flowConnCapabilities iface.ConnectorCapabilities
-	flowCDCResumeToken   bson.Raw
+	status                iface.ConnectorStatus
+	flowCtx               context.Context
+	flowCancelFunc        context.CancelFunc
+	flowId                iface.FlowID
+	flowConnCapabilities  iface.ConnectorCapabilities
+	flowCDCResumeTokenMap map[iface.ReadPlanTask]bson.Raw
 }
 
 type CosmosConnectorSettings struct {
@@ -117,7 +116,10 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.coord = coord
 
 	// Generate connector ID for resumability purposes
-	id := connector.GenerateConnectorID(cc.settings.ConnectionString)
+	id := generateConnectorID(cc.settings.ConnectionString)
+
+	// Create CDCResumeToken map
+	cc.flowCDCResumeTokenMap = make(map[iface.ReadPlanTask]bson.Raw)
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: cc.desc, Type: cc.connectorType, Cap: cc.connectorCapabilities, Id: id}
@@ -154,7 +156,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
-	cc.flowCDCResumeToken = readPlan.CdcResumeToken
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
@@ -185,47 +186,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	// start printing progress
 	go cc.printProgress(&readerProgress)
 
-	// kick off LSN tracking
-	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
-	go func() {
-		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", cc.id, flowId))
-		var nsFilter bson.D
-		if options.Namespace != nil { //means namespace filtering was requested
-			nsFilter = connector.CreateChangeStreamNamespaceFilterFromTasks(tasks)
-		} else {
-			nsFilter = connector.CreateChangeStreamNamespaceFilter()
-		}
-
-		changeStream, err := cc.createChangeStream(changeStreamLoc, cc.client, cc.flowCtx, nsFilter)
-		if err != nil {
-			slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
-			return
-		}
-		defer changeStream.Close(cc.flowCtx)
-
-		for changeStream.Next(cc.flowCtx) {
-			var change bson.M
-			if err := changeStream.Decode(&change); err != nil {
-				slog.Error(fmt.Sprintf("LSN tracker: Failed to decode change stream event: %v", err))
-				continue
-			}
-
-			if connector.ShouldIgnoreChangeStreamEvent(change) {
-				continue
-			}
-
-			cc.status.WriteLSN++
-		}
-
-		if err := changeStream.Err(); err != nil {
-			if cc.flowCtx.Err() == context.Canceled {
-				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
-			} else {
-				slog.Error(fmt.Sprintf("Change stream error: %v", err))
-			}
-		}
-	}()
-
 	// kick off the change stream reader
 	go func() {
 		//wait for the initial sync to finish
@@ -244,7 +204,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeTokenMap[tasks[0]]}
 				}
 			}
 		}()
@@ -252,17 +212,20 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		var lsn int64 = 0
 
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", cc.id, flowId))
-		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", cc.id, cc.flowCDCResumeToken))
+		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", cc.id, cc.flowCDCResumeTokenMap))
 
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
-			nsFilter = connector.CreateChangeStreamNamespaceFilterFromTasks(tasks)
+			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
 		} else {
-			nsFilter = connector.CreateChangeStreamNamespaceFilter()
+			nsFilter = createChangeStreamNamespaceFilter()
 		}
 		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
+		slog.Info(fmt.Sprintf("task 1: %v", tasks[0]))
+		slog.Info(fmt.Sprintf("Change stream resume token: %v", cc.flowCDCResumeTokenMap[tasks[0]]))
 
-		changeStream, err := cc.createChangeStream(changeStreamLoc, cc.client, cc.flowCtx, nsFilter)
+		opts := moptions.ChangeStream().SetResumeAfter(cc.flowCDCResumeTokenMap[tasks[0]]).SetFullDocument("updateLookup")
+		changeStream, err := cc.createChangeStreamWithNs(changeStreamLoc, nsFilter, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%v", err))
 			return
@@ -278,14 +241,10 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 				continue
 			}
 
-			if connector.ShouldIgnoreChangeStreamEvent(change) {
-				continue
-			}
-
 			readerProgress.changeStreamEvents++ //XXX Should we do atomic add here as well, shared variable multiple threads
 			lsn++
 
-			dataMsg, err := connector.ConvertChangeStreamEventToDataMessage(change)
+			dataMsg, err := cc.convertChangeStreamEventToDataMessage(change)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
 				continue
@@ -299,7 +258,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			dataChannel <- dataMsg
 
 			//update the last seen resume token
-			cc.flowCDCResumeToken = changeStream.ResumeToken()
+			cc.flowCDCResumeTokenMap[tasks[0]] = changeStream.ResumeToken()
 		}
 
 		if err := changeStream.Err(); err != nil {
@@ -452,19 +411,36 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
 
-		resumeToken, err := connector.GetLatestResumeToken(cc.ctx, cc.client)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
-			return
-		}
-
-		tasks, err := connector.CreateInitialCopyTasks(options.Namespace, cc.client, cc.ctx)
+		tasks, err := cc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
 			return
 		}
-		cc.flowCDCResumeToken = resumeToken
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeToken}
+		slog.Debug(fmt.Sprintf("created tasks: %v", tasks))
+		/* For multiple change streams, right now just using first task
+		//create resume token for each task
+		for _, task := range tasks {
+			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+			resumeToken, err := cc.getLatestResumeToken(loc)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
+				return
+			}
+			cc.flowCDCResumeTokenMap[task] = resumeToken
+		}*/
+		task1 := tasks[0]
+		loc := iface.Location{Database: task1.Def.Db, Collection: task1.Def.Col}
+		slog.Debug(fmt.Sprintf("getting resume token at loc %v", loc))
+		resumeToken, err := cc.getLatestResumeToken(loc)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task1.Id, err))
+			return
+		}
+		slog.Info(fmt.Sprintf("resume token: %v", resumeToken))
+		cc.flowCDCResumeTokenMap[task1] = resumeToken
+
+		//how to adjust this to cosmos, right now just using the first task
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeTokenMap[task1]}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
@@ -474,21 +450,39 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 	return nil
 }
 
-func (cc *CosmosConnector) createChangeStream(namespace iface.Location, client *mongo.Client, ctx context.Context, nsfilter primitive.D) (*mongo.ChangeStream, error) {
+func (cc *CosmosConnector) createChangeStreamWithNs(namespace iface.Location, nsfilter primitive.D, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
-	collection := client.Database(db).Collection(col)
+	collection := cc.client.Database(db).Collection(col)
 	pipeline := mongo.Pipeline{
 		bson.D{
 			{Key: "$match", Value: bson.D{{"$and", bson.A{nsfilter, bson.D{{"operationType", bson.D{{"$in", bson.A{"insert", "update", "replace"}}}}}}}}},
 		},
+		bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "fullDocument", Value: 1}, {Key: "ns", Value: 1}, {Key: "documentKey", Value: 1}}}},
 	}
-
-	opts := moptions.ChangeStream().SetStartAfter(cc.flowCDCResumeToken).SetFullDocument("updateLookup")
-	changeStream, err := collection.Watch(ctx, pipeline, opts)
+	changeStream, err := collection.Watch(cc.ctx, pipeline, opts)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Failed to open change stream: `%v`", err))
 	}
 	slog.Info("Opened change stream for %v\n", collection)
+	return changeStream, nil
+}
+
+func (cc *CosmosConnector) createChangeStream(namespace iface.Location) (*mongo.ChangeStream, error) {
+	db := namespace.Database
+	col := namespace.Collection
+	collection := cc.client.Database(db).Collection(col)
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{
+			{Key: "operationType", Value: bson.D{{Key: "$in", Value: bson.A{"insert", "update", "replace"}}}}}}},
+		bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "fullDocument", Value: 1}, {Key: "ns", Value: 1}, {Key: "documentKey", Value: 1}}}},
+	}
+	slog.Debug(fmt.Sprintf("pipeline: %v", pipeline))
+	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
+	changeStream, err := collection.Watch(cc.ctx, pipeline, opts)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("Opened change stream for %v\n", collection)
 	return changeStream, nil
 }
