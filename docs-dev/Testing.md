@@ -4,6 +4,8 @@
 
 Since we have defined protocol and interfaces for specific classes, the testing objective for a given implementation is simply to establish conformance to the specific specification. Thus, each implementation (e.g. MongoConnector) needs to be tested against a common interface test suite (e.g. ConnectorTestSuite), although additional implementation-specific tests are permitted and encouraged.
 
+The tests are expected to be executed against a database with prepopulated data (e.g. a test container) but no active load.
+
 ## Organization
 
 Shared test suites are located in the 'protocol.iface.test' subdirectory. 
