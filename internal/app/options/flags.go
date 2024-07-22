@@ -57,7 +57,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage: fmt.Sprintf("source database type (%s)", strings.Join(validSources, ",")),
 			Action: func(ctx *cli.Context, source string) error {
 				if !slices.Contains(validSources, source) {
-					return fmt.Errorf("unsupported verbosity setting %v", source)
+					return fmt.Errorf("unsupported sourcetype setting %v", source)
 				}
 				return nil
 			},

@@ -10,7 +10,6 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
@@ -43,7 +42,7 @@ type CosmosConnector struct {
 	flowCancelFunc        context.CancelFunc
 	flowId                iface.FlowID
 	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap map[iface.ReadPlanTask]bson.Raw
+	flowCDCResumeTokenMap map[iface.Location]bson.Raw //turn to iface.Location
 }
 
 type CosmosConnectorSettings struct {
@@ -119,7 +118,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	id := generateConnectorID(cc.settings.ConnectionString)
 
 	// Create CDCResumeToken map
-	cc.flowCDCResumeTokenMap = make(map[iface.ReadPlanTask]bson.Raw)
+	cc.flowCDCResumeTokenMap = make(map[iface.Location]bson.Raw)
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: cc.desc, Type: cc.connectorType, Cap: cc.connectorCapabilities, Id: id}
@@ -129,7 +128,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("MongoConnector has been configured with ID " + (string)(cc.id))
+	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
 
 	return nil
 }
@@ -153,12 +152,19 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	cc.flowId = flowId
 
 	tasks := readPlan.Tasks
+
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
 	}
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
+	//choose first namespace for change stream for now:
+
+	changeStreamLoc := iface.Location{Database: tasks[0].Def.Db, Collection: tasks[0].Def.Col}
+	slog.Info(fmt.Sprintf("Change stream location: %v", changeStreamLoc))
+
+	cc.flowCDCResumeTokenMap[changeStreamLoc] = readPlan.CdcResumeToken
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
@@ -177,11 +183,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	}
 
 	readerProgress.initialSyncDocs.Store(0)
-
-	//choose first namespace for change stream for now:
-
-	changeStreamLoc := iface.Location{Database: tasks[0].Def.Db, Collection: tasks[0].Def.Col}
-	slog.Info(fmt.Sprintf("Change stream location: %v", changeStreamLoc))
 
 	// start printing progress
 	go cc.printProgress(&readerProgress)
@@ -204,7 +205,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeTokenMap[tasks[0]]}
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeTokenMap[changeStreamLoc]}
 				}
 			}
 		}()
@@ -214,18 +215,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", cc.id, flowId))
 		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", cc.id, cc.flowCDCResumeTokenMap))
 
-		var nsFilter bson.D
-		if options.Namespace != nil { //means namespace filtering was requested
-			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
-		} else {
-			nsFilter = createChangeStreamNamespaceFilter()
-		}
-		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 		slog.Info(fmt.Sprintf("task 1: %v", tasks[0]))
-		slog.Info(fmt.Sprintf("Change stream resume token: %v", cc.flowCDCResumeTokenMap[tasks[0]]))
+		slog.Info(fmt.Sprintf("Change stream resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
 
-		opts := moptions.ChangeStream().SetResumeAfter(cc.flowCDCResumeTokenMap[tasks[0]]).SetFullDocument("updateLookup")
-		changeStream, err := cc.createChangeStreamWithNs(changeStreamLoc, nsFilter, opts)
+		opts := moptions.ChangeStream().SetResumeAfter(cc.flowCDCResumeTokenMap[changeStreamLoc]).SetFullDocument("updateLookup")
+		changeStream, err := cc.createChangeStream(changeStreamLoc, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%v", err))
 			return
@@ -255,10 +249,12 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 			//send the data message
 			dataMsg.SeqNum = lsn
+			cc.status.WriteLSN++
 			dataChannel <- dataMsg
 
 			//update the last seen resume token
-			cc.flowCDCResumeTokenMap[tasks[0]] = changeStream.ResumeToken()
+			cc.flowCDCResumeTokenMap[changeStreamLoc] = changeStream.ResumeToken()
+			slog.Debug(fmt.Sprintf("Updated resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
 		}
 
 		if err := changeStream.Err(); err != nil {
@@ -437,10 +433,10 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			return
 		}
 		slog.Info(fmt.Sprintf("resume token: %v", resumeToken))
-		cc.flowCDCResumeTokenMap[task1] = resumeToken
+		cc.flowCDCResumeTokenMap[loc] = resumeToken
 
 		//how to adjust this to cosmos, right now just using the first task
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeTokenMap[task1]}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeTokenMap[loc]}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
@@ -450,25 +446,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 	return nil
 }
 
-func (cc *CosmosConnector) createChangeStreamWithNs(namespace iface.Location, nsfilter primitive.D, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
-	db := namespace.Database
-	col := namespace.Collection
-	collection := cc.client.Database(db).Collection(col)
-	pipeline := mongo.Pipeline{
-		bson.D{
-			{Key: "$match", Value: bson.D{{"$and", bson.A{nsfilter, bson.D{{"operationType", bson.D{{"$in", bson.A{"insert", "update", "replace"}}}}}}}}},
-		},
-		bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "fullDocument", Value: 1}, {Key: "ns", Value: 1}, {Key: "documentKey", Value: 1}}}},
-	}
-	changeStream, err := collection.Watch(cc.ctx, pipeline, opts)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed to open change stream: `%v`", err))
-	}
-	slog.Info("Opened change stream for %v\n", collection)
-	return changeStream, nil
-}
-
-func (cc *CosmosConnector) createChangeStream(namespace iface.Location) (*mongo.ChangeStream, error) {
+func (cc *CosmosConnector) createChangeStream(namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
 	collection := cc.client.Database(db).Collection(col)
@@ -478,7 +456,6 @@ func (cc *CosmosConnector) createChangeStream(namespace iface.Location) (*mongo.
 		bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "fullDocument", Value: 1}, {Key: "ns", Value: 1}, {Key: "documentKey", Value: 1}}}},
 	}
 	slog.Debug(fmt.Sprintf("pipeline: %v", pipeline))
-	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := collection.Watch(cc.ctx, pipeline, opts)
 	if err != nil {
 		return nil, err
