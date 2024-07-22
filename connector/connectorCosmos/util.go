@@ -11,6 +11,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
+	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -49,7 +50,8 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 
 func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.Raw, error) {
 	slog.Debug("Getting latest resume token...")
-	changeStream, err := cc.createChangeStream(location)
+	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
+	changeStream, err := cc.createChangeStream(location, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
