@@ -17,6 +17,6 @@ import (
 func TestNullConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
 		return NewNullConnector("test")
-	})
+	}, nil)
 	suite.Run(t, tSuite)
 }

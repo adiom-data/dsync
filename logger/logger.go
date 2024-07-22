@@ -36,8 +36,9 @@ func Setup(o Options) {
 	w := os.Stderr
 	logger := slog.New(
 		tint.NewHandler(w, &tint.Options{
-			NoColor: !isatty.IsTerminal(w.Fd()),
-			Level:   level,
+			NoColor:   !isatty.IsTerminal(w.Fd()),
+			Level:     level,
+			AddSource: (level < 0), //only for debugging
 		}),
 	)
 

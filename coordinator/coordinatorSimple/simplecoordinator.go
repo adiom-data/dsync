@@ -134,7 +134,7 @@ func (c *SimpleCoordinator) Teardown() {
 }
 
 func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, cep iface.ConnectorICoordinatorSignal) (iface.ConnectorID, error) {
-	slog.Info("Registering connector with details: " + fmt.Sprintf("%v", details))
+	slog.Info("Registering connector with details: " + fmt.Sprintf("%+v", details))
 
 	// Add the connector to the list
 	cid := c.addConnector(ConnectorDetailsWithEp{Details: details, Endpoint: cep})
@@ -448,7 +448,7 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 		slog.Error("Failed to request integrity check from source", err)
 		return res, err
 	}
-	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, iface.ConnectorOptions{}); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
+	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
 		slog.Error("Failed to request integrity check from destination", err)
 		return res, err
 	}
@@ -478,10 +478,10 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	}
 
 	if resSource != resDestination {
-		slog.Debug("Checksums don't match")
+		slog.Debug("Results don't match")
 		res.Passed = false
 	} else {
-		slog.Debug("Checksums match")
+		slog.Debug("Results match")
 		res.Passed = true
 	}
 
