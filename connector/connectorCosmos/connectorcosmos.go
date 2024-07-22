@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -42,7 +42,8 @@ type CosmosConnector struct {
 	flowCancelFunc        context.CancelFunc
 	flowId                iface.FlowID
 	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap map[iface.Location]bson.Raw //turn to iface.Location
+	flowCDCResumeTokenMap map[iface.Location]bson.Raw
+	flowCDCResumeToken    []byte
 }
 
 type CosmosConnectorSettings struct {
@@ -77,7 +78,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
 	defer cancel()
-	clientOptions := options.Client().ApplyURI(cc.settings.ConnectionString)
+	clientOptions := moptions.Client().ApplyURI(cc.settings.ConnectionString)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
@@ -164,7 +165,14 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	changeStreamLoc := iface.Location{Database: tasks[0].Def.Db, Collection: tasks[0].Def.Col}
 	slog.Info(fmt.Sprintf("Change stream location: %v", changeStreamLoc))
 
-	cc.flowCDCResumeTokenMap[changeStreamLoc] = readPlan.CdcResumeToken
+	// Deserialize the resume token map
+	cc.flowCDCResumeToken = readPlan.CdcResumeToken
+	var err error
+	cc.flowCDCResumeTokenMap, err = decodeMap(cc.flowCDCResumeToken)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
+	}
+
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
@@ -177,12 +185,12 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	initialSyncDone := make(chan struct{})
 
 	readerProgress := ReaderProgress{ //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
-		changeStreamEvents: 0,
-		tasksTotal:         uint64(len(tasks)),
-		tasksCompleted:     0,
+		tasksTotal:     uint64(len(tasks)),
+		tasksCompleted: 0,
 	}
 
 	readerProgress.initialSyncDocs.Store(0)
+	readerProgress.changeStreamEvents.Store(0)
 
 	// start printing progress
 	go cc.printProgress(&readerProgress)
@@ -205,65 +213,67 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeTokenMap[changeStreamLoc]}
+					cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap)
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
 				}
 			}
 		}()
 
-		var lsn int64 = 0
-
 		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", cc.id, flowId))
 		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", cc.id, cc.flowCDCResumeTokenMap))
+		/*
+			slog.Info(fmt.Sprintf("task 1: %v", tasks[0]))
+			slog.Info(fmt.Sprintf("Change stream resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
 
-		slog.Info(fmt.Sprintf("task 1: %v", tasks[0]))
-		slog.Info(fmt.Sprintf("Change stream resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
-
-		opts := moptions.ChangeStream().SetResumeAfter(cc.flowCDCResumeTokenMap[changeStreamLoc]).SetFullDocument("updateLookup")
-		changeStream, err := cc.createChangeStream(changeStreamLoc, opts)
-		if err != nil {
-			slog.Error(fmt.Sprintf("%v", err))
-			return
-		}
-		defer changeStream.Close(cc.flowCtx)
-
-		cc.status.CDCActive = true
-
-		for changeStream.Next(cc.flowCtx) {
-			var change bson.M
-			if err := changeStream.Decode(&change); err != nil {
-				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
-				continue
-			}
-
-			readerProgress.changeStreamEvents++ //XXX Should we do atomic add here as well, shared variable multiple threads
-			lsn++
-
-			dataMsg, err := cc.convertChangeStreamEventToDataMessage(change)
+			opts := moptions.ChangeStream().SetResumeAfter(cc.flowCDCResumeTokenMap[changeStreamLoc]).SetFullDocument("updateLookup")
+			changeStream, err := cc.createChangeStream(changeStreamLoc, opts)
 			if err != nil {
-				slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
-				continue
+				slog.Error(fmt.Sprintf("%v", err))
+				return
 			}
-			if dataMsg.MutationType == iface.MutationType_Reserved { //TODO (AK, 6/2024): find a better way to indicate that we need to skip this event
-				slog.Debug(fmt.Sprintf("Skipping the event: %v", change))
-				continue
-			}
-			//send the data message
-			dataMsg.SeqNum = lsn
-			cc.status.WriteLSN++
-			dataChannel <- dataMsg
+			defer changeStream.Close(cc.flowCtx)
 
-			//update the last seen resume token
-			cc.flowCDCResumeTokenMap[changeStreamLoc] = changeStream.ResumeToken()
-			slog.Debug(fmt.Sprintf("Updated resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
-		}
+			cc.status.CDCActive = true
 
-		if err := changeStream.Err(); err != nil {
-			if cc.flowCtx.Err() == context.Canceled {
-				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
-			} else {
-				slog.Error(fmt.Sprintf("Change stream error: %v", err))
+			var lsn int64 = 0
+
+			for changeStream.Next(cc.flowCtx) {
+				var change bson.M
+				if err := changeStream.Decode(&change); err != nil {
+					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
+					continue
+				}
+
+				readerProgress.changeStreamEvents.Add(1) //XXX Should we do atomic add here as well, shared variable multiple threads
+				lsn++
+
+				dataMsg, err := cc.convertChangeStreamEventToDataMessage(change)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
+					continue
+				}
+				if dataMsg.MutationType == iface.MutationType_Reserved { //TODO (AK, 6/2024): find a better way to indicate that we need to skip this event
+					slog.Debug(fmt.Sprintf("Skipping the event: %v", change))
+					continue
+				}
+				//send the data message
+				dataMsg.SeqNum = lsn
+				cc.status.WriteLSN++
+				dataChannel <- dataMsg
+
+				//update the last seen resume token
+				cc.flowCDCResumeTokenMap[changeStreamLoc] = changeStream.ResumeToken()
+				slog.Debug(fmt.Sprintf("Updated resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
 			}
-		}
+
+			if err := changeStream.Err(); err != nil {
+				if cc.flowCtx.Err() == context.Canceled {
+					slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
+				} else {
+					slog.Error(fmt.Sprintf("Change stream error: %v", err))
+				}
+			} */
+		cc.concurrentChangeStreams(tasks, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -413,7 +423,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			return
 		}
 		slog.Debug(fmt.Sprintf("created tasks: %v", tasks))
-		/* For multiple change streams, right now just using first task
+
 		//create resume token for each task
 		for _, task := range tasks {
 			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
@@ -422,21 +432,16 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 				slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
 				return
 			}
-			cc.flowCDCResumeTokenMap[task] = resumeToken
-		}*/
-		task1 := tasks[0]
-		loc := iface.Location{Database: task1.Def.Db, Collection: task1.Def.Col}
-		slog.Debug(fmt.Sprintf("getting resume token at loc %v", loc))
-		resumeToken, err := cc.getLatestResumeToken(loc)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task1.Id, err))
-			return
+			cc.flowCDCResumeTokenMap[loc] = resumeToken
 		}
-		slog.Info(fmt.Sprintf("resume token: %v", resumeToken))
-		cc.flowCDCResumeTokenMap[loc] = resumeToken
 
+		//serialize the resume token map
+		cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
+		}
 		//how to adjust this to cosmos, right now just using the first task
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeTokenMap[loc]}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeToken}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
@@ -455,11 +460,83 @@ func (cc *CosmosConnector) createChangeStream(namespace iface.Location, opts *mo
 			{Key: "operationType", Value: bson.D{{Key: "$in", Value: bson.A{"insert", "update", "replace"}}}}}}},
 		bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 1}, {Key: "fullDocument", Value: 1}, {Key: "ns", Value: 1}, {Key: "documentKey", Value: 1}}}},
 	}
-	slog.Debug(fmt.Sprintf("pipeline: %v", pipeline))
+	//slog.Debug(fmt.Sprintf("pipeline: %v", pipeline))
 	changeStream, err := collection.Watch(cc.ctx, pipeline, opts)
 	if err != nil {
 		return nil, err
 	}
 	fmt.Printf("Opened change stream for %v\n", collection)
 	return changeStream, nil
+}
+
+func (cc *CosmosConnector) concurrentChangeStreams(tasks []iface.ReadPlanTask, readerProgress *ReaderProgress, channel chan<- iface.DataMessage) error {
+	//TODO (AK, 6/2024): Implement this
+	var wg sync.WaitGroup
+
+	var lsn atomic.Int64
+	lsn.Store(0)
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go func(task iface.ReadPlanTask) {
+			defer wg.Done()
+			slog.Debug(fmt.Sprintf("task: %v", task))
+			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+			//loc := task.Def.Db + "." + task.Def.Col
+			opts := moptions.ChangeStream().SetFullDocument("updateLookup")
+			changeStream, err := cc.createChangeStream(loc, opts)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to create change stream for task %v: %v", task.Id, err))
+				return
+			}
+			defer changeStream.Close(cc.flowCtx)
+
+			cc.status.CDCActive = true
+
+			cc.processChangeStreamEvent(readerProgress, changeStream, loc, channel, &lsn)
+
+			if err := changeStream.Err(); err != nil {
+				if cc.flowCtx.Err() == context.Canceled {
+					slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
+				} else {
+					slog.Error(fmt.Sprintf("Change stream error: %v", err))
+				}
+			}
+
+		}(task)
+	}
+	return nil
+}
+
+func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *atomic.Int64) {
+
+	for changeStream.Next(cc.flowCtx) {
+		var change bson.M
+		if err := changeStream.Decode(&change); err != nil {
+			slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
+			continue
+		}
+
+		readerProgress.changeStreamEvents.Add(1) //XXX Should we do atomic add here as well, shared variable multiple threads
+		lsn.Add(1)
+
+		dataMsg, err := cc.convertChangeStreamEventToDataMessage(change)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
+			continue
+		}
+		if dataMsg.MutationType == iface.MutationType_Reserved { //TODO (AK, 6/2024): find a better way to indicate that we need to skip this event
+			slog.Debug(fmt.Sprintf("Skipping the event: %v", change))
+			continue
+		}
+		//send the data message
+		dataMsg.SeqNum = lsn.Load()
+		cc.status.WriteLSN++
+		dataChannel <- dataMsg
+
+		//update the last seen resume token
+		cc.flowCDCResumeTokenMap[changeStreamLoc] = changeStream.ResumeToken()
+		slog.Debug(fmt.Sprintf("Updated resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
+	}
+
 }

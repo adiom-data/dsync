@@ -20,7 +20,7 @@ const (
 
 type ReaderProgress struct {
 	initialSyncDocs    atomic.Uint64
-	changeStreamEvents uint64
+	changeStreamEvents atomic.Uint64
 	tasksTotal         uint64
 	tasksCompleted     uint64
 }
@@ -36,20 +36,20 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 			return
 		case <-ticker.C:
 			elapsedTime := time.Since(startTime).Seconds()
-			operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
+			operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents.Load() - operations
 			opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 			// Print reader progress
 			slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-				readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+				readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents.Load(), opsPerSec))
 
 			startTime = time.Now()
-			operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents
+			operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents.Load()
 		}
 	}
 }
 
 func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.Raw, error) {
-	slog.Debug("Getting latest resume token...")
+	slog.Debug("Getting latest resume token for location: %v\n", location)
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := cc.createChangeStream(location, opts)
 	if err != nil {
