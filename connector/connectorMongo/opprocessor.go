@@ -93,7 +93,8 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	case iface.MutationType_Update:
 		idType := bsontype.Type(dataMsg.IdType)
 		data := *dataMsg.Data
-		_, err := collection.ReplaceOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}, bson.Raw(data))
+		opts := options.Replace().SetUpsert(true) //compatibility with Cosmos, all change stream events are generalized to upserts
+		_, err := collection.ReplaceOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}, bson.Raw(data), opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to update document in the collection: %v", err))
 			return err
