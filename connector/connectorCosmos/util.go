@@ -49,7 +49,7 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 }
 
 func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.Raw, error) {
-	slog.Debug("Getting latest resume token for location: %v\n", location)
+	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := cc.createChangeStream(location, opts)
 	if err != nil {
@@ -88,48 +88,35 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-func (mc *CosmosConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
+func (cc *CosmosConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
 	slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
 	db := change["ns"].(bson.M)["db"].(string)
 	col := change["ns"].(bson.M)["coll"].(string)
-	optype := change["operationType"].(string)
-
 	loc := iface.Location{Database: db, Collection: col}
 	var dataMsg iface.DataMessage
 
-	switch optype {
-	case "insert":
-		fullDocument := change["fullDocument"].(bson.M)
-		// convert fulldocument to BSON.Raw
-		fullDocumentRaw, err := bson.Marshal(fullDocument)
-		if err != nil {
-			return iface.DataMessage{}, fmt.Errorf("failed to marshal full document: %v", err)
-		}
-		dataMsg = iface.DataMessage{Loc: loc, Data: &fullDocumentRaw, MutationType: iface.MutationType_Insert}
-	case "update":
-		// get the id of the document that was changed
-		id := change["documentKey"].(bson.M)["_id"]
-		// convert id to raw bson
-		idType, idVal, err := bson.MarshalValue(id)
-		if err != nil {
-			return iface.DataMessage{}, fmt.Errorf("failed to marshal _id: %v", err)
-		}
-		// get the full state of the document after the change
-		if change["fullDocument"] == nil {
-			//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
-			return iface.DataMessage{MutationType: iface.MutationType_Reserved}, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
-		}
-		fullDocument := change["fullDocument"].(bson.M)
-		// convert fulldocument to BSON.Raw
-		fullDocumentRaw, err := bson.Marshal(fullDocument)
-		if err != nil {
-			return iface.DataMessage{}, fmt.Errorf("failed to marshal full document: %v", err)
-		}
-		dataMsg = iface.DataMessage{Loc: loc, Id: &idVal, IdType: byte(idType), Data: &fullDocumentRaw, MutationType: iface.MutationType_Update}
-	default:
-		return iface.DataMessage{}, fmt.Errorf("unsupported change event operation type: %v", optype)
+	// treat all change stream events as updates
+	// get the id of the document that was changed
+	id := change["documentKey"].(bson.M)["_id"]
+	// convert id to raw bson
+	idType, idVal, err := bson.MarshalValue(id)
+	if err != nil {
+		return iface.DataMessage{}, fmt.Errorf("failed to marshal _id: %v", err)
 	}
+	// get the full state of the document after the change
+	if change["fullDocument"] == nil {
+		//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
+		return iface.DataMessage{MutationType: iface.MutationType_Reserved}, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
+	}
+	fullDocument := change["fullDocument"].(bson.M)
+	// convert fulldocument to BSON.Raw
+	fullDocumentRaw, err := bson.Marshal(fullDocument)
+	if err != nil {
+		return iface.DataMessage{}, fmt.Errorf("failed to marshal full document: %v", err)
+	}
+	dataMsg = iface.DataMessage{Loc: loc, Id: &idVal, IdType: byte(idType), Data: &fullDocumentRaw, MutationType: iface.MutationType_Update}
 
+	slog.Debug(fmt.Sprintf("Converted change stream event to data message %v", dataMsg))
 	return dataMsg, nil
 }
