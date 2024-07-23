@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -35,6 +34,8 @@ type CosmosConnector struct {
 
 	coord iface.CoordinatorIConnectorSignal
 
+	mutex sync.Mutex
+
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
 	status                iface.ConnectorStatus
@@ -42,8 +43,8 @@ type CosmosConnector struct {
 	flowCancelFunc        context.CancelFunc
 	flowId                iface.FlowID
 	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap map[iface.Location]bson.Raw //stores the resume token for each namespace
-	flowCDCResumeToken    []byte                      //stores the serialized resume token map
+	flowCDCResumeTokenMap *TokenMap //stores the resume token for each namespace
+	flowCDCResumeToken    []byte    //stores the serialized resume token map
 }
 
 type CosmosConnectorSettings struct {
@@ -119,7 +120,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	id := generateConnectorID(cc.settings.ConnectionString)
 
 	// Create CDCResumeToken map
-	cc.flowCDCResumeTokenMap = make(map[iface.Location]bson.Raw)
+	cc.flowCDCResumeTokenMap = NewTokenMap()
 
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: cc.desc, Type: cc.connectorType, Cap: cc.connectorCapabilities, Id: id}
@@ -163,7 +164,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	// Get the flowCDCTokens from the read plan for resumability
 	cc.flowCDCResumeToken = readPlan.CdcResumeToken //Get the endoded token
 	var err error
-	cc.flowCDCResumeTokenMap, err = decodeMap(cc.flowCDCResumeToken) //Decode the token to get the map
+	cc.flowCDCResumeTokenMap.Map, err = decodeMap(cc.flowCDCResumeToken) //Decode the token to get the map
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
 	}
@@ -179,13 +180,13 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
 
-	readerProgress := ReaderProgress{ //initialSyncDocs and changeStreamEvents are atomic counters
-		tasksTotal:     uint64(len(tasks)),
-		tasksCompleted: 0,
+	readerProgress := ReaderProgress{ //initialSyncDocs is atomic counters
+		tasksTotal:         uint64(len(tasks)),
+		tasksCompleted:     0,
+		changeStreamEvents: 0,
 	}
 
 	readerProgress.initialSyncDocs.Store(0)
-	readerProgress.changeStreamEvents.Store(0)
 
 	// start printing progress
 	go cc.printProgress(&readerProgress)
@@ -208,7 +209,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap)
+					cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap.Map)
 					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
 				}
 			}
@@ -366,18 +367,24 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		slog.Debug(fmt.Sprintf("created tasks: %v", tasks))
 
 		//create resume token for each task
+		wg := sync.WaitGroup{}
 		for _, task := range tasks {
-			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
-			resumeToken, err := cc.getLatestResumeToken(loc)
-			if err != nil {
-				slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
-				return
-			}
-			cc.flowCDCResumeTokenMap[loc] = resumeToken
+			wg.Add(1)
+			go func(task iface.ReadPlanTask) {
+				defer wg.Done()
+				loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+				resumeToken, err := cc.getLatestResumeToken(loc)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
+					return
+				}
+				cc.flowCDCResumeTokenMap.AddToken(loc, resumeToken)
+			}(task)
 		}
+		wg.Wait()
 
 		//serialize the resume token map
-		cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap)
+		cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap.Map)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
@@ -414,8 +421,7 @@ func (cc *CosmosConnector) concurrentChangeStreams(tasks []iface.ReadPlanTask, r
 	//TODO (AK, 6/2024): Implement this
 	var wg sync.WaitGroup
 	// global atomic lsn counter
-	var lsn atomic.Int64
-	lsn.Store(0)
+	var lsn int64 = 0
 
 	// iterate over all tasks and start a change stream for each
 	for _, task := range tasks {
@@ -425,7 +431,10 @@ func (cc *CosmosConnector) concurrentChangeStreams(tasks []iface.ReadPlanTask, r
 			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
 			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s at namespace %s.%s", cc.id, cc.flowId, loc.Database, loc.Collection))
 
-			token := cc.flowCDCResumeTokenMap[loc]
+			token, err := cc.flowCDCResumeTokenMap.GetToken(loc)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
+			}
 			opts := moptions.ChangeStream().SetFullDocument("updateLookup").SetResumeAfter(token)
 			changeStream, err := cc.createChangeStream(loc, opts)
 			if err != nil {
@@ -452,7 +461,7 @@ func (cc *CosmosConnector) concurrentChangeStreams(tasks []iface.ReadPlanTask, r
 	return nil
 }
 
-func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *atomic.Int64) {
+func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *int64) {
 
 	for changeStream.Next(cc.flowCtx) {
 		var change bson.M
@@ -460,9 +469,6 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 			slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
 			continue
 		}
-
-		readerProgress.changeStreamEvents.Add(1) //XXX Should we do atomic add here as well, shared variable multiple threads
-		currLSN := lsn.Add(1)
 
 		dataMsg, err := cc.convertChangeStreamEventToDataMessage(change)
 		if err != nil {
@@ -474,13 +480,27 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 			continue
 		}
 		//send the data message
+		currLSN := cc.updateLSNTracking(readerProgress, lsn)
 		dataMsg.SeqNum = currLSN
-		atomic.AddInt64(&cc.status.WriteLSN, 1) // Atomically increment WriteLSN, seqNum and WriteLSN may not be synchronized, could create an atomic function updating both together
 		dataChannel <- dataMsg
 
 		//update the last seen resume token
-		cc.flowCDCResumeTokenMap[changeStreamLoc] = changeStream.ResumeToken()
-		slog.Debug(fmt.Sprintf("Updated resume token: %v", cc.flowCDCResumeTokenMap[changeStreamLoc]))
+		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
+
+		token, err := cc.flowCDCResumeTokenMap.GetToken(changeStreamLoc)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", changeStreamLoc, err))
+		}
+		slog.Debug(fmt.Sprintf("Updated resume token: %v", token))
 	}
 
+}
+
+func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
+	cc.mutex.Lock()
+	defer cc.mutex.Unlock()
+	reader.changeStreamEvents++
+	*lsn++
+	cc.status.WriteLSN++
+	return cc.status.WriteLSN
 }
