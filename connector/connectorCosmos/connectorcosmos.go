@@ -487,11 +487,11 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 		//update the last seen resume token
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
 
-		token, err := cc.flowCDCResumeTokenMap.GetToken(changeStreamLoc)
+		//token, err := cc.flowCDCResumeTokenMap.GetToken(changeStreamLoc)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", changeStreamLoc, err))
 		}
-		slog.Debug(fmt.Sprintf("Updated resume token: %v", token))
+		//slog.Debug(fmt.Sprintf("Updated resume token: %v", token))
 	}
 
 }
