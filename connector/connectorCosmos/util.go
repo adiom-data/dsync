@@ -89,7 +89,7 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 }
 
 func (cc *CosmosConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
-	slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
+	//slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
 	db := change["ns"].(bson.M)["db"].(string)
 	col := change["ns"].(bson.M)["coll"].(string)
@@ -117,6 +117,6 @@ func (cc *CosmosConnector) convertChangeStreamEventToDataMessage(change bson.M) 
 	}
 	dataMsg = iface.DataMessage{Loc: loc, Id: &idVal, IdType: byte(idType), Data: &fullDocumentRaw, MutationType: iface.MutationType_Update}
 
-	slog.Debug(fmt.Sprintf("Converted change stream event to data message %v", dataMsg))
+	//slog.Debug(fmt.Sprintf("Converted change stream event to data message %v", dataMsg))
 	return dataMsg, nil
 }
