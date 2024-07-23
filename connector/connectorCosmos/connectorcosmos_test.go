@@ -175,7 +175,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	assert.NoError(testState, err)
 
 	// Call the check for deletes function
-	connector.CheckForDeletesSync(flowID)
+	connector.CheckForDeletesSync(flowID) //TODO: THIS SHOULD BE A TRIGGER
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")
