@@ -50,12 +50,13 @@ type CosmosConnector struct {
 type CosmosConnectorSettings struct {
 	ConnectionString string
 
-	serverConnectTimeout          time.Duration
-	pingTimeout                   time.Duration
-	initialSyncNumParallelCopiers int
-	writerMaxBatchSize            int //0 means no limit (in # of documents)
-	numParallelWriters            int
-	CdcResumeTokenUpdateInterval  time.Duration
+	serverConnectTimeout           time.Duration
+	pingTimeout                    time.Duration
+	initialSyncNumParallelCopiers  int
+	writerMaxBatchSize             int //0 means no limit (in # of documents)
+	numParallelWriters             int
+	CdcResumeTokenUpdateInterval   time.Duration
+	numParallelIntegrityCheckTasks int
 }
 
 func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
@@ -65,6 +66,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
+	settings.numParallelIntegrityCheckTasks = 4
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
@@ -328,20 +330,7 @@ func (cc *CosmosConnector) StartWriteFromChannel(flowId iface.FlowID, dataChanne
 }
 
 func (cc *CosmosConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	//TODO (AK, 6/2024): Implement some real async logic here, otherwise it's just a stub for the demo
-
-	// get the number of records for the 'test.test' namespace
-	// couldn't use dbHash as it doesn't work on shared Mongo instances
-	db := "test"
-	col := "test"
-	collection := cc.client.Database(db).Collection(col)
-	count, err := collection.CountDocuments(cc.ctx, bson.D{})
-	if err != nil {
-		return err
-	}
-
-	res := iface.ConnectorDataIntegrityCheckResult{Count: count, Success: true}
-	cc.coord.PostDataIntegrityCheckResult(flowId, cc.id, res)
+	go cc.doIntegrityCheck_sync(flowId, options)
 	return nil
 }
 
@@ -486,6 +475,7 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 
 		//update the last seen resume token
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
+		//cc.flowCDCResumeToken, _ = encodeMap(cc.flowCDCResumeTokenMap.Map)
 
 		//token, err := cc.flowCDCResumeTokenMap.GetToken(changeStreamLoc)
 		if err != nil {
