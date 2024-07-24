@@ -286,6 +286,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	var readPlan iface.ConnectorReadPlan
 	phase := 0
 	flowComplete := make(chan struct{})
+	channelExhaustedPhase1 := make(chan struct{})
 
 	// Do some prep
 	flowID := iface.FlowID("1234")
@@ -329,6 +330,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 					}
 				}
 			}
+		}
+		if phase == 1 {
+			channelExhaustedPhase1 <- struct{}{}
 		}
 	}
 	go dataReader(dataChannel)
@@ -392,10 +396,20 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	// Wait for flow to complete after the second interruption (the first CDC barrier)
 	select {
 	case <-flowComplete:
-		// Read plan is complete
+		// Flow complete
 	case <-time.After(FlowCompletionTimeout):
 		// Timeout
 		suite.T().Errorf("Timed out while waiting for the flow to complete after the second interruption")
+		suite.T().FailNow()
+	}
+
+	// wait for data reader to completely exhaust the channel
+	select {
+	case <-channelExhaustedPhase1:
+		// Channel has been exhausted
+	case <-time.After(FlowCompletionTimeout):
+		// Timeout
+		suite.T().Errorf("Timed out while waiting for the message channel draining after the second interruption")
 		suite.T().FailNow()
 	}
 
