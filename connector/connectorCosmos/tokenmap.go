@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"io"
+	"sort"
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -38,12 +40,31 @@ func (tm *TokenMap) GetToken(key iface.Location) (bson.Raw, error) {
 func (tm *TokenMap) encodeMap() ([]byte, error) {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(tm.Map)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode map: %v", err)
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+
+	var keys []iface.Location
+	for k := range tm.Map {
+		keys = append(keys, k)
 	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		loc1 := keys[i].Database + keys[i].Collection
+		loc2 := keys[j].Database + keys[j].Collection
+		return loc1 < loc2
+	})
+
+	for _, k := range keys {
+		err := enc.Encode(k)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode key: %v", err)
+		}
+		err = enc.Encode(tm.Map[k])
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode value: %v", err)
+		}
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -52,9 +73,33 @@ func (tm *TokenMap) decodeMap(b []byte) error {
 	defer tm.mutex.Unlock()
 	buf := bytes.NewBuffer(b)
 	dec := gob.NewDecoder(buf)
-	err := dec.Decode(&tm.Map)
-	if err != nil {
-		return fmt.Errorf("failed to decode map: %v", err)
+
+	//var keys []iface.Location
+	for {
+		var k iface.Location
+		err := dec.Decode(&k)
+		if err != nil {
+			if err == io.EOF {
+				// End of the encoded stream, break out of the loop
+				break
+			}
+			return fmt.Errorf("failed to decode key: %v", err)
+		}
+		var v bson.Raw
+		err = dec.Decode(&v)
+		if err != nil {
+			return fmt.Errorf("failed to decode value: %v", err)
+		}
+		tm.Map[k] = v
 	}
 	return nil
+	/*
+	   err := dec.Decode(&tm.Map)
+
+	   	if err != nil {
+	   		return fmt.Errorf("failed to decode map: %v", err)
+	   	}
+
+	   return nil
+	*/
 }

@@ -212,6 +212,9 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
 					cc.flowCDCResumeToken, err = cc.flowCDCResumeTokenMap.encodeMap()
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
+					}
 					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
 				}
 			}
@@ -475,9 +478,6 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 
 		//update the last seen resume token
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
-		//cc.flowCDCResumeToken, _ = encodeMap(cc.flowCDCResumeTokenMap.Map)
-
-		//slog.Debug(fmt.Sprintf("Updated resume token: %v", token))
 	}
 
 }
