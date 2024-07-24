@@ -37,7 +37,7 @@ func TestCosmosConnectorSuite(t *testing.T) {
 /**
  * Implement a Mongo-specific test data store - we will use this to insert dummy data in some tests
  */
-func NewCosmosTestDataStore(TestMongoConnectionString string) test.TestDataStore {
+func NewCosmosTestDataStore(TestCosmosConnectionString string) test.TestDataStore {
 	return &CosmosTestDataStore{ConnectionString: TestCosmosConnectionString}
 }
 

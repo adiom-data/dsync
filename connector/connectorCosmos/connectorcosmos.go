@@ -166,7 +166,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	// Get the flowCDCTokens from the read plan for resumability
 	cc.flowCDCResumeToken = readPlan.CdcResumeToken //Get the endoded token
 	var err error
-	cc.flowCDCResumeTokenMap.Map, err = decodeMap(cc.flowCDCResumeToken) //Decode the token to get the map
+	err = cc.flowCDCResumeTokenMap.decodeMap(cc.flowCDCResumeToken) //Decode the token to get the map
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
 	}
@@ -211,7 +211,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap.Map)
+					cc.flowCDCResumeToken, err = cc.flowCDCResumeTokenMap.encodeMap()
 					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
 				}
 			}
@@ -373,7 +373,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		wg.Wait()
 
 		//serialize the resume token map
-		cc.flowCDCResumeToken, err = encodeMap(cc.flowCDCResumeTokenMap.Map)
+		cc.flowCDCResumeToken, err = cc.flowCDCResumeTokenMap.encodeMap()
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
@@ -477,10 +477,6 @@ func (cc *CosmosConnector) processChangeStreamEvent(readerProgress *ReaderProgre
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
 		//cc.flowCDCResumeToken, _ = encodeMap(cc.flowCDCResumeTokenMap.Map)
 
-		//token, err := cc.flowCDCResumeTokenMap.GetToken(changeStreamLoc)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", changeStreamLoc, err))
-		}
 		//slog.Debug(fmt.Sprintf("Updated resume token: %v", token))
 	}
 
