@@ -34,10 +34,7 @@ var connectorFactoryFunc = func() iface.Connector {
 	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 }
 var connectorDeletesEmuFactoryFunc = func() iface.Connector {
-	//create a client for the witness
-	clientOptions := options.Client().ApplyURI(MongoWitnessConnectionString)
-	client, _ := mongo.Connect(context.Background(), clientOptions)
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoClient: client})
+	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: MongoWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)

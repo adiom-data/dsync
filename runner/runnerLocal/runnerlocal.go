@@ -48,6 +48,8 @@ type RunnerLocalSettings struct {
 	CleanupRequestedFlag bool
 
 	FlowStatusReportingIntervalSecs time.Duration
+
+	CosmosDeletesEmuRequestedFlag bool
 }
 
 const (
@@ -61,7 +63,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
 	} else if settings.SrcType == "CosmosDB" {
-		r.src = connectorCosmos.NewCosmosConnector(sourceName, connectorCosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString})
+		cosmosSettings := connectorCosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString}
+		if settings.CosmosDeletesEmuRequestedFlag {
+			cosmosSettings.EmulateDeletes = true
+			// the destination is a MongoDB database otherwise the Options check would have failed
+			cosmosSettings.WitnessMongoConnString = settings.DstConnString
+		}
+		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	}

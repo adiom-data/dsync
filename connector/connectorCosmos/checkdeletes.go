@@ -53,16 +53,16 @@ func (cc *CosmosConnector) CheckForDeletesSync(flowId iface.FlowID, options ifac
 	idsToDelete := make(chan idsWithLocation) //channel to post ids to delete
 
 	// 1. Get namespaces list from the Witness
-	namespaces, err := getFQNamespaceListWitness(cc.flowCtx, cc.settings.WitnessMongoClient, options.Namespace)
+	namespaces, err := getFQNamespaceListWitness(cc.flowCtx, cc.witnessMongoClient, options.Namespace)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list from the witness: %v", err))
 		return
 	}
 	// 2. Compare the doc count on both sides (asynchoronously so that we can proceed with the next steps here)
-	go cc.compareDocCountWithWitness(cc.settings.WitnessMongoClient, namespaces, mismatchedNamespaces)
+	go cc.compareDocCountWithWitness(cc.witnessMongoClient, namespaces, mismatchedNamespaces)
 
 	// 3. For mismatches, use Witness index to find out what has been deleted (async so that we can proceed with the next steps here)
-	go cc.parallelScanWitnessNamespaces(cc.settings.WitnessMongoClient, mismatchedNamespaces, idsToCheck)
+	go cc.parallelScanWitnessNamespaces(cc.witnessMongoClient, mismatchedNamespaces, idsToCheck)
 	go cc.checkSourceIdsAndGenerateDeletes(idsToCheck, idsToDelete)
 
 	// 4. Generate delete events

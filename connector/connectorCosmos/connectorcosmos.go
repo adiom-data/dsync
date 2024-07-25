@@ -49,7 +49,8 @@ type CosmosConnector struct {
 	flowCancelFunc        context.CancelFunc
 	flowId                iface.FlowID
 	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap *TokenMap //stores the resume token for each namespace
+	flowCDCResumeTokenMap *TokenMap     //stores the resume token for each namespace
+	witnessMongoClient    *mongo.Client //for use in emulating deletes
 }
 
 type CosmosConnectorSettings struct {
@@ -63,8 +64,8 @@ type CosmosConnectorSettings struct {
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
 
-	EmulateDeletes     bool // if true, we will generate delete events
-	WitnessMongoClient *mongo.Client
+	EmulateDeletes         bool // if true, we will generate delete events
+	WitnessMongoConnString string
 }
 
 func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
@@ -85,6 +86,18 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ctx = ctx
 	cc.t = t
+
+	// Connect to the witness MongoDB instance
+	if cc.settings.EmulateDeletes {
+		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
+		defer cancel()
+		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString)
+		client, err := mongo.Connect(ctxConnect, clientOptions)
+		if err != nil {
+			return err
+		}
+		cc.witnessMongoClient = client
+	}
 
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
@@ -145,6 +158,10 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 func (cc *CosmosConnector) Teardown() {
 	if cc.client != nil {
 		cc.client.Disconnect(cc.ctx)
+	}
+
+	if cc.witnessMongoClient != nil {
+		cc.witnessMongoClient.Disconnect(cc.ctx)
 	}
 }
 
