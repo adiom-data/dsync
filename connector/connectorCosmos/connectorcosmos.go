@@ -61,6 +61,9 @@ type CosmosConnectorSettings struct {
 	numParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
+
+	EmulateDeletes     bool // if true, we will generate delete events
+	WitnessMongoClient *mongo.Client
 }
 
 func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
