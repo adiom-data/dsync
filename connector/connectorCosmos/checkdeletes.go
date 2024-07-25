@@ -17,6 +17,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -183,16 +184,19 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan id
 
 // Checks if the ids exist in the source and sends those that don't to the delete channel
 func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLocation, idsToDelete chan<- idsWithLocation) {
-	slog.Debug(fmt.Sprintf("Checking source for ids: %+v", idsWithLoc.loc))
+	slog.Debug(fmt.Sprintf("Checking source for ids: %+v (first: %v, last: %v, n: %v)", idsWithLoc.loc, idsWithLoc.ids[0], idsWithLoc.ids[len(idsWithLoc.ids)-1], len(idsWithLoc.ids)))
 	// we will take advatage of the $setDifference MongoDB aggregation operator to find the ids that are not in the source
 	// it does work in Cosmos, which is great!
 	// db.col.aggregate([ {$match:{_id:{$in: ID'S}}},{ "$group": { "_id": null, "ids": { "$addToSet": "$_id" } } }, { "$project": { "missingIds": { "$setDifference": [ID'S, "$ids"] }, "_id": 0 } }] )
 
 	// create a pipeline to find the missing ids
 	pipeline := mongo.Pipeline{
-		{{"$match", bson.M{"_id": bson.M{"$in": idsWithLoc.ids}}}},
-		{{"$group", bson.M{"_id": nil, "ids": bson.M{"$addToSet": "$_id"}}}},
-		{{"$project", bson.M{"missingIds": bson.M{"$setDifference": bson.A{idsWithLoc.ids, "$ids"}, "_id": 0}}}},
+		{{"$match", bson.D{{"_id", bson.D{{"$in", idsWithLoc.ids}}}}}},
+		{{"$group", bson.D{{"_id", nil}, {"ids", bson.D{{"$addToSet", "$_id"}}}}}},
+		{{"$project", bson.D{
+			{"missingIds", bson.D{{"$setDifference", bson.A{idsWithLoc.ids, "$ids"}}}},
+			{"_id", 0},
+		}}},
 	}
 
 	cur, err := cc.client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(cc.flowCtx, pipeline)
@@ -219,8 +223,13 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 		return
 	}
 
-	slog.Debug(fmt.Sprintf("Missing ids for %v: %v", idsWithLoc.loc, res["missingIds"]))
-	idsToDelete <- idsWithLocation{loc: idsWithLoc.loc, ids: res["missingIds"].([]interface{})}
+	// convert result to array
+	missingIds := []interface{}(res["missingIds"].(primitive.A))
+
+	if len(missingIds) > 0 {
+		slog.Debug(fmt.Sprintf("Missing ids for %v: %v", idsWithLoc.loc, missingIds))
+		idsToDelete <- idsWithLocation{loc: idsWithLoc.loc, ids: missingIds}
+	}
 }
 
 // Reads ids from one channel and sends delete event messages to the other

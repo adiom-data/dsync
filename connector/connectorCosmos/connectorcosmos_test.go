@@ -11,23 +11,33 @@ import (
 	"testing"
 	"time"
 
+	"github.com/adiom-data/dsync/logger"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/adiom-data/dsync/protocol/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const CosmosEnvironmentVariable = "COSMOS_TEST"
+const (
+	CosmosEnvironmentVariable    = "COSMOS_TEST"
+	MongoWitnessConnectionString = "mongodb://localhost:27021" //XXX: this should be a pre-seeded copy of the data in Cosmos
+)
+
+var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 
 var connectorFactoryFunc = func() iface.Connector {
 	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 }
 var connectorDeletesEmuFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true})
+	//create a client for the witness
+	clientOptions := options.Client().ApplyURI(MongoWitnessConnectionString)
+	client, _ := mongo.Connect(context.Background(), clientOptions)
+	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoClient: client})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -36,7 +46,6 @@ var datastoreFactoryFunc = func() test.TestDataStore {
 // Standard test suite for the connector interface
 func TestCosmosConnectorSuite(t *testing.T) {
 	// get the connection string from the environment variable COSMOS, if not set, fail the test
-	TestCosmosConnectionString := os.Getenv(CosmosEnvironmentVariable)
 	if TestCosmosConnectionString == "" {
 		t.Fatal("COSMOS environment variable not set")
 	}
@@ -57,11 +66,10 @@ func TestCosmosConnectorSuite(t *testing.T) {
 * Scenario:
 * 1) Start reading without any special configuration
 * 2) Wait a bit to make sure that we entered the CDC phase
-* 3) Insert 10 test records
-* 4) Do a delete
-* 5) Call CheckForDeletesSync()
-* 6) Wait a bit more to make sure that the deletes are processed
-* 7) Check that no deletes were emitted
+* 3) Do a delete
+* 4) Call CheckForDeletesSync()
+* 5) Wait a bit more to make sure that the deletes are processed
+* 6) Check that no deletes were emitted
  */
 func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	ctx := context.Background()
@@ -163,19 +171,10 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	// Introduce a change in the dataset
-	for i := 0; i < 10; i++ {
-		testRecord := map[string]int{
-			"a": i,
-		}
-		err = dataStore.InsertDummy(dummyTestDBName, dummyTestColName, testRecord)
+	for i := 0; i < 2; i++ {
+		err = dataStore.DeleteOneDoc(dummyTestDBName, dummyTestColName)
 		assert.NoError(testState, err)
-
 	}
-	testRecord := map[string]int{
-		"a": 0,
-	}
-	err = dataStore.DeleteDummy(dummyTestDBName, dummyTestColName, testRecord)
-	assert.NoError(testState, err)
 
 	// Call the check for deletes function
 	connector.CheckForDeletesSync(flowID, iface.ConnectorOptions{}, dataChannel) //TODO: THIS SHOULD BE A TRIGGER
@@ -214,13 +213,15 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 * Scenario:
 * 1) Start reading with a connector configuration that enables deletes
 * 2) Wait a bit to make sure that we entered the CDC phase
-* 3) Insert 10 test records
-* 4) Do 2 deletes
-* 5) Call CheckForDeletesSync()
-* 6) Wait a bit more to make sure that the deletes are processed
-* 7) Check that the 2 deletes were emitted
+* 3) Do 2 deletes
+* 4) Call CheckForDeletesSync()
+* 5) Wait a bit more to make sure that the deletes are processed
+* 6) Check that the 2 deletes were emitted
  */
 func TestConnectorDeletesEmitted(testState *testing.T) {
+
+	logger.Setup(logger.Options{Verbosity: "DEBUG"})
+
 	ctx := context.Background()
 
 	// create mocks for the transport and coordinator
@@ -320,19 +321,8 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	// Introduce a change in the dataset
-	for i := 0; i < 10; i++ {
-		testRecord := map[string]int{
-			"a": i,
-		}
-		err = dataStore.InsertDummy(dummyTestDBName, dummyTestColName, testRecord)
-		assert.NoError(testState, err)
-
-	}
 	for i := 0; i < 2; i++ {
-		testRecord := map[string]int{
-			"a": i,
-		}
-		err = dataStore.DeleteDummy(dummyTestDBName, dummyTestColName, testRecord)
+		err = dataStore.DeleteOneDoc(dummyTestDBName, dummyTestColName)
 		assert.NoError(testState, err)
 	}
 
@@ -359,8 +349,8 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 		testState.FailNow()
 	}
 
-	// Assert that no deletes were emitted
-	assert.Equal(testState, 0, deleteMessageCount, "No deletes should have been emitted")
+	// Assert that 2 deletes were emitted
+	assert.Equal(testState, 2, deleteMessageCount, "2 deletes should have been emitted")
 
 	connector.Teardown()
 	dataStore.Teardown()
@@ -398,9 +388,11 @@ func (c *CosmosTestDataStore) InsertDummy(dbName string, colName string, data in
 	return err
 }
 
-func (c *CosmosTestDataStore) DeleteDummy(dbName string, colName string, data interface{}) error {
+// Deletes the first document in the collection
+func (c *CosmosTestDataStore) DeleteOneDoc(dbName string, colName string) error {
 	db := c.client.Database(dbName)
 	coll := db.Collection(colName)
+	data := coll.FindOne(context.TODO(), bson.M{})
 	_, err := coll.DeleteOne(context.TODO(), data)
 
 	return err
