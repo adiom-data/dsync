@@ -30,6 +30,7 @@ type ReaderProgress struct {
 	changeStreamEvents uint64
 	tasksTotal         uint64
 	tasksCompleted     uint64
+	deletesCaught      uint64
 }
 
 // Generates static connector ID based on connection string
@@ -56,8 +57,14 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 			operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
 			opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 			// Print reader progress
-			slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-				readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+			if !cc.settings.EmulateDeletes {
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+			} else {
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Deletes - %d, Operations per Second - %.2f",
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, readerProgress.deletesCaught, opsPerSec))
+
+			}
 
 			startTime = time.Now()
 			operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents

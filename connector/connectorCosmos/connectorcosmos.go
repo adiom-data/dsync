@@ -215,6 +215,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		tasksTotal:         uint64(len(tasks)),
 		tasksCompleted:     0,
 		changeStreamEvents: 0,
+		deletesCaught:      0,
 	}
 
 	readerProgress.initialSyncDocs.Store(0)
@@ -230,7 +231,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 		// prepare the delete trigger channel and start the deletes worker, if necessary
 		if cc.settings.EmulateDeletes {
-			slog.Debug(fmt.Sprintf("Connector %s is starting deletes emulation worker for flow %s", cc.id, flowId))
+			slog.Info(fmt.Sprintf("Connector %s is starting deletes emulation worker for flow %s", cc.id, flowId))
 			cc.flowDeletesTriggerChannel = make(chan struct{}, 100) //XXX: do we need to close or reset this later?
 			//start the worker that will emulate deletes
 			go func() {
@@ -246,7 +247,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						cc.flowDeletesTriggerChannel <- struct{}{}
 					case <-cc.flowDeletesTriggerChannel:
 						// check for deletes
-						cc.checkForDeletes_sync(flowId, options, dataChannel)
+						readerProgress.deletesCaught += cc.checkForDeletes_sync(flowId, options, dataChannel)
 						// reset the timer - no point in checking too often
 						ticker.Reset(cc.settings.deletesCheckInterval)
 					}

@@ -50,9 +50,11 @@ func (cc *CosmosConnector) CheckForDeletesTrigger(flowId iface.FlowID) {
  * At any point in time, any document that is not present in the Witness index but is present in the source is considered deleted.
  *
  * For simplicity, we are using the destination's index directly right now because we can.
+ *
+ * Returns the number of deletes generated
  */
 //TODO: Could there be a race condition here when a doc with the same _id is recreated?
-func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) {
+func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) uint64 {
 	// Preparations
 	mismatchedNamespaces := make(chan namespace)
 	idsToCheck := make(chan idsWithLocation)  //channel to post ids to check
@@ -62,7 +64,7 @@ func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options ifa
 	namespaces, err := getFQNamespaceListWitness(cc.flowCtx, cc.witnessMongoClient, options.Namespace)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list from the witness: %v", err))
-		return
+		return 0
 	}
 	// 2. Compare the doc count on both sides (asynchoronously so that we can proceed with the next steps here)
 	go cc.compareDocCountWithWitness(cc.witnessMongoClient, namespaces, mismatchedNamespaces)
@@ -74,6 +76,7 @@ func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options ifa
 	// 4. Generate delete events
 	numDeletes := cc.generateDeleteMessages(idsToDelete, flowDataChannel)
 	slog.Debug(fmt.Sprintf("Generated %v delete messages", numDeletes))
+	return numDeletes
 }
 
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
@@ -244,8 +247,8 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 // Reads ids from one channel and sends delete event messages to the other
 // Exits when the channel is closed
 // Returns the number of delete messages generated
-func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) int64 {
-	var totalDeletes int64
+func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) uint64 {
+	var totalDeletes uint64
 	for idWithLoc := range idsToDelete {
 		for i := 0; i < len(idWithLoc.ids); i++ {
 			// convert id to raw bson
