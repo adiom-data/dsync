@@ -399,6 +399,7 @@ func (c *CosmosTestDataStore) Teardown() error {
 func (c *CosmosTestDataStore) DeleteNamespace(dbName string, colName string) error {
 	db := c.client.Database(dbName)
 	coll := db.Collection(colName)
-	err := coll.Drop(context.TODO())
+	// dropping collections on Cosmos causes issues with the change stream due to RID (collection id) caching
+	_, err := coll.DeleteMany(context.TODO(), bson.M{})
 	return err
 }
