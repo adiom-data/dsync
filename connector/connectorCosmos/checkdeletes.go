@@ -97,13 +97,11 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 			continue
 		}
 
-		if sourceCount != witnessCount {
+		if sourceCount < witnessCount { //there's something we haven't deleted yet
 			slog.Debug(fmt.Sprintf("Mismatched namespace: %v, source count: %v, witness count: %v", ns, sourceCount, witnessCount))
-			if witnessCount != 0 {
-				mismatchedNamespaces <- ns
-			} else {
-				slog.Debug(fmt.Sprintf("Witness count is 0 for %v, skipping", ns)) //XXX: is this possible?
-			}
+			mismatchedNamespaces <- ns
+		} else if sourceCount > witnessCount { //this is unexpected
+			slog.Debug(fmt.Sprintf("Witness count (%v) is less than source count (%v) for namespace %v, which is weird", witnessCount, sourceCount, ns)) //XXX: is this possible?
 		}
 	}
 	close(mismatchedNamespaces)
