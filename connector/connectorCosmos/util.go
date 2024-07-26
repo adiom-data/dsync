@@ -96,9 +96,9 @@ func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.R
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
 	rid, err := extractRidFromResumeToken(resumeToken)
 	if err != nil {
-		slog.Info(fmt.Sprintf("Failed to extract Rid from resume token: %v", err))
+		slog.Debug(fmt.Sprintf("Failed to extract Rid from resume token: %v", err))
 	} else {
-		slog.Info(fmt.Sprintf("Rid for namespace %v: %v", location, rid))
+		slog.Debug(fmt.Sprintf("Rid for namespace %v: %v", location, rid))
 	}
 
 	return resumeToken, nil
