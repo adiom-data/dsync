@@ -320,7 +320,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	}
 
 	// Call the check for deletes function
-	connector.checkForDeletes_sync(flowID, iface.ConnectorOptions{}, dataChannel) //TODO: THIS SHOULD BE A TRIGGER
+	connector.CheckForDeletesTrigger(flowID)
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")

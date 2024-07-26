@@ -35,6 +35,10 @@ const (
 * Trigger a check for deletes in Cosmos
  */
 func (cc *CosmosConnector) CheckForDeletesTrigger(flowId iface.FlowID) {
+	if !cc.settings.EmulateDeletes {
+		slog.Debug("EmulateDeletes is disabled, skipping check for deletes")
+		return
+	}
 	cc.flowDeletesTriggerChannel <- struct{}{}
 }
 
