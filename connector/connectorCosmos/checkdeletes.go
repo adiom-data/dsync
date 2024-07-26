@@ -32,6 +32,13 @@ const (
 )
 
 /**
+* Trigger a check for deletes in Cosmos
+ */
+func (cc *CosmosConnector) CheckForDeletesTrigger(flowId iface.FlowID) {
+	cc.flowDeletesTriggerChannel <- struct{}{}
+}
+
+/**
  * Check for deletes in Cosmos
  *
  * This function is used to simulate deletes in Cosmos since Cosmos does not support deletes in changestream.
@@ -41,12 +48,7 @@ const (
  * For simplicity, we are using the destination's index directly right now because we can.
  */
 //TODO: Could there be a race condition here when a doc with the same _id is recreated?
-func (cc *CosmosConnector) CheckForDeletesSync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) {
-	if !cc.settings.EmulateDeletes {
-		//do nothing
-		return
-	}
-
+func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) {
 	// Preparations
 	mismatchedNamespaces := make(chan namespace)
 	idsToCheck := make(chan idsWithLocation)  //channel to post ids to check
@@ -66,7 +68,8 @@ func (cc *CosmosConnector) CheckForDeletesSync(flowId iface.FlowID, options ifac
 	go cc.checkSourceIdsAndGenerateDeletes(idsToCheck, idsToDelete)
 
 	// 4. Generate delete events
-	cc.generateDeleteMessages(idsToDelete, flowDataChannel)
+	numDeletes := cc.generateDeleteMessages(idsToDelete, flowDataChannel)
+	slog.Debug(fmt.Sprintf("Generated %v delete messages", numDeletes))
 }
 
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
@@ -206,6 +209,7 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 	}
 	defer cur.Close(cc.flowCtx)
 	// extract the missing ids
+	var missingIds []interface{}
 	var res bson.M
 	if cur.Next(cc.flowCtx) {
 		err := cur.Decode(&res)
@@ -213,28 +217,31 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 			slog.Error(fmt.Sprintf("Failed to decode missing ids: %v", err))
 			return
 		}
+
+		if res["missingIds"] == nil {
+			slog.Debug(fmt.Sprintf("No missing ids found on the source for %v", idsWithLoc.loc))
+			return
+		}
+
+		// convert result to array
+		missingIds = []interface{}(res["missingIds"].(primitive.A))
 	} else {
 		slog.Debug(fmt.Sprintf("Missing ids source query returned nothing for %v", idsWithLoc.loc))
-		return
+		//this means all are missing on the source!
+		missingIds = idsWithLoc.ids
 	}
-
-	if res["missingIds"] == nil {
-		slog.Debug(fmt.Sprintf("No missing ids found on the source for %v", idsWithLoc.loc))
-		return
-	}
-
-	// convert result to array
-	missingIds := []interface{}(res["missingIds"].(primitive.A))
 
 	if len(missingIds) > 0 {
-		slog.Debug(fmt.Sprintf("Missing ids for %v: %v", idsWithLoc.loc, missingIds))
+		slog.Debug(fmt.Sprintf("Found %v missing ids for %v", len(missingIds), idsWithLoc.loc))
 		idsToDelete <- idsWithLocation{loc: idsWithLoc.loc, ids: missingIds}
 	}
 }
 
 // Reads ids from one channel and sends delete event messages to the other
 // Exits when the channel is closed
-func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) {
+// Returns the number of delete messages generated
+func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) int64 {
+	var totalDeletes int64
 	for idWithLoc := range idsToDelete {
 		for i := 0; i < len(idWithLoc.ids); i++ {
 			// convert id to raw bson
@@ -243,8 +250,10 @@ func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLoca
 				slog.Error(fmt.Sprintf("failed to marshal _id: %v", err))
 			}
 			dataChannel <- iface.DataMessage{Loc: idWithLoc.loc, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Delete}
+			totalDeletes++
 		}
 	}
+	return totalDeletes
 }
 
 /****************************************************

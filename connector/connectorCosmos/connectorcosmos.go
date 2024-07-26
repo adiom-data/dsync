@@ -44,13 +44,15 @@ type CosmosConnector struct {
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status                iface.ConnectorStatus
-	flowCtx               context.Context
-	flowCancelFunc        context.CancelFunc
-	flowId                iface.FlowID
-	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap *TokenMap     //stores the resume token for each namespace
-	witnessMongoClient    *mongo.Client //for use in emulating deletes
+	status                    iface.ConnectorStatus
+	flowCtx                   context.Context
+	flowCancelFunc            context.CancelFunc
+	flowId                    iface.FlowID
+	flowConnCapabilities      iface.ConnectorCapabilities
+	flowCDCResumeTokenMap     *TokenMap     //stores the resume token for each namespace
+	flowDeletesTriggerChannel chan struct{} //channel to trigger deletes
+
+	witnessMongoClient *mongo.Client //for use in emulating deletes
 }
 
 type CosmosConnectorSettings struct {
@@ -65,6 +67,7 @@ type CosmosConnectorSettings struct {
 	numParallelIntegrityCheckTasks int
 
 	EmulateDeletes         bool // if true, we will generate delete events
+	deletesCheckInterval   time.Duration
 	WitnessMongoConnString string
 }
 
@@ -79,6 +82,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
+	settings.deletesCheckInterval = 60 * time.Second
 
 	return &CosmosConnector{desc: desc, settings: settings}
 }
@@ -224,6 +228,32 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
+		// prepare the delete trigger channel and start the deletes worker, if necessary
+		if cc.settings.EmulateDeletes {
+			slog.Debug(fmt.Sprintf("Connector %s is starting deletes emulation worker for flow %s", cc.id, flowId))
+			cc.flowDeletesTriggerChannel = make(chan struct{}, 100) //XXX: do we need to close or reset this later?
+			//start the worker that will emulate deletes
+			go func() {
+				ticker := time.NewTicker(cc.settings.deletesCheckInterval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-cc.flowCtx.Done():
+						return
+					case <-changeStreamDone:
+						return
+					case <-ticker.C:
+						cc.flowDeletesTriggerChannel <- struct{}{}
+					case <-cc.flowDeletesTriggerChannel:
+						// check for deletes
+						cc.checkForDeletes_sync(flowId, options, dataChannel)
+						// reset the timer - no point in checking too often
+						ticker.Reset(cc.settings.deletesCheckInterval)
+					}
+				}
+			}()
+		}
+
 		// start sending periodic barrier messages with cdc resume token updates
 		go func() {
 			ticker := time.NewTicker(cc.settings.CdcResumeTokenUpdateInterval)
@@ -245,9 +275,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-
 		cc.StartConcurrentChangeStreams(tasks, &readerProgress, dataChannel)
-
 	}()
 
 	// kick off the initial sync

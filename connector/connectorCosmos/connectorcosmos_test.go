@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adiom-data/dsync/logger"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/adiom-data/dsync/protocol/test"
@@ -174,7 +173,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	}
 
 	// Call the check for deletes function
-	connector.CheckForDeletesSync(flowID, iface.ConnectorOptions{}, dataChannel) //TODO: THIS SHOULD BE A TRIGGER
+	connector.CheckForDeletesTrigger(flowID)
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")
@@ -216,9 +215,6 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 * 6) Check that the 2 deletes were emitted
  */
 func TestConnectorDeletesEmitted(testState *testing.T) {
-
-	logger.Setup(logger.Options{Verbosity: "DEBUG"})
-
 	ctx := context.Background()
 
 	// create mocks for the transport and coordinator
@@ -324,7 +320,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	}
 
 	// Call the check for deletes function
-	connector.CheckForDeletesSync(flowID, iface.ConnectorOptions{}, dataChannel) //TODO: THIS SHOULD BE A TRIGGER
+	connector.checkForDeletes_sync(flowID, iface.ConnectorOptions{}, dataChannel) //TODO: THIS SHOULD BE A TRIGGER
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")
