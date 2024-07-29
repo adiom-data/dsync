@@ -84,14 +84,14 @@ func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options ifa
 func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []namespace, mismatchedNamespaces chan<- namespace) {
 	for _, ns := range namespaces {
 		// get the count from the source
-		sourceCount, err := cc.client.Database(ns.db).Collection(ns.col).CountDocuments(cc.flowCtx, bson.M{})
+		sourceCount, err := cc.client.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from source for %v: %v", ns, err))
 			continue
 		}
 
 		// get the count from the witness
-		witnessCount, err := witnessClient.Database(ns.db).Collection(ns.col).CountDocuments(cc.flowCtx, bson.M{})
+		witnessCount, err := witnessClient.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from witness for %v: %v", ns, err))
 			continue
@@ -101,7 +101,7 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 			slog.Debug(fmt.Sprintf("Mismatched namespace: %v, source count: %v, witness count: %v", ns, sourceCount, witnessCount))
 			mismatchedNamespaces <- ns
 		} else if sourceCount > witnessCount { //this is unexpected
-			slog.Debug(fmt.Sprintf("Witness count (%v) is less than source count (%v) for namespace %v, which is weird", witnessCount, sourceCount, ns)) //XXX: is this possible?
+			slog.Debug(fmt.Sprintf("Witness count (%v) is less than source count (%v) for namespace %v - not running a deletes cycle for it", witnessCount, sourceCount, ns)) //XXX: is this possible?
 		}
 	}
 	close(mismatchedNamespaces)
