@@ -21,6 +21,8 @@ const (
 	EventReactionTimeout = 5 * time.Second
 	// Data integrity check timeout
 	DataIntegrityCheckTimeout = 5 * time.Second
+	// Max Message Count until we interrupt the flow
+	MaxMessageCount = 4
 )
 
 // GenericMethod represents a method that takes a receiver, variable arguments, and returns an error

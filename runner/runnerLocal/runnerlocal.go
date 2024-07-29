@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/adiom-data/dsync/connector/connectorCosmos"
 	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/adiom-data/dsync/connector/connectorNull"
 	"github.com/adiom-data/dsync/connector/connectorRandom"
@@ -38,6 +39,7 @@ type RunnerLocal struct {
 type RunnerLocalSettings struct {
 	SrcConnString        string
 	DstConnString        string
+	SrcType              string
 	StateStoreConnString string
 
 	NsFromString []string
@@ -58,7 +60,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
-	} else {
+	} else if settings.SrcType == "CosmosDB" {
+		r.src = connectorCosmos.NewCosmosConnector(sourceName, connectorCosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString})
+	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
 	}
 	//null write?

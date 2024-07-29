@@ -549,7 +549,7 @@ func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options ifa
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		resumeToken, err := getLatestResumeToken(mc.flowCtx, mc.client)
+		resumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 			return
