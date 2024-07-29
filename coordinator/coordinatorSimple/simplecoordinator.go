@@ -258,6 +258,7 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 		case <-flowDet.readPlanningDone:
 			slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
 			if flowDet.Resumable {
+				slog.Debug(fmt.Sprintf("Persisting the flow plan for flow %v", flowDet))
 				err := c.s.PersistObject(flowStateMetadataStore, fid, flowDet)
 				if err != nil {
 					slog.Error("Failed to persist the flow plan", err)

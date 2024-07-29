@@ -124,7 +124,8 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 			if msg.MutationType != iface.MutationType_Barrier {
 				// This is a data message
 				messageCount++
-				if phase == 0 && messageCount == 24 {
+				//MaxMessageCount has to be less than number of data messages in the test data, otherwise will error due to timeout
+				if phase == 0 && messageCount == MaxMessageCount {
 					// let's interrupt the flow
 					err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
 						return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
@@ -286,6 +287,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	var readPlan iface.ConnectorReadPlan
 	phase := 0
 	flowComplete := make(chan struct{})
+	channelExhaustedPhase1 := make(chan struct{})
 
 	// Do some prep
 	flowID := iface.FlowID("1234")
@@ -329,6 +331,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 					}
 				}
 			}
+		}
+		if phase == 1 {
+			channelExhaustedPhase1 <- struct{}{}
 		}
 	}
 	go dataReader(dataChannel)
@@ -392,10 +397,20 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	// Wait for flow to complete after the second interruption (the first CDC barrier)
 	select {
 	case <-flowComplete:
-		// Read plan is complete
+		// Flow complete
 	case <-time.After(FlowCompletionTimeout):
 		// Timeout
 		suite.T().Errorf("Timed out while waiting for the flow to complete after the second interruption")
+		suite.T().FailNow()
+	}
+
+	// wait for data reader to completely exhaust the channel
+	select {
+	case <-channelExhaustedPhase1:
+		// Channel has been exhausted
+	case <-time.After(FlowCompletionTimeout):
+		// Timeout
+		suite.T().Errorf("Timed out while waiting for the message channel draining after the second interruption")
 		suite.T().FailNow()
 	}
 

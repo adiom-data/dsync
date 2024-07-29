@@ -10,7 +10,8 @@ import (
 )
 
 type Options struct {
-	Verbosity string
+	Verbosity  string
+	Sourcetype string
 
 	SrcConnString        string
 	DstConnString        string
@@ -26,6 +27,7 @@ func NewFromCLIContext(c *cli.Context) Options {
 	o := Options{}
 
 	o.Verbosity = c.String("verbosity")
+	o.Sourcetype = c.String("sourcetype")
 	o.SrcConnString = c.String("source")
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
