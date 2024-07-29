@@ -7,6 +7,7 @@ package connectorCosmos
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -17,13 +18,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	// TestMongoConnectionString is the connection string for the test MongoDB
-	TestCosmosConnectionString = "mongodb://cosmosdbtest-3:wmbSIIZaUllEYE5AGzejifnHwcvCzhLMVuRPndbxDLXhdjy1utbfIhSOPuJ9ZVIZJ4H17BwAhJyYACDbfYehyQ==@cosmosdbtest-3.mongo.cosmos.azure.com:10255/?ssl=true&retrywrites=false&replicaSet=globaldb&maxIdleTimeMS=120000&appName=@cosmosdbtest-3@"
-)
-
 // Standard test suite for the connector interface
 func TestCosmosConnectorSuite(t *testing.T) {
+	// get the connection string from the environment variable COSMOS, if not set, fail the test
+	TestCosmosConnectionString := os.Getenv("COSMOS")
+	if TestCosmosConnectionString == "" {
+		t.Fatal("COSMOS environment variable not set")
+	}
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
 			return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})

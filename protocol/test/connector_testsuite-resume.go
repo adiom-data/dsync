@@ -124,7 +124,8 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 			if msg.MutationType != iface.MutationType_Barrier {
 				// This is a data message
 				messageCount++
-				if phase == 0 && messageCount == 4 {
+				//MaxMessageCount has to be less than number of data messages in the test data, otherwise will error due to timeout
+				if phase == 0 && messageCount == MaxMessageCount {
 					// let's interrupt the flow
 					err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
 						return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))

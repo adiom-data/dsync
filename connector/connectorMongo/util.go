@@ -43,8 +43,8 @@ func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timest
 */
 
 const (
-	connectorDBType string = "MongoDB"  // We're a MongoDB-compatible connector
-	connectorSpec   string = "Specific" // We're generic in the sense that we work with Cosmos, shared tier, etc.
+	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
+	connectorSpec   string = "Genuine"
 	// specific, not compatible with Cosmos DB
 	dummyDB                      string = "adiom-internal-dummy" //note that this must be different from the metadata DB - that one is excluded from copying, while this one isn't
 	dummyCol                     string = "dummy"

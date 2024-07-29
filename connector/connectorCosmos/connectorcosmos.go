@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2024 Adiom, Inc.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 package connectorCosmos
 
 import (
@@ -15,8 +20,8 @@ import (
 )
 
 const (
-	connectorDBType string = "CosmosDB" // We're a CosmosDB-compatible connector
-	connectorSpec   string = "specific" // We're specific in the sense that we work with Cosmos
+	connectorDBType string = "CosmosDB"               // We're a CosmosDB-compatible connector
+	connectorSpec   string = "MongoDB Provisioned RU" // Only compatible with MongoDB API and provisioned deployments
 )
 
 type CosmosConnector struct {
@@ -44,7 +49,6 @@ type CosmosConnector struct {
 	flowId                iface.FlowID
 	flowConnCapabilities  iface.ConnectorCapabilities
 	flowCDCResumeTokenMap *TokenMap //stores the resume token for each namespace
-	flowCDCResumeToken    []byte    //stores the serialized resume token map
 }
 
 type CosmosConnectorSettings struct {
@@ -162,14 +166,18 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	}
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
+	// If the resume token map is empty, we are continuing a flow and need to retrieve the latest resume token map
+	if cc.flowCDCResumeTokenMap.IsEmpty() {
+		// Get the flowCDCTokens from the read plan for resumability
+		flowCDCResumeToken := readPlan.CdcResumeToken //Get the endoded token
 
-	// Get the flowCDCTokens from the read plan for resumability
-	cc.flowCDCResumeToken = readPlan.CdcResumeToken                  //Get the endoded token
-	err := cc.flowCDCResumeTokenMap.decodeMap(cc.flowCDCResumeToken) //Decode the token to get the map
-	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
+		err := cc.flowCDCResumeTokenMap.decodeMap(flowCDCResumeToken) //Decode the token to get the map
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
+		}
 	}
+
+	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
@@ -211,11 +219,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					cc.flowCDCResumeToken, err = cc.flowCDCResumeTokenMap.encodeMap()
+					flowCDCResumeToken, err := cc.flowCDCResumeTokenMap.encodeMap()
 					if err != nil {
 						slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 					}
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: cc.flowCDCResumeToken}
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: flowCDCResumeToken}
 				}
 			}
 		}()
@@ -379,12 +387,12 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 
 		slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", cc.flowCDCResumeTokenMap.Map))
 		//serialize the resume token map
-		cc.flowCDCResumeToken, err = cc.flowCDCResumeTokenMap.encodeMap()
+		flowCDCResumeToken, err := cc.flowCDCResumeTokenMap.encodeMap()
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
-		//how to adjust this to cosmos, right now just using the first task
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: cc.flowCDCResumeToken}
+
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {

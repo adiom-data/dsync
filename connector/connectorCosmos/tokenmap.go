@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2024 Adiom, Inc.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 package connectorCosmos
 
 import (
@@ -101,4 +106,9 @@ func (tm *TokenMap) decodeMap(b []byte) error {
 		tm.Map[k] = v
 	}
 	return nil
+}
+
+// returns whether the map is empty, use case doesn't require atomicity
+func (tm *TokenMap) IsEmpty() bool {
+	return len(tm.Map) == 0
 }
