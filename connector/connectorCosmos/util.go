@@ -7,6 +7,7 @@
 package connectorCosmos
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -72,20 +73,20 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 	}
 }
 
-func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.Raw, error) {
+func (cc *CosmosConnector) getLatestResumeToken(ctx context.Context, location iface.Location) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
-	changeStream, err := cc.createChangeStream(location, opts)
+	changeStream, err := cc.createChangeStream(ctx, location, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
-	defer changeStream.Close(cc.ctx)
+	defer changeStream.Close(ctx)
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
 	var id interface{}
 	col := cc.client.Database(location.Database).Collection(location.Collection)
 
-	result, err := col.InsertOne(cc.ctx, bson.M{})
+	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {
 		slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
 		return nil, fmt.Errorf("failed to insert dummy record")
@@ -93,12 +94,12 @@ func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.R
 
 	id = result.InsertedID
 	//get the resume token from the change stream event, then delete the inserted document
-	changeStream.Next(cc.ctx)
+	changeStream.Next(ctx)
 	resumeToken := changeStream.ResumeToken()
 	if resumeToken == nil {
 		return nil, fmt.Errorf("failed to get resume token from change stream")
 	}
-	col.DeleteOne(cc.ctx, bson.M{"_id": id})
+	col.DeleteOne(ctx, bson.M{"_id": id})
 
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
 	rid, err := extractRidFromResumeToken(resumeToken)

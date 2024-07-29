@@ -276,7 +276,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(tasks, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -423,7 +423,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			go func(task iface.ReadPlanTask) {
 				defer wg.Done()
 				loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
-				resumeToken, err := cc.getLatestResumeToken(loc)
+				resumeToken, err := cc.getLatestResumeToken(cc.ctx, loc)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
 					return
