@@ -18,10 +18,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const CosmosEnvironmentVariable = "COSMOS_TEST"
+
 // Standard test suite for the connector interface
 func TestCosmosConnectorSuite(t *testing.T) {
 	// get the connection string from the environment variable COSMOS, if not set, fail the test
-	TestCosmosConnectionString := os.Getenv("COSMOS")
+	TestCosmosConnectionString := os.Getenv(CosmosEnvironmentVariable)
 	if TestCosmosConnectionString == "" {
 		t.Fatal("COSMOS environment variable not set")
 	}

@@ -125,9 +125,6 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Generate connector ID for resumability purposes
 	id := generateConnectorID(cc.settings.ConnectionString)
 
-	// Create CDCResumeToken map
-	cc.flowCDCResumeTokenMap = NewTokenMap()
-
 	// Create a new connector details structure
 	connectorDetails := iface.ConnectorDetails{Desc: cc.desc, Type: cc.connectorType, Cap: cc.connectorCapabilities, Id: id}
 	// Register the connector
@@ -166,15 +163,14 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	}
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
-	// If the resume token map is empty, we are continuing a flow and need to retrieve the latest resume token map
-	if cc.flowCDCResumeTokenMap.IsEmpty() {
-		// Get the flowCDCTokens from the read plan for resumability
-		flowCDCResumeToken := readPlan.CdcResumeToken //Get the endoded token
 
-		err := cc.flowCDCResumeTokenMap.decodeMap(flowCDCResumeToken) //Decode the token to get the map
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
-		}
+	cc.flowCDCResumeTokenMap = NewTokenMap()
+
+	flowCDCResumeToken := readPlan.CdcResumeToken //Get the endoded token
+
+	err := cc.flowCDCResumeTokenMap.decodeMap(flowCDCResumeToken) //Decode the token to get the map
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
 	}
 
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
@@ -368,6 +364,8 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		}
 		slog.Debug(fmt.Sprintf("created tasks: %v", tasks))
 
+		tokenMap := NewTokenMap()
+
 		//create resume token for each task
 		wg := sync.WaitGroup{}
 		for _, task := range tasks {
@@ -380,14 +378,14 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
 					return
 				}
-				cc.flowCDCResumeTokenMap.AddToken(loc, resumeToken)
+				tokenMap.AddToken(loc, resumeToken)
 			}(task)
 		}
 		wg.Wait()
 
-		slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", cc.flowCDCResumeTokenMap.Map))
+		slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", tokenMap.Map))
 		//serialize the resume token map
-		flowCDCResumeToken, err := cc.flowCDCResumeTokenMap.encodeMap()
+		flowCDCResumeToken, err := tokenMap.encodeMap()
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}

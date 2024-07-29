@@ -107,8 +107,3 @@ func (tm *TokenMap) decodeMap(b []byte) error {
 	}
 	return nil
 }
-
-// returns whether the map is empty, use case doesn't require atomicity
-func (tm *TokenMap) IsEmpty() bool {
-	return len(tm.Map) == 0
-}
