@@ -65,7 +65,7 @@ mongorestore --archive=sampledata.archive
 ```
 7) Start the sync
 ```
-./dsync -s $MDB_LOCAL1 -d $MDB_LOCAL2 -m $MDB_LOCAL2 --verbosity INFO
+./dsync -s $MDB_LOCAL1 -d $MDB_LOCAL2 -m $MDB_LOCAL2 --sourcetype MongoDB --verbosity INFO
 ```
 Now Dsync should be running! 
 
@@ -79,6 +79,7 @@ java -jar tools/SimRunner/SimRunner.jar tools/SimRunner/adiom-load.json
 
 - Source: 
     - MongoDB: Supports Atlas Dedicated, Atlas Serverless and Self-Managed installations.
+    - CosmosDB: Supports Azure Cosmos with Mongo API with Provisioned RUs (not serverless).
     - /dev/random: Generates a stream of random operations.
 - Destination: 
     - MongoDB: Generic MongoDB API connector.
@@ -95,6 +96,10 @@ Can be run separately using the ```--verify``` flag. See ```dsync --help``` for 
 
 ## Resumability 
 Automatic resume on restart during initial data copy and CDC. See [docs](docs-dev/Resumability.md) on how it works.
+
+## CosmosDB deletes emulation
+Cosmos with MongoDB API [doesn't emit delete events](https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/change-streams?tabs=javascript#current-limitations) in the changestream. Dsync includes a workaround that captures delete operations from the source using a periodic index scan. This behavior can be turned on using the ```--cosmos-deletes-cdc``` flag.
+See [docs](docs-dev/CosmosDeletesEmu.md) for the details.
 
 # Cleanup
 

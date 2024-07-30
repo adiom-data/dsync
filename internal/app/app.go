@@ -36,7 +36,11 @@ func NewApp() *cli.App {
 }
 
 func runDsync(c *cli.Context) error {
-	o := options.NewFromCLIContext(c)
+	o, err := options.NewFromCLIContext(c)
+	if err != nil {
+		return err
+	}
+
 	lo := logger.Options{Verbosity: o.Verbosity}
 
 	logger.Setup(lo)
@@ -51,8 +55,9 @@ func runDsync(c *cli.Context) error {
 		VerifyRequestedFlag:             o.Verify,
 		CleanupRequestedFlag:            o.Cleanup,
 		FlowStatusReportingIntervalSecs: 10,
+		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})
-	err := r.Setup(c.Context)
+	err = r.Setup(c.Context)
 	if err == nil {
 		r.Run()
 	}
