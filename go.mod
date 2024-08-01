@@ -8,14 +8,17 @@ require (
 )
 
 require (
+	github.com/acobaugh/osrelease v0.0.0-20181218015638-a93a0a55a249 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/lmittmann/tint v1.0.4 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/hashstructure v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/spf13/afero v1.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/tryvium-travels/memongo v0.12.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 )
 
