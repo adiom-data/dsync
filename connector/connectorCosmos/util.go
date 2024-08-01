@@ -3,9 +3,12 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+
 package connectorCosmos
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -28,6 +31,7 @@ type ReaderProgress struct {
 	changeStreamEvents uint64
 	tasksTotal         uint64
 	tasksCompleted     uint64
+	deletesCaught      uint64
 }
 
 // Generates static connector ID based on connection string
@@ -54,8 +58,14 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 			operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
 			opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 			// Print reader progress
-			slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-				readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+			if !cc.settings.EmulateDeletes {
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
+			} else {
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Deletes - %d, Operations per Second - %.2f",
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, readerProgress.deletesCaught, opsPerSec))
+
+			}
 
 			startTime = time.Now()
 			operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents
@@ -63,34 +73,56 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 	}
 }
 
-func (cc *CosmosConnector) getLatestResumeToken(location iface.Location) (bson.Raw, error) {
+func (cc *CosmosConnector) getLatestResumeToken(ctx context.Context, location iface.Location) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
-	changeStream, err := cc.createChangeStream(location, opts)
+	changeStream, err := cc.createChangeStream(ctx, location, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
-	defer changeStream.Close(cc.ctx)
+	defer changeStream.Close(ctx)
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
 	var id interface{}
 	col := cc.client.Database(location.Database).Collection(location.Collection)
 
-	result, err := col.InsertOne(cc.ctx, bson.M{})
+	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {
 		slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
-	} else {
-		id = result.InsertedID
-		//get the resume token from the change stream event, then delete the inserted document
-		changeStream.Next(cc.ctx)
-		resumeToken := changeStream.ResumeToken()
-		if resumeToken == nil {
-			return nil, fmt.Errorf("failed to get resume token from change stream")
-		}
-		col.DeleteOne(cc.ctx, bson.M{"_id": id})
-		return resumeToken, nil
+		return nil, fmt.Errorf("failed to insert dummy record")
 	}
-	return nil, fmt.Errorf("failed to insert dummy record")
+
+	id = result.InsertedID
+	//get the resume token from the change stream event, then delete the inserted document
+	changeStream.Next(ctx)
+	resumeToken := changeStream.ResumeToken()
+	if resumeToken == nil {
+		return nil, fmt.Errorf("failed to get resume token from change stream")
+	}
+	col.DeleteOne(ctx, bson.M{"_id": id})
+
+	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
+	rid, err := extractRidFromResumeToken(resumeToken)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("Failed to extract Rid from resume token: %v", err))
+	} else {
+		slog.Debug(fmt.Sprintf("Rid for namespace %v: %v", location, rid))
+	}
+
+	return resumeToken, nil
+}
+
+// extractRidFromResumeToken extracts the Cosmos Resource Id (collection Id) from the resume token
+func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
+	data := resumeToken.Lookup("_data").Value[5:] //Skip the first 5 bytes because it's some Cosmic garbage
+
+	var keyJsonMap map[string]interface{}
+	err := json.Unmarshal(data, &keyJsonMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse resume token from JSON: %v", err)
+	}
+
+	return fmt.Sprintf("%v", keyJsonMap["Rid"]), nil
 }
 
 // update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum

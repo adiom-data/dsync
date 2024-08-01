@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+
 package connectorCosmos
 
 import (
@@ -43,12 +44,15 @@ type CosmosConnector struct {
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status                iface.ConnectorStatus
-	flowCtx               context.Context
-	flowCancelFunc        context.CancelFunc
-	flowId                iface.FlowID
-	flowConnCapabilities  iface.ConnectorCapabilities
-	flowCDCResumeTokenMap *TokenMap //stores the resume token for each namespace
+	status                    iface.ConnectorStatus
+	flowCtx                   context.Context
+	flowCancelFunc            context.CancelFunc
+	flowId                    iface.FlowID
+	flowConnCapabilities      iface.ConnectorCapabilities
+	flowCDCResumeTokenMap     *TokenMap     //stores the resume token for each namespace
+	flowDeletesTriggerChannel chan struct{} //channel to trigger deletes
+
+	witnessMongoClient *mongo.Client //for use in emulating deletes
 }
 
 type CosmosConnectorSettings struct {
@@ -61,6 +65,10 @@ type CosmosConnectorSettings struct {
 	numParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
+
+	EmulateDeletes         bool // if true, we will generate delete events
+	deletesCheckInterval   time.Duration
+	WitnessMongoConnString string
 }
 
 func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
@@ -74,6 +82,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
+	settings.deletesCheckInterval = 60 * time.Second
 
 	return &CosmosConnector{desc: desc, settings: settings}
 }
@@ -81,6 +90,18 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ctx = ctx
 	cc.t = t
+
+	// Connect to the witness MongoDB instance
+	if cc.settings.EmulateDeletes {
+		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
+		defer cancel()
+		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString)
+		client, err := mongo.Connect(ctxConnect, clientOptions)
+		if err != nil {
+			return err
+		}
+		cc.witnessMongoClient = client
+	}
 
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
@@ -142,6 +163,10 @@ func (cc *CosmosConnector) Teardown() {
 	if cc.client != nil {
 		cc.client.Disconnect(cc.ctx)
 	}
+
+	if cc.witnessMongoClient != nil {
+		cc.witnessMongoClient.Disconnect(cc.ctx)
+	}
 }
 
 func (cc *CosmosConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
@@ -190,6 +215,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		tasksTotal:         uint64(len(tasks)),
 		tasksCompleted:     0,
 		changeStreamEvents: 0,
+		deletesCaught:      0,
 	}
 
 	readerProgress.initialSyncDocs.Store(0)
@@ -202,6 +228,32 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		//wait for the initial sync to finish
 		<-initialSyncDone
 		defer close(changeStreamDone)
+
+		// prepare the delete trigger channel and start the deletes worker, if necessary
+		if cc.settings.EmulateDeletes {
+			slog.Info(fmt.Sprintf("Connector %s is starting deletes emulation worker for flow %s", cc.id, flowId))
+			cc.flowDeletesTriggerChannel = make(chan struct{}, 100) //XXX: do we need to close or reset this later?
+			//start the worker that will emulate deletes
+			go func() {
+				ticker := time.NewTicker(cc.settings.deletesCheckInterval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-cc.flowCtx.Done():
+						return
+					case <-changeStreamDone:
+						return
+					case <-ticker.C:
+						cc.flowDeletesTriggerChannel <- struct{}{}
+					case <-cc.flowDeletesTriggerChannel:
+						// check for deletes
+						readerProgress.deletesCaught += cc.checkForDeletes_sync(flowId, options, dataChannel)
+						// reset the timer - no point in checking too often
+						ticker.Reset(cc.settings.deletesCheckInterval)
+					}
+				}
+			}()
+		}
 
 		// start sending periodic barrier messages with cdc resume token updates
 		go func() {
@@ -224,9 +276,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-
-		cc.StartConcurrentChangeStreams(tasks, &readerProgress, dataChannel)
-
+		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -373,7 +423,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			go func(task iface.ReadPlanTask) {
 				defer wg.Done()
 				loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
-				resumeToken, err := cc.getLatestResumeToken(loc)
+				resumeToken, err := cc.getLatestResumeToken(cc.ctx, loc)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
 					return

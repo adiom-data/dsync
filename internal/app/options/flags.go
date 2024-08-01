@@ -95,6 +95,10 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:  "cleanup",
 			Usage: "Cleanup metadata for an existing flow",
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "cosmos-deletes-cdc",
+			Usage: "Generate CDC events for CosmosDB deletes",
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},

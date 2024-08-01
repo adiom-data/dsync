@@ -6,6 +6,8 @@
 package options
 
 import (
+	"fmt"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,9 +23,11 @@ type Options struct {
 
 	Verify  bool
 	Cleanup bool
+
+	CosmosDeletesEmu bool
 }
 
-func NewFromCLIContext(c *cli.Context) Options {
+func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o := Options{}
 
 	o.Verbosity = c.String("verbosity")
@@ -35,5 +39,14 @@ func NewFromCLIContext(c *cli.Context) Options {
 	o.Verify = c.Bool("verify")
 	o.Cleanup = c.Bool("cleanup")
 
-	return o
+	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
+	if o.Sourcetype != "CosmosDB" && o.CosmosDeletesEmu {
+		return o, fmt.Errorf("cosmos-deletes-cdc flag is only valid for CosmosDB source")
+	}
+	if (o.DstConnString == "/dev/null") && o.CosmosDeletesEmu {
+		// /dev/null doesn't offer a persistent index
+		return o, fmt.Errorf("cosmos-deletes-cdc flag cannot be used with /dev/null destination")
+	}
+
+	return o, nil
 }
