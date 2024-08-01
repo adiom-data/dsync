@@ -25,7 +25,7 @@ Could be MongoDB Atlas or local. If the source is local, you need to start it as
 # How to Test
 Prerequisites: 
   - MongoDB Connector tests: a MongoDB instance on localhost:27017
-  - Cosmos Connector tests: a Cosmos instance (COSMOS_TEST enviromental variable) and a MongoDB instance on localhost:27021 _seeded with an exact copy of the Cosmos db data_
+  - Cosmos Connector tests: a Cosmos instance (COSMOS_TEST enviromental variable)
 
 To run all tests (will take under a minute or so):
 ```
