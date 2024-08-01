@@ -9,6 +9,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/adiom-data/dsync/connector/connectorCosmos"
@@ -32,6 +34,8 @@ type RunnerLocal struct {
 	statestore iface.Statestore
 	coord      iface.Coordinator
 	src, dst   iface.Connector
+
+	runnerProgress runnerSyncProgress
 
 	ctx context.Context
 }
@@ -59,6 +63,23 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
+	r.runnerProgress = runnerSyncProgress{
+		startTime:           time.Now(),
+		syncState:           "InitialSync",
+		totalNamespaces:     5,
+		numNamespacesSynced: 0,
+		totalDocs:           1000,
+		numDocsSynced:       0,
+		throughput:          0,
+		nsProgressMap: map[iface.Location]namespaceProgress{
+			{Database: "db1", Collection: "col1"}: {startTime: time.Now(), totalDocs: 10, numDocsSynced: 5, throughput: 2},
+			{Database: "db1", Collection: "col2"}: {startTime: time.Now(), totalDocs: 20, numDocsSynced: 10, throughput: 9},
+			{Database: "db2", Collection: "col1"}: {startTime: time.Now(), totalDocs: 30, numDocsSynced: 15, throughput: 10},
+			{Database: "db2", Collection: "col2"}: {startTime: time.Now(), totalDocs: 40, numDocsSynced: 25, throughput: 20},
+			{Database: "db2", Collection: "col3"}: {startTime: time.Now(), totalDocs: 50, numDocsSynced: 35, throughput: 25},
+		},
+		namespaces: []iface.Location{{Database: "db1", Collection: "col1"}, {Database: "db1", Collection: "col2"}, {Database: "db2", Collection: "col1"}, {Database: "db2", Collection: "col2"}, {Database: "db2", Collection: "col3"}},
+	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
@@ -227,4 +248,51 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
+}
+
+type runnerSyncProgress struct {
+	startTime           time.Time
+	syncState           string                               //get from coordinator
+	totalNamespaces     int                                  //get from reader
+	numNamespacesSynced int                                  //get from writer
+	totalDocs           int                                  //get from reader
+	numDocsSynced       int                                  //get from writer
+	throughput          int                                  //get from coord
+	nsProgressMap       map[iface.Location]namespaceProgress //get from coord? or writer?
+	namespaces          []iface.Location                     //use map and get the keys so print order is consistent
+}
+
+type namespaceProgress struct {
+	startTime     time.Time //get from reader
+	totalDocs     int       //get from reader
+	numDocsSynced int       //get from writer
+	throughput    int       //writer?
+}
+
+func (r *RunnerLocal) GetStatusReport() {
+	totalTimeElapsed := time.Since(r.runnerProgress.startTime).Seconds()
+	fmt.Printf("\n\033[2K\rDsync Progress Report : %v\nTime Elapsed: %.2fs\n\n", r.runnerProgress.syncState, totalTimeElapsed)
+
+	for _, key := range r.runnerProgress.namespaces {
+		ns := r.runnerProgress.nsProgressMap[key]
+		percentComplete := math.Floor(float64(ns.numDocsSynced) / float64(ns.totalDocs) * 100)
+		percentCompleteStr := fmt.Sprintf("%.0f%% complete", percentComplete)
+		timeElapsed := time.Since(ns.startTime).Seconds()
+		timeElapsedStr := fmt.Sprintf("Time Elapsed: %.2fs", timeElapsed)
+		throughputStr := fmt.Sprintf("Throughput: %v docs/s", ns.throughput)
+		namespace := "Namespace: " + key.Database + "." + key.Collection
+		fmt.Printf("\033[2K\r%-30s %-30s %-25s %-25s\n", namespace, timeElapsedStr, percentCompleteStr, throughputStr)
+	}
+	totalPercentComplete := float64(r.runnerProgress.numDocsSynced) / float64(r.runnerProgress.totalDocs) * 100
+	progressBarWidth := 50
+	progress := int(totalPercentComplete / 100 * float64(progressBarWidth))
+	progressBar := fmt.Sprintf("[%s%s] %.2f%%", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
+	fmt.Printf("\n\033[2K\r%s\n", progressBar)
+
+	for i := 0; i < r.runnerProgress.totalNamespaces+6; i++ {
+		fmt.Print("\033[F")
+	}
+	if totalPercentComplete != 100 {
+		r.runnerProgress.numDocsSynced += 50
+	}
 }

@@ -9,6 +9,8 @@ package dsync
 import (
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
@@ -57,17 +59,33 @@ func runDsync(c *cli.Context) error {
 		FlowStatusReportingIntervalSecs: 10,
 		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})
-	defer r.Teardown()
 
-	err = r.Setup(c.Context)
-	if err != nil {
-		return err
-	}
+	// Start the status reporting goroutine
+	go func() {
+		for {
+			r.GetStatusReport()
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
-	err = r.Run()
-	if err != nil {
-		return err
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func(err error) {
+		defer wg.Done()
+		err = r.Setup(c.Context)
+		if err != nil {
+			return
+		}
+		err = r.Run()
+		if err != nil {
+			return
+		}
+		r.Teardown()
+
+	}(err)
+
+	wg.Wait()
 
 	return err
 }

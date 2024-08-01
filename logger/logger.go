@@ -19,6 +19,10 @@ type Options struct {
 
 func Setup(o Options) {
 	// set up log level
+	logFile, err := os.OpenFile("dsync.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
 	var level slog.Level
 	switch o.Verbosity {
 	case "DEBUG":
@@ -35,7 +39,7 @@ func Setup(o Options) {
 
 	w := os.Stderr
 	logger := slog.New(
-		tint.NewHandler(w, &tint.Options{
+		tint.NewHandler(logFile, &tint.Options{
 			NoColor:   !isatty.IsTerminal(w.Fd()),
 			Level:     level,
 			AddSource: level < 0, //only for debugging
