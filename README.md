@@ -23,15 +23,22 @@ Could be MongoDB Atlas or local. If the source is local, you need to start it as
 5) Optionally, you may also want to generate some load on the source (I use SimRunner for this)
 
 # How to Test
+Prerequisites: 
+  - MongoDB Connector tests: a MongoDB instance on localhost:27017
+  - Cosmos Connector tests: a Cosmos instance (COSMOS_TEST enviromental variable) and a MongoDB instance on localhost:27021 _seeded with an exact copy of the Cosmos db data_
 
 To run all tests (will take under a minute or so):
 ```
 go test ./...
 ```
-
-To test a specific connector (e.g. the null writer):
+To run all tests for a specific connector (e.g. connector Mongo):
 ```
-go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestConnectorWriteResumeInitialCopy$ github.com/adiom-data/dsync/connector
+go test -v -timeout 30s github.com/adiom-data/dsync/connector/connectorMongo
+```
+
+To run a specific test for a specific connector (e.g. TestConnectorWriteResumeInitialCopy for Mongo connector):
+```
+go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestConnectorWriteResumeInitialCopy$ github.com/adiom-data/dsync/connector/connectorMongo
 ```
 # Quickstart
 
