@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/tryvium-travels/memongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
-	CosmosEnvironmentVariable    = "COSMOS_TEST"
-	MongoWitnessConnectionString = "mongodb://localhost:27021" //XXX: this should be a pre-seeded copy of the data in Cosmos
+	CosmosEnvironmentVariable = "COSMOS_TEST"
 )
 
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
@@ -32,8 +32,8 @@ var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 var connectorFactoryFunc = func() iface.Connector {
 	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 }
-var connectorDeletesEmuFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: MongoWitnessConnectionString})
+var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
+	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -209,13 +209,26 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 * Scenario:
 * 1) Start reading with a connector configuration that enables deletes
 * 2) Wait a bit to make sure that we entered the CDC phase
-* 3) Do 2 deletes
+* 3) Inject two entries into the witness that don't exist on the source
 * 4) Call CheckForDeletesSync()
 * 5) Wait a bit more to make sure that the deletes are processed
 * 6) Check that the 2 deletes were emitted
  */
 func TestConnectorDeletesEmitted(testState *testing.T) {
 	ctx := context.Background()
+
+	// start mongo server
+	witnessMongoServer, err := memongo.Start("6.0.16")
+	if err != nil {
+		testState.Fatal(err)
+	}
+	defer witnessMongoServer.Stop()
+	// create a data store for tampering with evidence
+	witnessDataStore := NewCosmosTestDataStore(witnessMongoServer.URI())
+	err = witnessDataStore.Setup()
+	if err != nil {
+		testState.Fatal(err)
+	}
 
 	// create mocks for the transport and coordinator
 	t := new(mocks.Transport)
@@ -228,10 +241,10 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorDeletesEmuFactoryFunc().(*CosmosConnector)
+	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*CosmosConnector)
 
 	// setup the connector and make sure it returns no errors
-	err := connector.Setup(ctx, t)
+	err = connector.Setup(ctx, t)
 	assert.NoError(testState, err)
 
 	// check that the mocked methods were called
@@ -313,10 +326,10 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	testState.Log("Sleeping for 10 seconds to allow the connector to read data")
 	time.Sleep(10 * time.Second)
 
-	// Introduce a change in the dataset
+	// Inject fake entries into the witness
+	// It's like what BMW did, but legal
 	for i := 0; i < 2; i++ {
-		err = dataStore.DeleteOneDoc(dummyTestDBName, dummyTestColName)
-		assert.NoError(testState, err)
+		witnessDataStore.InsertDummy(dummyTestDBName, dummyTestColName, bson.M{"_id": i})
 	}
 
 	// Call the check for deletes function

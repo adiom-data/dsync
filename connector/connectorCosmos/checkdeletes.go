@@ -97,11 +97,9 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 			continue
 		}
 
-		if sourceCount < witnessCount { //there's something we haven't deleted yet
+		if sourceCount != witnessCount { //there's something we haven't deleted yet //XXX: is there a better heuristic here? This will not work for some workloads
 			slog.Debug(fmt.Sprintf("Mismatched namespace: %v, source count: %v, witness count: %v", ns, sourceCount, witnessCount))
 			mismatchedNamespaces <- ns
-		} else if sourceCount > witnessCount { //this is unexpected
-			slog.Debug(fmt.Sprintf("Witness count (%v) is less than source count (%v) for namespace %v - not running a deletes cycle for it", witnessCount, sourceCount, ns)) //XXX: is this possible?
 		}
 	}
 	close(mismatchedNamespaces)
