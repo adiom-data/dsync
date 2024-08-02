@@ -7,11 +7,13 @@
 package connectorCosmos
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
@@ -77,7 +79,72 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 	if len(tasks) > cc.settings.maxNumNamespaces {
 		return nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(tasks), cc.settings.maxNumNamespaces)
 	}
-	return tasks, nil
+
+	return cc.partitionTasksIfNecessary(tasks)
+}
+
+// partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
+func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.ReadPlanTask) ([]iface.ReadPlanTask, error) {
+	countCheckChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
+	approxSplitPointsCalcChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
+
+	finalTasksChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
+	finalTasks := make([]iface.ReadPlanTask, 0, len(namespaceTasks))
+
+	// add namespace tasks to the queue to check their counts
+	go func() {
+		for _, task := range namespaceTasks {
+			countCheckChannel <- task
+		}
+		close(countCheckChannel)
+	}()
+
+	// do parallel counting (async)
+	// do parallel task generation based on approximate boundaries
+
+	for task := range finalTasksChannel {
+		finalTasks = append(finalTasks, task)
+	}
+	return finalTasks, nil
+}
+
+// In parallel checks the count of the namespace and segregates them into two channels
+func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask, approxSplitPointsCalcChannel chan<- iface.ReadPlanTask) {
+	//define workgroup
+	wg := sync.WaitGroup{}
+	wg.Add(cc.settings.numParallelPartitionWorkers)
+	// create workers to do the counting
+	for i := 0; i < cc.settings.numParallelPartitionWorkers; i++ {
+		go func() {
+			for nsTask := range countCheckChannel {
+				collection := cc.client.Database(nsTask.Def.Db).Collection(nsTask.Def.Col)
+				count, err := collection.EstimatedDocumentCount(cc.ctx)
+				if err != nil {
+					if cc.ctx.Err() == context.Canceled {
+						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
+					} else {
+						slog.Error(fmt.Sprintf("Failed to count documents: %v", err))
+					}
+				}
+
+				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
+					finalTasksChannel <- nsTask
+				} else {
+					//get top and bottom bounds
+					//if can't partition (different type, not objectid or number), just add the task as a whole
+					//send top and bottom tasks to finalized channel
+					//do a split in floor (count / cc.settings.targetDocCountPerPartition) parts
+					//generate new approx boundaries
+					//send the tasks with approx bounaries downstream
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	// wait for all workers to finish and close the idsToCheck channel
+	wg.Wait()
+	close(approxSplitPointsCalcChannel)
 }
 
 // get all database names except system databases
