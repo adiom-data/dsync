@@ -90,7 +90,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	settings.deletesCheckInterval = 60 * time.Second
 
 	settings.maxNumNamespaces = 8
-	settings.targetDocCountPerPartition = 256 * 1000
+	settings.targetDocCountPerPartition = 512 * 1000
 	settings.numParallelPartitionWorkers = 4
 	settings.partitionKey = "_id"
 
