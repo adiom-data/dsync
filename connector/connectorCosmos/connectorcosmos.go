@@ -300,7 +300,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					db := task.Def.Db
 					col := task.Def.Col
 					collection := cc.client.Database(db).Collection(col)
-					cursor, err := collection.Find(cc.flowCtx, bson.D{})
+					cursor, err := createFindQuery(cc.flowCtx, collection, task)
 					if err != nil {
 						if cc.flowCtx.Err() == context.Canceled {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))

@@ -52,6 +52,11 @@ type ReadPlanTask struct {
 	Def struct {
 		Db  string
 		Col string
+
+		// all are optional and define the range of documents to copy for the task
+		PartitionKey string      // partition key for the task
+		Low          interface{} // lower bound for the task (inclusive)
+		High         interface{} // upper bound for the task (exclusive)
 	}
 }
 

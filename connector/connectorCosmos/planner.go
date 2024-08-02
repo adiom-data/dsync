@@ -15,6 +15,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
 var (
@@ -47,6 +48,12 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 				task := iface.ReadPlanTask{Id: taskId}
 				task.Def.Db = db
 				task.Def.Col = col
+
+				task.Def.PartitionKey = "_id"
+				task.Def.High = bson.RawValue{
+					Type:  bson.TypeInt32,
+					Value: bsoncore.AppendInt32(nil, 0),
+				}
 
 				tasks = append(tasks, task)
 				taskId++
