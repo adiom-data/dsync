@@ -97,6 +97,14 @@ func (cc *CosmosConnector) getMinAndMax(ctx context.Context, task iface.ReadPlan
 		return bson.RawValue{}, bson.RawValue{}, err
 	}
 
+	if !topCursor.Next(ctx) {
+		return bson.RawValue{}, bson.RawValue{}, fmt.Errorf("failed to get top boundary")
+	}
+
+	if !bottomCursor.Next(ctx) {
+		return bson.RawValue{}, bson.RawValue{}, fmt.Errorf("failed to get bottom boundary")
+	}
+
 	topId := topCursor.Current.Lookup(partitionKey)
 	bottomId := bottomCursor.Current.Lookup(partitionKey)
 

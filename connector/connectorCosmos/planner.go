@@ -142,6 +142,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						finalTasksChannel <- nsTask
 						continue
 					}
+					slog.Debug(fmt.Sprintf("Min and max boundaries for task %v: %v, %v", nsTask, min, max))
 					// find approximate split points
 					numParts := int(count / cc.settings.targetDocCountPerPartition)
 					approxBounds, err := splitRange(min, max, numParts)
