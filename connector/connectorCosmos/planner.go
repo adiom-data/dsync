@@ -17,7 +17,6 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -87,7 +86,7 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 // partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
 func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.ReadPlanTask) ([]iface.ReadPlanTask, error) {
 	countCheckChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
-	approxSplitPointsCalcChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
+	approxTasksChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
 
 	finalTasksChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
 	finalTasks := make([]iface.ReadPlanTask, 0, len(namespaceTasks))
@@ -101,6 +100,7 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.Read
 	}()
 
 	// do parallel counting (async) and generate approximate boundaries
+	go cc.parallelNamespaceTaskPreparer(countCheckChannel, finalTasksChannel, approxTasksChannel)
 	// do parallel task generation based on approximate boundaries (skip those with matching boundaries - empty tasks)
 
 	for task := range finalTasksChannel {
@@ -110,7 +110,8 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.Read
 }
 
 // In parallel checks the count of the namespace and segregates them into two channels
-func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask, approxSplitPointsCalcChannel chan<- iface.ReadPlanTask) {
+// One for finalized tasks, and another for partitioned tasks with approximate bounds that need to be clarified
+func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(cc.settings.numParallelPartitionWorkers)
@@ -124,25 +125,46 @@ func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <
 					if cc.ctx.Err() == context.Canceled {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
 					} else {
-						slog.Error(fmt.Sprintf("Failed to count documents: %v", err))
+						slog.Warn(fmt.Sprintf("Failed to count documents, not splitting: %v", err))
+						finalTasksChannel <- nsTask
+						continue
 					}
 				}
 
 				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
 					finalTasksChannel <- nsTask
-				} else {
-					//get top and bottom bounds
-					top, bottom, err := cc.getTopAndBottom(cc.ctx, nsTask, cc.settings.partitionKey)
+				} else { //we need to split it
+					slog.Debug(fmt.Sprintf("Need to split task %v with count %v", nsTask, count))
+					//get min and max bounds
+					min, max, err := cc.getMinAndMax(cc.ctx, nsTask, cc.settings.partitionKey)
 					if err != nil {
-						slog.Error(fmt.Sprintf("Failed to get top and bottom boundaries for a task %v so not splitting: %v", nsTask, err))
+						slog.Warn(fmt.Sprintf("Failed to get min and max boundaries for a task %v so not splitting: %v", nsTask, err))
 						finalTasksChannel <- nsTask
-					} else {
-
+						continue
 					}
-					//if can't partition (different type, not objectid or number), just add the task as a whole
-					//send top and bottom tasks to finalized channel
-					//do a split in floor (count / cc.settings.targetDocCountPerPartition) parts
-					//generate new approx boundaries
+					// find approximate split points
+					numParts := int(count / cc.settings.targetDocCountPerPartition)
+					approxBounds, err := splitRange(min, max, numParts)
+					if err != nil {
+						slog.Warn(fmt.Sprintf("Failed to split range for task %v so not splitting: %v", nsTask, err))
+						finalTasksChannel <- nsTask
+						continue
+					}
+					slog.Debug(fmt.Sprintf("Number of approximate split points for task %v: %v", nsTask, len(approxBounds)))
+
+					//send min and max tasks to finalized channel
+					minTask := iface.ReadPlanTask{}
+					minTask.Def = nsTask.Def
+					minTask.Def.PartitionKey = cc.settings.partitionKey
+					minTask.Def.High = min //only setting the high boundary indicating that we want (-INF, min)
+
+					maxTask := iface.ReadPlanTask{}
+					maxTask.Def = nsTask.Def
+					maxTask.Def.PartitionKey = cc.settings.partitionKey
+					maxTask.Def.Low = max //only setting the low boundary indicating that we want (max, INF)
+
+					finalTasksChannel <- minTask
+					finalTasksChannel <- maxTask
 					//send the tasks with approx bounaries downstream
 				}
 			}
@@ -152,45 +174,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <
 
 	// wait for all workers to finish and close the idsToCheck channel
 	wg.Wait()
-	close(approxSplitPointsCalcChannel)
-}
-
-// check if two bounaries of a range are of the same and a "partitionable" type (ObjectId or Number)
-func canPartitionRange(value1 bson.RawValue, value2 bson.RawValue) bool {
-	if value1.Type != value2.Type {
-		return false
-	}
-
-	if value1.Type == bson.TypeObjectID /* || value1.Type == bson.TypeInt32 || value1.Type == bson.TypeInt64 */ {
-		return true
-	}
-
-	return false
-}
-
-// get top and bottom boundaries for a namespace task
-func (cc *CosmosConnector) getTopAndBottom(ctx context.Context, task iface.ReadPlanTask, partitionKey string) (bson.RawValue, bson.RawValue, error) {
-	collection := cc.client.Database(task.Def.Db).Collection(task.Def.Col)
-	optsTop := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, -1}})
-	optsBottom := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, 1}})
-
-	//get the top and bottom boundaries
-	topCursor, err := collection.Find(ctx, bson.M{}, optsTop)
-	defer topCursor.Close(ctx)
-	if err != nil {
-		return bson.RawValue{}, bson.RawValue{}, err
-	}
-
-	bottomCursor, err := collection.Find(ctx, bson.M{}, optsBottom)
-	defer bottomCursor.Close(ctx)
-	if err != nil {
-		return bson.RawValue{}, bson.RawValue{}, err
-	}
-
-	topId := topCursor.Current.Lookup(partitionKey)
-	bottomId := bottomCursor.Current.Lookup(partitionKey)
-
-	return topId, bottomId, nil
+	close(finalTasksChannel)
 }
 
 // get all database names except system databases
