@@ -13,6 +13,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -59,9 +60,9 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 	diff := maxT.Sub(minT)
 	partSize := diff / time.Duration(numParts)
 
-	// create the boundaries
+	// create the boundaries (except the min and max)
 	boundaries := make([]bson.RawValue, numParts+1)
-	for i := 0; i < numParts; i++ {
+	for i := 1; i < numParts; i++ {
 		t := minT.Add(time.Duration(i) * partSize)
 		val := primitive.NewObjectIDFromTimestamp(t)
 		boundaries[i] = bson.RawValue{
@@ -71,7 +72,8 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 
 	}
 
-	// add the top boundary to be precise
+	// add the mina nd max boundaries to be precise
+	boundaries[0] = value1
 	boundaries[numParts] = value2
 
 	return boundaries, nil
@@ -108,4 +110,18 @@ func (cc *CosmosConnector) getMinAndMax(ctx context.Context, ns namespace, parti
 	bottomId := bottomCursor.Current.Lookup(partitionKey)
 
 	return bottomId, topId, nil
+}
+
+// function to find the closest (lower or equal) value in the collection
+func findClosestLowerValue(ctx context.Context, collection *mongo.Collection, partitionKey string, value interface{}) (bson.RawValue, error) {
+	opts := options.FindOne().SetSort(bson.D{{partitionKey, -1}})
+	filter := bson.D{{partitionKey, bson.D{{"$lte", value}}}}
+	resRaw, err := collection.FindOne(ctx, filter, opts).Raw()
+	if err != nil {
+		return bson.RawValue{}, err
+	}
+	if resRaw == nil {
+		return bson.RawValue{}, fmt.Errorf("failed to find the closest value to %v in %v", value, collection.Name())
+	}
+	return resRaw.Lookup(partitionKey), nil
 }

@@ -92,6 +92,7 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []namespace)
 	// do parallel counting (async) and generate approximate boundaries
 	go cc.parallelNamespaceTaskPreparer(countCheckChannel, finalTasksChannel, approxTasksChannel)
 	// do parallel task generation based on approximate boundaries (skip those with matching boundaries - empty tasks)
+	go cc.parallelTaskBoundsClarifier(approxTasksChannel, finalTasksChannel)
 
 	// get all the finalized tasks and assign sequential task ids
 	taskId := iface.ReadPlanTaskID(1)
@@ -101,6 +102,50 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []namespace)
 		taskId++
 	}
 	return finalTasks, nil
+}
+
+// In parallel clarifies bounds for tasks that have approximate boundaries
+// Replaces the approximate bound with the closest lower or equal value found
+// Disconiues the task if the bounds are the same
+// Outputs finalized tasks into the finalTasksChannel
+func (cc *CosmosConnector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
+	//define workgroup
+	wg := sync.WaitGroup{}
+	wg.Add(cc.settings.numParallelPartitionWorkers)
+	// create workers to do the work
+	for i := 0; i < cc.settings.numParallelPartitionWorkers; i++ {
+		go func() {
+			for task := range approxTasksChannel {
+				collection := cc.client.Database(task.Def.Db).Collection(task.Def.Col)
+
+				// first, clarify the low value
+				valLow, errLow := findClosestLowerValue(cc.ctx, collection, task.Def.PartitionKey, task.Def.Low)
+				if errLow != nil {
+					slog.Error(fmt.Sprintf("Failed to clarify low value for task %v: %v", task, errLow))
+					continue //XXX: this task will be skipped, should we panic here?
+				}
+
+				// then, clarify the high value
+				valHigh, errHigh := findClosestLowerValue(cc.ctx, collection, task.Def.PartitionKey, task.Def.High)
+				if errHigh != nil {
+					slog.Error(fmt.Sprintf("Failed to clarify high value for task %v: %v", task, errHigh))
+					continue //XXX: this task will be skipped, should we panic here?
+				}
+
+				// if the bounds are the same, then we don't need to do anything
+				if !valLow.Equal(valHigh) {
+					task.Def.Low = valLow
+					task.Def.High = valHigh
+					finalTasksChannel <- task
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	// wait for all workers to finish and close the finalTasksChannel channel
+	wg.Wait()
+	close(finalTasksChannel)
 }
 
 func createReadPlanTaskForNs(ns namespace) iface.ReadPlanTask {
@@ -165,16 +210,25 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 
 					finalTasksChannel <- minTask
 					finalTasksChannel <- maxTask
+
 					//send the tasks with approx bounaries downstream
+					for i := 0; i < len(approxBounds)-1; i++ {
+						task := createReadPlanTaskForNs(nsTask)
+						task.Def.PartitionKey = cc.settings.partitionKey
+						task.Def.Low = approxBounds[i]
+						task.Def.High = approxBounds[i+1]
+						approxTasksChannel <- task
+					}
+
 				}
 			}
 			wg.Done()
 		}()
 	}
 
-	// wait for all workers to finish and close the idsToCheck channel
+	// wait for all workers to finish and close the approxTasksChannel channel
 	wg.Wait()
-	close(finalTasksChannel) //XXX: should be the other one
+	close(approxTasksChannel)
 }
 
 // get all database names except system databases
