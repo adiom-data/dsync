@@ -417,7 +417,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
 
-		tasks, err := cc.createInitialCopyTasks(options.Namespace)
+		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
 			return
@@ -428,18 +428,18 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 
 		//create resume token for each task
 		wg := sync.WaitGroup{}
-		for _, task := range tasks {
+		for _, ns := range namespaces {
 			wg.Add(1)
-			go func(task iface.ReadPlanTask) {
+			go func(ns namespace) {
 				defer wg.Done()
-				loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+				loc := iface.Location{Database: ns.db, Collection: ns.col}
 				resumeToken, err := cc.getLatestResumeToken(cc.ctx, loc)
 				if err != nil {
-					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
+					slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
 					return
 				}
 				tokenMap.AddToken(loc, resumeToken)
-			}(task)
+			}(ns)
 		}
 		wg.Wait()
 

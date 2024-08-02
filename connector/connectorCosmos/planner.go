@@ -26,7 +26,8 @@ var (
 	ExcludedSystemCollPattern = "^system[.]"
 )
 
-func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPlanTask, error) {
+// returns the list of namespaces and the tasks to be executed (partitioned if necessary)
+func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]namespace, []iface.ReadPlanTask, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
 	var nsTasks []namespace
@@ -35,7 +36,7 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 		var err error
 		dbsToResolve, err = cc.getAllDatabases()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		// iterate over provided namespaces
@@ -57,7 +58,7 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 	for _, db := range dbsToResolve {
 		colls, err := cc.getAllCollections(db)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		//create tasks for these
 		for _, coll := range colls {
@@ -66,10 +67,11 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 	}
 
 	if len(nsTasks) > cc.settings.maxNumNamespaces {
-		return nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.maxNumNamespaces)
+		return nil, nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.maxNumNamespaces)
 	}
 
-	return cc.partitionTasksIfNecessary(nsTasks)
+	partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)
+	return nsTasks, partitionedTasks, err
 }
 
 // partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
