@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	MaxNumNamespaces = 8
 	// System databases that we don't want to copy
 	ExcludedDBListForIC = []string{"local", "config", "admin", "adiom-internal"}
 	// System collections that we don't want to copy (regex pattern)
@@ -75,8 +74,8 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 		}
 	}
 
-	if len(tasks) > MaxNumNamespaces {
-		return nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(tasks), MaxNumNamespaces)
+	if len(tasks) > cc.settings.maxNumNamespaces {
+		return nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(tasks), cc.settings.maxNumNamespaces)
 	}
 	return tasks, nil
 }
