@@ -17,6 +17,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -99,8 +100,8 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.Read
 		close(countCheckChannel)
 	}()
 
-	// do parallel counting (async)
-	// do parallel task generation based on approximate boundaries
+	// do parallel counting (async) and generate approximate boundaries
+	// do parallel task generation based on approximate boundaries (skip those with matching boundaries - empty tasks)
 
 	for task := range finalTasksChannel {
 		finalTasks = append(finalTasks, task)
@@ -131,6 +132,13 @@ func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <
 					finalTasksChannel <- nsTask
 				} else {
 					//get top and bottom bounds
+					top, bottom, err := cc.getTopAndBottom(cc.ctx, nsTask, cc.settings.partitionKey)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to get top and bottom boundaries for a task %v so not splitting: %v", nsTask, err))
+						finalTasksChannel <- nsTask
+					} else {
+
+					}
 					//if can't partition (different type, not objectid or number), just add the task as a whole
 					//send top and bottom tasks to finalized channel
 					//do a split in floor (count / cc.settings.targetDocCountPerPartition) parts
@@ -145,6 +153,44 @@ func (cc *CosmosConnector) parallelNamespaceTaskCountChecker(countCheckChannel <
 	// wait for all workers to finish and close the idsToCheck channel
 	wg.Wait()
 	close(approxSplitPointsCalcChannel)
+}
+
+// check if two bounaries of a range are of the same and a "partitionable" type (ObjectId or Number)
+func canPartitionRange(value1 bson.RawValue, value2 bson.RawValue) bool {
+	if value1.Type != value2.Type {
+		return false
+	}
+
+	if value1.Type == bson.TypeObjectID /* || value1.Type == bson.TypeInt32 || value1.Type == bson.TypeInt64 */ {
+		return true
+	}
+
+	return false
+}
+
+// get top and bottom boundaries for a namespace task
+func (cc *CosmosConnector) getTopAndBottom(ctx context.Context, task iface.ReadPlanTask, partitionKey string) (bson.RawValue, bson.RawValue, error) {
+	collection := cc.client.Database(task.Def.Db).Collection(task.Def.Col)
+	optsTop := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, -1}})
+	optsBottom := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, 1}})
+
+	//get the top and bottom boundaries
+	topCursor, err := collection.Find(ctx, bson.M{}, optsTop)
+	defer topCursor.Close(ctx)
+	if err != nil {
+		return bson.RawValue{}, bson.RawValue{}, err
+	}
+
+	bottomCursor, err := collection.Find(ctx, bson.M{}, optsBottom)
+	defer bottomCursor.Close(ctx)
+	if err != nil {
+		return bson.RawValue{}, bson.RawValue{}, err
+	}
+
+	topId := topCursor.Current.Lookup(partitionKey)
+	bottomId := bottomCursor.Current.Lookup(partitionKey)
+
+	return topId, bottomId, nil
 }
 
 // get all database names except system databases
