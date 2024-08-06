@@ -66,6 +66,11 @@ type CosmosConnectorSettings struct {
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
 
+	maxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
+	targetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	numParallelPartitionWorkers int    //number of workers used for partitioning
+	partitionKey                string //partition key to use for collections
+
 	EmulateDeletes         bool // if true, we will generate delete events
 	deletesCheckInterval   time.Duration
 	WitnessMongoConnString string
@@ -83,6 +88,11 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
 	settings.deletesCheckInterval = 60 * time.Second
+
+	settings.maxNumNamespaces = 8
+	settings.targetDocCountPerPartition = 512 * 1000
+	settings.numParallelPartitionWorkers = 4
+	settings.partitionKey = "_id"
 
 	return &CosmosConnector{desc: desc, settings: settings}
 }
@@ -300,7 +310,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					db := task.Def.Db
 					col := task.Def.Col
 					collection := cc.client.Database(db).Collection(col)
-					cursor, err := collection.Find(cc.flowCtx, bson.D{})
+					cursor, err := createFindQuery(cc.flowCtx, collection, task)
 					if err != nil {
 						if cc.flowCtx.Err() == context.Canceled {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
@@ -407,7 +417,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
 
-		tasks, err := cc.createInitialCopyTasks(options.Namespace)
+		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
 			return
@@ -418,18 +428,18 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 
 		//create resume token for each task
 		wg := sync.WaitGroup{}
-		for _, task := range tasks {
+		for _, ns := range namespaces {
 			wg.Add(1)
-			go func(task iface.ReadPlanTask) {
+			go func(ns namespace) {
 				defer wg.Done()
-				loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+				loc := iface.Location{Database: ns.db, Collection: ns.col}
 				resumeToken, err := cc.getLatestResumeToken(cc.ctx, loc)
 				if err != nil {
-					slog.Error(fmt.Sprintf("Failed to get latest resume token for task %v: %v", task.Id, err))
+					slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
 					return
 				}
 				tokenMap.AddToken(loc, resumeToken)
-			}(task)
+			}(ns)
 		}
 		wg.Wait()
 

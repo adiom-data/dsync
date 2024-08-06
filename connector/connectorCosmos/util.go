@@ -19,6 +19,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -133,4 +134,43 @@ func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64)
 	*lsn++
 	cc.status.WriteLSN++
 	return cc.status.WriteLSN
+}
+
+// create a find query for a task
+func createFindQuery(ctx context.Context, collection *mongo.Collection, task iface.ReadPlanTask) (cur *mongo.Cursor, err error) {
+	if task.Def.Low == nil && task.Def.High == nil { //no boundaries
+
+		return collection.Find(ctx, bson.D{})
+	} else if task.Def.Low == nil && task.Def.High != nil { //only upper boundary
+		if task.Def.PartitionKey == "" {
+			return nil, fmt.Errorf("Invalid task definition: %v", task)
+		}
+
+		return collection.Find(ctx, bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$lt", task.Def.High},
+			}},
+		})
+	} else if task.Def.Low != nil && task.Def.High == nil { //only lower boundary
+		if task.Def.PartitionKey == "" {
+			return nil, fmt.Errorf("Invalid task definition: %v", task)
+		}
+
+		return collection.Find(ctx, bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$gte", task.Def.Low},
+			}},
+		})
+	} else { //both boundaries
+		if task.Def.PartitionKey == "" {
+			return nil, fmt.Errorf("Invalid task definition: %v", task)
+		}
+
+		return collection.Find(ctx, bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$gte", task.Def.Low},
+				{"$lt", task.Def.High},
+			}},
+		})
+	}
 }
