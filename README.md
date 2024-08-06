@@ -103,7 +103,8 @@ Can be run separately using the ```--verify``` flag. See ```dsync --help``` for 
 
 ## Resumability 
 Automatic resume on restart during initial data copy and CDC. See [docs](docs-dev/Resumability.md) on how it works.
-Cosmos DB connector offers granular resumability during the initial data copy and higher throughout for reads - read more about it in partitioning docs [here](docs-dev/TasksPartitioning.md)
+
+Cosmos DB connector offers granular resumability during the initial data copy and higher throughout for reads - read more about it in partitioning docs [here](docs-dev/TasksPartitioning.md).
 
 ## CosmosDB deletes emulation
 Cosmos with MongoDB API [doesn't emit delete events](https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/change-streams?tabs=javascript#current-limitations) in the changestream. Dsync includes a workaround that captures delete operations from the source using a periodic index scan. This behavior can be turned on using the ```--cosmos-deletes-cdc``` flag.
