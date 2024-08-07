@@ -467,6 +467,10 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 		//XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 	}
 	writerProgress.dataMessages.Store(0)
+
+	// create a batch assembly
+	flowBatchWriteAssembly := NewBatchWriteAssembly(mc.flowCtx, mc, 0, mc.settings.writerMaxBatchSize, 0)
+
 	// start printing progress
 	go func() {
 		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
@@ -501,16 +505,16 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 						}
 						// Check if this is a barrier first
 						if dataMsg.MutationType == iface.MutationType_Barrier {
-							err = mc.handleBarrierMessage(dataMsg)
+							err = flowBatchWriteAssembly.ScheduleBarrier(dataMsg)
 							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to handle barrier message: %v", err))
+								slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
 							}
 						} else {
 							// Process the data message
-							writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
-							err = mc.processDataMessage(dataMsg)
+							writerProgress.dataMessages.Add(1)
+							err = flowBatchWriteAssembly.ScheduleDataMessage(dataMsg)
 							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
+								slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
 							}
 						}
 					}
