@@ -7,6 +7,8 @@
 package dsync
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -16,6 +18,8 @@ import (
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
 	runner "github.com/adiom-data/dsync/runner/runnerLocal"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 	"github.com/urfave/cli/v2"
 )
 
@@ -42,10 +46,23 @@ func runDsync(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
 	lo := logger.Options{Verbosity: o.Verbosity}
+	logbuffer := bytes.Buffer{}
 
-	logger.Setup(lo)
+	logFile := logger.Setup(lo, logbuffer)
+	if logFile != nil {
+		defer logFile.Close()
+	}
+
+	defer func() {
+		fmt.Printf("\ndsync has stopped running\n")
+		if logbuffer.Len() > 0 {
+			fmt.Print(logbuffer.String())
+		} else {
+			fmt.Printf("No logs generated\n")
+		}
+	}()
+	//logger.SetUpLogFile(lo)
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
@@ -60,15 +77,51 @@ func runDsync(c *cli.Context) error {
 		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})
 
-	// Start the status reporting goroutine
-	go func() {
-		for {
-			r.GetStatusReport()
-			time.Sleep(1 * time.Second)
-		}
-	}()
-
 	var wg sync.WaitGroup
+
+	if o.Progress {
+		wg.Add(1)
+		tviewCtx, cancelFunc := context.WithCancel(c.Context)
+
+		// Start the status reporting goroutine
+		go func() {
+			defer wg.Done()
+
+			errorTextView := tview.NewTextView()
+			tviewApp := tview.NewApplication()
+			defer tviewApp.Stop()
+
+			// Custom signal handler for Ctrl+C within tview
+			tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+				if event.Key() == tcell.KeyCtrlC {
+					tviewApp.Stop()
+					cancelFunc() // Cancel the main context
+					return nil
+				}
+				return event
+			})
+			r.SetUpDisplay(tviewApp, errorTextView)
+
+			// Start the status reporting goroutine
+			go func() {
+				for {
+					select {
+					case <-tviewCtx.Done():
+						return
+					default:
+						r.GetStatusReport2()
+						time.Sleep(1 * time.Second)
+					}
+				}
+
+			}()
+
+			if err := tviewApp.Run(); err != nil {
+				slog.Error(fmt.Sprintf("Error running tview app: %v", err))
+			}
+		}()
+	}
+
 	wg.Add(1)
 
 	go func(err error) {

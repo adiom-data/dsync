@@ -21,6 +21,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestore/statestoreMongo"
 	"github.com/adiom-data/dsync/transport/transportLocal"
+	"github.com/rivo/tview"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -35,7 +36,9 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress runnerSyncProgress
+	runnerProgress  runnerSyncProgress
+	runnerInterface *tview.Application
+	root            *tview.Flex
 
 	ctx context.Context
 }
@@ -248,6 +251,9 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
+	if r.runnerInterface != nil {
+		r.runnerInterface.Stop()
+	}
 }
 
 type runnerSyncProgress struct {
@@ -295,4 +301,59 @@ func (r *RunnerLocal) GetStatusReport() {
 	if totalPercentComplete != 100 {
 		r.runnerProgress.numDocsSynced += 50
 	}
+}
+
+func (r *RunnerLocal) SetUpDisplay(app *tview.Application, errorText *tview.TextView) {
+	r.runnerInterface = app
+	headerTextView := tview.NewTextView().SetText("Dsync Progress Report").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
+	table := tview.NewTable()
+	progressBarTextView := tview.NewTextView().SetText("Progress Bar").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
+	errorText.SetText("Error Logs").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
+	root := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(headerTextView, 0, 1, false).
+		AddItem(table, 0, 1, false).
+		AddItem(progressBarTextView, 1, 1, false).
+		AddItem(errorText, 0, 1, false)
+	r.root = root //indices are 0, 1, 2, 3, corresponding to header, table, progressBar, and errorLogs respectively
+	r.runnerInterface.SetRoot(root, true)
+}
+
+func (r *RunnerLocal) GetStatusReport2() {
+	//set the header text
+	header := r.root.GetItem(0).(*tview.TextView)
+	header.Clear()
+	totalTimeElapsed := time.Since(r.runnerProgress.startTime).Seconds()
+	headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs        %d/%d Namespaces synced\n", r.runnerProgress.syncState, totalTimeElapsed, r.runnerProgress.numNamespacesSynced, r.runnerProgress.totalNamespaces)
+	header.SetText(headerString)
+
+	//set the table
+	table := r.root.GetItem(1).(*tview.Table)
+	table.Clear()
+
+	for row, key := range r.runnerProgress.namespaces {
+		ns := r.runnerProgress.nsProgressMap[key]
+		percentComplete := math.Floor(float64(ns.numDocsSynced) / float64(ns.totalDocs) * 100)
+		percentCompleteStr := fmt.Sprintf(" %.0f%% complete ", percentComplete)
+		timeElapsed := time.Since(ns.startTime).Seconds()
+		timeElapsedStr := fmt.Sprintf(" Time Elapsed: %.2fs ", timeElapsed)
+		throughputStr := fmt.Sprintf(" Throughput: %v docs/s ", ns.throughput)
+		namespace := " Namespace: " + key.Database + "." + key.Collection + " "
+		table.SetCellSimple(row, 0, namespace)
+		table.SetCellSimple(row, 1, percentCompleteStr)
+		table.SetCellSimple(row, 2, timeElapsedStr)
+		table.SetCellSimple(row, 3, throughputStr)
+	}
+
+	//set the progress bar
+	progressBar := r.root.GetItem(2).(*tview.TextView)
+	totalPercentComplete := float64(r.runnerProgress.numDocsSynced) / float64(r.runnerProgress.totalDocs) * 100
+	if totalPercentComplete != 100 {
+		r.runnerProgress.numDocsSynced += 50
+	}
+	progressBarWidth := 50
+	progress := int(totalPercentComplete / 100 * float64(progressBarWidth))
+	progressBarString := fmt.Sprintf("[%s%s] %.2f%%\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
+	progressBar.SetText(progressBarString)
+
+	r.runnerInterface.Draw()
 }

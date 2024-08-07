@@ -19,10 +19,13 @@ type Options struct {
 	DstConnString        string
 	StateStoreConnString string
 
+	Logfile string
+
 	NamespaceFrom []string
 
-	Verify  bool
-	Cleanup bool
+	Verify   bool
+	Cleanup  bool
+	Progress bool
 
 	CosmosDeletesEmu bool
 }
@@ -35,9 +38,11 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.SrcConnString = c.String("source")
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
+	o.Logfile = c.String("logfile")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
 	o.Cleanup = c.Bool("cleanup")
+	o.Progress = c.Bool("progress")
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
 	if o.Sourcetype != "CosmosDB" && o.CosmosDeletesEmu {

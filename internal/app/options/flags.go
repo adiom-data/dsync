@@ -99,6 +99,14 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:  "cosmos-deletes-cdc",
 			Usage: "Generate CDC events for CosmosDB deletes",
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "progress",
+			Usage: "Displays detailed progress of the sync, logfile required",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "logfile",
+			Usage: "Log file path, sends logs to file instead of stdout, default logs to stdout",
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
@@ -107,5 +115,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		cli.VersionFlag,
 	}
 
-	return flags, altsrc.InitInputSourceWithContext(flags, altsrc.NewYamlSourceFromFlagFunc("config"))
+	before := func(c *cli.Context) error {
+		if c.IsSet("progress") && !c.IsSet("logfile") {
+			return fmt.Errorf("logfile is required to display progress")
+		}
+		return altsrc.InitInputSourceWithContext(flags, altsrc.NewYamlSourceFromFlagFunc("config"))(c)
+	}
+	return flags, before
 }
