@@ -78,10 +78,10 @@ func runDsync(c *cli.Context) error {
 	})
 
 	var wg sync.WaitGroup
+	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
 
 	if o.Progress {
 		wg.Add(1)
-		tviewCtx, cancelFunc := context.WithCancel(c.Context)
 
 		// Start the status reporting goroutine
 		go func() {
@@ -95,7 +95,7 @@ func runDsync(c *cli.Context) error {
 			tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 				if event.Key() == tcell.KeyCtrlC {
 					tviewApp.Stop()
-					cancelFunc() // Cancel the main context
+					runnerCancelFunc() // Cancel the runner
 					return nil
 				}
 				return event
@@ -106,7 +106,7 @@ func runDsync(c *cli.Context) error {
 			go func() {
 				for {
 					select {
-					case <-tviewCtx.Done():
+					case <-runnerCtx.Done():
 						return
 					default:
 						r.GetStatusReport2()
@@ -126,7 +126,7 @@ func runDsync(c *cli.Context) error {
 
 	go func(err error) {
 		defer wg.Done()
-		err = r.Setup(c.Context)
+		err = r.Setup(runnerCtx)
 		if err != nil {
 			return
 		}
