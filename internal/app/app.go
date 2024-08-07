@@ -62,7 +62,7 @@ func runDsync(c *cli.Context) error {
 			fmt.Printf("No logs generated\n")
 		}
 	}()
-	//logger.SetUpLogFile(lo)
+
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
