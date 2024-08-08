@@ -53,7 +53,7 @@ type MongoConnectorSettings struct {
 	serverConnectTimeout           time.Duration
 	pingTimeout                    time.Duration
 	initialSyncNumParallelCopiers  int
-	writerMaxBatchSize             int
+	writerMaxBatchSize             int // applies to batch inserts only; 0 means no limit
 	numParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
@@ -64,7 +64,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 0 // 0 means no limit
+	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
