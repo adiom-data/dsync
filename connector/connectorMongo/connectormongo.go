@@ -136,7 +136,9 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 
 func (mc *MongoConnector) Teardown() {
 	if mc.client != nil {
-		mc.client.Disconnect(mc.ctx)
+		if err := mc.client.Disconnect(mc.ctx); err != nil {
+			slog.Warn(fmt.Sprintf("Failed to disconnect from MongoDB: %v", err))
+		}
 	}
 }
 
@@ -246,7 +248,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if mc.flowCtx.Err() == context.Canceled {
+			if errors.Is(context.Canceled, mc.flowCtx.Err()) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -334,7 +336,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if mc.flowCtx.Err() == context.Canceled {
+			if errors.Is(context.Canceled, mc.flowCtx.Err()) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -365,7 +367,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 					collection := mc.client.Database(db).Collection(col)
 					cursor, err := collection.Find(mc.flowCtx, bson.D{})
 					if err != nil {
-						if mc.flowCtx.Err() == context.Canceled {
+						if errors.Is(context.Canceled, mc.flowCtx.Err()) {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
@@ -394,7 +396,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						}
 					}
 					if err := cursor.Err(); err != nil {
-						if mc.flowCtx.Err() == context.Canceled {
+						if errors.Is(context.Canceled, mc.flowCtx.Err()) {
 							slog.Debug(fmt.Sprintf("Cursor error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Cursor error: %v", err))

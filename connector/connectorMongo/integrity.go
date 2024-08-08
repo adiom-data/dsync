@@ -9,6 +9,7 @@ package connectorMongo
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -35,7 +36,7 @@ type nsCountResult struct {
 
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
-func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) {
+func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult
@@ -45,7 +46,10 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 	namespaces, err := mc.getFQNamespaceList(options.Namespace)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list: %v", err))
-		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+		err := mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Quick exit if there are no namespaces
@@ -53,8 +57,10 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 		res.Success = true
 		res.Count = 0
 		res.Digest = ""
-		mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
-		return
+		if err := mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	slog.Debug(fmt.Sprintf("Namespaces for validation: %v", namespaces))
@@ -76,7 +82,7 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 				collection := mc.client.Database(ns.db).Collection(ns.col)
 				count, err := collection.EstimatedDocumentCount(mc.ctx)
 				if err != nil {
-					if mc.ctx.Err() == context.Canceled {
+					if errors.Is(context.Canceled, mc.ctx.Err()) {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
 					} else {
 						slog.Error(fmt.Sprintf("Failed to count documents: %v", err))
@@ -99,8 +105,10 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 		result := <-resultChannel //XXX: should there be a timeout here?
 		if result.err != nil {
 			slog.Error(fmt.Sprintf("Failed to count documents for namespace %s: %v", result.ns.String(), result.err))
-			mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
-			return
+			if err := mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res); err != nil {
+				return err
+			}
+			return nil
 		} else {
 			namespacesCountMap[result.ns.String()] = result.count
 		}
@@ -133,7 +141,10 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 	res.Count = totalCount
 	res.Digest = fmt.Sprintf("%x", hash)
 
-	mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res)
+	if err := mc.coord.PostDataIntegrityCheckResult(flowId, mc.id, res); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Returns a list of fully qualified namespaces

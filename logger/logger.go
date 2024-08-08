@@ -38,7 +38,7 @@ func Setup(o Options) {
 		tint.NewHandler(w, &tint.Options{
 			NoColor:   !isatty.IsTerminal(w.Fd()),
 			Level:     level,
-			AddSource: (level < 0), //only for debugging
+			AddSource: level < 0, //only for debugging
 		}),
 	)
 

@@ -41,12 +41,12 @@ func (im *IndexMap) AddRandomID() uint32 {
 }
 
 func (im *IndexMap) getRandomIndex_unsafe() int {
-	len := len(im.IDArray)
-	if len == 0 {
+	length := len(im.IDArray)
+	if length == 0 {
 		slog.Debug("IndexMap is empty")
 		return -1
 	}
-	idx := gofakeit.Number(0, len-1)
+	idx := gofakeit.Number(0, length-1)
 	return idx
 }
 
@@ -67,9 +67,9 @@ func (im *IndexMap) DeleteRandomKey() uint32 {
 	key := im.IDArray[idx]
 	delete(im.IDSet, key)
 	//delete from IDArray slice
-	len := len(im.IDArray)
-	im.IDArray[idx], im.IDArray[len-1] = im.IDArray[len-1], im.IDArray[idx] //swap with last element to make delete O(1)
-	im.IDArray = im.IDArray[:len-1]
+	length := len(im.IDArray)
+	im.IDArray[idx], im.IDArray[length-1] = im.IDArray[length-1], im.IDArray[idx] //swap with last element to make delete O(1)
+	im.IDArray = im.IDArray[:length-1]
 	return key
 }
 
