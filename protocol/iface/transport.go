@@ -20,7 +20,7 @@ type DataMessage struct {
 	// header for data messages
 	MutationType uint     //required
 	Loc          Location //required
-	Id           *[]byte  //required except for inserts (for efficiency)
+	Id           *[]byte  //required except for batch inserts (for efficiency)
 	IdType       byte     //required when Id is present
 	SeqNum       int64    //optional field to provide a global ordering of messages
 

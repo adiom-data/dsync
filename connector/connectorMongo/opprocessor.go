@@ -34,7 +34,6 @@ func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) err
 	return nil
 }
 
-// TODO (AK, 6/2024): this should be parallelized with a batch assembly (e.g. per-namespace) and a worker pool
 func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection

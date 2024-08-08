@@ -226,7 +226,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 			bsonDataRaw, _ := bson.Marshal(doc)
 			bsonDataRawUpdated, _ := bson.Marshal(updatedDoc)
 
-			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
+			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
 			lsn++
 			dataChannel <- iface.DataMessage{Data: &bsonDataRawUpdated, MutationType: iface.MutationType_Update, Loc: loc, SeqNum: lsn, Id: &idVal, IdType: byte(idType)}
 			lsn++

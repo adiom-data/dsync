@@ -122,8 +122,11 @@ func (rc *RandomReadConnector) SingleInsertDataMessage(loc iface.Location, doc m
 	if err != nil {
 		return iface.DataMessage{}, fmt.Errorf("failed to marshal map to bson: %v", err)
 	}
+	idType, idVal, _ := bson.MarshalValue(id)
 	return iface.DataMessage{
 		Loc:          loc,
+		Id:           &idVal,
+		IdType:       byte(idType),
 		Data:         &data,
 		MutationType: iface.MutationType_Insert,
 	}, nil

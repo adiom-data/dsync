@@ -53,7 +53,7 @@ type MongoConnectorSettings struct {
 	serverConnectTimeout           time.Duration
 	pingTimeout                    time.Duration
 	initialSyncNumParallelCopiers  int
-	writerMaxBatchSize             int //0 means no limit (in # of documents)
+	writerMaxBatchSize             int // applies to batch inserts only; 0 means no limit
 	numParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
@@ -467,6 +467,11 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 		//XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 	}
 	writerProgress.dataMessages.Store(0)
+
+	// create a batch assembly
+	flowParallelWriter := NewParallelWriter(mc.flowCtx, mc, mc.settings.numParallelWriters)
+	flowParallelWriter.Start()
+
 	// start printing progress
 	go func() {
 		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
@@ -484,40 +489,32 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}()
 
 	go func() {
-		var wg sync.WaitGroup
-		for i := 0; i < mc.settings.numParallelWriters; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for loop := true; loop; {
-					select {
-					case <-mc.flowCtx.Done():
-						return
-					case dataMsg, ok := <-dataChannel:
-						if !ok {
-							// channel is closed which is a signal for us to stop
-							loop = false
-							break
-						}
-						// Check if this is a barrier first
-						if dataMsg.MutationType == iface.MutationType_Barrier {
-							err = mc.handleBarrierMessage(dataMsg)
-							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to handle barrier message: %v", err))
-							}
-						} else {
-							// Process the data message
-							writerProgress.dataMessages.Add(1) //XXX Possible concurrency issue here as well, atomic add?
-							err = mc.processDataMessage(dataMsg)
-							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to process data message: %v", err))
-							}
-						}
+		for loop := true; loop; {
+			select {
+			case <-mc.flowCtx.Done():
+				loop = false
+			case dataMsg, ok := <-dataChannel:
+				if !ok {
+					// channel is closed which is a signal for us to stop
+					loop = false
+					break
+				}
+				// Check if this is a barrier first
+				if dataMsg.MutationType == iface.MutationType_Barrier {
+					err := flowParallelWriter.ScheduleBarrier(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
+					}
+				} else {
+					// Process the data message
+					writerProgress.dataMessages.Add(1)
+					err := flowParallelWriter.ScheduleDataMessage(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
 					}
 				}
-			}()
+			}
 		}
-		wg.Wait()
 
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id)
