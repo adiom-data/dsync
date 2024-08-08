@@ -32,10 +32,10 @@ type ConnectorTestSuite struct {
 }
 
 func NewConnectorTestSuite(connectorFunc func() iface.Connector, datastoreFactoryFunc func() TestDataStore) *ConnectorTestSuite {
-	suite := new(ConnectorTestSuite)
-	suite.connectorFactoryFunc = connectorFunc
-	suite.datastoreFactoryFunc = datastoreFactoryFunc
-	return suite
+	test_suite := new(ConnectorTestSuite)
+	test_suite.connectorFactoryFunc = connectorFunc
+	test_suite.datastoreFactoryFunc = datastoreFactoryFunc
+	return test_suite
 }
 
 // We are creating new connector instances for each test, so we don't need to do anything here

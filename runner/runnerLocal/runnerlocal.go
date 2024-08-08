@@ -117,7 +117,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (r *RunnerLocal) Run() {
+func (r *RunnerLocal) Run() error {
 	slog.Debug("RunnerLocal Run")
 
 	// get available connectors from the coordinator
@@ -137,11 +137,11 @@ func (r *RunnerLocal) Run() {
 
 	if srcId == iface.ConnectorID("") {
 		slog.Error("Source connector not found")
-		return
+		return fmt.Errorf("source connector not found")
 	}
 	if dstId == iface.ConnectorID("") {
-		slog.Error("Source connector not found")
-		return
+		slog.Error("Destination connector not found")
+		return fmt.Errorf("destination connector not found")
 	}
 
 	// create a flow
@@ -154,11 +154,8 @@ func (r *RunnerLocal) Run() {
 	flowID, err := r.coord.FlowGetOrCreate(flowOptions)
 	if err != nil {
 		slog.Error("Failed to create flow", err)
-		return
+		return err
 	}
-	// destroy the flow (commented out to avoid the 'flow not found' error on ^C for now)
-	//defer r.coord.FlowDestroy(flowID)
-	//XXX (AK, 6/2024): We should probably stop the flow instead of destroying it, but it's a prototype so...
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
@@ -172,21 +169,21 @@ func (r *RunnerLocal) Run() {
 				slog.Error("Data integrity check: FAIL")
 			}
 		}
-		return
+		return err
 	}
 
-	// destory the flow if the cleanup flag is set
+	// destroy the flow if the cleanup flag is set
 	if r.settings.CleanupRequestedFlag {
 		slog.Info("Cleaning up metadata for the flow")
 		r.coord.FlowDestroy(flowID)
-		return
+		return nil
 	}
 
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {
 		slog.Error("Failed to start flow", err)
-		return
+		return err
 	}
 	// periodically print the flow status for visibility
 	//XXX (AK, 6/2024): not sure if this is the best way to do it
@@ -217,7 +214,10 @@ func (r *RunnerLocal) Run() {
 	}()
 
 	// wait for the flow to finish
-	r.coord.WaitForFlowDone(flowID)
+	if err := r.coord.WaitForFlowDone(flowID); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *RunnerLocal) Teardown() {

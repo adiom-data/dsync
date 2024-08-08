@@ -57,11 +57,17 @@ func runDsync(c *cli.Context) error {
 		FlowStatusReportingIntervalSecs: 10,
 		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})
-	err = r.Setup(c.Context)
-	if err == nil {
-		r.Run()
-	}
-	r.Teardown()
+	defer r.Teardown()
 
-	return nil
+	err = r.Setup(c.Context)
+	if err != nil {
+		return err
+	}
+
+	err = r.Run()
+	if err != nil {
+		return err
+	}
+
+	return err
 }
