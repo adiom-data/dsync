@@ -492,7 +492,7 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 		for loop := true; loop; {
 			select {
 			case <-mc.flowCtx.Done():
-				return
+				loop = false
 			case dataMsg, ok := <-dataChannel:
 				if !ok {
 					// channel is closed which is a signal for us to stop
