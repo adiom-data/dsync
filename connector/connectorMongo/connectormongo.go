@@ -469,8 +469,8 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowBatchWriteAssembly := NewBatchWriteAssembly(mc.flowCtx, mc, mc.settings.numParallelWriters, mc.settings.writerMaxBatchSize, 3000)
-	flowBatchWriteAssembly.Start()
+	flowParallelWriter := NewParallelWriter(mc.flowCtx, mc, mc.settings.numParallelWriters)
+	flowParallelWriter.Start()
 
 	// start printing progress
 	go func() {
@@ -501,14 +501,14 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 				}
 				// Check if this is a barrier first
 				if dataMsg.MutationType == iface.MutationType_Barrier {
-					err := flowBatchWriteAssembly.ScheduleBarrier(dataMsg)
+					err := flowParallelWriter.ScheduleBarrier(dataMsg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
 					}
 				} else {
 					// Process the data message
 					writerProgress.dataMessages.Add(1)
-					err := flowBatchWriteAssembly.ScheduleDataMessage(dataMsg)
+					err := flowParallelWriter.ScheduleDataMessage(dataMsg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
 					}

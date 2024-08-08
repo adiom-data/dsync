@@ -22,7 +22,7 @@ import (
 // Preserves sequence of operations for a given _id
 // Supports barriers
 // Automatically winds down when the context is done
-type BatchWriteAssembly struct {
+type ParallelWriter struct {
 	// Context for execution
 	ctx context.Context
 
@@ -31,10 +31,6 @@ type BatchWriteAssembly struct {
 
 	// Number of parallel workers
 	numWorkers int
-	// Maximum number of operations in a batch for the assembly
-	maxBatchSizeOps int
-	// Maximum time to wait for a batch to fill up - after this time the flush will be forced anyway
-	maxBatchFillTimeMs int
 
 	// Array of workers
 	workers []writerWorker
@@ -51,19 +47,17 @@ type BatchWriteAssembly struct {
 	resumeTokenBarrierWorkersCountdown atomic.Int32
 }
 
-// NewBatchWriteAssembly creates a new BatchWriteAssembly
-func NewBatchWriteAssembly(ctx context.Context, connector *MongoConnector, numWorkers int, maxBatchSizeOps int, maxBatchFillTimeMs int) *BatchWriteAssembly {
-	return &BatchWriteAssembly{
-		ctx:                ctx,
-		connector:          connector,
-		numWorkers:         numWorkers,
-		maxBatchSizeOps:    maxBatchSizeOps,
-		maxBatchFillTimeMs: maxBatchFillTimeMs,
-		taskBarrierMap:     make(map[uint]uint),
+// NewParallelWriter creates a new ParallelWriter
+func NewParallelWriter(ctx context.Context, connector *MongoConnector, numWorkers int) *ParallelWriter {
+	return &ParallelWriter{
+		ctx:            ctx,
+		connector:      connector,
+		numWorkers:     numWorkers,
+		taskBarrierMap: make(map[uint]uint),
 	}
 }
 
-func (bwa *BatchWriteAssembly) Start() {
+func (bwa *ParallelWriter) Start() {
 	// create and start the workers
 	bwa.workers = make([]writerWorker, bwa.numWorkers)
 	for i := 0; i < bwa.numWorkers; i++ {
@@ -80,9 +74,9 @@ func hashDataMsgId(dataMsg iface.DataMessage) int {
 }
 
 // Processes a data message
-func (bwa *BatchWriteAssembly) ScheduleDataMessage(dataMsg iface.DataMessage) error {
+func (bwa *ParallelWriter) ScheduleDataMessage(dataMsg iface.DataMessage) error {
 	if len(bwa.workers) == 0 {
-		return fmt.Errorf("BatchWriteAssembly not started")
+		return fmt.Errorf("ParallelWriter not started")
 	}
 
 	var workerId int
@@ -100,7 +94,7 @@ func (bwa *BatchWriteAssembly) ScheduleDataMessage(dataMsg iface.DataMessage) er
 }
 
 // Processes a barrier
-func (bwa *BatchWriteAssembly) ScheduleBarrier(barrierMsg iface.DataMessage) error {
+func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 	// For task barriers, initialize the countdown for the task based on task ID
 	// Error out if the barrier is already present in the map
 	// For CDC barriers, warn if the countdown is not 0
@@ -128,7 +122,7 @@ func (bwa *BatchWriteAssembly) ScheduleBarrier(barrierMsg iface.DataMessage) err
 }
 
 // Broadcasts message to all workers
-func (bwa *BatchWriteAssembly) BroadcastMessage(dataMsg iface.DataMessage) {
+func (bwa *ParallelWriter) BroadcastMessage(dataMsg iface.DataMessage) {
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i].addMessage(dataMsg)
 	}
@@ -140,7 +134,7 @@ func (bwa *BatchWriteAssembly) BroadcastMessage(dataMsg iface.DataMessage) {
 
 type writerWorker struct {
 	// Assembly
-	batchWriteAssembly *BatchWriteAssembly
+	parallelWriter *ParallelWriter
 
 	// Worker ID
 	id int
@@ -149,15 +143,15 @@ type writerWorker struct {
 }
 
 // newWriterWorker creates a new writerWorker
-func newWriterWorker(batchWriteAssembly *BatchWriteAssembly, id int, queueSize int) writerWorker {
-	return writerWorker{batchWriteAssembly, id, make(chan iface.DataMessage, queueSize)}
+func newWriterWorker(parallelWriter *ParallelWriter, id int, queueSize int) writerWorker {
+	return writerWorker{parallelWriter, id, make(chan iface.DataMessage, queueSize)}
 }
 
 // Worker's main loop - processes messages from the queue
 func (ww *writerWorker) run() {
 	for {
 		select {
-		case <-ww.batchWriteAssembly.ctx.Done():
+		case <-ww.parallelWriter.ctx.Done():
 			return
 		case msg := <-ww.queue:
 			// if it's a barrier message, check that we're the last worker to see it before handling
@@ -166,25 +160,25 @@ func (ww *writerWorker) run() {
 
 				// if it's a task barrier, decrement the countdown for the task
 				if msg.BarrierType == iface.BarrierType_TaskComplete {
-					ww.batchWriteAssembly.taskBarrierMapMutex.Lock()
-					ww.batchWriteAssembly.taskBarrierMap[msg.BarrierTaskId]--
-					if ww.batchWriteAssembly.taskBarrierMap[msg.BarrierTaskId] == 0 {
-						delete(ww.batchWriteAssembly.taskBarrierMap, msg.BarrierTaskId)
+					ww.parallelWriter.taskBarrierMapMutex.Lock()
+					ww.parallelWriter.taskBarrierMap[msg.BarrierTaskId]--
+					if ww.parallelWriter.taskBarrierMap[msg.BarrierTaskId] == 0 {
+						delete(ww.parallelWriter.taskBarrierMap, msg.BarrierTaskId)
 						isLastWorker = true
 					}
-					ww.batchWriteAssembly.taskBarrierMapMutex.Unlock()
+					ww.parallelWriter.taskBarrierMapMutex.Unlock()
 				}
 
 				// if it's a CDC barrier, decrement the countdown
 				if msg.BarrierType == iface.BarrierType_CdcResumeTokenUpdate {
-					countdown := ww.batchWriteAssembly.resumeTokenBarrierWorkersCountdown.Add(-1)
+					countdown := ww.parallelWriter.resumeTokenBarrierWorkersCountdown.Add(-1)
 					if countdown == 0 {
 						isLastWorker = true
 					}
 				}
 
 				if isLastWorker {
-					err := ww.batchWriteAssembly.connector.handleBarrierMessage(msg)
+					err := ww.parallelWriter.connector.handleBarrierMessage(msg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to handle barrier message: %v", ww.id, err))
 					}
@@ -194,7 +188,7 @@ func (ww *writerWorker) run() {
 			}
 
 			// process the data message
-			err := ww.batchWriteAssembly.connector.processDataMessage(msg)
+			err := ww.parallelWriter.connector.processDataMessage(msg)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Worker %v failed to process data message: %v", ww.id, err))
 			}
