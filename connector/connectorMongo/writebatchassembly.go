@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"log/slog"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"golang.org/x/exp/rand"
@@ -116,7 +117,11 @@ func (ww *writerWorker) run() {
 		case <-ww.batchWriteAssembly.ctx.Done():
 			return
 		case msg := <-ww.queue:
-			ww.batchWriteAssembly.connector.processDataMessage(msg)
+			// process the message
+			err := ww.batchWriteAssembly.connector.processDataMessage(msg)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Worker %v failed to process data message: %v", ww.id, err))
+			}
 		}
 	}
 }
