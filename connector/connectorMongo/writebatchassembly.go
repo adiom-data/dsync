@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
-	"log/slog"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"golang.org/x/exp/rand"
@@ -36,39 +35,6 @@ type BatchWriteAssembly struct {
 
 	// Array of workers
 	workers []writerWorker
-}
-
-type writerWorker struct {
-	// Assembly
-	batchWriteAssembly *BatchWriteAssembly
-
-	// Worker ID
-	id int
-	// Worker's queue
-	queue chan iface.DataMessage
-}
-
-// newWriterWorker creates a new writerWorker
-func newWriterWorker(batchWriteAssembly *BatchWriteAssembly, id int, queueSize int) writerWorker {
-	return writerWorker{batchWriteAssembly, id, make(chan iface.DataMessage, queueSize)}
-}
-
-// Worker's main loop - processes messages from the queue
-func (ww *writerWorker) run() {
-	for {
-		select {
-		case <-ww.batchWriteAssembly.ctx.Done():
-			return
-		case msg := <-ww.queue:
-			//ww.batchWriteAssembly.processMessage(msg)
-			slog.Debug("Processing message %v", msg)
-		}
-	}
-}
-
-// Adds a message to the worker's queue
-func (ww *writerWorker) addMessage(msg iface.DataMessage) {
-	ww.queue <- msg
 }
 
 // NewBatchWriteAssembly creates a new BatchWriteAssembly
@@ -122,4 +88,40 @@ func (bwa *BatchWriteAssembly) ScheduleDataMessage(dataMsg iface.DataMessage) er
 func (bwa *BatchWriteAssembly) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 	bwa.connector.handleBarrierMessage(barrierMsg)
 	return nil
+}
+
+// ----------------
+// Worker business
+// ----------------
+
+type writerWorker struct {
+	// Assembly
+	batchWriteAssembly *BatchWriteAssembly
+
+	// Worker ID
+	id int
+	// Worker's queue
+	queue chan iface.DataMessage
+}
+
+// newWriterWorker creates a new writerWorker
+func newWriterWorker(batchWriteAssembly *BatchWriteAssembly, id int, queueSize int) writerWorker {
+	return writerWorker{batchWriteAssembly, id, make(chan iface.DataMessage, queueSize)}
+}
+
+// Worker's main loop - processes messages from the queue
+func (ww *writerWorker) run() {
+	for {
+		select {
+		case <-ww.batchWriteAssembly.ctx.Done():
+			return
+		case msg := <-ww.queue:
+			ww.batchWriteAssembly.connector.processDataMessage(msg)
+		}
+	}
+}
+
+// Adds a message to the worker's queue
+func (ww *writerWorker) addMessage(msg iface.DataMessage) {
+	ww.queue <- msg
 }
