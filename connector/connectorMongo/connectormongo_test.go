@@ -67,7 +67,9 @@ func (m *MongoTestDataStore) InsertDummy(dbName string, colName string, data int
 }
 
 func (m *MongoTestDataStore) Teardown() error {
-	m.client.Disconnect(context.TODO())
+	if err := m.client.Disconnect(context.TODO()); err != nil {
+		return err
+	}
 	return nil
 }
 

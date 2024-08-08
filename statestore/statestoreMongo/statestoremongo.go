@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
@@ -49,7 +48,8 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 
 	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
 	tM := reflect.TypeOf(bson.M{})
-	reg := bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, tM).Build()
+	reg := bson.NewRegistry()
+	reg.RegisterTypeMapEntry(bson.TypeEmbeddedDocument, tM)
 
 	// Connect to the MongoDB instance
 	ctxConnect, cancelConnectCtx := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
@@ -84,7 +84,9 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 
 func (s *MongoStateStore) Teardown() {
 	if s.client != nil {
-		s.client.Disconnect(s.ctx)
+		if err := s.client.Disconnect(s.ctx); err != nil {
+			panic(err)
+		}
 	}
 }
 

@@ -258,6 +258,6 @@ func (rc *RandomReadConnector) generateOperation() (string, error) {
 // increment progress counters for change stream events and lsn, cleans up the change stream generation code
 func (rc *RandomReadConnector) incrementProgress(reader *ReaderProgress, lsn *int64) {
 	reader.changeStreamEvents++
-	(*lsn)++
+	*lsn++
 	rc.status.WriteLSN++
 }
