@@ -8,8 +8,12 @@ package connectorMongo
 
 import (
 	"context"
+	"fmt"
+	"hash/fnv"
+	"log/slog"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"golang.org/x/exp/rand"
 )
 
 // A parallelized assembly for writes batching
@@ -27,23 +31,90 @@ type BatchWriteAssembly struct {
 	numWorkers int
 	// Maximum number of operations in a batch for the assembly
 	maxBatchSizeOps int
-	// Assembly flush interval in milliseconds
-	flushIntervalMs int
+	// Maximum time to wait for a batch to fill up - after this time the flush will be forced anyway
+	maxBatchFillTimeMs int
+
+	// Array of workers
+	workers []writerWorker
+}
+
+type writerWorker struct {
+	// Assembly
+	batchWriteAssembly *BatchWriteAssembly
+
+	// Worker ID
+	id int
+	// Worker's queue
+	queue chan iface.DataMessage
+}
+
+// newWriterWorker creates a new writerWorker
+func newWriterWorker(batchWriteAssembly *BatchWriteAssembly, id int, queueSize int) writerWorker {
+	return writerWorker{batchWriteAssembly, id, make(chan iface.DataMessage, queueSize)}
+}
+
+// Worker's main loop - processes messages from the queue
+func (ww *writerWorker) run() {
+	for {
+		select {
+		case <-ww.batchWriteAssembly.ctx.Done():
+			return
+		case msg := <-ww.queue:
+			//ww.batchWriteAssembly.processMessage(msg)
+			slog.Debug("Processing message %v", msg)
+		}
+	}
+}
+
+// Adds a message to the worker's queue
+func (ww *writerWorker) addMessage(msg iface.DataMessage) {
+	ww.queue <- msg
 }
 
 // NewBatchWriteAssembly creates a new BatchWriteAssembly
-func NewBatchWriteAssembly(ctx context.Context, connector *MongoConnector, numWorkers int, maxBatchSizeOps int, flushIntervalMs int) *BatchWriteAssembly {
+func NewBatchWriteAssembly(ctx context.Context, connector *MongoConnector, numWorkers int, maxBatchSizeOps int, maxBatchFillTimeMs int) *BatchWriteAssembly {
 	return &BatchWriteAssembly{
-		ctx:             ctx,
-		connector:       connector,
-		numWorkers:      numWorkers,
-		maxBatchSizeOps: maxBatchSizeOps,
-		flushIntervalMs: flushIntervalMs,
+		ctx:                ctx,
+		connector:          connector,
+		numWorkers:         numWorkers,
+		maxBatchSizeOps:    maxBatchSizeOps,
+		maxBatchFillTimeMs: maxBatchFillTimeMs,
 	}
+}
+
+func (bwa *BatchWriteAssembly) Start() {
+	// create and start the workers
+	bwa.workers = make([]writerWorker, bwa.numWorkers)
+	for i := 0; i < bwa.numWorkers; i++ {
+		bwa.workers[i] = newWriterWorker(bwa, i, 1000) //XXX: should we make the queue size configurable?
+		go bwa.workers[i].run()
+	}
+}
+
+func hashDataMsgId(dataMsg iface.DataMessage) int {
+	hash := fnv.New32a()
+	hash.Write(*dataMsg.Id)
+
+	return int(hash.Sum32())
 }
 
 // Processes a data message
 func (bwa *BatchWriteAssembly) ScheduleDataMessage(dataMsg iface.DataMessage) error {
+	if len(bwa.workers) == 0 {
+		return fmt.Errorf("BatchWriteAssembly not started")
+	}
+
+	var workerId int
+
+	if dataMsg.MutationType == iface.MutationType_InsertBatch { // batch inserts don't have ids in the data message
+		workerId = rand.Intn(bwa.numWorkers) // let's just randomly assign them to workers //XXX: how safe is this?
+	} else {
+		// hash the _id to determine the correct worker
+		workerId = hashDataMsgId(dataMsg) % bwa.numWorkers
+	}
+	// add the message to the worker's queue
+	bwa.workers[workerId].addMessage(dataMsg)
+
 	return nil
 }
 

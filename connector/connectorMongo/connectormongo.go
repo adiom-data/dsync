@@ -53,7 +53,7 @@ type MongoConnectorSettings struct {
 	serverConnectTimeout           time.Duration
 	pingTimeout                    time.Duration
 	initialSyncNumParallelCopiers  int
-	writerMaxBatchSize             int //0 means no limit (in # of documents)
+	writerMaxBatchSize             int
 	numParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
@@ -64,7 +64,7 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 0
+	settings.writerMaxBatchSize = 1000
 	settings.numParallelWriters = 4
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
@@ -469,7 +469,8 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowBatchWriteAssembly := NewBatchWriteAssembly(mc.flowCtx, mc, 0, mc.settings.writerMaxBatchSize, 0)
+	flowBatchWriteAssembly := NewBatchWriteAssembly(mc.flowCtx, mc, mc.settings.numParallelWriters, mc.settings.writerMaxBatchSize, 3000)
+	flowBatchWriteAssembly.Start()
 
 	// start printing progress
 	go func() {
