@@ -489,40 +489,32 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	}()
 
 	go func() {
-		var wg sync.WaitGroup
-		for i := 0; i < mc.settings.numParallelWriters; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for loop := true; loop; {
-					select {
-					case <-mc.flowCtx.Done():
-						return
-					case dataMsg, ok := <-dataChannel:
-						if !ok {
-							// channel is closed which is a signal for us to stop
-							loop = false
-							break
-						}
-						// Check if this is a barrier first
-						if dataMsg.MutationType == iface.MutationType_Barrier {
-							err = flowBatchWriteAssembly.ScheduleBarrier(dataMsg)
-							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
-							}
-						} else {
-							// Process the data message
-							writerProgress.dataMessages.Add(1)
-							err = flowBatchWriteAssembly.ScheduleDataMessage(dataMsg)
-							if err != nil {
-								slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
-							}
-						}
+		for loop := true; loop; {
+			select {
+			case <-mc.flowCtx.Done():
+				return
+			case dataMsg, ok := <-dataChannel:
+				if !ok {
+					// channel is closed which is a signal for us to stop
+					loop = false
+					break
+				}
+				// Check if this is a barrier first
+				if dataMsg.MutationType == iface.MutationType_Barrier {
+					err := flowBatchWriteAssembly.ScheduleBarrier(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
+					}
+				} else {
+					// Process the data message
+					writerProgress.dataMessages.Add(1)
+					err := flowBatchWriteAssembly.ScheduleDataMessage(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
 					}
 				}
-			}()
+			}
 		}
-		wg.Wait()
 
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id)
