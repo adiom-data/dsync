@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"golang.org/x/exp/rand"
 )
 
-// A parallelized assembly for writes batching
+// A parallelized writes processor
 // Preserves sequence of operations for a given _id
 // Supports barriers
 // Automatically winds down when the context is done
@@ -36,6 +38,17 @@ type BatchWriteAssembly struct {
 
 	// Array of workers
 	workers []writerWorker
+
+	// Map of task barriers that were scheduled but haven't been cleared yet
+	// Maps task ID to the number of workers that processed the barrier yet (countdown to 0)
+	// A barrier is cleared out by the last worker that processes it
+	taskBarrierMap map[uint]uint
+	// mutex for taskBarrierMap
+	taskBarrierMapMutex sync.Mutex
+
+	// CDC resume token barrier countdown
+	// We don't admit new CDC barriers until the countdown reaches 0
+	resumeTokenBarrierWorkersCountdown atomic.Int32
 }
 
 // NewBatchWriteAssembly creates a new BatchWriteAssembly
@@ -46,6 +59,7 @@ func NewBatchWriteAssembly(ctx context.Context, connector *MongoConnector, numWo
 		numWorkers:         numWorkers,
 		maxBatchSizeOps:    maxBatchSizeOps,
 		maxBatchFillTimeMs: maxBatchFillTimeMs,
+		taskBarrierMap:     make(map[uint]uint),
 	}
 }
 
@@ -87,8 +101,37 @@ func (bwa *BatchWriteAssembly) ScheduleDataMessage(dataMsg iface.DataMessage) er
 
 // Processes a barrier
 func (bwa *BatchWriteAssembly) ScheduleBarrier(barrierMsg iface.DataMessage) error {
-	bwa.connector.handleBarrierMessage(barrierMsg)
+	// For task barriers, initialize the countdown for the task based on task ID
+	// Error out if the barrier is already present in the map
+	// For CDC barriers, warn if the countdown is not 0
+	// Otherwise, set the countdown to the number of workers
+	// Lastly, broadcast the barrier to all workers
+	switch barrierMsg.BarrierType {
+	case iface.BarrierType_TaskComplete:
+		bwa.taskBarrierMapMutex.Lock()
+		if _, ok := bwa.taskBarrierMap[barrierMsg.BarrierTaskId]; ok {
+			bwa.taskBarrierMapMutex.Unlock()
+			return fmt.Errorf("task barrier for task %v already present in the map", barrierMsg.BarrierTaskId)
+		}
+		bwa.taskBarrierMap[barrierMsg.BarrierTaskId] = uint(bwa.numWorkers)
+		bwa.taskBarrierMapMutex.Unlock()
+	case iface.BarrierType_CdcResumeTokenUpdate:
+		countdown := bwa.resumeTokenBarrierWorkersCountdown.Load()
+		if countdown != 0 {
+			return fmt.Errorf("another CDC resume token barrier is already being processed (countdown is %v instead of 0)", countdown)
+		}
+		bwa.resumeTokenBarrierWorkersCountdown.Store(int32(bwa.numWorkers))
+	}
+
+	bwa.BroadcastMessage(barrierMsg)
 	return nil
+}
+
+// Broadcasts message to all workers
+func (bwa *BatchWriteAssembly) BroadcastMessage(dataMsg iface.DataMessage) {
+	for i := 0; i < bwa.numWorkers; i++ {
+		bwa.workers[i].addMessage(dataMsg)
+	}
 }
 
 // ----------------
@@ -117,7 +160,40 @@ func (ww *writerWorker) run() {
 		case <-ww.batchWriteAssembly.ctx.Done():
 			return
 		case msg := <-ww.queue:
-			// process the message
+			// if it's a barrier message, check that we're the last worker to see it before handling
+			if msg.MutationType == iface.MutationType_Barrier {
+				isLastWorker := false
+
+				// if it's a task barrier, decrement the countdown for the task
+				if msg.BarrierType == iface.BarrierType_TaskComplete {
+					ww.batchWriteAssembly.taskBarrierMapMutex.Lock()
+					ww.batchWriteAssembly.taskBarrierMap[msg.BarrierTaskId]--
+					if ww.batchWriteAssembly.taskBarrierMap[msg.BarrierTaskId] == 0 {
+						delete(ww.batchWriteAssembly.taskBarrierMap, msg.BarrierTaskId)
+						isLastWorker = true
+					}
+					ww.batchWriteAssembly.taskBarrierMapMutex.Unlock()
+				}
+
+				// if it's a CDC barrier, decrement the countdown
+				if msg.BarrierType == iface.BarrierType_CdcResumeTokenUpdate {
+					countdown := ww.batchWriteAssembly.resumeTokenBarrierWorkersCountdown.Add(-1)
+					if countdown == 0 {
+						isLastWorker = true
+					}
+				}
+
+				if isLastWorker {
+					err := ww.batchWriteAssembly.connector.handleBarrierMessage(msg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Worker %v failed to handle barrier message: %v", ww.id, err))
+					}
+				}
+
+				continue
+			}
+
+			// process the data message
 			err := ww.batchWriteAssembly.connector.processDataMessage(msg)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Worker %v failed to process data message: %v", ww.id, err))
