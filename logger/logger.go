@@ -46,18 +46,27 @@ func Setup(o Options, buffer bytes.Buffer) *os.File {
 			panic(err)
 		}
 
-		// File handler
-		fileHandler := tint.NewHandler(logFile, &tint.Options{
-			NoColor:   !isatty.IsTerminal(logFile.Fd()),
-			Level:     level,
-			AddSource: (level < 0), // only for debugging
-		})
+		/*
+			// File handler
+			fileHandler := tint.NewHandler(logFile, &tint.Options{
+				NoColor:   !isatty.IsTerminal(logFile.Fd()),
+				Level:     level,
+				AddSource: (level < 0), // only for debugging
+			})
 
-		logger = slog.New(NewErrorHandler(level, fileHandler, &buffer))
+			logger = slog.New(NewErrorHandler(level, fileHandler, &buffer))
+		*/
+		logger = slog.New(
+			slog.NewTextHandler(logFile, &slog.HandlerOptions{
+				Level:     level,
+				AddSource: (level < 0), // only for debugging
+			}),
+		)
 		slog.SetDefault(logger)
 		return logFile
 
 	} else {
+		fmt.Println("No log file specified, using stderr")
 		w := os.Stderr
 		logger = slog.New(
 			tint.NewHandler(w, &tint.Options{
@@ -106,7 +115,7 @@ func (h *ErrorHandler) Handle(ctx context.Context, record slog.Record) error {
 		return err
 	}
 
-	if record.Level >= slog.LevelInfo {
+	if record.Level >= slog.LevelWarn {
 		if _, err := h.buffer.Write([]byte(fmt.Sprintf("%s: %s\n", record.Level, record.Message))); err != nil {
 			return err
 		}

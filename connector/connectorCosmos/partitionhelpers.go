@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -80,8 +81,8 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 }
 
 // get min and max boundaries for a namespace task
-func (cc *CosmosConnector) getMinAndMax(ctx context.Context, ns namespace, partitionKey string) (bson.RawValue, bson.RawValue, error) {
-	collection := cc.client.Database(ns.db).Collection(ns.col)
+func (cc *CosmosConnector) getMinAndMax(ctx context.Context, ns iface.Namespace, partitionKey string) (bson.RawValue, bson.RawValue, error) {
+	collection := cc.client.Database(ns.Db).Collection(ns.Col)
 	optsMax := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, -1}})
 	optsMin := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, 1}})
 

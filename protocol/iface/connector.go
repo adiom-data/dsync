@@ -5,7 +5,11 @@
  */
 package iface
 
-import "context"
+import (
+	"context"
+	"sync/atomic"
+	"time"
+)
 
 type ConnectorType struct {
 	DbType  string
@@ -46,6 +50,44 @@ type ConnectorStatus struct {
 	WriteLSN int64
 	// For the source, indicates whether the change stream is active
 	CDCActive bool
+	// For the source, indicates whether the initial sync is active
+	InitialSyncActive bool
+	// For the source, indicates whether the read planning is active
+	ReadPlanningActive bool
+
+	//progress reporting attributes
+	NamespaceProgress map[Namespace]*NameSpaceStatus
+	Namespaces        []Namespace
+
+	EstimatedTotalDocCount atomic.Int64
+
+	SyncProgress SyncProgress
+}
+
+type SyncProgress struct {
+	NumNamespaces       int64
+	NumNamespacesSynced atomic.Int64
+
+	NumDocsSynced      atomic.Int64
+	ChangeStreamEvents atomic.Int64
+	DeletesCaught      uint64
+
+	TasksTotal     int64
+	TasksStarted   atomic.Int64
+	TasksCompleted atomic.Int64
+}
+type Namespace struct {
+	Db  string
+	Col string
+}
+
+type NameSpaceStatus struct {
+	EstimatedDocCount int64
+	StartTime         time.Time
+	Throughput        int64
+	Tasks             []ReadPlanTask //all the tasks for the namespace
+	TasksCompleted    atomic.Int64
+	DocsCopied        atomic.Int64
 }
 
 // Pass options to use to the connector

@@ -65,21 +65,10 @@ const (
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
 	r.runnerProgress = runnerSyncProgress{
-		startTime:           time.Now(),
-		syncState:           "InitialSync",
-		totalNamespaces:     5,
-		numNamespacesSynced: 0,
-		totalDocs:           1000,
-		numDocsSynced:       0,
-		throughput:          0,
-		nsProgressMap: map[iface.Location]namespaceProgress{
-			{Database: "db1", Collection: "col1"}: {startTime: time.Now(), totalDocs: 10, numDocsSynced: 5, throughput: 2},
-			{Database: "db1", Collection: "col2"}: {startTime: time.Now(), totalDocs: 20, numDocsSynced: 10, throughput: 9},
-			{Database: "db2", Collection: "col1"}: {startTime: time.Now(), totalDocs: 30, numDocsSynced: 15, throughput: 10},
-			{Database: "db2", Collection: "col2"}: {startTime: time.Now(), totalDocs: 40, numDocsSynced: 25, throughput: 20},
-			{Database: "db2", Collection: "col3"}: {startTime: time.Now(), totalDocs: 50, numDocsSynced: 35, throughput: 25},
-		},
-		namespaces: []iface.Location{{Database: "db1", Collection: "col1"}, {Database: "db1", Collection: "col2"}, {Database: "db2", Collection: "col1"}, {Database: "db2", Collection: "col2"}, {Database: "db2", Collection: "col3"}},
+		startTime:     time.Now(),
+		syncState:     "Setup",
+		nsProgressMap: make(map[iface.Namespace]*iface.NameSpaceStatus),
+		namespaces:    make([]iface.Namespace, 0),
 	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
@@ -181,6 +170,7 @@ func (r *RunnerLocal) Run() error {
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
+		r.runnerProgress.syncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
 		if err != nil {
 			slog.Error("Failed to perform flow integrity check", err)
@@ -196,11 +186,19 @@ func (r *RunnerLocal) Run() error {
 
 	// destroy the flow if the cleanup flag is set
 	if r.settings.CleanupRequestedFlag {
+		r.runnerProgress.syncState = "Cleanup"
 		slog.Info("Cleaning up metadata for the flow")
 		r.coord.FlowDestroy(flowID)
 		return nil
 	}
 
+	//continuoslly update the runner progress
+	go func() {
+		for {
+			//update the runnerprogress
+			r.UpdateRunnerProgress(flowID)
+		}
+	}()
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {

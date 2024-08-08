@@ -64,6 +64,7 @@ type ReadPlanTaskID uint
 
 const (
 	ReadPlanTaskStatus_New = iota
+	ReadPlanTaskStatus_InProgress
 	ReadPlanTaskStatus_Completed
 )
 
@@ -75,6 +76,9 @@ type CoordinatorIConnectorSignal interface {
 
 	// Done event for a flow (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
+
+	// Start event for a task (for a connector to announce that they started a task)
+	NotifyTaskStarted(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error
 
 	// Done event for a task (for a connector to announce that they finished a task)
 	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error

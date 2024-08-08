@@ -7,6 +7,7 @@ package runnerLocal
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -15,16 +16,20 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	targetDocCountPerPartition = 512 * 1000
+)
+
 type runnerSyncProgress struct {
 	startTime           time.Time
-	syncState           string                               //get from coordinator
-	totalNamespaces     int                                  //get from reader
-	numNamespacesSynced int                                  //get from writer
-	totalDocs           int                                  //get from reader
-	numDocsSynced       int                                  //get from writer
-	throughput          int                                  //get from coord
-	nsProgressMap       map[iface.Location]namespaceProgress //get from coord? or writer?
-	namespaces          []iface.Location                     //use map and get the keys so print order is consistent
+	syncState           string                                     //get from coordinator
+	totalNamespaces     int64                                      //get from reader
+	numNamespacesSynced int64                                      //get from writer
+	totalDocs           int64                                      //get from reader
+	numDocsSynced       int64                                      //get from writer
+	throughput          int64                                      //get from coord
+	nsProgressMap       map[iface.Namespace]*iface.NameSpaceStatus //get from coord? or writer?
+	namespaces          []iface.Namespace                          //use map and get the keys so print order is consistent
 }
 
 type namespaceProgress struct {
@@ -34,18 +39,41 @@ type namespaceProgress struct {
 	throughput    int       //writer?
 }
 
+func (r *RunnerLocal) UpdateRunnerProgress(flowId iface.FlowID) {
+	flowStatus, err := r.coord.GetFlowStatus(flowId)
+	if err != nil {
+		slog.Error("Failed to get flow status", err)
+		return
+	}
+	srcStatus, _ := flowStatus.SrcStatus, flowStatus.DstStatus
+	if srcStatus.InitialSyncActive {
+		r.runnerProgress.syncState = "InitialSync"
+	} else if srcStatus.CDCActive {
+		r.runnerProgress.syncState = "CDC"
+	} else if srcStatus.ReadPlanningActive {
+		r.runnerProgress.syncState = "ReadPlanning"
+	}
+	r.runnerProgress.numNamespacesSynced = srcStatus.SyncProgress.NumNamespacesSynced.Load()
+	r.runnerProgress.totalNamespaces = srcStatus.SyncProgress.NumNamespaces
+	r.runnerProgress.totalDocs = srcStatus.EstimatedTotalDocCount.Load()
+	r.runnerProgress.numDocsSynced = srcStatus.SyncProgress.NumDocsSynced.Load()
+	r.runnerProgress.nsProgressMap = srcStatus.NamespaceProgress
+
+	r.runnerProgress.namespaces = srcStatus.Namespaces
+}
+
 func (r *RunnerLocal) GetStatusReport() {
 	totalTimeElapsed := time.Since(r.runnerProgress.startTime).Seconds()
 	fmt.Printf("\n\033[2K\rDsync Progress Report : %v\nTime Elapsed: %.2fs\n\n", r.runnerProgress.syncState, totalTimeElapsed)
 
 	for _, key := range r.runnerProgress.namespaces {
 		ns := r.runnerProgress.nsProgressMap[key]
-		percentComplete := math.Floor(float64(ns.numDocsSynced) / float64(ns.totalDocs) * 100)
+		percentComplete := math.Floor(float64(ns.DocsCopied.Load()) / float64(ns.EstimatedDocCount) * 100)
 		percentCompleteStr := fmt.Sprintf("%.0f%% complete", percentComplete)
-		timeElapsed := time.Since(ns.startTime).Seconds()
+		timeElapsed := time.Since(ns.StartTime).Seconds()
 		timeElapsedStr := fmt.Sprintf("Time Elapsed: %.2fs", timeElapsed)
-		throughputStr := fmt.Sprintf("Throughput: %v docs/s", ns.throughput)
-		namespace := "Namespace: " + key.Database + "." + key.Collection
+		throughputStr := fmt.Sprintf("Throughput: %v docs/s", ns.Throughput)
+		namespace := "Namespace: " + key.Db + "." + key.Col
 		fmt.Printf("\033[2K\r%-30s %-30s %-25s %-25s\n", namespace, timeElapsedStr, percentCompleteStr, throughputStr)
 	}
 	totalPercentComplete := float64(r.runnerProgress.numDocsSynced) / float64(r.runnerProgress.totalDocs) * 100
@@ -54,12 +82,12 @@ func (r *RunnerLocal) GetStatusReport() {
 	progressBar := fmt.Sprintf("[%s%s] %.2f%%", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
 	fmt.Printf("\n\033[2K\r%s\n", progressBar)
 
-	for i := 0; i < r.runnerProgress.totalNamespaces+6; i++ {
+	/*for i := 0; i < r.runnerProgress.totalNamespaces+6; i++ {
 		fmt.Print("\033[F")
 	}
 	if totalPercentComplete != 100 {
 		r.runnerProgress.numDocsSynced += 50
-	}
+	} */
 }
 
 func (r *RunnerLocal) SetUpDisplay(app *tview.Application, errorText *tview.TextView) {
@@ -78,41 +106,68 @@ func (r *RunnerLocal) SetUpDisplay(app *tview.Application, errorText *tview.Text
 }
 
 func (r *RunnerLocal) GetStatusReport2() {
-	//set the header text
+	//get tview components
 	header := r.root.GetItem(0).(*tview.TextView)
 	header.Clear()
-	totalTimeElapsed := time.Since(r.runnerProgress.startTime).Seconds()
-	headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs        %d/%d Namespaces synced\n", r.runnerProgress.syncState, totalTimeElapsed, r.runnerProgress.numNamespacesSynced, r.runnerProgress.totalNamespaces)
-	header.SetText(headerString)
 
-	//set the table
 	table := r.root.GetItem(1).(*tview.Table)
 	table.Clear()
 
-	for row, key := range r.runnerProgress.namespaces {
-		ns := r.runnerProgress.nsProgressMap[key]
-		percentComplete := math.Floor(float64(ns.numDocsSynced) / float64(ns.totalDocs) * 100)
-		percentCompleteStr := fmt.Sprintf(" %.0f%% complete ", percentComplete)
-		timeElapsed := time.Since(ns.startTime).Seconds()
-		timeElapsedStr := fmt.Sprintf(" Time Elapsed: %.2fs ", timeElapsed)
-		throughputStr := fmt.Sprintf(" Throughput: %v docs/s ", ns.throughput)
-		namespace := " Namespace: " + key.Database + "." + key.Collection + " "
-		table.SetCellSimple(row, 0, namespace)
-		table.SetCellSimple(row, 1, percentCompleteStr)
-		table.SetCellSimple(row, 2, timeElapsedStr)
-		table.SetCellSimple(row, 3, throughputStr)
-	}
-
-	//set the progress bar
 	progressBar := r.root.GetItem(2).(*tview.TextView)
-	totalPercentComplete := float64(r.runnerProgress.numDocsSynced) / float64(r.runnerProgress.totalDocs) * 100
-	if totalPercentComplete != 100 {
-		r.runnerProgress.numDocsSynced += 50
-	}
-	progressBarWidth := 50
-	progress := int(totalPercentComplete / 100 * float64(progressBarWidth))
-	progressBarString := fmt.Sprintf("[%s%s] %.2f%%\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
-	progressBar.SetText(progressBarString)
+	progressBar.Clear()
 
+	//get the time elapsed
+	totalTimeElapsed := time.Since(r.runnerProgress.startTime).Seconds()
+
+	switch r.runnerProgress.syncState {
+	case "Setup":
+		headerString := fmt.Sprintf("Dsync Progress Report : %s\nTime Elapsed: %.2fs\nSetting up the sync\n", r.runnerProgress.syncState, totalTimeElapsed)
+		header.SetText(headerString)
+	case "ReadPlanning":
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs\nCreating the read plan\n", r.runnerProgress.syncState, totalTimeElapsed)
+		header.SetText(headerString)
+	case "InitialSync":
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs        %d/%d Namespaces synced\n", r.runnerProgress.syncState, totalTimeElapsed, r.runnerProgress.numNamespacesSynced, r.runnerProgress.totalNamespaces)
+		header.SetText(headerString)
+
+		//set the table
+		for row, key := range r.runnerProgress.namespaces {
+			ns := r.runnerProgress.nsProgressMap[key]
+			//percentComplete := math.Floor(float64(ns.DocsCopied.Load()) / float64(ns.EstimatedDocCount) * 100)
+			//percentCompleteStr := fmt.Sprintf(" %.0f%% complete ", percentComplete)
+			timeElapsed := time.Since(ns.StartTime).Seconds()
+			timeElapsedStr := fmt.Sprintf(" Time Elapsed: %.2fs ", timeElapsed)
+			//throughputStr := fmt.Sprintf(" Throughput: %v docs/s ", ns.Throughput)
+			namespace := " Namespace: " + key.Db + "." + key.Col + " "
+			table.SetCellSimple(row, 0, namespace)
+			//table.SetCellSimple(row, 1, percentCompleteStr)
+			table.SetCellSimple(row, 2, timeElapsedStr)
+			//table.SetCellSimple(row, 3, throughputStr)
+		}
+
+		//set the progress bar
+		totalPercentComplete := float64(r.runnerProgress.numDocsSynced) / float64(r.runnerProgress.totalDocs) * 100
+		if totalPercentComplete != 100 {
+			r.runnerProgress.numDocsSynced += 50
+		}
+		progressBarWidth := 50
+		progress := int(totalPercentComplete / 100 * float64(progressBarWidth))
+		progressBarString := fmt.Sprintf("[%s%s] %.2f%%\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
+		progressBar.SetText(progressBarString)
+
+	case "CDC":
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs        %d/%d Namespaces synced\nProcessing change stream events\n", r.runnerProgress.syncState, totalTimeElapsed, r.runnerProgress.numNamespacesSynced, r.runnerProgress.totalNamespaces)
+		header.SetText(headerString)
+
+	case "Cleanup":
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs\nCleaning up flow data\n", r.runnerProgress.syncState, totalTimeElapsed)
+		header.SetText(headerString)
+
+	case "Verification":
+		//set the header text
+
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %.2fs\nPerforming Data Integrity Check", r.runnerProgress.syncState, totalTimeElapsed)
+		header.SetText(headerString)
+	}
 	r.runnerInterface.Draw()
 }

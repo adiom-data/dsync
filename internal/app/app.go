@@ -46,18 +46,19 @@ func runDsync(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	lo := logger.Options{Verbosity: o.Verbosity}
+	lo := logger.Options{Verbosity: o.Verbosity, Logfile: o.Logfile}
 	logbuffer := bytes.Buffer{}
 
 	logFile := logger.Setup(lo, logbuffer)
+
 	if logFile != nil {
 		defer logFile.Close()
 	}
 
 	defer func() {
-		fmt.Printf("\ndsync has stopped running\n")
+		fmt.Printf("dsync has stopped running\n")
 		if logbuffer.Len() > 0 {
-			fmt.Print(logbuffer.String())
+			fmt.Printf("%v\n", logbuffer.String())
 		} else {
 			fmt.Printf("No logs generated\n")
 		}
@@ -124,21 +125,17 @@ func runDsync(c *cli.Context) error {
 
 	wg.Add(1)
 
-	go func(err error) {
+	go func() {
 		defer wg.Done()
-		err = r.Setup(runnerCtx)
-		if err != nil {
-			return
-		}
-		err = r.Run()
-		if err != nil {
-			return
+		err := r.Setup(runnerCtx)
+		if err == nil {
+			r.Run()
 		}
 		r.Teardown()
 
-	}(err)
+	}()
 
 	wg.Wait()
 
-	return err
+	return nil
 }

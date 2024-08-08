@@ -31,6 +31,7 @@ type ReaderProgress struct {
 	initialSyncDocs    atomic.Uint64
 	changeStreamEvents uint64
 	tasksTotal         uint64
+	tasksStarted       uint64
 	tasksCompleted     uint64
 	deletesCaught      uint64
 }
@@ -173,4 +174,9 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 			}},
 		})
 	}
+}
+
+func (cc *CosmosConnector) checkNamespaceComplete(ns iface.Namespace) bool {
+	nsStatus := cc.status.NamespaceProgress[ns]
+	return nsStatus.TasksCompleted.Load() == int64(len(nsStatus.Tasks))
 }
