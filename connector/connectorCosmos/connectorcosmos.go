@@ -192,6 +192,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	cc.flowId = flowId
 
 	tasks := readPlan.Tasks
+	namespaces := make([]namespace, 0)
 
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -200,6 +201,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
 	cc.flowCDCResumeTokenMap = NewTokenMap()
+
+	//placeholder for how to get namespaces, can use status struct from progress output later
+	for loc, _ := range cc.flowCDCResumeTokenMap.Map {
+		namespaces = append(namespaces, namespace{db: loc.Database, col: loc.Collection})
+	}
 
 	flowCDCResumeToken := readPlan.CdcResumeToken //Get the endoded token
 
@@ -286,7 +292,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, namespaces, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
