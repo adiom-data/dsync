@@ -78,7 +78,7 @@ type CosmosConnectorSettings struct {
 
 func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
 	// Set default values
-	settings.serverConnectTimeout = 10 * time.Second
+	settings.serverConnectTimeout = 15 * time.Second
 	settings.pingTimeout = 2 * time.Second
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
@@ -105,7 +105,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	if cc.settings.EmulateDeletes {
 		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
 		defer cancel()
-		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString)
+		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString).SetConnectTimeout(cc.settings.serverConnectTimeout)
 		client, err := mongo.Connect(ctxConnect, clientOptions)
 		if err != nil {
 			return err
@@ -116,7 +116,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
 	defer cancel()
-	clientOptions := moptions.Client().ApplyURI(cc.settings.ConnectionString)
+	clientOptions := moptions.Client().ApplyURI(cc.settings.ConnectionString).SetConnectTimeout(cc.settings.serverConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
@@ -202,11 +202,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 	cc.flowCDCResumeTokenMap = NewTokenMap()
 
-	//placeholder for how to get namespaces, can use status struct from progress output later
-	for loc, _ := range cc.flowCDCResumeTokenMap.Map {
-		namespaces = append(namespaces, namespace{db: loc.Database, col: loc.Collection})
-	}
-
 	flowCDCResumeToken := readPlan.CdcResumeToken //Get the endoded token
 
 	err := cc.flowCDCResumeTokenMap.decodeMap(flowCDCResumeToken) //Decode the token to get the map
@@ -215,6 +210,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	}
 
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
+
+	//placeholder for how to get namespaces, can use status struct from progress output later
+	for loc, _ := range cc.flowCDCResumeTokenMap.Map {
+		namespaces = append(namespaces, namespace{db: loc.Database, col: loc.Collection})
+	}
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
