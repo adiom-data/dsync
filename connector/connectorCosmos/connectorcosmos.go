@@ -310,7 +310,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(cc.flowCtx, cc.status.Namespaces, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -340,12 +340,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 					nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
-
-					cc.muProgressMetrics.Lock()
-					if nsStatus.StartTime.IsZero() {
-						nsStatus.StartTime = time.Now() //if this is the first task of the namespace that is processed, start the time
-					}
-					cc.muProgressMetrics.Unlock()
 
 					collection := cc.client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.flowCtx, collection, task)

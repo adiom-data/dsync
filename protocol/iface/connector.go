@@ -8,7 +8,6 @@ package iface
 import (
 	"context"
 	"sync/atomic"
-	"time"
 )
 
 type ConnectorType struct {
@@ -64,7 +63,7 @@ type ConnectorStatus struct {
 
 type ProgressMetrics struct {
 	NumNamespaces       int64
-	NumNamespacesSynced int64
+	NumNamespacesSynced int64 //change name
 
 	NumDocsSynced      int64
 	ChangeStreamEvents int64
@@ -81,7 +80,6 @@ type Namespace struct {
 
 type NameSpaceStatus struct {
 	EstimatedDocCount int64
-	StartTime         time.Time
 	Throughput        int64
 	Tasks             []ReadPlanTask //all the tasks for the namespace
 	TasksCompleted    atomic.Int64
