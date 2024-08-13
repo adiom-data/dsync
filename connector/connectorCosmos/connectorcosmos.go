@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -40,7 +41,7 @@ type CosmosConnector struct {
 
 	coord iface.CoordinatorIConnectorSignal
 
-	mutex sync.Mutex
+	muProgressMetrics sync.Mutex
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
@@ -144,15 +145,24 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorCapabilities, current capabilities are source only
 	cc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: false, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
-	cc.status = iface.ConnectorStatus{WriteLSN: 0, NamespaceProgress: make(map[iface.Namespace]*iface.NameSpaceStatus), Namespaces: make([]iface.Namespace, 0)}
-	//store atomic values for status
-	cc.status.EstimatedTotalDocCount.Store(0)
-	cc.status.SyncProgress = iface.SyncProgress{TasksTotal: 0, NumNamespaces: 0, DeletesCaught: 0}
-	cc.status.SyncProgress.NumDocsSynced.Store(0)
-	cc.status.SyncProgress.NumNamespacesSynced.Store(0)
-	cc.status.SyncProgress.ChangeStreamEvents.Store(0)
-	cc.status.SyncProgress.TasksStarted.Store(0)
-	cc.status.SyncProgress.TasksCompleted.Store(0)
+	progressMetrics := iface.ProgressMetrics{
+		TasksTotal:          0,
+		NumNamespaces:       0,
+		DeletesCaught:       0,
+		NumDocsSynced:       0,
+		NumNamespacesSynced: 0,
+		ChangeStreamEvents:  0,
+		TasksStarted:        0,
+		TasksCompleted:      0,
+	}
+
+	cc.status = iface.ConnectorStatus{
+		WriteLSN:               0,
+		NamespaceProgress:      make(map[string]*iface.NameSpaceStatus),
+		Namespaces:             make([]iface.Namespace, 0),
+		EstimatedTotalDocCount: 0,
+		ProgressMetrics:        progressMetrics,
+	}
 
 	// Get the coordinator endpoint
 	coord, err := cc.t.GetCoordinatorEndpoint("local")
@@ -200,6 +210,9 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	cc.flowId = flowId
 
 	tasks := readPlan.Tasks
+	resetStartedTasks(tasks)
+
+	cc.status = readPlan.SrcConnectorProgress
 
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -246,7 +259,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		cc.status.InitialSyncActive = false
+		cc.status.SyncState = "ChangeStream"
 		defer close(changeStreamDone)
 
 		// prepare the delete trigger channel and start the deletes worker, if necessary
@@ -282,6 +295,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			for {
 				select {
 				case <-cc.flowCtx.Done():
+					readPlan.SrcConnectorProgress = cc.status
 					return
 				case <-changeStreamDone:
 					return
@@ -296,7 +310,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, cc.status.Namespaces, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -304,7 +318,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		defer close(initialSyncDone)
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", cc.id, flowId))
-		cc.status.InitialSyncActive = true
+		cc.status.SyncState = "InitialSync"
 
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan iface.ReadPlanTask)
@@ -318,17 +332,20 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
-					cc.coord.NotifyTaskStarted(flowId, cc.id, task.Id)
-					cc.status.SyncProgress.TasksStarted.Add(1)
+					task.Started = true
+					atomic.AddInt64(&cc.status.ProgressMetrics.TasksStarted, 1)
 					db := task.Def.Db
 					col := task.Def.Col
 
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
-					nsStatus := cc.status.NamespaceProgress[ns]
+					nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
+
+					cc.muProgressMetrics.Lock()
 					if nsStatus.StartTime.IsZero() {
 						nsStatus.StartTime = time.Now() //if this is the first task of the namespace that is processed, start the time
 					}
+					cc.muProgressMetrics.Unlock()
 
 					collection := cc.client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.flowCtx, collection, task)
@@ -353,7 +370,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
 						nsStatus.DocsCopied.Add(1)
-						cc.status.SyncProgress.NumDocsSynced.Add(1)
+						atomic.AddInt64(&cc.status.ProgressMetrics.NumDocsSynced, 1)
 
 						dataBatch[batch_idx] = data
 						batch_idx++
@@ -373,10 +390,10 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					} else {
 						cursor.Close(cc.flowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
-						cc.status.SyncProgress.TasksCompleted.Add(1)
+						atomic.AddInt64(&cc.status.ProgressMetrics.TasksCompleted, 1)
 						nsStatus.TasksCompleted.Add(1)
 						if cc.checkNamespaceComplete(ns) {
-							cc.status.SyncProgress.NumNamespacesSynced.Add(1)
+							atomic.AddInt64(&cc.status.ProgressMetrics.NumNamespacesSynced, 1)
 						}
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
@@ -445,11 +462,11 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		cc.status.ReadPlanningActive = true
+		cc.status.SyncState = "ReadPlanning"
 		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace)
 		cc.status.Namespaces = namespaces
-		cc.status.SyncProgress.TasksTotal = int64(len(tasks))
-		cc.status.SyncProgress.NumNamespaces = int64(len(namespaces))
+		cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
+		cc.status.ProgressMetrics.NumNamespaces = int64(len(namespaces))
 
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
@@ -483,13 +500,12 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
 
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken, SrcConnectorProgress: cc.status}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
 		}
-		cc.status.ReadPlanningActive = false
 	}()
 	return nil
 }

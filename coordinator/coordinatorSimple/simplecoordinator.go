@@ -243,7 +243,6 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	if flowDet.ReadPlan.Tasks != nil && flowDet.Resumable {
 		slog.Debug("Using the existing read plan for a resumable flow. Flow ID: " + fmt.Sprintf("%v", fid))
 		//reset all in progress tasks to new
-		resetStartedTasks(flowDet)
 	} else if flowDet.ReadPlan.Tasks != nil {
 		slog.Error("Flow is not resumable but we have found the old plan. Please clean the metadata before restarting. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("flow is not resumable but old plan")
@@ -415,21 +414,6 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 	}
 
 	return fmt.Errorf("connector not part of the flow")
-}
-
-func (c *SimpleCoordinator) NotifyTaskStarted(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
-	flowDet, ok := c.getFlow(flowId)
-	if !ok {
-		return fmt.Errorf("flow not found")
-	}
-
-	if flowDet.Options.SrcId == conn {
-		err := updateFlowTaskStatus(flowDet, taskId, iface.ReadPlanTaskStatus_InProgress)
-		if err != nil {
-			return err
-		}
-	}
-	return fmt.Errorf("source connector not part of the flow")
 }
 
 func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {

@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
@@ -156,10 +157,10 @@ func (cc *CosmosConnector) createReadPlanTaskForNs(ns iface.Namespace) iface.Rea
 	task.Def.Col = ns.Col
 
 	//add Task to NameSpaceStatus struct using the map
-	cc.mutex.Lock()
-	nsStatus := cc.status.NamespaceProgress[ns]
+	cc.muProgressMetrics.Lock()
+	nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
 	nsStatus.Tasks = append(nsStatus.Tasks, task)
-	cc.mutex.Unlock()
+	cc.muProgressMetrics.Unlock()
 
 	return task
 }
@@ -176,14 +177,14 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 			for nsTask := range countCheckChannel {
 				collection := cc.client.Database(nsTask.Db).Collection(nsTask.Col)
 				count, err := collection.EstimatedDocumentCount(cc.ctx)
-				cc.status.EstimatedTotalDocCount.Add(count)
-				cc.mutex.Lock()
+				atomic.AddInt64(&cc.status.EstimatedTotalDocCount, count)
+				cc.muProgressMetrics.Lock()
 				nsStatus := &iface.NameSpaceStatus{EstimatedDocCount: count}
 				nsStatus.DocsCopied.Store(0)
 				nsStatus.TasksCompleted.Store(0)
-				cc.status.NamespaceProgress[nsTask] = nsStatus
+				cc.status.NamespaceProgress[nsToString(nsTask)] = nsStatus
 
-				cc.mutex.Unlock()
+				cc.muProgressMetrics.Unlock()
 				if err != nil {
 					if cc.ctx.Err() == context.Canceled {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))

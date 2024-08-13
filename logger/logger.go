@@ -20,6 +20,7 @@ import (
 type Options struct {
 	Verbosity string
 	Logfile   string
+	Format    bool // false = human readable, true = json
 }
 
 func Setup(o Options, buffer bytes.Buffer) *os.File {
@@ -56,17 +57,26 @@ func Setup(o Options, buffer bytes.Buffer) *os.File {
 
 			logger = slog.New(NewErrorHandler(level, fileHandler, &buffer))
 		*/
-		logger = slog.New(
-			slog.NewTextHandler(logFile, &slog.HandlerOptions{
-				Level:     level,
-				AddSource: (level < 0), // only for debugging
-			}),
-		)
+		if o.Format {
+			logger = slog.New(
+				slog.NewTextHandler(logFile, &slog.HandlerOptions{
+					Level:     level,
+					AddSource: (level < 0), // only for debugging
+				}),
+			)
+		} else {
+			logger = slog.New(
+				tint.NewHandler(logFile, &tint.Options{
+					NoColor:   !isatty.IsTerminal(logFile.Fd()),
+					Level:     level,
+					AddSource: (level < 0), //only for debugging
+				}),
+			)
+		}
 		slog.SetDefault(logger)
 		return logFile
 
 	} else {
-		fmt.Println("No log file specified, using stderr")
 		w := os.Stderr
 		logger = slog.New(
 			tint.NewHandler(w, &tint.Options{

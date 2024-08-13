@@ -50,31 +50,29 @@ type ConnectorStatus struct {
 	WriteLSN int64
 	// For the source, indicates whether the change stream is active
 	CDCActive bool
-	// For the source, indicates whether the initial sync is active
-	InitialSyncActive bool
-	// For the source, indicates whether the read planning is active
-	ReadPlanningActive bool
+
+	SyncState string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
 
 	//progress reporting attributes
-	NamespaceProgress map[Namespace]*NameSpaceStatus
+	NamespaceProgress map[string]*NameSpaceStatus //map key is namespace: "db.col"
 	Namespaces        []Namespace
 
-	EstimatedTotalDocCount atomic.Int64
+	EstimatedTotalDocCount int64
 
-	SyncProgress SyncProgress
+	ProgressMetrics ProgressMetrics
 }
 
-type SyncProgress struct {
+type ProgressMetrics struct {
 	NumNamespaces       int64
-	NumNamespacesSynced atomic.Int64
+	NumNamespacesSynced int64
 
-	NumDocsSynced      atomic.Int64
-	ChangeStreamEvents atomic.Int64
+	NumDocsSynced      int64
+	ChangeStreamEvents int64
 	DeletesCaught      uint64
 
 	TasksTotal     int64
-	TasksStarted   atomic.Int64
-	TasksCompleted atomic.Int64
+	TasksStarted   int64
+	TasksCompleted int64
 }
 type Namespace struct {
 	Db  string

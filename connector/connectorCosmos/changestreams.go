@@ -35,19 +35,19 @@ func (cc *CosmosConnector) createChangeStream(ctx context.Context, namespace ifa
 }
 
 // Creates parallel change streams for each task in the read plan, and processes the events concurrently
-func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, tasks []iface.ReadPlanTask, readerProgress *ReaderProgress, channel chan<- iface.DataMessage) error {
+func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, namespaces []iface.Namespace, readerProgress *ReaderProgress, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
 	// global atomic lsn counter
 	var lsn int64 = 0
 
 	cc.status.CDCActive = true
 	// iterate over all tasks and start a change stream for each
-	for _, task := range tasks {
+	for _, ns := range namespaces {
 		wg.Add(1)
-		go func(task iface.ReadPlanTask) {
+		go func(ns iface.Namespace) {
 			defer wg.Done()
 			//get task location and retrieve resume token
-			loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
+			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
 			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s at namespace %s.%s", cc.id, cc.flowId, loc.Database, loc.Collection))
 
 			token, err := cc.flowCDCResumeTokenMap.GetToken(loc)
@@ -59,9 +59,9 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, tas
 			changeStream, err := cc.createChangeStream(ctx, loc, opts)
 			if err != nil {
 				if ctx.Err() == context.Canceled {
-					slog.Debug(fmt.Sprintf("Failed to create change stream for task %v, namespace %s.%s: %v, but the context was cancelled", task.Id, task.Def.Db, task.Def.Col, err))
+					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", ns.Db, ns.Col, err))
 				} else {
-					slog.Error(fmt.Sprintf("Failed to create change stream for task %v, namespace %s.%s: %v", task.Id, task.Def.Db, task.Def.Col, err))
+					slog.Error(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v", ns.Db, ns.Col, err))
 				}
 				return
 			}
@@ -78,7 +78,7 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, tas
 				}
 			}
 
-		}(task)
+		}(ns)
 	}
 	wg.Wait()
 	return nil

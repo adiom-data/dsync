@@ -67,11 +67,3 @@ func updateFlowTaskStatus(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID,
 	}
 	return fmt.Errorf("task with ID %d not found", taskId)
 }
-
-func resetStartedTasks(flowDetails *FlowDetails) {
-	for i, task := range flowDetails.ReadPlan.Tasks {
-		if task.Status == iface.ReadPlanTaskStatus_InProgress {
-			flowDetails.ReadPlan.Tasks[i].Status = iface.ReadPlanTaskStatus_New
-		}
-	}
-}

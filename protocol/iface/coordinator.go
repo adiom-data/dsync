@@ -40,13 +40,15 @@ type ConnectorDetails struct {
 
 // Abstraction for the read plan
 type ConnectorReadPlan struct {
-	Tasks          []ReadPlanTask
-	CdcResumeToken []byte // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
+	Tasks                []ReadPlanTask
+	CdcResumeToken       []byte          // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
+	SrcConnectorProgress ConnectorStatus // store read progress for the source connector
 }
 
 type ReadPlanTask struct {
-	Id     ReadPlanTaskID //should always start with 1 to avoid confusion with an uninitialized value
-	Status uint
+	Id      ReadPlanTaskID //should always start with 1 to avoid confusion with an uninitialized value
+	Status  uint
+	Started bool
 
 	//XXX: this should be interface{} - a connector-specific task definition (implementation-specific) but making simple for now
 	Def struct {
@@ -64,7 +66,6 @@ type ReadPlanTaskID uint
 
 const (
 	ReadPlanTaskStatus_New = iota
-	ReadPlanTaskStatus_InProgress
 	ReadPlanTaskStatus_Completed
 )
 
@@ -76,9 +77,6 @@ type CoordinatorIConnectorSignal interface {
 
 	// Done event for a flow (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
-
-	// Start event for a task (for a connector to announce that they started a task)
-	NotifyTaskStarted(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error
 
 	// Done event for a task (for a connector to announce that they finished a task)
 	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error

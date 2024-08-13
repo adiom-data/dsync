@@ -19,7 +19,6 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestore/statestoreMongo"
 	"github.com/adiom-data/dsync/transport/transportLocal"
-	"github.com/rivo/tview"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -34,9 +33,8 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress  runnerSyncProgress
-	runnerInterface *tview.Application
-	root            *tview.Flex
+	runnerProgress runnerSyncProgress
+	tui            tviewDetails
 
 	ctx context.Context
 }
@@ -66,8 +64,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
 	r.runnerProgress = runnerSyncProgress{
 		startTime:     time.Now(),
+		currTime:      time.Now(),
 		syncState:     "Setup",
-		nsProgressMap: make(map[iface.Namespace]*iface.NameSpaceStatus),
+		nsProgressMap: make(map[string]*iface.NameSpaceStatus),
 		namespaces:    make([]iface.Namespace, 0),
 	}
 	nullRead := settings.SrcConnString == "/dev/random"
@@ -247,7 +246,7 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
-	if r.runnerInterface != nil {
-		r.runnerInterface.Stop()
+	if r.tui.app != nil {
+		r.tui.app.Stop()
 	}
 }

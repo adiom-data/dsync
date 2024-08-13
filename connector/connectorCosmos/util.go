@@ -129,8 +129,8 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 
 // update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum
 func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
-	cc.mutex.Lock()
-	defer cc.mutex.Unlock()
+	cc.muProgressMetrics.Lock()
+	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
 	*lsn++
 	cc.status.WriteLSN++
@@ -177,6 +177,18 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 }
 
 func (cc *CosmosConnector) checkNamespaceComplete(ns iface.Namespace) bool {
-	nsStatus := cc.status.NamespaceProgress[ns]
+	nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
 	return nsStatus.TasksCompleted.Load() == int64(len(nsStatus.Tasks))
+}
+
+func resetStartedTasks(tasks []iface.ReadPlanTask) {
+	for i, task := range tasks {
+		if task.Started {
+			tasks[i].Started = false
+		}
+	}
+}
+
+func nsToString(ns iface.Namespace) string {
+	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
 }
