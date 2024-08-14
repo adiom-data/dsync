@@ -56,9 +56,10 @@ type ReadPlanTask struct {
 		Col string
 
 		// all are optional and define the range of documents to copy for the task
-		PartitionKey string      // partition key for the task
-		Low          interface{} // lower bound for the task (inclusive)
-		High         interface{} // upper bound for the task (exclusive)
+		PartitionKey      string      // partition key for the task
+		Low               interface{} // lower bound for the task (inclusive)
+		High              interface{} // upper bound for the task (exclusive)
+		EstimatedDocCount int64       // estimated number of documents in the task
 	}
 }
 

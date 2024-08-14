@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/adiom-data/dsync/connector/connectorCosmos"
@@ -191,11 +192,37 @@ func (r *RunnerLocal) Run() error {
 		return nil
 	}
 
-	//continuoslly update the runner progress
+	//continuoslly update the runner progress, update throughput in intervals
 	go func() {
+		ticker := time.NewTicker(throughputUpdateInterval)
+		currTime := time.Now()
+		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + r.runnerProgress.deletesCaught
+		nsProgress := r.runnerProgress.nsProgressMap
+
 		for {
-			//update the runnerprogress
-			r.UpdateRunnerProgress(flowID)
+			select {
+			case <-ticker.C:
+				r.UpdateRunnerProgress(flowID)
+				elapsed := time.Since(currTime).Seconds()
+				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + r.runnerProgress.deletesCaught
+				total_operations_delta := operationsNew - totaloperations
+
+				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
+
+				currTime = time.Now()
+				totaloperations = operationsNew
+
+				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+					if nsProgress[ns] != nil {
+						operationsDelta := nsStatus.DocsCopied.Load() - nsProgress[ns].DocsCopied.Load()
+						nsStatus.Throughput = math.Floor(float64(operationsDelta) / elapsed)
+					}
+				}
+
+			default:
+				//update the runnerprogress
+				r.UpdateRunnerProgress(flowID)
+			}
 		}
 	}()
 	// start the flow

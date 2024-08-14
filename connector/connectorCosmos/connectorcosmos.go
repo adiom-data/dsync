@@ -210,6 +210,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	cc.flowId = flowId
 
 	tasks := readPlan.Tasks
+	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 	resetStartedTasks(tasks)
 
 	cc.status = readPlan.SrcConnectorProgress
@@ -340,6 +341,8 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 					nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
+					//update num tasks started for namespace
+					nsStatus.TasksStarted.Add(1)
 
 					collection := cc.client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.flowCtx, collection, task)

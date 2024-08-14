@@ -110,7 +110,7 @@ func runDsync(c *cli.Context) error {
 					case <-runnerCtx.Done():
 						return
 					default:
-						r.GetStatusReport2()
+						r.GetStatusReport()
 						time.Sleep(1 * time.Second)
 					}
 				}

@@ -80,9 +80,10 @@ type Namespace struct {
 
 type NameSpaceStatus struct {
 	EstimatedDocCount int64
-	Throughput        int64
+	Throughput        float64
 	Tasks             []ReadPlanTask //all the tasks for the namespace
 	TasksCompleted    atomic.Int64
+	TasksStarted      atomic.Int64
 	DocsCopied        atomic.Int64
 }
 
