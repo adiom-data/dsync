@@ -219,7 +219,7 @@ func percentCompleteNamespace(nsStatus *iface.NameSpaceStatus) (float64, float64
 		}
 	} else {
 		//partitioning
-		numDocsCopied := atomic.LoadInt64(&nsStatus.DocsCopied)
+		numDocsCopied := atomic.LoadInt64(&nsStatus.EstimatedDocsCopied)
 		docsPerTask := nsStatus.Tasks[0].Def.EstimatedDocCount
 
 		numCompletedDocs := atomic.LoadInt64(&nsStatus.TasksCompleted) * docsPerTask

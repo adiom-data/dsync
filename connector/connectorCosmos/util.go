@@ -204,12 +204,13 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask, pr
 		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
 		if nsStatus == nil {
 			nsStatus = &iface.NameSpaceStatus{
-				EstimatedDocCount: 0,
-				Throughput:        0,
-				Tasks:             []iface.ReadPlanTask{},
-				TasksCompleted:    0,
-				TasksStarted:      0,
-				DocsCopied:        0,
+				EstimatedDocCount:   0,
+				Throughput:          0,
+				Tasks:               []iface.ReadPlanTask{},
+				TasksCompleted:      0,
+				TasksStarted:        0,
+				DocsCopied:          0,
+				EstimatedDocsCopied: 0,
 			}
 			cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)] = nsStatus
 		}
@@ -223,7 +224,7 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask, pr
 
 			nsStatus.TasksCompleted++
 
-			nsStatus.DocsCopied += task.Def.EstimatedDocCount
+			nsStatus.EstimatedDocsCopied += task.Def.EstimatedDocCount
 		}
 
 		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) && !complete {

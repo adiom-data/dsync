@@ -138,6 +138,7 @@ func (cc *CosmosConnector) parallelTaskBoundsClarifier(approxTasksChannel <-chan
 				if !valLow.Equal(valHigh) {
 					task.Def.Low = valLow
 					task.Def.High = valHigh
+					task.Def.EstimatedDocCount = cc.settings.targetDocCountPerPartition
 					finalTasksChannel <- task
 				}
 			}
@@ -170,10 +171,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 			for nsTask := range countCheckChannel {
 				collection := cc.client.Database(nsTask.Db).Collection(nsTask.Col)
 				count, err := collection.EstimatedDocumentCount(cc.ctx)
-
-				cc.muProgressMetrics.Lock()
-				cc.status.ProgressMetrics.EstimatedTotalDocCount += count
-				cc.muProgressMetrics.Unlock()
+				slog.Debug(fmt.Sprintf("Count for task %v: %v", nsToString(nsTask), count))
 
 				if err != nil {
 					if cc.ctx.Err() == context.Canceled {
@@ -181,17 +179,20 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 					} else {
 						slog.Warn(fmt.Sprintf("Failed to count documents, not splitting: %v", err))
 						task := cc.createReadPlanTaskForNs(nsTask)
-						//cc.updateNSTasks(task)
+						task.Def.EstimatedDocCount = count
 						finalTasksChannel <- task
 						continue
 					}
 				}
 
+				cc.muProgressMetrics.Lock()
+				cc.status.ProgressMetrics.EstimatedTotalDocCount += count
+				cc.muProgressMetrics.Unlock()
+
 				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
 					task := cc.createReadPlanTaskForNs(nsTask)
 					task.Def.EstimatedDocCount = count
-					//cc.updateNSTasks(task)
-					finalTasksChannel <- cc.createReadPlanTaskForNs(nsTask)
+					finalTasksChannel <- task
 				} else { //we need to split it
 					slog.Debug(fmt.Sprintf("Need to split task %v with count %v", nsTask, count))
 					//get min and max bounds
@@ -200,9 +201,6 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						slog.Warn(fmt.Sprintf("Failed to get min and max boundaries for a task %v so not splitting: %v", nsTask, err))
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.EstimatedDocCount = count
-
-						//cc.updateNSTasks(task)
-
 						finalTasksChannel <- task
 						continue
 					}
@@ -214,9 +212,6 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						slog.Warn(fmt.Sprintf("Failed to split range for task %v so not splitting: %v", nsTask, err))
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.EstimatedDocCount = count
-
-						//cc.updateNSTasks(task)
-
 						finalTasksChannel <- task
 						continue
 					}
@@ -233,10 +228,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 					maxTask.Def.Low = max //only setting the low boundary indicating that we want (max, INF)
 					maxTask.Def.EstimatedDocCount = cc.settings.targetDocCountPerPartition
 
-					//cc.updateNSTasks(minTask)
 					finalTasksChannel <- minTask
-
-					//cc.updateNSTasks(maxTask)
 					finalTasksChannel <- maxTask
 
 					//send the tasks with approx bounaries downstream
@@ -289,12 +281,3 @@ func (cc *CosmosConnector) getAllCollections(dbName string) ([]string, error) {
 
 	return collections, nil
 }
-
-/*
-func (cc *CosmosConnector) updateNSTasks(task iface.ReadPlanTask) {
-	ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
-	cc.muProgressMetrics.Lock()
-	nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
-	nsStatus.Tasks = append(nsStatus.Tasks, task)
-	cc.muProgressMetrics.Unlock()
-} */

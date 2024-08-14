@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -374,6 +375,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
 						atomic.AddInt64(&nsStatus.DocsCopied, 1)
+						atomic.AddInt64(&nsStatus.EstimatedDocsCopied, 1)
 						atomic.AddInt64(&cc.status.ProgressMetrics.NumDocsSynced, 1)
 
 						dataBatch[batch_idx] = data
@@ -396,6 +398,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 						atomic.AddInt64(&cc.status.ProgressMetrics.TasksCompleted, 1)
 						atomic.AddInt64(&nsStatus.TasksCompleted, 1)
+
+						cc.muProgressMetrics.Lock()
+						cc.status.ProgressMetrics.EstimatedTotalDocCount = int64(math.Max(float64(nsStatus.EstimatedDocCount), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition)))
+						cc.muProgressMetrics.Unlock()
+
 						if cc.checkNamespaceComplete(ns) {
 							atomic.AddInt64(&cc.status.ProgressMetrics.NumNamespacesSynced, 1)
 						}

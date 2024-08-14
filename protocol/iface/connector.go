@@ -79,12 +79,13 @@ type Namespace struct {
 }
 
 type NameSpaceStatus struct {
-	EstimatedDocCount int64
-	Throughput        float64
-	Tasks             []ReadPlanTask //all the tasks for the namespace
-	TasksCompleted    int64
-	TasksStarted      int64
-	DocsCopied        int64
+	EstimatedDocCount   int64
+	Throughput          float64
+	Tasks               []ReadPlanTask //all the tasks for the namespace
+	TasksCompleted      int64
+	TasksStarted        int64
+	DocsCopied          int64
+	EstimatedDocsCopied int64 //this is for calculating percentage complete based on approximate number of docs per task, not actual number of docs copied
 }
 
 // Pass options to use to the connector
