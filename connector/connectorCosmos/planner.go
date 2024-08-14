@@ -139,13 +139,6 @@ func (cc *CosmosConnector) parallelTaskBoundsClarifier(approxTasksChannel <-chan
 					task.Def.Low = valLow
 					task.Def.High = valHigh
 					finalTasksChannel <- task
-
-					//add Task to NameSpaceStatus struct using the map
-					ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
-					cc.muProgressMetrics.Lock()
-					nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
-					nsStatus.Tasks = append(nsStatus.Tasks, task)
-					cc.muProgressMetrics.Unlock()
 				}
 			}
 			wg.Done()
@@ -179,22 +172,16 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 				count, err := collection.EstimatedDocumentCount(cc.ctx)
 
 				cc.muProgressMetrics.Lock()
-
-				cc.status.EstimatedTotalDocCount += count
-				nsStatus := &iface.NameSpaceStatus{EstimatedDocCount: count, Tasks: make([]iface.ReadPlanTask, 0)}
-				nsStatus.DocsCopied.Store(0)
-				nsStatus.TasksCompleted.Store(0)
-				nsStatus.TasksStarted.Store(0)
-				cc.status.NamespaceProgress[nsToString(nsTask)] = nsStatus
-
+				cc.status.ProgressMetrics.EstimatedTotalDocCount += count
 				cc.muProgressMetrics.Unlock()
+
 				if err != nil {
 					if cc.ctx.Err() == context.Canceled {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
 					} else {
 						slog.Warn(fmt.Sprintf("Failed to count documents, not splitting: %v", err))
 						task := cc.createReadPlanTaskForNs(nsTask)
-						cc.updateNSTasks(task)
+						//cc.updateNSTasks(task)
 						finalTasksChannel <- task
 						continue
 					}
@@ -203,7 +190,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
 					task := cc.createReadPlanTaskForNs(nsTask)
 					task.Def.EstimatedDocCount = count
-					cc.updateNSTasks(task)
+					//cc.updateNSTasks(task)
 					finalTasksChannel <- cc.createReadPlanTaskForNs(nsTask)
 				} else { //we need to split it
 					slog.Debug(fmt.Sprintf("Need to split task %v with count %v", nsTask, count))
@@ -214,7 +201,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.EstimatedDocCount = count
 
-						cc.updateNSTasks(task)
+						//cc.updateNSTasks(task)
 
 						finalTasksChannel <- task
 						continue
@@ -228,7 +215,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.EstimatedDocCount = count
 
-						cc.updateNSTasks(task)
+						//cc.updateNSTasks(task)
 
 						finalTasksChannel <- task
 						continue
@@ -246,10 +233,10 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 					maxTask.Def.Low = max //only setting the low boundary indicating that we want (max, INF)
 					maxTask.Def.EstimatedDocCount = cc.settings.targetDocCountPerPartition
 
-					cc.updateNSTasks(minTask)
+					//cc.updateNSTasks(minTask)
 					finalTasksChannel <- minTask
 
-					cc.updateNSTasks(maxTask)
+					//cc.updateNSTasks(maxTask)
 					finalTasksChannel <- maxTask
 
 					//send the tasks with approx bounaries downstream
@@ -303,10 +290,11 @@ func (cc *CosmosConnector) getAllCollections(dbName string) ([]string, error) {
 	return collections, nil
 }
 
+/*
 func (cc *CosmosConnector) updateNSTasks(task iface.ReadPlanTask) {
 	ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
 	cc.muProgressMetrics.Lock()
-	nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
+	nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
 	nsStatus.Tasks = append(nsStatus.Tasks, task)
 	cc.muProgressMetrics.Unlock()
-}
+} */

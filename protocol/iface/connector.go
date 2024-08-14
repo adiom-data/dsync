@@ -7,7 +7,6 @@ package iface
 
 import (
 	"context"
-	"sync/atomic"
 )
 
 type ConnectorType struct {
@@ -52,16 +51,12 @@ type ConnectorStatus struct {
 
 	SyncState string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
 
-	//progress reporting attributes
-	NamespaceProgress map[string]*NameSpaceStatus //map key is namespace: "db.col"
-	Namespaces        []Namespace
-
-	EstimatedTotalDocCount int64
-
 	ProgressMetrics ProgressMetrics
 }
 
 type ProgressMetrics struct {
+	EstimatedTotalDocCount int64
+
 	NumNamespaces       int64
 	NumNamespacesSynced int64 //change name
 
@@ -72,7 +67,12 @@ type ProgressMetrics struct {
 	TasksTotal     int64
 	TasksStarted   int64
 	TasksCompleted int64
+
+	//progress reporting attributes
+	NamespaceProgress map[string]*NameSpaceStatus //map key is namespace: "db.col"
+	Namespaces        []Namespace
 }
+
 type Namespace struct {
 	Db  string
 	Col string
@@ -82,9 +82,9 @@ type NameSpaceStatus struct {
 	EstimatedDocCount int64
 	Throughput        float64
 	Tasks             []ReadPlanTask //all the tasks for the namespace
-	TasksCompleted    atomic.Int64
-	TasksStarted      atomic.Int64
-	DocsCopied        atomic.Int64
+	TasksCompleted    int64
+	TasksStarted      int64
+	DocsCopied        int64
 }
 
 // Pass options to use to the connector

@@ -134,6 +134,7 @@ func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64)
 	reader.changeStreamEvents++
 	*lsn++
 	cc.status.WriteLSN++
+	cc.status.ProgressMetrics.ChangeStreamEvents++
 	return cc.status.WriteLSN
 }
 
@@ -177,8 +178,10 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 }
 
 func (cc *CosmosConnector) checkNamespaceComplete(ns iface.Namespace) bool {
-	nsStatus := cc.status.NamespaceProgress[nsToString(ns)]
-	return nsStatus.TasksCompleted.Load() == int64(len(nsStatus.Tasks))
+	cc.muProgressMetrics.Lock()
+	defer cc.muProgressMetrics.Unlock()
+	nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
+	return nsStatus.TasksCompleted == int64(len(nsStatus.Tasks))
 }
 
 func resetStartedTasks(tasks []iface.ReadPlanTask) {
@@ -191,4 +194,47 @@ func resetStartedTasks(tasks []iface.ReadPlanTask) {
 
 func nsToString(ns iface.Namespace) string {
 	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
+}
+
+func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask, progress iface.PersistProgress) { //TODO: parallelize this if it works
+	slog.Debug("Restoring progress metrics from tasks")
+	cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
+	for _, task := range tasks {
+		ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
+		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
+		if nsStatus == nil {
+			nsStatus = &iface.NameSpaceStatus{
+				EstimatedDocCount: 0,
+				Throughput:        0,
+				Tasks:             []iface.ReadPlanTask{},
+				TasksCompleted:    0,
+				TasksStarted:      0,
+				DocsCopied:        0,
+			}
+			cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)] = nsStatus
+		}
+		nsStatus.Tasks = append(nsStatus.Tasks, task)
+		complete := nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) //this is before adding the task, will check again after processing the task
+		nsStatus.EstimatedDocCount += task.Def.EstimatedDocCount
+
+		if task.Status == iface.ReadPlanTaskStatus_Completed {
+			cc.status.ProgressMetrics.TasksCompleted++
+			cc.status.ProgressMetrics.NumDocsSynced += task.Def.EstimatedDocCount
+
+			nsStatus.TasksCompleted++
+
+			nsStatus.DocsCopied += task.Def.EstimatedDocCount
+		}
+
+		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) && !complete {
+			cc.status.ProgressMetrics.NumNamespacesSynced += 1
+		}
+	}
+	cc.status.ProgressMetrics.NumNamespaces = int64(len(cc.status.ProgressMetrics.NamespaceProgress))
+	cc.status.ProgressMetrics.EstimatedTotalDocCount = progress.EstimatedDocs
+	cc.status.ProgressMetrics.ChangeStreamEvents = progress.ChangeStreamEvents
+	cc.status.ProgressMetrics.DeletesCaught = progress.DeletesCaught
+
+	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.status.ProgressMetrics))
+
 }

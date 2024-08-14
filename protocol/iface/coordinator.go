@@ -38,11 +38,17 @@ type ConnectorDetails struct {
 	Cap  ConnectorCapabilities
 }
 
+type PersistProgress struct {
+	EstimatedDocs      int64
+	ChangeStreamEvents int64
+	DeletesCaught      uint64
+}
+
 // Abstraction for the read plan
 type ConnectorReadPlan struct {
-	Tasks                []ReadPlanTask
-	CdcResumeToken       []byte          // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
-	SrcConnectorProgress ConnectorStatus // store read progress for the source connector
+	Tasks           []ReadPlanTask
+	CdcResumeToken  []byte          // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
+	ProgressDetails PersistProgress // progress details for the read plan
 }
 
 type ReadPlanTask struct {

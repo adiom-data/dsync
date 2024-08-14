@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/connector/connectorCosmos"
@@ -48,8 +49,9 @@ type RunnerLocalSettings struct {
 
 	NsFromString []string
 
-	VerifyRequestedFlag  bool
-	CleanupRequestedFlag bool
+	VerifyRequestedFlag   bool
+	CleanupRequestedFlag  bool
+	ProgressRequestedFlag bool
 
 	FlowStatusReportingIntervalSecs time.Duration
 
@@ -192,39 +194,41 @@ func (r *RunnerLocal) Run() error {
 		return nil
 	}
 
-	//continuoslly update the runner progress, update throughput in intervals
-	go func() {
-		ticker := time.NewTicker(throughputUpdateInterval)
-		currTime := time.Now()
-		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + r.runnerProgress.deletesCaught
-		nsProgress := r.runnerProgress.nsProgressMap
+	if r.settings.ProgressRequestedFlag {
+		//continuoslly update the runner progress, update throughput in intervals
+		go func() {
+			ticker := time.NewTicker(throughputUpdateInterval)
+			currTime := time.Now()
+			totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+			nsProgress := r.runnerProgress.nsProgressMap
 
-		for {
-			select {
-			case <-ticker.C:
-				r.UpdateRunnerProgress(flowID)
-				elapsed := time.Since(currTime).Seconds()
-				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + r.runnerProgress.deletesCaught
-				total_operations_delta := operationsNew - totaloperations
+			for {
+				select {
+				case <-ticker.C:
+					r.UpdateRunnerProgress(flowID)
+					elapsed := time.Since(currTime).Seconds()
+					operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+					total_operations_delta := operationsNew - totaloperations
 
-				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
+					r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
 
-				currTime = time.Now()
-				totaloperations = operationsNew
+					currTime = time.Now()
+					totaloperations = operationsNew
 
-				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-					if nsProgress[ns] != nil {
-						operationsDelta := nsStatus.DocsCopied.Load() - nsProgress[ns].DocsCopied.Load()
-						nsStatus.Throughput = math.Floor(float64(operationsDelta) / elapsed)
+					for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+						if nsProgress[ns] != nil {
+							operationsDelta := atomic.LoadInt64(&nsStatus.DocsCopied) - atomic.LoadInt64(&(nsProgress[ns].DocsCopied))
+							nsStatus.Throughput = math.Floor(float64(operationsDelta) / elapsed)
+						}
 					}
-				}
 
-			default:
-				//update the runnerprogress
-				r.UpdateRunnerProgress(flowID)
+				default:
+					//update the runnerprogress
+					r.UpdateRunnerProgress(flowID)
+				}
 			}
-		}
-	}()
+		}()
+	}
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {

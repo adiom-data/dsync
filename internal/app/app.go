@@ -74,6 +74,7 @@ func runDsync(c *cli.Context) error {
 		NsFromString:                    o.NamespaceFrom,
 		VerifyRequestedFlag:             o.Verify,
 		CleanupRequestedFlag:            o.Cleanup,
+		ProgressRequestedFlag:           o.Progress,
 		FlowStatusReportingIntervalSecs: 10,
 		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})

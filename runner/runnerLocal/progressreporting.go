@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -41,7 +42,7 @@ type runnerSyncProgress struct {
 	numDocsSynced int64
 
 	changeStreamEvents int64
-	deletesCaught      int64
+	deletesCaught      uint64
 
 	throughput    float64
 	nsProgressMap map[string]*iface.NameSpaceStatus //map key is namespace "db.col"
@@ -80,14 +81,16 @@ func (r *RunnerLocal) UpdateRunnerProgress(flowId iface.FlowID) {
 	r.runnerProgress.currTime = time.Now()
 	r.runnerProgress.numNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesSynced
 	r.runnerProgress.totalNamespaces = srcStatus.ProgressMetrics.NumNamespaces
-	r.runnerProgress.totalDocs = srcStatus.EstimatedTotalDocCount
+	r.runnerProgress.totalDocs = srcStatus.ProgressMetrics.EstimatedTotalDocCount
 	r.runnerProgress.numDocsSynced = srcStatus.ProgressMetrics.NumDocsSynced
-	r.runnerProgress.nsProgressMap = srcStatus.NamespaceProgress
+	r.runnerProgress.nsProgressMap = srcStatus.ProgressMetrics.NamespaceProgress
 
-	r.runnerProgress.namespaces = srcStatus.Namespaces
+	r.runnerProgress.namespaces = srcStatus.ProgressMetrics.Namespaces
 	r.runnerProgress.tasksTotal = srcStatus.ProgressMetrics.TasksTotal
 	r.runnerProgress.tasksStarted = srcStatus.ProgressMetrics.TasksStarted
 	r.runnerProgress.tasksCompleted = srcStatus.ProgressMetrics.TasksCompleted
+	r.runnerProgress.changeStreamEvents = srcStatus.ProgressMetrics.ChangeStreamEvents
+	r.runnerProgress.deletesCaught = srcStatus.ProgressMetrics.DeletesCaught
 
 }
 
@@ -96,7 +99,7 @@ func (r *RunnerLocal) SetUpDisplay(app *tview.Application, errorText *tview.Text
 	headerTextView := tview.NewTextView().SetText("Dsync Progress Report").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
 	table := tview.NewTable()
 	progressBarTextView := tview.NewTextView().SetText("Progress Bar").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
-	errorText.SetText("Error Logs").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
+	errorText.SetText("Error Logs\n").SetDynamicColors(true).SetRegions(true).SetWordWrap(true)
 	root := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(headerTextView, 0, 1, false).
 		AddItem(table, 0, 1, false).
@@ -143,31 +146,27 @@ func (r *RunnerLocal) GetStatusReport() {
 			nsString := key.Db + "." + key.Col
 			ns := r.runnerProgress.nsProgressMap[nsString]
 
-			docsCopied := ns.DocsCopied.Load()
-			//percentComplete := percentCompleteNamespace(ns)
+			docsCopied := atomic.LoadInt64(&ns.DocsCopied)
+			percentComplete, _, _ := percentCompleteNamespace(ns)
 
 			table.SetCellSimple(row+1, 0, fmt.Sprintf("%s.%s", key.Db, key.Col))
-			//table.SetCellSimple(row+1, 1, fmt.Sprintf("%.0f%%", percentComplete))
-			table.SetCellSimple(row+1, 2, fmt.Sprintf("%d/%d", ns.TasksCompleted.Load(), len(ns.Tasks)))
+			table.SetCellSimple(row+1, 1, fmt.Sprintf("%.0f%%", percentComplete))
+			table.SetCellSimple(row+1, 2, fmt.Sprintf("%d/%d", atomic.LoadInt64(&ns.TasksCompleted), len(ns.Tasks)))
 			table.SetCellSimple(row+1, 3, fmt.Sprintf("%d", docsCopied))
 			table.SetCellSimple(row+1, 4, fmt.Sprintf("%.0f", ns.Throughput))
 		}
 
 		progressBarWidth := 80
 
-		/*
-			totalPercentComplete := percentCompleteTotal(r.runnerProgress)
-			slog.Debug(fmt.Sprintf("Total percent complete: %.2f", totalPercentComplete))
+		totalPercentComplete := percentCompleteTotal(r.runnerProgress)
+		slog.Debug(fmt.Sprintf("Total percent complete: %.2f", totalPercentComplete))
 
-			progress := int(math.Floor((totalPercentComplete / 100 * float64(progressBarWidth))))
-			progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete, r.runnerProgress.throughput)
-			progressBar.SetText(progressBarString) */
-		//placeholder for now
-		progressBarString := fmt.Sprintf("[%s] %.2f%%		%.2f docs/sec\n", strings.Repeat(" ", progressBarWidth), 0.0, r.runnerProgress.throughput)
+		progress := int(math.Floor((totalPercentComplete / 100 * float64(progressBarWidth))))
+		progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete, r.runnerProgress.throughput)
 		progressBar.SetText(progressBarString)
 
 	case "ChangeStream":
-		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d        %d/%d Namespaces synced\nProcessing change stream events\n", r.runnerProgress.syncState, minutes, seconds, r.runnerProgress.numNamespacesCompleted, r.runnerProgress.totalNamespaces)
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d        %d/%d Namespaces synced\nProcessing change stream events\n\nChange Stream Events- %d		Deletes Caught- %d", r.runnerProgress.syncState, minutes, seconds, r.runnerProgress.numNamespacesCompleted, r.runnerProgress.totalNamespaces, r.runnerProgress.changeStreamEvents, r.runnerProgress.deletesCaught)
 		header.SetText(headerString)
 
 		progressBarWidth := 80
@@ -190,63 +189,52 @@ func (r *RunnerLocal) GetStatusReport() {
 
 func percentCompleteTotal(progress runnerSyncProgress) float64 {
 	var percentComplete float64
-	if progress.tasksTotal == progress.totalNamespaces {
-		//no partitioning
-		numDocsCompleted := int64(0)
-		maxNumDocsInProgress := int64(0)
-		numDocsInProgress := progress.numDocsSynced
-		for _, ns := range progress.nsProgressMap {
-			if ns.TasksCompleted.Load() == 1 {
-				numDocsCompleted += ns.EstimatedDocCount
-			} else {
-				maxNumDocsInProgress += ns.EstimatedDocCount
-			}
-		}
-		numDocsInProgress = numDocsInProgress - numDocsCompleted
-		if numDocsInProgress >= maxNumDocsInProgress && progress.numNamespacesCompleted != progress.totalNamespaces {
-			numDocsInProgress = maxNumDocsInProgress - 1
-		} else if numDocsInProgress > maxNumDocsInProgress && progress.numNamespacesCompleted == progress.totalNamespaces {
-			numDocsInProgress = maxNumDocsInProgress
-		}
-		percentComplete = float64(numDocsCompleted+numDocsInProgress) / float64(numDocsCompleted+maxNumDocsInProgress) * 100
-	} else {
-		//partitioning
-		totalPercents := float64(0)
-		for _, ns := range progress.nsProgressMap {
-			totalPercents += percentCompleteNamespace(ns)
-			slog.Debug(fmt.Sprintf("Namespace is %.2f%% complete", percentCompleteNamespace(ns)))
-		}
-		percentComplete = float64(totalPercents) / float64(progress.totalNamespaces)
+	docsCopied, totalDocs := float64(0), float64(0)
+	for _, ns := range progress.nsProgressMap {
+		_, numerator, denominator := percentCompleteNamespace(ns)
+		docsCopied += numerator
+		totalDocs += denominator
 	}
+	percentComplete = docsCopied / totalDocs * 100
+
 	return percentComplete
 
 }
 
-func percentCompleteNamespace(nsStatus *iface.NameSpaceStatus) float64 {
+// Calculates the percent complete for the given namespace, returns (percentComplete, numerator, denominator)
+func percentCompleteNamespace(nsStatus *iface.NameSpaceStatus) (float64, float64, float64) {
 	var percentComplete float64
+	var numerator, denominator float64
 	if len(nsStatus.Tasks) == 1 {
 		//no partitioning
 		docCount := nsStatus.EstimatedDocCount
 		if docCount == 0 {
 			percentComplete = 100
+			numerator = 1
+			denominator = 1
 		} else {
-			percentComplete = float64(nsStatus.DocsCopied.Load()) / float64(nsStatus.EstimatedDocCount) * 100
+			percentComplete = float64(atomic.LoadInt64(&nsStatus.DocsCopied)) / float64(docCount) * 100
+			numerator = float64(atomic.LoadInt64(&nsStatus.DocsCopied))
+			denominator = float64(docCount)
 		}
 	} else {
 		//partitioning
-		numDocsCopied := nsStatus.DocsCopied.Load()
+		numDocsCopied := atomic.LoadInt64(&nsStatus.DocsCopied)
 		docsPerTask := nsStatus.Tasks[0].Def.EstimatedDocCount
 
-		numCompletedDocs := int64(nsStatus.TasksCompleted.Load()) * docsPerTask
-		numInProgressDocsMax := int64(nsStatus.TasksStarted.Load()) * docsPerTask
+		numCompletedDocs := atomic.LoadInt64(&nsStatus.TasksCompleted) * docsPerTask
+		numInProgressDocsMax := int64(atomic.LoadInt64(&nsStatus.TasksStarted)) * docsPerTask
 		numDocsCopied -= numCompletedDocs
-		if numDocsCopied >= int64(numInProgressDocsMax) && len(nsStatus.Tasks) != int(nsStatus.TasksCompleted.Load()) {
+		numDocsLeft := (int64(len(nsStatus.Tasks)) - nsStatus.TasksCompleted) * docsPerTask
+		if numDocsCopied >= int64(numInProgressDocsMax) && len(nsStatus.Tasks) != int(atomic.LoadInt64(&nsStatus.TasksCompleted)) {
 			//we are in the middle of a task
 			numDocsCopied = int64(numInProgressDocsMax - 1)
-		} else if numDocsCopied > int64(numInProgressDocsMax) && len(nsStatus.Tasks) == int(nsStatus.TasksCompleted.Load()) {
+		} else if numDocsCopied > int64(numInProgressDocsMax) && len(nsStatus.Tasks) == int(atomic.LoadInt64(&nsStatus.TasksCompleted)) {
 			numDocsCopied = int64(numInProgressDocsMax)
 		}
-		percentComplete = float64(numCompletedDocs+numDocsCopied) / float64(numCompletedDocs+numInProgressDocsMax) * 100
+		percentComplete = float64(numCompletedDocs+numDocsCopied) / float64(numCompletedDocs+numDocsLeft) * 100
+		numerator = float64(numCompletedDocs + numDocsCopied)
+		denominator = float64(numCompletedDocs + numDocsLeft)
 	}
-	return percentComplete
+	return percentComplete, numerator, denominator
 }

@@ -81,7 +81,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(mc.ctx, mc.settings.serverConnectTimeout)
 	defer cancel()
-	clientOptions := options.Client().ApplyURI(mc.settings.ConnectionString)
+	clientOptions := options.Client().ApplyURI(mc.settings.ConnectionString).SetConnectTimeout(mc.settings.serverConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
