@@ -239,6 +239,8 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		<-initialSyncDone
 		defer close(changeStreamDone)
 
+		// wait group to ensure we don't kill things mid-cycle for the deletes emulation
+		var wg sync.WaitGroup
 		// prepare the delete trigger channel and start the deletes worker, if necessary
 		if cc.settings.EmulateDeletes {
 			slog.Info(fmt.Sprintf("Connector %s is starting deletes emulation worker for flow %s", cc.id, flowId))
@@ -257,7 +259,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						cc.flowDeletesTriggerChannel <- struct{}{}
 					case <-cc.flowDeletesTriggerChannel:
 						// check for deletes
+						slog.Error("XXX: START")
+						wg.Add(1)
 						readerProgress.deletesCaught += cc.checkForDeletes_sync(flowId, options, dataChannel)
+						wg.Done()
+						slog.Error("XXX: DONE")
 						// reset the timer - no point in checking too often
 						ticker.Reset(cc.settings.deletesCheckInterval)
 					}
@@ -287,6 +293,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		}()
 		// start the concurrent change streams
 		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
+		wg.Wait()
 	}()
 
 	// kick off the initial sync

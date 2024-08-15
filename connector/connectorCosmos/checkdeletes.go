@@ -8,6 +8,7 @@ package connectorCosmos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -82,10 +83,16 @@ func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options ifa
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
 // The channel is closed at the end to signal that all comparisons are done
 func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []namespace, mismatchedNamespaces chan<- namespace) {
+	defer close(mismatchedNamespaces)
+
 	for _, ns := range namespaces {
 		// get the count from the source
 		sourceCount, err := cc.client.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
+				return
+			}
 			slog.Error(fmt.Sprintf("Failed to get count from source for %v: %v", ns, err))
 			continue
 		}
@@ -93,6 +100,10 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 		// get the count from the witness
 		witnessCount, err := witnessClient.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
+				return
+			}
 			slog.Error(fmt.Sprintf("Failed to get count from witness for %v: %v", ns, err))
 			continue
 		}
@@ -102,7 +113,7 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 			mismatchedNamespaces <- ns
 		}
 	}
-	close(mismatchedNamespaces)
+
 	slog.Debug("All comparisons done")
 }
 
@@ -135,7 +146,11 @@ func (cc *CosmosConnector) scanWitnessNamespace(witnessClient *mongo.Client, ns 
 	opts := options.Find().SetProjection(bson.M{"_id": 1})
 	cur, err := witnessClient.Database(ns.db).Collection(ns.col).Find(cc.flowCtx, bson.M{}, opts)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get all ids from source for %v: %v", ns, err))
+		if errors.Is(err, context.Canceled) {
+			slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
+		} else {
+			slog.Error(fmt.Sprintf("Failed to get all ids from source for %v: %v", ns, err))
+		}
 		return
 	}
 	defer cur.Close(cc.flowCtx)
@@ -163,7 +178,7 @@ func (cc *CosmosConnector) scanWitnessNamespace(witnessClient *mongo.Client, ns 
 		}
 	}
 
-	if count > 0 {
+	if count > 0 && !errors.Is(cur.Err(), context.Canceled) { //there's something left to check and we weren't cancelled
 		idsToCheck <- idsWithLocation{loc: iface.Location{Database: ns.db, Collection: ns.col}, ids: ids}
 	}
 }
@@ -207,7 +222,11 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 
 	cur, err := cc.client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(cc.flowCtx, pipeline)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to aggregate: %v", err))
+		if errors.Is(err, context.Canceled) {
+			slog.Debug(fmt.Sprintf("Aggregate error: %v, but the context was cancelled", err))
+		} else {
+			slog.Error(fmt.Sprintf("Failed to aggregate: %v", err))
+		}
 		return
 	}
 	defer cur.Close(cc.flowCtx)
@@ -234,7 +253,7 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 		missingIds = idsWithLoc.ids
 	}
 
-	if len(missingIds) > 0 {
+	if len(missingIds) > 0 && !errors.Is(cur.Err(), context.Canceled) { //there's something to delete and we weren't cancelled
 		slog.Debug(fmt.Sprintf("Found %v missing ids for %v", len(missingIds), idsWithLoc.loc))
 		idsToDelete <- idsWithLocation{loc: idsWithLoc.loc, ids: missingIds}
 	}
