@@ -50,7 +50,7 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 	// Check that the provided connection string is pointing to a genuine MongoDB instance
 	// Otherwise we might get strange errors later on
 	if !connectorMongo.IsGenuineMongo(s.settings.ConnectionString) {
-		return fmt.Errorf("the provided connection string does not point to a genuine MongoDB instance")
+		return fmt.Errorf("statestore connection string should point to a genuine MongoDB instance")
 	}
 
 	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
