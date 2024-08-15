@@ -51,14 +51,12 @@ type ConnectorStatus struct {
 
 	SyncState string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
 
-	ProgressMetrics ProgressMetrics
+	ProgressMetrics ProgressMetrics // Progress Details for progress reporting interface, not required for all connectors
 }
 
 type ProgressMetrics struct {
-	EstimatedTotalDocCount int64
-
-	NumNamespaces       int64
-	NumNamespacesSynced int64 //change name
+	NumNamespaces          int64
+	NumNamespacesCompleted int64 //change name
 
 	NumDocsSynced      int64
 	ChangeStreamEvents int64

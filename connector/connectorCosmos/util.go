@@ -177,13 +177,7 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 	}
 }
 
-func (cc *CosmosConnector) checkNamespaceComplete(ns iface.Namespace) bool {
-	cc.muProgressMetrics.Lock()
-	defer cc.muProgressMetrics.Unlock()
-	nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
-	return nsStatus.TasksCompleted == int64(len(nsStatus.Tasks))
-}
-
+// resetStartedTasks resets the Started to false for all started tasks
 func resetStartedTasks(tasks []iface.ReadPlanTask) {
 	for i, task := range tasks {
 		if task.Started {
@@ -196,12 +190,14 @@ func nsToString(ns iface.Namespace) string {
 	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
 }
 
-func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask, progress iface.PersistProgress) { //TODO: parallelize this if it works
+// restoreProgressDetails restores the progress metrics from the persisted tasks and progress
+func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
 	slog.Debug("Restoring progress metrics from tasks")
 	cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
 	for _, task := range tasks {
 		ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
 		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
+		//check if the namespace status exists, if not create it
 		if nsStatus == nil {
 			nsStatus = &iface.NameSpaceStatus{
 				EstimatedDocCount:   0,
@@ -216,28 +212,54 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask, pr
 		}
 		nsStatus.Tasks = append(nsStatus.Tasks, task)
 		nsStatus.EstimatedDocCount += task.Def.EstimatedDocCount
-
+		//if the task is completed, update the document counters
 		if task.Status == iface.ReadPlanTaskStatus_Completed {
 			cc.status.ProgressMetrics.TasksCompleted++
-			//cc.status.ProgressMetrics.NumDocsSynced += task.Def.EstimatedDocCount
+			cc.status.ProgressMetrics.NumDocsSynced += task.Def.DocsCopied
 
 			nsStatus.TasksCompleted++
+			nsStatus.DocsCopied += task.Def.DocsCopied
 
 			nsStatus.EstimatedDocsCopied += task.Def.EstimatedDocCount
+			slog.Debug("totalDocsCopied: %v, ns docs copied: %v", cc.status.ProgressMetrics.NumDocsSynced, nsStatus.DocsCopied)
 		}
 	}
 	cc.status.ProgressMetrics.NumNamespaces = int64(len(cc.status.ProgressMetrics.NamespaceProgress))
-	cc.status.ProgressMetrics.EstimatedTotalDocCount = progress.EstimatedDocs
-	cc.status.ProgressMetrics.ChangeStreamEvents = progress.ChangeStreamEvents
-	cc.status.ProgressMetrics.DeletesCaught = progress.DeletesCaught
 
 	for ns, nsStatus := range cc.status.ProgressMetrics.NamespaceProgress {
 		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-			cc.status.ProgressMetrics.NumNamespacesSynced++
+			cc.status.ProgressMetrics.NumNamespacesCompleted++
 		}
 		cc.status.ProgressMetrics.Namespaces = append(cc.status.ProgressMetrics.Namespaces, ns)
 	}
 
 	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.status.ProgressMetrics))
 
+}
+
+// Updates the progress metrics once a task has been completed
+func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NameSpaceStatus, task iface.ReadPlanTask) *iface.TaskDoneMeta {
+	cc.muProgressMetrics.Lock()
+	//update progress counters: num tasks completed
+	cc.status.ProgressMetrics.TasksCompleted++
+	nsStatus.TasksCompleted++
+	//update the estimated docs copied count for the namespace to keep percentage proportional
+	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition)))
+	//check if namespace has been completed
+	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
+		cc.status.ProgressMetrics.NumNamespacesCompleted++
+	}
+	taskData := &iface.TaskDoneMeta{DocsCopied: task.Def.DocsCopied}
+	cc.muProgressMetrics.Unlock()
+	return taskData
+}
+
+// Updates the progress metrics once a task has been started
+func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NameSpaceStatus, task iface.ReadPlanTask) {
+	cc.muProgressMetrics.Lock()
+	nsStatus.DocsCopied++
+	nsStatus.EstimatedDocsCopied++
+	cc.status.ProgressMetrics.NumDocsSynced++
+	task.Def.DocsCopied++
+	cc.muProgressMetrics.Unlock()
 }

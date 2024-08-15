@@ -379,7 +379,7 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
+func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -389,6 +389,10 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
 		slog.Debug("Task done notification from source connector for task ID: " + fmt.Sprintf("%v", taskId))
+		err := updateFlowTaskData(flowDet, taskId, taskData)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 

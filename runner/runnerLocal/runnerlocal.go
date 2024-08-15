@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math"
 	"sync/atomic"
 	"time"
 
@@ -200,27 +199,36 @@ func (r *RunnerLocal) Run() error {
 			ticker := time.NewTicker(throughputUpdateInterval)
 			currTime := time.Now()
 			totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-			nsProgress := r.runnerProgress.nsProgressMap
+			nsProgress := make(map[iface.Namespace]int64)
+			for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+				if nsStatus != nil {
+					nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
+				}
+			}
 
 			for {
 				select {
 				case <-ticker.C:
 					r.UpdateRunnerProgress(flowID)
 					elapsed := time.Since(currTime).Seconds()
-					operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+					operationsNew := int64(0)
+					if r.runnerProgress.syncState == "InitialSync" {
+						operationsNew += r.runnerProgress.numDocsSynced
+					} else if r.runnerProgress.syncState == "ChangeStream" {
+						operationsNew += r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+					}
 					total_operations_delta := operationsNew - totaloperations
 
 					r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
 
+					for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+						operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
+						operationsDelta := operationsNew - nsProgress[ns]
+						nsStatus.Throughput = float64(operationsDelta) / elapsed
+						nsProgress[ns] = operationsNew
+					}
 					currTime = time.Now()
 					totaloperations = operationsNew
-
-					for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-						if nsProgress[ns] != nil {
-							operationsDelta := atomic.LoadInt64(&nsStatus.DocsCopied) - atomic.LoadInt64(&(nsProgress[ns].DocsCopied))
-							nsStatus.Throughput = math.Floor(float64(operationsDelta) / elapsed)
-						}
-					}
 
 				default:
 					//update the runnerprogress

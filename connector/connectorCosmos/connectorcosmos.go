@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -82,7 +81,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	// Set default values
 	settings.serverConnectTimeout = 15 * time.Second
 	settings.pingTimeout = 2 * time.Second
-	settings.initialSyncNumParallelCopiers = 4
+	settings.initialSyncNumParallelCopiers = 8
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
 	settings.numParallelIntegrityCheckTasks = 4
@@ -147,13 +146,12 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: false, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	progressMetrics := iface.ProgressMetrics{
-		EstimatedTotalDocCount: 0,
 		NumDocsSynced:          0,
 		TasksTotal:             0,
 		TasksStarted:           0,
 		TasksCompleted:         0,
 		NumNamespaces:          0,
-		NumNamespacesSynced:    0,
+		NumNamespacesCompleted: 0,
 		DeletesCaught:          0,
 		ChangeStreamEvents:     0,
 
@@ -215,7 +213,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 	resetStartedTasks(tasks)
 
-	cc.restoreProgressDetails(tasks, readPlan.ProgressDetails)
+	cc.restoreProgressDetails(tasks)
 
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -345,8 +343,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 					cc.muProgressMetrics.Lock()
 					nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
-					//update num tasks started for namespace
-					nsStatus.TasksStarted++
+					nsStatus.TasksStarted++ //update number of tasks started in the namespace
 					cc.muProgressMetrics.Unlock()
 
 					collection := cc.client.Database(db).Collection(col)
@@ -371,9 +368,8 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						data := []byte(rawData)
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
-						atomic.AddInt64(&nsStatus.DocsCopied, 1)
-						atomic.AddInt64(&nsStatus.EstimatedDocsCopied, 1)
-						atomic.AddInt64(&cc.status.ProgressMetrics.NumDocsSynced, 1)
+
+						cc.taskInProgressUpdate(nsStatus, task)
 
 						dataBatch[batch_idx] = data
 						batch_idx++
@@ -393,19 +389,13 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					} else {
 						cursor.Close(cc.flowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
-						atomic.AddInt64(&cc.status.ProgressMetrics.TasksCompleted, 1)
-						atomic.AddInt64(&nsStatus.TasksCompleted, 1)
 
-						cc.muProgressMetrics.Lock()
-						cc.status.ProgressMetrics.EstimatedTotalDocCount = int64(math.Max(float64(nsStatus.EstimatedDocCount), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition)))
-						cc.muProgressMetrics.Unlock()
+						//update the progress after completing the task, retrieve the task meta data to update persisted tasks
+						taskData := cc.taskDoneProgressUpdate(nsStatus, task)
 
-						if cc.checkNamespaceComplete(ns) {
-							atomic.AddInt64(&cc.status.ProgressMetrics.NumNamespacesSynced, 1)
-						}
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
-						cc.coord.NotifyTaskDone(cc.flowId, cc.id, task.Id)
+						cc.coord.NotifyTaskDone(cc.flowId, cc.id, task.Id, taskData)
 						//send a barrier message to signal the end of the task
 						if cc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
@@ -505,13 +495,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
 
-		progress := iface.PersistProgress{
-			EstimatedDocs:      cc.status.ProgressMetrics.EstimatedTotalDocCount,
-			ChangeStreamEvents: cc.status.ProgressMetrics.ChangeStreamEvents,
-			DeletesCaught:      cc.status.ProgressMetrics.DeletesCaught,
-		}
-
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken, ProgressDetails: progress}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {

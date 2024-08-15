@@ -155,6 +155,7 @@ func (cc *CosmosConnector) createReadPlanTaskForNs(ns iface.Namespace) iface.Rea
 	task := iface.ReadPlanTask{}
 	task.Def.Db = ns.Db
 	task.Def.Col = ns.Col
+	task.Def.DocsCopied = 0
 
 	return task
 }
@@ -184,10 +185,6 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 						continue
 					}
 				}
-
-				cc.muProgressMetrics.Lock()
-				cc.status.ProgressMetrics.EstimatedTotalDocCount += count
-				cc.muProgressMetrics.Unlock()
 
 				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
 					task := cc.createReadPlanTaskForNs(nsTask)
