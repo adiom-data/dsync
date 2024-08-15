@@ -18,6 +18,7 @@ import (
 	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestore/statestoreMongo"
+	"github.com/adiom-data/dsync/statestore/statestoreTemp"
 	"github.com/adiom-data/dsync/transport/transportLocal"
 )
 
@@ -80,7 +81,16 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	} else {
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString})
 	}
-	r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+
+	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
+		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+	} else if !nullWrite { //if the destination is stateful, we can use it as statestore
+		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.DstConnString})
+	} else {
+		// otherwise, use a stub statestore because no statestore is needed
+		r.statestore = statestoreTemp.NewMongoStateStore()
+	}
+
 	r.coord = coordinatorSimple.NewSimpleCoordinator()
 	r.trans = transportLocal.NewTransportLocal(r.coord)
 	r.settings = settings
