@@ -488,7 +488,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 		}
 		wg.Wait()
 
-		slog.Error(fmt.Sprintf("Read Plan Resume token map: %v", tokenMap.Map))
+		slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", tokenMap.Map))
 		//serialize the resume token map
 		flowCDCResumeToken, err := tokenMap.encodeMap()
 		if err != nil {
