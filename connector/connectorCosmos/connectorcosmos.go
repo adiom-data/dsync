@@ -259,11 +259,9 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						cc.flowDeletesTriggerChannel <- struct{}{}
 					case <-cc.flowDeletesTriggerChannel:
 						// check for deletes
-						slog.Error("XXX: START")
 						wg.Add(1)
 						readerProgress.deletesCaught += cc.checkForDeletes_sync(flowId, options, dataChannel)
 						wg.Done()
-						slog.Error("XXX: DONE")
 						// reset the timer - no point in checking too often
 						ticker.Reset(cc.settings.deletesCheckInterval)
 					}

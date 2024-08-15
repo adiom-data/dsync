@@ -286,21 +286,15 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 
 	go func() {
 		// Async wait until both src and dst signal that they are done
-		// Exit if the context has been cancelled
+		// The flow should be gracefully stopped if the context is cancelled
 		slog.Debug("Waiting for source to finish. Flow ID: " + fmt.Sprintf("%v", fid))
-		select {
-		case <-flowDet.doneNotificationChannels[0]:
-			slog.Debug("Source finished. Flow ID: " + fmt.Sprintf("%v", fid))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
+		<-flowDet.doneNotificationChannels[0]
+		slog.Debug("Source finished. Flow ID: " + fmt.Sprintf("%v", fid))
+
 		slog.Debug("Waiting for destination to finish. Flow ID: " + fmt.Sprintf("%v", fid))
-		select {
-		case <-flowDet.doneNotificationChannels[1]:
-			slog.Debug("Destination finished. Flow ID: " + fmt.Sprintf("%v", fid))
-		case <-c.ctx.Done():
-			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
-		}
+		<-flowDet.doneNotificationChannels[1]
+		slog.Debug("Destination finished. Flow ID: " + fmt.Sprintf("%v", fid))
+
 		slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is done")
 		close(flowDet.flowDone)
 	}()
