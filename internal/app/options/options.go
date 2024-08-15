@@ -42,7 +42,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Cleanup = c.Bool("cleanup")
 
 	// Infer source type if not provided
-	if o.Sourcetype == "" {
+	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
 		mongoFlavor := connectorMongo.GetMongoFlavor(o.SrcConnString)
 		if mongoFlavor == connectorMongo.FlavorCosmosDB {
 			o.Sourcetype = "CosmosDB"
