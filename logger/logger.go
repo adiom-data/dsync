@@ -6,15 +6,11 @@
 package logger
 
 import (
-	"bytes"
-	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
 	"github.com/lmittmann/tint"
-	"github.com/rivo/tview"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -83,51 +79,4 @@ func Setup(o Options) {
 
 	logger := slog.New(slogHandler)
 	slog.SetDefault(logger)
-}
-
-func SetUpTviewLogger(o Options) *tview.TextView {
-	errorLogs := tview.NewTextView().SetScrollable(true).SetDynamicColors(true).ScrollToEnd()
-	//writer := &TextViewWriter{errorLogs}
-
-	logger := slog.New(NewErrorHandler(slog.LevelInfo, nil, &bytes.Buffer{}))
-	slog.SetDefault(logger)
-
-	return errorLogs
-}
-
-type TextViewWriter struct {
-	textView *tview.TextView
-}
-
-func (w *TextViewWriter) Write(p []byte) (n int, err error) {
-	w.textView.Write(p)
-	return len(p), nil
-}
-
-type ErrorHandler struct {
-	level       slog.Level
-	fileHandler slog.Handler
-	buffer      *bytes.Buffer
-
-	slog.Handler
-}
-
-func NewErrorHandler(level slog.Level, fileHandler slog.Handler, buffer *bytes.Buffer) *ErrorHandler {
-	return &ErrorHandler{level: level, fileHandler: fileHandler, buffer: buffer}
-}
-func (h *ErrorHandler) Handle(ctx context.Context, record slog.Record) error {
-	if err := h.fileHandler.Handle(ctx, record); err != nil {
-		return err
-	}
-
-	if record.Level >= slog.LevelWarn {
-		if _, err := h.buffer.Write([]byte(fmt.Sprintf("%s: %s\n", record.Level, record.Message))); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (h *ErrorHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.level <= level
 }
