@@ -131,16 +131,25 @@ func getHostnameFromUrl(url string) string {
 	return getHostnameFromHost(host)
 }
 
-func IsGenuineMongo(connectionString string) bool {
+// GetMongoFlavor returns the flavor of the MongoDB instance based on the connection string
+type MongoFlavor string
+
+const (
+	FlavorCosmosDB   MongoFlavor = "COSMOS"
+	FlavorDocumentDB MongoFlavor = "DOCDB"
+	FlavorMongoDB    MongoFlavor = "MONGODB"
+)
+
+func GetMongoFlavor(connectionString string) MongoFlavor {
 	hostname := getHostnameFromUrl(connectionString)
 
 	//check if the connection string matches the regex for Cosmos DB
 	if COSMOS_DB_REGEX.MatchString(hostname) {
-		return false
+		return FlavorCosmosDB
 	}
 	//check if the connection string matches the regex for Document DB
 	if DOCUMENT_DB_REGEX.MatchString(hostname) {
-		return false
+		return FlavorDocumentDB
 	}
-	return true
+	return FlavorMongoDB
 }

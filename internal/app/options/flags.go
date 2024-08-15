@@ -61,7 +61,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				}
 				return nil
 			},
-			Required: true,
+			Required: false,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "source",

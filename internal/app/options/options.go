@@ -7,7 +7,9 @@ package options
 
 import (
 	"fmt"
+	"log/slog"
 
+	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/urfave/cli/v2"
 )
 
@@ -38,6 +40,17 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
 	o.Cleanup = c.Bool("cleanup")
+
+	// Infer source type if not provided
+	if o.Sourcetype == "" {
+		mongoFlavor := connectorMongo.GetMongoFlavor(o.SrcConnString)
+		if mongoFlavor == connectorMongo.FlavorCosmosDB {
+			o.Sourcetype = "CosmosDB"
+		} else {
+			o.Sourcetype = "MongoDB"
+		}
+		slog.Info(fmt.Sprintf("Inferred source type: %v", o.Sourcetype))
+	}
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
 	if o.Sourcetype != "CosmosDB" && o.CosmosDeletesEmu {

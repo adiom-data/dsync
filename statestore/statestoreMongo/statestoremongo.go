@@ -49,7 +49,7 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 
 	// Check that the provided connection string is pointing to a genuine MongoDB instance
 	// Otherwise we might get strange errors later on
-	if !connectorMongo.IsGenuineMongo(s.settings.ConnectionString) {
+	if connectorMongo.GetMongoFlavor(s.settings.ConnectionString) != connectorMongo.FlavorMongoDB {
 		return fmt.Errorf("statestore connection string should point to a genuine MongoDB instance")
 	}
 
