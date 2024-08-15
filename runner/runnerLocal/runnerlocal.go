@@ -69,7 +69,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		startTime:     time.Now(),
 		currTime:      time.Now(),
 		syncState:     "Setup",
-		nsProgressMap: make(map[string]*iface.NameSpaceStatus),
+		nsProgressMap: make(map[iface.Namespace]*iface.NameSpaceStatus),
 		namespaces:    make([]iface.Namespace, 0),
 	}
 	nullRead := settings.SrcConnString == "/dev/random"

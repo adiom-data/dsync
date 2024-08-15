@@ -157,7 +157,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 		DeletesCaught:          0,
 		ChangeStreamEvents:     0,
 
-		NamespaceProgress: make(map[string]*iface.NameSpaceStatus),
+		NamespaceProgress: make(map[iface.Namespace]*iface.NameSpaceStatus),
 		Namespaces:        make([]iface.Namespace, 0),
 	}
 
@@ -234,9 +234,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
 
-	for loc, _ := range cc.flowCDCResumeTokenMap.Map {
-		cc.status.ProgressMetrics.Namespaces = append(cc.status.ProgressMetrics.Namespaces, iface.Namespace{Db: loc.Database, Col: loc.Collection})
-	}
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
@@ -347,7 +344,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					ns := iface.Namespace{Db: db, Col: col}
 
 					cc.muProgressMetrics.Lock()
-					nsStatus := cc.status.ProgressMetrics.NamespaceProgress[nsToString(ns)]
+					nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
 					//update num tasks started for namespace
 					nsStatus.TasksStarted++
 					cc.muProgressMetrics.Unlock()

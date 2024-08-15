@@ -45,8 +45,8 @@ type runnerSyncProgress struct {
 	deletesCaught      uint64
 
 	throughput    float64
-	nsProgressMap map[string]*iface.NameSpaceStatus //map key is namespace "db.col"
-	namespaces    []iface.Namespace                 //use map and get the keys so print order is consistent
+	nsProgressMap map[iface.Namespace]*iface.NameSpaceStatus //map key is namespace "db.col"
+	namespaces    []iface.Namespace                          //use map and get the keys so print order is consistent
 
 	tasksTotal     int64
 	tasksStarted   int64
@@ -144,12 +144,12 @@ func (r *RunnerLocal) GetStatusReport() {
 		table.SetCellSimple(0, 4, "Throughput: Docs/s")
 		for row, key := range r.runnerProgress.namespaces {
 			nsString := key.Db + "." + key.Col
-			ns := r.runnerProgress.nsProgressMap[nsString]
+			ns := r.runnerProgress.nsProgressMap[key]
 
 			docsCopied := atomic.LoadInt64(&ns.DocsCopied)
 			percentComplete, _, _ := percentCompleteNamespace(ns)
 
-			table.SetCellSimple(row+1, 0, fmt.Sprintf("%s.%s", key.Db, key.Col))
+			table.SetCellSimple(row+1, 0, fmt.Sprintf("%s", nsString))
 			table.SetCellSimple(row+1, 1, fmt.Sprintf("%.0f%%", percentComplete))
 			table.SetCellSimple(row+1, 2, fmt.Sprintf("%d/%d", atomic.LoadInt64(&ns.TasksCompleted), len(ns.Tasks)))
 			table.SetCellSimple(row+1, 3, fmt.Sprintf("%d", docsCopied))
