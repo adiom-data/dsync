@@ -54,7 +54,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:  "sourcetype",
-			Usage: fmt.Sprintf("source database type (%s)", strings.Join(validSources, ",")),
+			Usage: fmt.Sprintf("source database type (%s). When not specified, will autodetect using the source URI", strings.Join(validSources, ",")),
 			Action: func(ctx *cli.Context, source string) error {
 				if !slices.Contains(validSources, source) {
 					return fmt.Errorf("unsupported sourcetype setting %v", source)
@@ -65,44 +65,44 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "source",
-			Usage:    "Source connection string",
+			Usage:    "source connection string",
 			Aliases:  []string{"s"},
 			Required: true,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "destination",
-			Usage:    "Destination connection string",
+			Usage:    "destination connection string",
 			Aliases:  []string{"d"},
 			Required: true,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "metadata",
-			Usage:    "Metadata store connection string",
+			Usage:    "metadata store connection string. Will default to the destination if not provided",
 			Aliases:  []string{"m"},
 			Required: false,
 		}),
 		altsrc.NewGenericFlag(&cli.GenericFlag{
 			Name:    "namespace",
-			Usage:   "List of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
+			Usage:   "list of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
 			Aliases: []string{"ns", "nsFrom"},
 			Value:   &ListFlag{},
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "verify",
-			Usage: "Perform a data integrity check for an existing flow",
+			Usage: "perform a data integrity check for an existing flow",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "cleanup",
-			Usage: "Cleanup metadata for an existing flow",
+			Usage: "cleanup metadata for an existing flow",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "cosmos-deletes-cdc",
-			Usage: "Generate CDC events for CosmosDB deletes",
+			Usage: "generate CDC events for CosmosDB deletes",
 		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
-			Usage:   "Specify the path of the config file",
+			Usage:   "specify the path of the config file",
 		},
 		cli.VersionFlag,
 	}
