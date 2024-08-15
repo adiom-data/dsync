@@ -9,21 +9,24 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
 	"github.com/lmittmann/tint"
-	"github.com/mattn/go-isatty"
 	"github.com/rivo/tview"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 type Options struct {
-	Verbosity string
-	Logfile   string
-	Format    bool // false = human readable, true = json
+	Verbosity  string   //log verbosity
+	Logfile    *os.File //log file handle. When not provided, logs are written to stderr
+	FormatJSON bool     // false = human readable, true = json
+
+	ErrorView io.Writer //error view for UI
 }
 
-func Setup(o Options, buffer bytes.Buffer) *os.File {
+func Setup(o Options) {
 	// set up log level
 	var level slog.Level
 	switch o.Verbosity {
@@ -39,55 +42,47 @@ func Setup(o Options, buffer bytes.Buffer) *os.File {
 		level = slog.LevelDebug // default to DEBUG if verbosity is not recognized
 	}
 
-	var logger *slog.Logger
+	var slogHandler slog.Handler
 
-	if o.Logfile != "" {
-		logFile, err := os.OpenFile(o.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			panic(err)
-		}
-
-		/*
-			// File handler
-			fileHandler := tint.NewHandler(logFile, &tint.Options{
-				NoColor:   !isatty.IsTerminal(logFile.Fd()),
+	if o.Logfile == nil { // just log to stderr
+		if o.FormatJSON {
+			slogHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 				Level:     level,
 				AddSource: (level < 0), // only for debugging
 			})
-
-			logger = slog.New(NewErrorHandler(level, fileHandler, &buffer))
-		*/
-		if o.Format {
-			logger = slog.New(
-				slog.NewTextHandler(logFile, &slog.HandlerOptions{
-					Level:     level,
-					AddSource: (level < 0), // only for debugging
-				}),
-			)
 		} else {
-			logger = slog.New(
-				tint.NewHandler(logFile, &tint.Options{
-					NoColor:   !isatty.IsTerminal(logFile.Fd()),
-					Level:     level,
-					AddSource: (level < 0), //only for debugging
-				}),
-			)
-		}
-		slog.SetDefault(logger)
-		return logFile
-
-	} else {
-		w := os.Stderr
-		logger = slog.New(
-			tint.NewHandler(w, &tint.Options{
-				NoColor:   !isatty.IsTerminal(w.Fd()),
+			slogHandler = tint.NewHandler(os.Stderr, &tint.Options{
+				NoColor:   false, // colorize output
 				Level:     level,
 				AddSource: (level < 0), //only for debugging
-			}),
-		)
-		slog.SetDefault(logger)
+			})
+		}
+	} else { // log to file and potentially send errors to the UI
+		if o.FormatJSON {
+			slogHandler = slog.NewTextHandler(o.Logfile, &slog.HandlerOptions{
+				Level:     level,
+				AddSource: (level < 0), // only for debugging
+			})
+		} else {
+			slogHandler = tint.NewHandler(o.Logfile, &tint.Options{
+				NoColor:   true, // no colors
+				Level:     level,
+				AddSource: (level < 0), //only for debugging
+			})
+		}
+
+		if o.ErrorView != nil {
+			// create a dedicated error handler and fanout
+			slogHandlerEV := tint.NewHandler(o.ErrorView, &tint.Options{
+				NoColor: true,           // no colors
+				Level:   slog.LevelWarn, //only warnings and errors
+			})
+			slogHandler = slogmulti.Fanout(slogHandler, slogHandlerEV)
+		}
 	}
-	return nil
+
+	logger := slog.New(slogHandler)
+	slog.SetDefault(logger)
 }
 
 func SetUpTviewLogger(o Options) *tview.TextView {

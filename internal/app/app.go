@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -46,14 +47,25 @@ func runDsync(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	lo := logger.Options{Verbosity: o.Verbosity, Logfile: o.Logfile}
-	logbuffer := bytes.Buffer{}
 
-	logFile := logger.Setup(lo, logbuffer)
+	// set up logging
+	lo := logger.Options{Verbosity: o.Verbosity}
+	logbuffer := bytes.Buffer{} //XXX: remove me
 
-	if logFile != nil {
+	errorTextView := tview.NewTextView().SetScrollable(true).SetDynamicColors(true).ScrollToEnd()
+	if o.Logfile != "" { // need to log to a file
+		logFile, err := os.OpenFile(o.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			panic(err)
+		}
 		defer logFile.Close()
+		lo.Logfile = logFile
+
+		if o.Progress { // log to tview as well
+			lo.ErrorView = errorTextView
+		}
 	}
+	logger.Setup(lo)
 
 	defer func() {
 		fmt.Printf("dsync has stopped running\n")
@@ -89,7 +101,6 @@ func runDsync(c *cli.Context) error {
 		go func() {
 			defer wg.Done()
 
-			errorTextView := tview.NewTextView()
 			tviewApp := tview.NewApplication()
 			defer tviewApp.Stop()
 
