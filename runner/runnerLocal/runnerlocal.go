@@ -211,12 +211,8 @@ func (r *RunnerLocal) Run() error {
 				case <-ticker.C:
 					r.UpdateRunnerProgress(flowID)
 					elapsed := time.Since(currTime).Seconds()
-					operationsNew := int64(0)
-					if r.runnerProgress.syncState == "InitialSync" {
-						operationsNew += r.runnerProgress.numDocsSynced
-					} else if r.runnerProgress.syncState == "ChangeStream" {
-						operationsNew += r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-					}
+					operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+
 					total_operations_delta := operationsNew - totaloperations
 
 					r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
