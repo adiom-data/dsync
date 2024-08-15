@@ -88,16 +88,16 @@ func (cc *CosmosConnector) getMinAndMax(ctx context.Context, ns iface.Namespace,
 
 	//get the top and bottom boundaries
 	topCursor, err := collection.Find(ctx, bson.M{}, optsMax)
-	defer topCursor.Close(ctx)
 	if err != nil {
 		return bson.RawValue{}, bson.RawValue{}, err
 	}
+	defer topCursor.Close(ctx)
 
 	bottomCursor, err := collection.Find(ctx, bson.M{}, optsMin)
-	defer bottomCursor.Close(ctx)
 	if err != nil {
 		return bson.RawValue{}, bson.RawValue{}, err
 	}
+	defer bottomCursor.Close(ctx)
 
 	if !topCursor.Next(ctx) {
 		return bson.RawValue{}, bson.RawValue{}, fmt.Errorf("failed to get top boundary")
