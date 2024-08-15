@@ -7,7 +7,6 @@
 package dsync
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -50,7 +49,6 @@ func runDsync(c *cli.Context) error {
 
 	// set up logging
 	lo := logger.Options{Verbosity: o.Verbosity}
-	logbuffer := bytes.Buffer{} //XXX: remove me
 
 	errorTextView := tview.NewTextView().SetScrollable(true).SetDynamicColors(true).ScrollToEnd()
 	if o.Logfile != "" { // need to log to a file
@@ -67,14 +65,7 @@ func runDsync(c *cli.Context) error {
 	}
 	logger.Setup(lo)
 
-	defer func() {
-		fmt.Printf("dsync has stopped running\n")
-		if logbuffer.Len() > 0 {
-			fmt.Printf("%v\n", logbuffer.String())
-		} else {
-			fmt.Printf("No logs generated\n")
-		}
-	}()
+	defer fmt.Printf("dsync has stopped running\n")
 
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
@@ -142,6 +133,9 @@ func runDsync(c *cli.Context) error {
 		err := r.Setup(runnerCtx)
 		if err == nil {
 			r.Run()
+		} else {
+			slog.Error(fmt.Sprintf("%v", err))
+			runnerCancelFunc()
 		}
 		r.Teardown()
 
