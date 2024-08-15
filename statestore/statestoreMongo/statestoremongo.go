@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -45,6 +46,12 @@ func NewMongoStateStore(settings MongoStateStoreSettings) *MongoStateStore {
 
 func (s *MongoStateStore) Setup(ctx context.Context) error {
 	s.ctx = ctx
+
+	// Check that the provided connection string is pointing to a genuine MongoDB instance
+	// Otherwise we might get strange errors later on
+	if !connectorMongo.IsGenuineMongo(s.settings.ConnectionString) {
+		return fmt.Errorf("the provided connection string does not point to a genuine MongoDB instance")
+	}
 
 	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
 	tM := reflect.TypeOf(bson.M{})
