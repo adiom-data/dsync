@@ -1,10 +1,10 @@
 name: Build and Release
 
-# Triggers on pushes to any tag
+# Trigger on push to the main branch
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - 'main'  # Adjust this to your main branch name
 
 permissions:
   contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
@@ -67,7 +67,6 @@ jobs:
         asset_name: dsync.zip
         asset_content_type: application/zip
     - name: Create new tag
-      if: github.event_name == 'push'
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
