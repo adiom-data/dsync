@@ -357,6 +357,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 					loc := iface.Location{Database: db, Collection: col}
 					var dataBatch [][]byte
 					var batch_idx int
+					var docs int64
 					for cursor.Next(cc.flowCtx) {
 						if dataBatch == nil {
 							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
@@ -367,7 +368,8 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
 
-						cc.taskInProgressUpdate(nsStatus, task)
+						cc.taskInProgressUpdate(nsStatus)
+						docs++
 
 						dataBatch[batch_idx] = data
 						batch_idx++
@@ -388,12 +390,13 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						cursor.Close(cc.flowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 
-						//update the progress after completing the task, retrieve the task meta data to update persisted tasks
-						taskData := cc.taskDoneProgressUpdate(nsStatus, task)
+						//update the progress after completing the task and create task metadata to pass to coordinator to persist
+						cc.taskDoneProgressUpdate(nsStatus)
 
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
-						cc.coord.NotifyTaskDone(cc.flowId, cc.id, task.Id, taskData)
+						taskData := iface.TaskDoneMeta{DocsCopied: docs}
+						cc.coord.NotifyTaskDone(cc.flowId, cc.id, task.Id, &taskData)
 						//send a barrier message to signal the end of the task
 						if cc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
