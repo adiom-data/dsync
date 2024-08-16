@@ -211,6 +211,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 	tasks := readPlan.Tasks
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
+	namespaces := make([]namespace, 0)
 
 	cc.restoreProgressDetails(tasks)
 
@@ -230,6 +231,11 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	}
 
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", cc.flowCDCResumeTokenMap.Map))
+
+	//placeholder for how to get namespaces, can use status struct from progress output later
+	for loc, _ := range cc.flowCDCResumeTokenMap.Map {
+		namespaces = append(namespaces, namespace{db: loc.Database, col: loc.Collection})
+	}
 
 	// Get data channel from transport interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
@@ -317,7 +323,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(cc.flowCtx, tasks, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, namespaces, &readerProgress, dataChannel)
 	}()
 
 	// kick off the initial sync

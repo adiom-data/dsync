@@ -9,12 +9,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 //XXX (AK, 6/2024): this is not going to work on anything but a dedicated Mongo cluster
@@ -100,4 +103,53 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
 	}
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
+}
+
+// Checks if the MongoDB is genuine based on the connection string
+var COSMOS_DB_REGEX = regexp.MustCompile(`(?i)\.cosmos\.azure\.com$`)
+var DOCUMENT_DB_REGEX = regexp.MustCompile(`(?i)docdb(-elastic)?\.amazonaws\.com$`)
+
+func getHostnameFromHost(host string) string {
+	if strings.HasPrefix(host, "[") {
+		// If it's ipv6 return what's in the brackets.
+		return strings.Split(strings.TrimPrefix(host, "["), "]")[0]
+	}
+	return strings.Split(host, ":")[0]
+}
+
+func getHostnameFromUrl(url string) string {
+	var host string
+
+	connString, err := connstring.Parse(url)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to parse connection string: %v", err))
+		host = url //assume it's a hostname
+	} else {
+		host = connString.Hosts[0]
+	}
+
+	return getHostnameFromHost(host)
+}
+
+// GetMongoFlavor returns the flavor of the MongoDB instance based on the connection string
+type MongoFlavor string
+
+const (
+	FlavorCosmosDB   MongoFlavor = "COSMOS"
+	FlavorDocumentDB MongoFlavor = "DOCDB"
+	FlavorMongoDB    MongoFlavor = "MONGODB"
+)
+
+func GetMongoFlavor(connectionString string) MongoFlavor {
+	hostname := getHostnameFromUrl(connectionString)
+
+	//check if the connection string matches the regex for Cosmos DB
+	if COSMOS_DB_REGEX.MatchString(hostname) {
+		return FlavorCosmosDB
+	}
+	//check if the connection string matches the regex for Document DB
+	if DOCUMENT_DB_REGEX.MatchString(hostname) {
+		return FlavorDocumentDB
+	}
+	return FlavorMongoDB
 }
