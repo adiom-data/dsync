@@ -84,9 +84,9 @@ jobs:
     - name: Archive binary and README
       run: zip dsync.zip dsync README.md
 
-    - name: Extract GIT_TAG from ref
-      id: extract_tag
-      run: echo "::set-output name=GIT_TAG::${GITHUB_REF#refs/tags/}"
+    - name: Determine the tag name
+      id: get_tag_name
+      run: echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
     - name: Create Release
       id: create_release
@@ -94,8 +94,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.extract_tag.outputs.GIT_TAG }}
-        release_name: Release ${{ steps.extract_tag.outputs.GIT_TAG }}
+        tag_name: ${{ env.GIT_TAG }}
+        release_name: Release ${{ env.GIT_TAG }}
         draft: false
         prerelease: false
 
