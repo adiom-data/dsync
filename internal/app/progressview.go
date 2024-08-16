@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/adiom-data/dsync/runner/runnerLocal"
 	"github.com/rivo/tview"
 )
 
@@ -47,7 +48,7 @@ func (tv *TViewDetails) SetUpDisplay(app *tview.Application, errorText *tview.Te
 }
 
 // Get the latest status report based on the runner progress struct and update the tview components accoringly
-func (tv *TViewDetails) GetStatusReport(runnerProgress iface.RunnerSyncProgress) {
+func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncProgress) {
 	//get tview components and clear them
 	header := tv.root.GetItem(0).(*tview.TextView)
 	header.Clear()
@@ -132,7 +133,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress iface.RunnerSyncProgress)
 }
 
 // Calculate the total percent complete for all namespaces
-func percentCompleteTotal(progress iface.RunnerSyncProgress) float64 {
+func percentCompleteTotal(progress runnerLocal.RunnerSyncProgress) float64 {
 	var percentComplete float64
 	docsCopied, totalDocs := float64(0), float64(0)
 	for _, ns := range progress.NsProgressMap {

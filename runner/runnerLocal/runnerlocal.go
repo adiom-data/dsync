@@ -33,7 +33,7 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress iface.RunnerSyncProgress
+	runnerProgress RunnerSyncProgress
 
 	ctx context.Context
 }
@@ -61,7 +61,7 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.runnerProgress = iface.RunnerSyncProgress{
+	r.runnerProgress = RunnerSyncProgress{
 		StartTime:     time.Now(),
 		CurrTime:      time.Now(),
 		SyncState:     "Setup",

@@ -113,7 +113,7 @@ func runDsync(c *cli.Context) error {
 					case <-runnerCtx.Done():
 						return
 					default:
-						tv.GetStatusReport()
+						tv.GetStatusReport(r.GetRunnerProgress())
 						time.Sleep(1 * time.Second)
 					}
 				}
