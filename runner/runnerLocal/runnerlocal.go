@@ -54,6 +54,8 @@ type RunnerLocalSettings struct {
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
+
+	AdvancedProgressRecalcInterval time.Duration //0 means disabled
 }
 
 const (
@@ -200,32 +202,35 @@ func (r *RunnerLocal) Run() error {
 		return err
 	}
 
+	if r.settings.AdvancedProgressRecalcInterval > 0 {
+		// periodically update the throughout
+		go r.updateRunnerSyncThroughputRoutine(r.settings.AdvancedProgressRecalcInterval)
+	}
+
 	// periodically print the flow status for visibility
 	//XXX (AK, 6/2024): not sure if this is the best way to do it
 	go func() {
-		go func() {
-			for {
-				select {
-				case <-r.ctx.Done():
-					return
-				default:
-					flowStatus, err := r.coord.GetFlowStatus(flowID)
-					if err != nil {
-						slog.Error("Failed to get flow status", err)
-						break
-					}
-					slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))
-					if flowStatus.SrcStatus.CDCActive {
-						eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
-						if eventsDiff < 0 {
-							eventsDiff = 0
-						}
-						slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
-					}
-					time.Sleep(r.settings.FlowStatusReportingInterval * time.Second)
+		for {
+			select {
+			case <-r.ctx.Done():
+				return
+			default:
+				flowStatus, err := r.coord.GetFlowStatus(flowID)
+				if err != nil {
+					slog.Error("Failed to get flow status", err)
+					break
 				}
+				slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))
+				if flowStatus.SrcStatus.CDCActive {
+					eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
+					if eventsDiff < 0 {
+						eventsDiff = 0
+					}
+					slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
+				}
+				time.Sleep(r.settings.FlowStatusReportingInterval * time.Second)
 			}
-		}()
+		}
 	}()
 
 	// wait for the flow to finish

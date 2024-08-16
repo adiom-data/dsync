@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	throughputUpdateInterval = 5 * time.Second
+	throughputUpdateInterval = 10 * time.Second
 )
 
 var (

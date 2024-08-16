@@ -7,6 +7,7 @@ package runnerLocal
 
 import (
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -67,44 +68,39 @@ func (r *RunnerLocal) GetRunnerProgress() RunnerSyncProgress {
 	return r.runnerProgress
 }
 
-//func (r *RunnerLocal) updateRunnerSyncThroughput() RunnerSyncProgress {
-// if r.settings.ProgressRequestedFlag {
-// 	//continuoslly update the runner progress, update throughput in intervals
-// 	go func() {
-// 		ticker := time.NewTicker(throughputUpdateInterval)
-// 		currTime := time.Now()
-// 		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-// 		nsProgress := make(map[iface.Namespace]int64)
-// 		for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-// 			if nsStatus != nil {
-// 				nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
-// 			}
-// 		}
+// Loops to update the status and throughput metrics for the runner progress struct
+func (r *RunnerLocal) updateRunnerSyncThroughputRoutine(throughputUpdateInterval time.Duration) {
+	ticker := time.NewTicker(throughputUpdateInterval)
+	currTime := time.Now()
+	totaloperations := 0 + r.runnerProgress.NumDocsSynced + r.runnerProgress.ChangeStreamEvents + int64(r.runnerProgress.DeletesCaught)
+	nsProgress := make(map[iface.Namespace]int64)
+	for ns, nsStatus := range r.runnerProgress.NsProgressMap {
+		if nsStatus != nil {
+			nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
+		}
+	}
 
-// 		for {
-// 			select {
-// 			case <-ticker.C:
-// 				r.UpdateRunnerProgress(flowID)
-// 				elapsed := time.Since(currTime).Seconds()
-// 				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+	for {
+		select {
+		case <-r.ctx.Done():
+			return
+		case <-ticker.C:
+			r.UpdateRunnerProgress()
+			elapsed := time.Since(currTime).Seconds()
+			operationsNew := r.runnerProgress.NumDocsSynced + r.runnerProgress.ChangeStreamEvents + int64(r.runnerProgress.DeletesCaught)
 
-// 				total_operations_delta := operationsNew - totaloperations
+			total_operations_delta := operationsNew - totaloperations
 
-// 				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
+			r.runnerProgress.Throughput = float64(total_operations_delta) / elapsed
 
-// 				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-// 					operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
-// 					operationsDelta := operationsNew - nsProgress[ns]
-// 					nsStatus.Throughput = float64(operationsDelta) / elapsed
-// 					nsProgress[ns] = operationsNew
-// 				}
-// 				currTime = time.Now()
-// 				totaloperations = operationsNew
-
-// 			default:
-// 				//update the runnerprogress
-// 				r.UpdateRunnerProgress(flowID)
-// 			}
-// 		}
-// 	}()
-// }
+			for ns, nsStatus := range r.runnerProgress.NsProgressMap {
+				operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
+				operationsDelta := operationsNew - nsProgress[ns]
+				nsStatus.Throughput = float64(operationsDelta) / elapsed
+				nsProgress[ns] = operationsNew
+			}
+			currTime = time.Now()
+			totaloperations = operationsNew
+		}
+	}
+}

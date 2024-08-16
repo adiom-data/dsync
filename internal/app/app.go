@@ -67,16 +67,24 @@ func runDsync(c *cli.Context) error {
 
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
+	var advancedProgressRecalcInterval time.Duration
+	if !o.Progress {
+		advancedProgressRecalcInterval = 0
+	} else {
+		advancedProgressRecalcInterval = throughputUpdateInterval
+	}
+
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
-		SrcConnString:                 o.SrcConnString,
-		DstConnString:                 o.DstConnString,
-		SrcType:                       o.Sourcetype,
-		StateStoreConnString:          o.StateStoreConnString,
-		NsFromString:                  o.NamespaceFrom,
-		VerifyRequestedFlag:           o.Verify,
-		CleanupRequestedFlag:          o.Cleanup,
-		FlowStatusReportingInterval:   10,
-		CosmosDeletesEmuRequestedFlag: o.CosmosDeletesEmu,
+		SrcConnString:                  o.SrcConnString,
+		DstConnString:                  o.DstConnString,
+		SrcType:                        o.Sourcetype,
+		StateStoreConnString:           o.StateStoreConnString,
+		NsFromString:                   o.NamespaceFrom,
+		VerifyRequestedFlag:            o.Verify,
+		CleanupRequestedFlag:           o.Cleanup,
+		FlowStatusReportingInterval:    10,
+		CosmosDeletesEmuRequestedFlag:  o.CosmosDeletesEmu,
+		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
 	})
 
 	var wg sync.WaitGroup
