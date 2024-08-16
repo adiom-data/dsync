@@ -145,10 +145,13 @@ func runDsync(c *cli.Context) error {
 		err := r.Setup(runnerCtx)
 		if err == nil {
 			err = r.Run()
+			if !o.Verify { //if verification was requested, the user should be able to see the results
+				runnerCancelFunc()
+			}
 		} else {
 			slog.Error(fmt.Sprintf("%v", err))
+			runnerCancelFunc() //stop tview since we failed
 		}
-		runnerCancelFunc() //make sure tview is stopped when the runner is done
 		r.Teardown()
 		runnerErr = err
 	}()

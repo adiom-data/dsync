@@ -179,8 +179,10 @@ func (r *RunnerLocal) Run() error {
 			slog.Error("Failed to perform flow integrity check", err)
 		} else {
 			if integrityCheckRes.Passed {
+				r.runnerProgress.VerificationResult = "OK"
 				slog.Info("Data integrity check: OK")
 			} else {
+				r.runnerProgress.VerificationResult = "FAIL"
 				slog.Error("Data integrity check: FAIL")
 			}
 		}

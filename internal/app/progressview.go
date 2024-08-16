@@ -122,7 +122,13 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 
 	case iface.VerifySyncState:
 		//set the header text
-		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d\nPerforming Data Integrity Check", runnerProgress.SyncState, hours, minutes, seconds)
+		stateString := "Performing Data Integrity Check"
+		if runnerProgress.VerificationResult == "PASS" {
+			stateString = "Data Integrity Check: PASS        Press Ctrl+C to exit"
+		} else if runnerProgress.VerificationResult == "FAIL" {
+			stateString = "Data Integrity Check: FAIL        Press Ctrl+C to exit"
+		}
+		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d\n%s", runnerProgress.SyncState, hours, minutes, seconds, stateString)
 		header.SetText(headerString)
 
 	default:

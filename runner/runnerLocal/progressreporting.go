@@ -35,6 +35,8 @@ type RunnerSyncProgress struct {
 	TasksCompleted int64
 
 	Lag int64
+
+	VerificationResult string
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
