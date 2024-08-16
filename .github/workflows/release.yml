@@ -59,6 +59,7 @@ jobs:
       with:
         tag_name: ${{ env.NEW_TAG }}
         release_name: Release ${{ env.NEW_TAG }}
+        commitish: true
         draft: false
         prerelease: false
     - name: Upload Release Asset
