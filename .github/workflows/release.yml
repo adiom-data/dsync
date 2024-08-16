@@ -1,0 +1,97 @@
+name: Build and Release
+# On merge or push to main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+    - name: Build the binary
+      run: go build -o dsync
+    - name: Create a README with instructions
+      run: |
+        echo "# dsync Binary" > README.txt
+        echo "## Introduction to Dsync" >> README.txt
+        echo "Dsync is a one-way data migration tool between MongoDB databases, and over time it will extend to other databases including Azure Cosmos, bidirectional communication, and complex flows." >> README.txt
+        echo "" >> README.txt
+        echo "## How to Use:" >> README.txt
+        echo "### Prerequisites:" >> README.txt
+        echo "1. Download the \`dsync.zip\` archive from the release assets." >> README.txt
+        echo "2. Upload the \`dsync.zip\` file to your target VM." >> README.txt
+        echo "3. SSH into your VM and navigate to the directory where you've placed \`dsync.zip\`." >> README.txt
+        echo "4. Unzip the archive using the command: \`unzip dsync.zip\`." >> README.txt
+        echo "5. Make sure the \`dsync\` binary is executable: \`chmod +x dsync\`." >> README.txt
+        echo "6. **Run the binary with command-line flags:**" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   ./dsync --source <source_connection_string> --destination <destination_connection_string> --sourcetype MongoDB --verbosity INFO" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   For more details on available flags, run:" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   ./dsync --help" >> README.txt
+        echo "   ```" >> README.txt
+        echo "7. **Alternatively, run with a configuration file:**" >> README.txt
+        echo "   Create a YAML configuration file (e.g., `config.yaml`) with the following structure:" >> README.txt
+        echo "   ```yaml" >> README.txt
+        echo "   verbosity: INFO" >> README.txt
+        echo "   sourcetype: MongoDB" >> README.txt
+        echo "   source: <source_connection_string>" >> README.txt
+        echo "   destination: <destination_connection_string>" >> README.txt
+        echo "   metadata: <metadata_connection_string>" >> README.txt
+        echo "   namespace: db1,db2.collection" >> README.txt
+        echo "   verify: false" >> README.txt
+        echo "   cleanup: false" >> README.txt
+        echo "   cosmos-deletes-cdc: false" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   Then run:" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   ./dsync --config config.yaml" >> README.txt
+        echo "   ```" >> README.txt
+        echo "8. If your application requires a configuration file, please ensure the config is set correctly before running the binary." >> README.txt
+        echo "## Cleanup" >> README.txt
+        echo "To cleanup after use:" >> README.txt
+        echo "1. Kill all running \`mongod\` processes:" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   killall mongod" >> README.txt
+        echo "   ```" >> README.txt
+        echo "2. Remove all data from a MongoDB instance:" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   mongosh <URI>" >> README.txt
+        echo "   var dbs = db.getMongo().getDBNames()" >> README.txt
+        echo "   for (var i in dbs) { db = db.getMongo().getDB(dbs[i]); print(\"dropping db \" + db.getName()); (!['admin','config','local'].includes(db.getName())) && db.dropDatabase(); }" >> README.txt
+        echo "   ```" >> README.txt
+        echo "3. Remove metadata associated with the flow by running:" >> README.txt
+        echo "   ```" >> README.txt
+        echo "   ./dsync ... --cleanup" >> README.txt
+        echo "   ```" >> README.txt
+    - name: Archive binary and README
+      run: zip dsync.zip dsync README.txt
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dsync.zip
+        asset_name: dsync.zip
+        asset_content_type: application/zip
