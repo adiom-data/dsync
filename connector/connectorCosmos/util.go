@@ -211,16 +211,16 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 			cc.status.ProgressMetrics.NamespaceProgress[ns] = nsStatus
 		}
 		nsStatus.Tasks = append(nsStatus.Tasks, task)
-		nsStatus.EstimatedDocCount += task.Def.EstimatedDocCount
+		nsStatus.EstimatedDocCount += task.EstimatedDocCount
 		//if the task is completed, update the document counters
 		if task.Status == iface.ReadPlanTaskStatus_Completed {
 			cc.status.ProgressMetrics.TasksCompleted++
-			cc.status.ProgressMetrics.NumDocsSynced += task.Def.DocsCopied
+			cc.status.ProgressMetrics.NumDocsSynced += task.DocsCopied
 
 			nsStatus.TasksCompleted++
-			nsStatus.DocsCopied += task.Def.DocsCopied
+			nsStatus.DocsCopied += task.DocsCopied
 
-			nsStatus.EstimatedDocsCopied += task.Def.EstimatedDocCount
+			nsStatus.EstimatedDocsCopied += task.EstimatedDocCount
 			slog.Debug("totalDocsCopied: %v, ns docs copied: %v", cc.status.ProgressMetrics.NumDocsSynced, nsStatus.DocsCopied)
 		}
 	}
@@ -249,7 +249,7 @@ func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatu
 	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
 		cc.status.ProgressMetrics.NumNamespacesCompleted++
 	}
-	taskData := &iface.TaskDoneMeta{DocsCopied: task.Def.DocsCopied}
+	taskData := &iface.TaskDoneMeta{DocsCopied: task.DocsCopied}
 	cc.muProgressMetrics.Unlock()
 	return taskData
 }
@@ -260,6 +260,6 @@ func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus,
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++
 	cc.status.ProgressMetrics.NumDocsSynced++
-	task.Def.DocsCopied++
+	task.DocsCopied++
 	cc.muProgressMetrics.Unlock()
 }

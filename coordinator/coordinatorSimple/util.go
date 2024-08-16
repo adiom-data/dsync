@@ -75,7 +75,7 @@ func updateFlowTaskData(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID, t
 
 	for i, task := range flowDetails.ReadPlan.Tasks {
 		if task.Id == taskId {
-			flowDetails.ReadPlan.Tasks[i].Def.DocsCopied = taskData.DocsCopied
+			flowDetails.ReadPlan.Tasks[i].DocsCopied = taskData.DocsCopied
 			return nil
 		}
 	}
