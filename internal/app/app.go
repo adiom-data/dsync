@@ -65,8 +65,6 @@ func runDsync(c *cli.Context) error {
 	}
 	logger.Setup(lo)
 
-	defer fmt.Printf("dsync has stopped running\n")
-
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
@@ -84,6 +82,8 @@ func runDsync(c *cli.Context) error {
 	var wg sync.WaitGroup
 	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
 
+	var userInterrupted bool
+
 	if o.Progress {
 		wg.Add(1)
 
@@ -97,6 +97,8 @@ func runDsync(c *cli.Context) error {
 			// Custom signal handler for Ctrl+C within tview
 			tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 				if event.Key() == tcell.KeyCtrlC {
+					//fmt.Printf("received Ctrl+C from the user\n")
+					userInterrupted = true
 					tviewApp.Stop()
 					runnerCancelFunc() // Cancel the runner
 					return nil
@@ -129,20 +131,25 @@ func runDsync(c *cli.Context) error {
 
 	wg.Add(1)
 
+	var runnerErr error
 	go func() {
 		defer wg.Done()
 		err := r.Setup(runnerCtx)
 		if err == nil {
-			r.Run()
+			err = r.Run()
 		} else {
 			slog.Error(fmt.Sprintf("%v", err))
-			runnerCancelFunc() //to make sure tview is stopped
+			runnerCancelFunc() //make sure tview is stopped if we didn't start the runner
 		}
 		r.Teardown()
-
+		runnerErr = err
 	}()
 
 	wg.Wait()
 
-	return nil
+	if userInterrupted {
+		fmt.Println("user interrupted the process")
+	}
+
+	return runnerErr
 }
