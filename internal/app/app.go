@@ -136,7 +136,7 @@ func runDsync(c *cli.Context) error {
 			r.Run()
 		} else {
 			slog.Error(fmt.Sprintf("%v", err))
-			runnerCancelFunc()
+			runnerCancelFunc() //to make sure tview is stopped
 		}
 		r.Teardown()
 
