@@ -7,7 +7,6 @@ package options
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/urfave/cli/v2"
@@ -54,7 +53,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 		} else {
 			o.Sourcetype = "MongoDB"
 		}
-		slog.Info(fmt.Sprintf("Inferred source type: %v", o.Sourcetype))
+		fmt.Printf("Inferred source type: %v\n", o.Sourcetype)
 	}
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
