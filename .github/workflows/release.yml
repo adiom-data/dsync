@@ -1,18 +1,13 @@
 name: Build and Release
 
-# On merge or push to main
+# Triggers on pushes to any tag
 on:
   push:
     tags:
       - '*'
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: write  # This ensures the GITHUB_TOKEN has write permissions to contents
+  contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
 
 jobs:
   build:
@@ -35,23 +30,31 @@ jobs:
           output_name=dsync-$GOOS-$GOARCH
           env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name
         done
-    - name: Archive binaries
+    - name: Create a README with instructions
+      run: echo "# dsync Binary" > README.md
+    - name: Archive binaries and README
       run: |
-        zip dsync.zip dsync-*
-    - name: Get the latest tag name
+        zip dsync.zip dsync-* README.md
+    - name: Get the latest tag name and increment it
       id: get_tag_name
       run: |
         TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        NEW_TAG=$(echo $TAG | awk -F. -v OFS=. '{$NF++;print}')
-        echo "GIT_TAG=$NEW_TAG" >> $GITHUB_ENV
+        echo "Latest tag found: $TAG"
+        if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          IFS='.' read -r -a parts <<< "${TAG:1}"
+          new_version="v${parts[0]}.${parts[1]}.$((parts[2]+1))"
+        else
+          new_version="v0.0.1"
+        fi
+        echo "NEW_TAG=$new_version" >> $GITHUB_ENV
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ env.GIT_TAG }}
-        release_name: Release ${{ env.GIT_TAG }}
+        tag_name: ${{ env.NEW_TAG }}
+        release_name: Release ${{ env.NEW_TAG }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
@@ -63,3 +66,10 @@ jobs:
         asset_path: ./dsync.zip
         asset_name: dsync.zip
         asset_content_type: application/zip
+    - name: Create new tag
+      if: github.event_name == 'push'
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git tag ${{ env.NEW_TAG }}
+        git push origin ${{ env.NEW_TAG }}
