@@ -77,7 +77,6 @@ func runDsync(c *cli.Context) error {
 		NsFromString:                    o.NamespaceFrom,
 		VerifyRequestedFlag:             o.Verify,
 		CleanupRequestedFlag:            o.Cleanup,
-		ProgressRequestedFlag:           o.Progress,
 		FlowStatusReportingIntervalSecs: 10,
 		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
 	})
@@ -104,7 +103,8 @@ func runDsync(c *cli.Context) error {
 				}
 				return event
 			})
-			r.SetUpDisplay(tviewApp, errorTextView)
+			tv := &TViewDetails{}
+			tv.SetUpDisplay(tviewApp, errorTextView)
 
 			// Start the status reporting goroutine
 			go func() {
@@ -113,7 +113,7 @@ func runDsync(c *cli.Context) error {
 					case <-runnerCtx.Done():
 						return
 					default:
-						r.GetStatusReport()
+						tv.GetStatusReport()
 						time.Sleep(1 * time.Second)
 					}
 				}

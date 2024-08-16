@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/connector/connectorCosmos"
@@ -34,8 +33,7 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress runnerSyncProgress
-	tui            tviewDetails
+	runnerProgress iface.RunnerSyncProgress
 
 	ctx context.Context
 }
@@ -48,9 +46,8 @@ type RunnerLocalSettings struct {
 
 	NsFromString []string
 
-	VerifyRequestedFlag   bool
-	CleanupRequestedFlag  bool
-	ProgressRequestedFlag bool
+	VerifyRequestedFlag  bool
+	CleanupRequestedFlag bool
 
 	FlowStatusReportingIntervalSecs time.Duration
 
@@ -64,12 +61,12 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.runnerProgress = runnerSyncProgress{
-		startTime:     time.Now(),
-		currTime:      time.Now(),
-		syncState:     "Setup",
-		nsProgressMap: make(map[iface.Namespace]*iface.NameSpaceStatus),
-		namespaces:    make([]iface.Namespace, 0),
+	r.runnerProgress = iface.RunnerSyncProgress{
+		StartTime:     time.Now(),
+		CurrTime:      time.Now(),
+		SyncState:     "Setup",
+		NsProgressMap: make(map[iface.Namespace]*iface.NameSpaceStatus),
+		Namespaces:    make([]iface.Namespace, 0),
 	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
@@ -171,7 +168,7 @@ func (r *RunnerLocal) Run() error {
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
-		r.runnerProgress.syncState = "Verify"
+		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
 		if err != nil {
 			slog.Error("Failed to perform flow integrity check", err)
@@ -187,52 +184,52 @@ func (r *RunnerLocal) Run() error {
 
 	// destroy the flow if the cleanup flag is set
 	if r.settings.CleanupRequestedFlag {
-		r.runnerProgress.syncState = "Cleanup"
+		r.runnerProgress.SyncState = "Cleanup"
 		slog.Info("Cleaning up metadata for the flow")
 		r.coord.FlowDestroy(flowID)
 		return nil
 	}
 
-	if r.settings.ProgressRequestedFlag {
-		//continuoslly update the runner progress, update throughput in intervals
-		go func() {
-			ticker := time.NewTicker(throughputUpdateInterval)
-			currTime := time.Now()
-			totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-			nsProgress := make(map[iface.Namespace]int64)
-			for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-				if nsStatus != nil {
-					nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
-				}
-			}
+	// if r.settings.ProgressRequestedFlag {
+	// 	//continuoslly update the runner progress, update throughput in intervals
+	// 	go func() {
+	// 		ticker := time.NewTicker(throughputUpdateInterval)
+	// 		currTime := time.Now()
+	// 		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+	// 		nsProgress := make(map[iface.Namespace]int64)
+	// 		for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+	// 			if nsStatus != nil {
+	// 				nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
+	// 			}
+	// 		}
 
-			for {
-				select {
-				case <-ticker.C:
-					r.UpdateRunnerProgress(flowID)
-					elapsed := time.Since(currTime).Seconds()
-					operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+	// 		for {
+	// 			select {
+	// 			case <-ticker.C:
+	// 				r.UpdateRunnerProgress(flowID)
+	// 				elapsed := time.Since(currTime).Seconds()
+	// 				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
 
-					total_operations_delta := operationsNew - totaloperations
+	// 				total_operations_delta := operationsNew - totaloperations
 
-					r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
+	// 				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
 
-					for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-						operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
-						operationsDelta := operationsNew - nsProgress[ns]
-						nsStatus.Throughput = float64(operationsDelta) / elapsed
-						nsProgress[ns] = operationsNew
-					}
-					currTime = time.Now()
-					totaloperations = operationsNew
+	// 				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+	// 					operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
+	// 					operationsDelta := operationsNew - nsProgress[ns]
+	// 					nsStatus.Throughput = float64(operationsDelta) / elapsed
+	// 					nsProgress[ns] = operationsNew
+	// 				}
+	// 				currTime = time.Now()
+	// 				totaloperations = operationsNew
 
-				default:
-					//update the runnerprogress
-					r.UpdateRunnerProgress(flowID)
-				}
-			}
-		}()
-	}
+	// 			default:
+	// 				//update the runnerprogress
+	// 				r.UpdateRunnerProgress(flowID)
+	// 			}
+	// 		}
+	// 	}()
+	// }
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {
@@ -281,7 +278,4 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
-	if r.tui.app != nil {
-		r.tui.app.Stop()
-	}
 }
