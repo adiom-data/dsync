@@ -4,7 +4,10 @@ name: Build and Release
 on:
   push:
     branches:
-      - 'main'  # Adjust this to your main branch name
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
