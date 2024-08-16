@@ -90,7 +90,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	options := iface.ConnectorOptions{}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageCount := 0
 
 	// Start a go routine to read from the data channel until it's closed
@@ -205,7 +205,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageIterCount := 1000
 
 	// Start a go routine to write to the data channel

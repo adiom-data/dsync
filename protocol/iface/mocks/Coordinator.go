@@ -19,14 +19,14 @@ func (_m *Coordinator) DelistConnector(_a0 iface.ConnectorID) {
 	_m.Called(_a0)
 }
 
-// FlowDestroy provides a mock function with given fields: fid
-func (_m *Coordinator) FlowDestroy(fid iface.FlowID) {
-	_m.Called(fid)
+// FlowDestroy provides a mock function with given fields: _a0
+func (_m *Coordinator) FlowDestroy(_a0 iface.FlowID) {
+	_m.Called(_a0)
 }
 
-// FlowGetOrCreate provides a mock function with given fields: o
-func (_m *Coordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
-	ret := _m.Called(o)
+// FlowGetOrCreate provides a mock function with given fields: _a0
+func (_m *Coordinator) FlowGetOrCreate(_a0 iface.FlowOptions) (iface.FlowID, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FlowGetOrCreate")
@@ -35,16 +35,16 @@ func (_m *Coordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error
 	var r0 iface.FlowID
 	var r1 error
 	if rf, ok := ret.Get(0).(func(iface.FlowOptions) (iface.FlowID, error)); ok {
-		return rf(o)
+		return rf(_a0)
 	}
 	if rf, ok := ret.Get(0).(func(iface.FlowOptions) iface.FlowID); ok {
-		r0 = rf(o)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(iface.FlowID)
 	}
 
 	if rf, ok := ret.Get(1).(func(iface.FlowOptions) error); ok {
-		r1 = rf(o)
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -52,9 +52,9 @@ func (_m *Coordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error
 	return r0, r1
 }
 
-// FlowStart provides a mock function with given fields: fid
-func (_m *Coordinator) FlowStart(fid iface.FlowID) error {
-	ret := _m.Called(fid)
+// FlowStart provides a mock function with given fields: _a0
+func (_m *Coordinator) FlowStart(_a0 iface.FlowID) error {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FlowStart")
@@ -62,7 +62,7 @@ func (_m *Coordinator) FlowStart(fid iface.FlowID) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(iface.FlowID) error); ok {
-		r0 = rf(fid)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -70,9 +70,9 @@ func (_m *Coordinator) FlowStart(fid iface.FlowID) error {
 	return r0
 }
 
-// FlowStop provides a mock function with given fields: fid
-func (_m *Coordinator) FlowStop(fid iface.FlowID) {
-	_m.Called(fid)
+// FlowStop provides a mock function with given fields: _a0
+func (_m *Coordinator) FlowStop(_a0 iface.FlowID) {
+	_m.Called(_a0)
 }
 
 // GetConnectors provides a mock function with given fields:
@@ -95,9 +95,9 @@ func (_m *Coordinator) GetConnectors() []iface.ConnectorDetails {
 	return r0
 }
 
-// GetFlowStatus provides a mock function with given fields: fid
-func (_m *Coordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
-	ret := _m.Called(fid)
+// GetFlowStatus provides a mock function with given fields: _a0
+func (_m *Coordinator) GetFlowStatus(_a0 iface.FlowID) (iface.FlowStatus, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFlowStatus")
@@ -106,16 +106,16 @@ func (_m *Coordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error)
 	var r0 iface.FlowStatus
 	var r1 error
 	if rf, ok := ret.Get(0).(func(iface.FlowID) (iface.FlowStatus, error)); ok {
-		return rf(fid)
+		return rf(_a0)
 	}
 	if rf, ok := ret.Get(0).(func(iface.FlowID) iface.FlowStatus); ok {
-		r0 = rf(fid)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(iface.FlowStatus)
 	}
 
 	if rf, ok := ret.Get(1).(func(iface.FlowID) error); ok {
-		r1 = rf(fid)
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -141,17 +141,17 @@ func (_m *Coordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) e
 	return r0
 }
 
-// NotifyTaskDone provides a mock function with given fields: flowId, conn, taskId
-func (_m *Coordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
-	ret := _m.Called(flowId, conn, taskId)
+// NotifyTaskDone provides a mock function with given fields: flowId, conn, taskId, taskData
+func (_m *Coordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
+	ret := _m.Called(flowId, conn, taskId, taskData)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NotifyTaskDone")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ReadPlanTaskID) error); ok {
-		r0 = rf(flowId, conn, taskId)
+	if rf, ok := ret.Get(0).(func(iface.FlowID, iface.ConnectorID, iface.ReadPlanTaskID, *iface.TaskDoneMeta) error); ok {
+		r0 = rf(flowId, conn, taskId, taskData)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -159,9 +159,9 @@ func (_m *Coordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorI
 	return r0
 }
 
-// PerformFlowIntegrityCheck provides a mock function with given fields: fid
-func (_m *Coordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
-	ret := _m.Called(fid)
+// PerformFlowIntegrityCheck provides a mock function with given fields: _a0
+func (_m *Coordinator) PerformFlowIntegrityCheck(_a0 iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PerformFlowIntegrityCheck")
@@ -170,16 +170,16 @@ func (_m *Coordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDa
 	var r0 iface.FlowDataIntegrityCheckResult
 	var r1 error
 	if rf, ok := ret.Get(0).(func(iface.FlowID) (iface.FlowDataIntegrityCheckResult, error)); ok {
-		return rf(fid)
+		return rf(_a0)
 	}
 	if rf, ok := ret.Get(0).(func(iface.FlowID) iface.FlowDataIntegrityCheckResult); ok {
-		r0 = rf(fid)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(iface.FlowDataIntegrityCheckResult)
 	}
 
 	if rf, ok := ret.Get(1).(func(iface.FlowID) error); ok {
-		r1 = rf(fid)
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -297,9 +297,9 @@ func (_m *Coordinator) UpdateConnectorStatus(flowId iface.FlowID, conn iface.Con
 	return r0
 }
 
-// WaitForFlowDone provides a mock function with given fields: flowId
-func (_m *Coordinator) WaitForFlowDone(flowId iface.FlowID) error {
-	ret := _m.Called(flowId)
+// WaitForFlowDone provides a mock function with given fields: _a0
+func (_m *Coordinator) WaitForFlowDone(_a0 iface.FlowID) error {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WaitForFlowDone")
@@ -307,7 +307,7 @@ func (_m *Coordinator) WaitForFlowDone(flowId iface.FlowID) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(iface.FlowID) error); ok {
-		r0 = rf(flowId)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
 	}
