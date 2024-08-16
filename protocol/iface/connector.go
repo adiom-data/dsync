@@ -54,6 +54,17 @@ type ConnectorStatus struct {
 	ProgressMetrics ProgressMetrics // Progress Details for progress reporting interface, not required for all connectors
 }
 
+// XXX: we should separate the connector and the flow state instead of mixing them together
+const (
+	SetupSyncState        = "Setup"
+	VerifySyncState       = "Verify"
+	CleanupSyncState      = "Cleanup"
+	ReadPlanningSyncState = "ReadPlanning"
+
+	ChangeStreamSyncState = "ChangeStream"
+	InitialSyncSyncState  = "InitialSync"
+)
+
 type ProgressMetrics struct {
 	NumNamespaces          int64
 	NumNamespacesCompleted int64 //change name

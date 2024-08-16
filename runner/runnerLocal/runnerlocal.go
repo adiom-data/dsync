@@ -68,7 +68,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r.runnerProgress = RunnerSyncProgress{
 		StartTime:     time.Now(),
 		CurrTime:      time.Now(),
-		SyncState:     "Setup",
+		SyncState:     iface.SetupSyncState,
 		NsProgressMap: make(map[iface.Namespace]*iface.NamespaceStatus),
 		Namespaces:    make([]iface.Namespace, 0),
 	}

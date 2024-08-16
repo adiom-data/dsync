@@ -50,7 +50,9 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	}
 	srcStatus := flowStatus.SrcStatus
 
-	r.runnerProgress.SyncState = srcStatus.SyncState
+	if r.runnerProgress.SyncState != iface.VerifySyncState && r.runnerProgress.SyncState != iface.CleanupSyncState { //XXX: if we're cleaning up or verifying, we don't want to overwrite the state
+		r.runnerProgress.SyncState = srcStatus.SyncState
+	}
 	r.runnerProgress.CurrTime = time.Now()
 	r.runnerProgress.NumNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesCompleted
 	r.runnerProgress.TotalNamespaces = srcStatus.ProgressMetrics.NumNamespaces

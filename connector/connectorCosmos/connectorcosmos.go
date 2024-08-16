@@ -259,7 +259,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		cc.status.SyncState = "ChangeStream"
+		cc.status.SyncState = iface.ChangeStreamSyncState
 		defer close(changeStreamDone)
 
 		// prepare the delete trigger channel and start the deletes worker, if necessary
@@ -318,7 +318,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		defer close(initialSyncDone)
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", cc.id, flowId))
-		cc.status.SyncState = "InitialSync"
+		cc.status.SyncState = iface.InitialSyncSyncState
 
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan iface.ReadPlanTask)
@@ -461,7 +461,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		cc.status.SyncState = "ReadPlanning"
+		cc.status.SyncState = iface.ReadPlanningSyncState
 		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace)
 
 		if err != nil {
