@@ -33,6 +33,8 @@ type RunnerSyncProgress struct {
 	TasksTotal     int64
 	TasksStarted   int64
 	TasksCompleted int64
+
+	Lag int64
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
@@ -61,6 +63,15 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	r.runnerProgress.TasksCompleted = srcStatus.ProgressMetrics.TasksCompleted
 	r.runnerProgress.ChangeStreamEvents = srcStatus.ProgressMetrics.ChangeStreamEvents
 	r.runnerProgress.DeletesCaught = srcStatus.ProgressMetrics.DeletesCaught
+
+	// update replication lag
+	if flowStatus.SrcStatus.CDCActive {
+		eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
+		if eventsDiff < 0 {
+			eventsDiff = 0
+		}
+		r.runnerProgress.Lag = eventsDiff
+	}
 }
 
 // Get the latest runner progress struct
