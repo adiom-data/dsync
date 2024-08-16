@@ -116,7 +116,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 
 		//set the indefinite progress bar
 		progressBarWidth := 80
-		cdcPaginatorPosition = (cdcPaginatorPosition + 1) % (progressBarWidth - 4)
+		cdcPaginatorPosition = (cdcPaginatorPosition + 5) % (progressBarWidth - 4)
 		progressBarString := fmt.Sprintf("[%s%s%s] %.2f events/sec\n\n", strings.Repeat(string('-'), cdcPaginatorPosition), strings.Repeat(">", 3), strings.Repeat("-", progressBarWidth-cdcPaginatorPosition-2), runnerProgress.Throughput)
 		progressBar.SetText(progressBarString)
 
