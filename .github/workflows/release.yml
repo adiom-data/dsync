@@ -33,7 +33,10 @@ jobs:
       run: zip dsync.zip dsync README.md
     - name: Get the latest tag name
       id: get_tag_name
-      run: echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+      run: |
+        TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        NEW_TAG=$(echo $TAG | awk -F. -v OFS=. '{$NF++;print}')
+        echo "GIT_TAG=$NEW_TAG" >> $GITHUB_ENV
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
