@@ -24,13 +24,20 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: 1.22
-    - name: Build the binary
-      run: go build -o dsync
-    - name: Create a README with instructions
+    - name: Build binaries for multiple platforms
       run: |
-        echo "# dsync Binary" > README.md
-    - name: Archive binary and README
-      run: zip dsync.zip dsync README.md
+        platforms=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64")
+        for platform in "${platforms[@]}"
+        do
+          os_arch=(${platform//\// })
+          GOOS=${os_arch[0]}
+          GOARCH=${os_arch[1]}
+          output_name=dsync-$GOOS-$GOARCH
+          env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name
+        done
+    - name: Archive binaries
+      run: |
+        zip dsync.zip dsync-*
     - name: Get the latest tag name
       id: get_tag_name
       run: |
