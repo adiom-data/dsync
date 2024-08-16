@@ -68,15 +68,15 @@ func runDsync(c *cli.Context) error {
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
-		SrcConnString:                   o.SrcConnString,
-		DstConnString:                   o.DstConnString,
-		SrcType:                         o.Sourcetype,
-		StateStoreConnString:            o.StateStoreConnString,
-		NsFromString:                    o.NamespaceFrom,
-		VerifyRequestedFlag:             o.Verify,
-		CleanupRequestedFlag:            o.Cleanup,
-		FlowStatusReportingIntervalSecs: 10,
-		CosmosDeletesEmuRequestedFlag:   o.CosmosDeletesEmu,
+		SrcConnString:                 o.SrcConnString,
+		DstConnString:                 o.DstConnString,
+		SrcType:                       o.Sourcetype,
+		StateStoreConnString:          o.StateStoreConnString,
+		NsFromString:                  o.NamespaceFrom,
+		VerifyRequestedFlag:           o.Verify,
+		CleanupRequestedFlag:          o.Cleanup,
+		FlowStatusReportingInterval:   10,
+		CosmosDeletesEmuRequestedFlag: o.CosmosDeletesEmu,
 	})
 
 	var wg sync.WaitGroup
@@ -116,6 +116,7 @@ func runDsync(c *cli.Context) error {
 						tviewApp.Stop() //need to make sure we stop the tview app when context is cancelled
 						return
 					default:
+						r.UpdateRunnerProgress()
 						tv.GetStatusReport(r.GetRunnerProgress())
 						time.Sleep(1 * time.Second)
 					}

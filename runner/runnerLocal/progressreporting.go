@@ -35,8 +35,12 @@ type RunnerSyncProgress struct {
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
-func (r *RunnerLocal) UpdateRunnerProgress(flowId iface.FlowID) {
-	flowStatus, err := r.coord.GetFlowStatus(flowId)
+func (r *RunnerLocal) UpdateRunnerProgress() {
+	if r.activeFlowID == iface.FlowID("") { //no active flow - probably not active yet
+		return
+	}
+
+	flowStatus, err := r.coord.GetFlowStatus(r.activeFlowID)
 	if err != nil {
 		slog.Error("Failed to get flow status", err)
 		return
@@ -62,3 +66,45 @@ func (r *RunnerLocal) UpdateRunnerProgress(flowId iface.FlowID) {
 func (r *RunnerLocal) GetRunnerProgress() RunnerSyncProgress {
 	return r.runnerProgress
 }
+
+//func (r *RunnerLocal) updateRunnerSyncThroughput() RunnerSyncProgress {
+// if r.settings.ProgressRequestedFlag {
+// 	//continuoslly update the runner progress, update throughput in intervals
+// 	go func() {
+// 		ticker := time.NewTicker(throughputUpdateInterval)
+// 		currTime := time.Now()
+// 		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+// 		nsProgress := make(map[iface.Namespace]int64)
+// 		for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+// 			if nsStatus != nil {
+// 				nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
+// 			}
+// 		}
+
+// 		for {
+// 			select {
+// 			case <-ticker.C:
+// 				r.UpdateRunnerProgress(flowID)
+// 				elapsed := time.Since(currTime).Seconds()
+// 				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
+
+// 				total_operations_delta := operationsNew - totaloperations
+
+// 				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
+
+// 				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
+// 					operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
+// 					operationsDelta := operationsNew - nsProgress[ns]
+// 					nsStatus.Throughput = float64(operationsDelta) / elapsed
+// 					nsProgress[ns] = operationsNew
+// 				}
+// 				currTime = time.Now()
+// 				totaloperations = operationsNew
+
+// 			default:
+// 				//update the runnerprogress
+// 				r.UpdateRunnerProgress(flowID)
+// 			}
+// 		}
+// 	}()
+// }

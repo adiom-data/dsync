@@ -33,9 +33,11 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress RunnerSyncProgress
+	runnerProgress RunnerSyncProgress //internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
 
 	ctx context.Context
+
+	activeFlowID iface.FlowID
 }
 
 type RunnerLocalSettings struct {
@@ -49,7 +51,7 @@ type RunnerLocalSettings struct {
 	VerifyRequestedFlag  bool
 	CleanupRequestedFlag bool
 
-	FlowStatusReportingIntervalSecs time.Duration
+	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
 }
@@ -165,6 +167,7 @@ func (r *RunnerLocal) Run() error {
 		slog.Error("Failed to create flow", err)
 		return err
 	}
+	r.activeFlowID = flowID
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
@@ -190,52 +193,13 @@ func (r *RunnerLocal) Run() error {
 		return nil
 	}
 
-	// if r.settings.ProgressRequestedFlag {
-	// 	//continuoslly update the runner progress, update throughput in intervals
-	// 	go func() {
-	// 		ticker := time.NewTicker(throughputUpdateInterval)
-	// 		currTime := time.Now()
-	// 		totaloperations := 0 + r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-	// 		nsProgress := make(map[iface.Namespace]int64)
-	// 		for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-	// 			if nsStatus != nil {
-	// 				nsProgress[ns] = atomic.LoadInt64(&nsStatus.DocsCopied)
-	// 			}
-	// 		}
-
-	// 		for {
-	// 			select {
-	// 			case <-ticker.C:
-	// 				r.UpdateRunnerProgress(flowID)
-	// 				elapsed := time.Since(currTime).Seconds()
-	// 				operationsNew := r.runnerProgress.numDocsSynced + r.runnerProgress.changeStreamEvents + int64(r.runnerProgress.deletesCaught)
-
-	// 				total_operations_delta := operationsNew - totaloperations
-
-	// 				r.runnerProgress.throughput = float64(total_operations_delta) / elapsed
-
-	// 				for ns, nsStatus := range r.runnerProgress.nsProgressMap {
-	// 					operationsNew := atomic.LoadInt64(&nsStatus.DocsCopied)
-	// 					operationsDelta := operationsNew - nsProgress[ns]
-	// 					nsStatus.Throughput = float64(operationsDelta) / elapsed
-	// 					nsProgress[ns] = operationsNew
-	// 				}
-	// 				currTime = time.Now()
-	// 				totaloperations = operationsNew
-
-	// 			default:
-	// 				//update the runnerprogress
-	// 				r.UpdateRunnerProgress(flowID)
-	// 			}
-	// 		}
-	// 	}()
-	// }
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {
 		slog.Error("Failed to start flow", err)
 		return err
 	}
+
 	// periodically print the flow status for visibility
 	//XXX (AK, 6/2024): not sure if this is the best way to do it
 	go func() {
@@ -258,7 +222,7 @@ func (r *RunnerLocal) Run() error {
 						}
 						slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
 					}
-					time.Sleep(r.settings.FlowStatusReportingIntervalSecs * time.Second)
+					time.Sleep(r.settings.FlowStatusReportingInterval * time.Second)
 				}
 			}
 		}()
