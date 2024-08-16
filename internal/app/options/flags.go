@@ -101,11 +101,15 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "progress",
-			Usage: "Displays detailed progress of the sync, logfile required",
+			Usage: "displays detailed progress of the sync, logfile required",
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:  "logfile",
-			Usage: "Log file path, sends logs to file instead of stdout, default logs to stdout",
+			Usage: "log file path, sends logs to file instead of stdout, default logs to stdout",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "enable pprof profiling on localhost:8080",
 		}),
 		&cli.StringFlag{
 			Name:    "config",

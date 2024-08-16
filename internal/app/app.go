@@ -14,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
@@ -45,6 +48,12 @@ func runDsync(c *cli.Context) error {
 	o, err := options.NewFromCLIContext(c)
 	if err != nil {
 		return err
+	}
+
+	if o.Pprof {
+		go func() {
+			http.ListenAndServe("localhost:8080", nil)
+		}()
 	}
 
 	// set up logging

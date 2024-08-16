@@ -29,6 +29,8 @@ type Options struct {
 	Progress bool
 
 	CosmosDeletesEmu bool
+
+	Pprof bool
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -44,6 +46,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Verify = c.Bool("verify")
 	o.Cleanup = c.Bool("cleanup")
 	o.Progress = c.Bool("progress")
+	o.Pprof = c.Bool("pprof")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
