@@ -105,7 +105,6 @@ func runDsync(c *cli.Context) error {
 			// Custom signal handler for Ctrl+C within tview
 			tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 				if event.Key() == tcell.KeyCtrlC {
-					//fmt.Printf("received Ctrl+C from the user\n")
 					userInterrupted = true
 					tviewApp.Stop()
 					runnerCancelFunc() // Cancel the runner
@@ -148,8 +147,8 @@ func runDsync(c *cli.Context) error {
 			err = r.Run()
 		} else {
 			slog.Error(fmt.Sprintf("%v", err))
-			runnerCancelFunc() //make sure tview is stopped if we didn't start the runner
 		}
+		runnerCancelFunc() //make sure tview is stopped when the runner is done
 		r.Teardown()
 		runnerErr = err
 	}()
