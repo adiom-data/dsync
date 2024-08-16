@@ -31,9 +31,9 @@ jobs:
         echo "# dsync Binary" > README.md
     - name: Archive binary and README
       run: zip dsync.zip dsync README.md
-    - name: Determine the tag name
+    - name: Get the latest tag name
       id: get_tag_name
-      run: echo "GIT_TAG=${GITHUB_REF/refs\//}"
+      run: echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
