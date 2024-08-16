@@ -70,6 +70,7 @@ func (r *RunnerLocal) GetRunnerProgress() RunnerSyncProgress {
 
 // Loops to update the status and throughput metrics for the runner progress struct
 func (r *RunnerLocal) updateRunnerSyncThroughputRoutine(throughputUpdateInterval time.Duration) {
+	r.UpdateRunnerProgress()
 	ticker := time.NewTicker(throughputUpdateInterval)
 	currTime := time.Now()
 	totaloperations := 0 + r.runnerProgress.NumDocsSynced + r.runnerProgress.ChangeStreamEvents + int64(r.runnerProgress.DeletesCaught)
