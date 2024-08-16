@@ -199,7 +199,7 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
 		//check if the namespace status exists, if not create it
 		if nsStatus == nil {
-			nsStatus = &iface.NameSpaceStatus{
+			nsStatus = &iface.NamespaceStatus{
 				EstimatedDocCount:   0,
 				Throughput:          0,
 				Tasks:               []iface.ReadPlanTask{},
@@ -238,7 +238,7 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 }
 
 // Updates the progress metrics once a task has been completed
-func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NameSpaceStatus, task iface.ReadPlanTask) *iface.TaskDoneMeta {
+func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, task iface.ReadPlanTask) *iface.TaskDoneMeta {
 	cc.muProgressMetrics.Lock()
 	//update progress counters: num tasks completed
 	cc.status.ProgressMetrics.TasksCompleted++
@@ -255,7 +255,7 @@ func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NameSpaceStatu
 }
 
 // Updates the progress metrics once a task has been started
-func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NameSpaceStatus, task iface.ReadPlanTask) {
+func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus, task iface.ReadPlanTask) {
 	cc.muProgressMetrics.Lock()
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++

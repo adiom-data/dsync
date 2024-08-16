@@ -67,7 +67,7 @@ type ProgressMetrics struct {
 	TasksCompleted int64
 
 	//progress reporting attributes
-	NamespaceProgress map[Namespace]*NameSpaceStatus //map key is namespace: "db.col"
+	NamespaceProgress map[Namespace]*NamespaceStatus //map key is namespace: "db.col"
 	Namespaces        []Namespace
 }
 
@@ -76,7 +76,7 @@ type Namespace struct {
 	Col string
 }
 
-type NameSpaceStatus struct {
+type NamespaceStatus struct {
 	EstimatedDocCount   int64
 	Throughput          float64
 	Tasks               []ReadPlanTask //all the tasks for the namespace

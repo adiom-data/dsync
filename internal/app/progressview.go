@@ -148,7 +148,7 @@ func percentCompleteTotal(progress runnerLocal.RunnerSyncProgress) float64 {
 }
 
 // Calculates the percent complete for the given namespace, returns (percentComplete, numerator, denominator)
-func percentCompleteNamespace(nsStatus *iface.NameSpaceStatus) (float64, float64, float64) {
+func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64, float64) {
 	var percentComplete float64
 	var numerator, denominator float64
 	if len(nsStatus.Tasks) == 1 {

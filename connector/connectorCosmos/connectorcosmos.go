@@ -155,7 +155,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 		DeletesCaught:          0,
 		ChangeStreamEvents:     0,
 
-		NamespaceProgress: make(map[iface.Namespace]*iface.NameSpaceStatus),
+		NamespaceProgress: make(map[iface.Namespace]*iface.NamespaceStatus),
 		Namespaces:        make([]iface.Namespace, 0),
 	}
 

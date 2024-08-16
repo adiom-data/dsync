@@ -26,7 +26,7 @@ type RunnerSyncProgress struct {
 	DeletesCaught      uint64
 
 	Throughput    float64
-	NsProgressMap map[iface.Namespace]*iface.NameSpaceStatus
+	NsProgressMap map[iface.Namespace]*iface.NamespaceStatus
 	Namespaces    []iface.Namespace //use map and get the keys so print order is consistent
 
 	TasksTotal     int64
