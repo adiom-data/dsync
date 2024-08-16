@@ -22,7 +22,7 @@ jobs:
     - name: Get the latest tag name and increment it
       id: get_tag_name
       run: |
-        TAG=$(git ls-remote --tags origin=0 2>/dev/null || echo "v0.0.0")
+        TAG=$(git ls-remote --tags origin)
         echo "Latest tag found: $TAG"
         if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           IFS='.' read -r -a parts <<< "${TAG:1}"
