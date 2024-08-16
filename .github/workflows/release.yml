@@ -33,60 +33,13 @@ jobs:
     - name: Create a README with instructions
       run: |
         echo "# dsync Binary" > README.md
-        echo "## Introduction to Dsync" >> README.md
-        echo "Dsync is a one-way data migration tool between MongoDB databases, with future support planned for other databases including Azure Cosmos, bidirectional communication, and complex flows." >> README.md
-        echo "" >> README.md
-        echo "## How to Use" >> README.md
-        echo "### Prerequisites" >> README.md
-        echo "1. Ensure you have two MongoDB instances (source and destination)." >> README.md
-        echo "   - If using a local MongoDB instance, it should be started as a replica set to support change streams." >> README.md
-        echo "### Steps" >> README.md
-        echo "1. Download the \`dsync.zip\` archive from the release assets." >> README.md
-        echo "2. Upload the \`dsync.zip\` file to your target VM." >> README.md
-        echo "3. SSH into your VM and navigate to the directory where you've placed \`dsync.zip\`." >> README.md
-        echo "4. Unzip the archive using the command: \`unzip dsync.zip\`." >> README.md
-        echo "5. Make sure the \`dsync\` binary is executable: \`chmod +x dsync\`." >> README.md
-        echo "" >> README.md
-        echo "### Running the Binary" >> README.md
-        echo "#### Using Command-line Flags" >> README.md
-        echo "```sh" >> README.md
-        echo "./dsync --source <source_connection_string> --destination <destination_connection_string> --sourcetype MongoDB --verbosity INFO" >> README.md
-        echo "```" >> README.md
-        echo "For more details on available flags, run:" >> README.md
-        echo "```sh" >> README.md
-        echo "./dsync --help" >> README.md
-        echo "```" >> README.md
-        echo "#### Using a Configuration File" >> README.md
-        echo "1. Create a YAML configuration file (e.g., `config.yaml`) with the following structure:" >> README.md
-        echo "   ```yaml" >> README.md
-        echo "   verbosity: INFO" >> README.md
-        echo "   sourcetype: MongoDB" >> README.md
-        echo "   source: <source_connection_string>" >> README.md
-        echo "   destination: <destination_connection_string>" >> README.md
-        echo "   metadata: <metadata_connection_string>" >> README.md
-        echo "   namespace: db1,db2.collection" >> README.md
-        echo "   verify: false" >> README.md
-        echo "   cleanup: false" >> README.md
-        echo "   cosmos-deletes-cdc: false" >> README.md
-        echo "   ```" >> README.md
-        echo "2. Run the binary with the configuration file:" >> README.md
-        echo "   ```sh" >> README.md
-        echo "   ./dsync --config config.yaml" >> README.md
-        echo "   ```" >> README.md
-        echo "" >> README.md
-        echo "## Cleanup" >> README.md
-        echo "To clean up after use:" >> README.md
-        echo "1. Remove metadata associated with the flow by running:" >> README.md
-        echo "   ```sh" >> README.md
-        echo "   ./dsync ... --cleanup" >> README.md
-        echo "   ```" >> README.md
 
     - name: Archive binary and README
       run: zip dsync.zip dsync README.md
 
     - name: Determine the tag name
       id: get_tag_name
-      run: echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+      run: echo "GIT_TAG=${GITHUB_REF\/tags\//}" >> $GITHUB_ENV
 
     - name: Create Release
       id: create_release
