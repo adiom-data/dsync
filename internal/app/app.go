@@ -111,6 +111,7 @@ func runDsync(c *cli.Context) error {
 				for {
 					select {
 					case <-runnerCtx.Done():
+						tviewApp.Stop() //need to make sure we stop the tview app when context is cancelled
 						return
 					default:
 						tv.GetStatusReport(r.GetRunnerProgress())
