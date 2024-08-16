@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'main'  # Adjust this to your main branch name
+  workflow_dispatch:
 
 permissions:
   contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
