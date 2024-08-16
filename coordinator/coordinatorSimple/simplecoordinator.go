@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 )
@@ -491,9 +490,6 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 		slog.Debug("Results match")
 		res.Passed = true
 	}
-
-	// sleep 10 sec
-	time.Sleep(10 * time.Second)
 
 	return res, nil
 }
