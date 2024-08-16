@@ -177,15 +177,6 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 	}
 }
 
-// resetStartedTasks resets the Started to false for all started tasks
-func resetStartedTasks(tasks []iface.ReadPlanTask) {
-	for i, task := range tasks {
-		if task.Started {
-			tasks[i].Started = false
-		}
-	}
-}
-
 func nsToString(ns iface.Namespace) string {
 	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
 }
@@ -221,7 +212,7 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 			nsStatus.DocsCopied += task.DocsCopied
 
 			nsStatus.EstimatedDocsCopied += task.EstimatedDocCount
-			slog.Debug("totalDocsCopied: %v, ns docs copied: %v", cc.status.ProgressMetrics.NumDocsSynced, nsStatus.DocsCopied)
+			slog.Debug(fmt.Sprintf("totalDocsCopied: %v, ns docs copied: %v", cc.status.ProgressMetrics.NumDocsSynced, nsStatus.DocsCopied))
 		}
 	}
 	cc.status.ProgressMetrics.NumNamespaces = int64(len(cc.status.ProgressMetrics.NamespaceProgress))

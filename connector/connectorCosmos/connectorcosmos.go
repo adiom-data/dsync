@@ -211,7 +211,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 
 	tasks := readPlan.Tasks
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
-	resetStartedTasks(tasks)
 
 	cc.restoreProgressDetails(tasks)
 
@@ -333,7 +332,6 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
-					task.Started = true
 					atomic.AddInt64(&cc.status.ProgressMetrics.TasksStarted, 1)
 					db := task.Def.Db
 					col := task.Def.Col
