@@ -37,6 +37,8 @@ type RunnerSyncProgress struct {
 	Lag int64
 
 	VerificationResult string
+
+	SrcAdditionalStateInfo string
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
@@ -55,6 +57,8 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	if r.runnerProgress.SyncState != iface.VerifySyncState && r.runnerProgress.SyncState != iface.CleanupSyncState { //XXX: if we're cleaning up or verifying, we don't want to overwrite the state
 		r.runnerProgress.SyncState = srcStatus.SyncState
 	}
+	r.runnerProgress.SrcAdditionalStateInfo = srcStatus.AdditionalInfo
+
 	r.runnerProgress.CurrTime = time.Now()
 	r.runnerProgress.NumNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesCompleted
 	r.runnerProgress.TotalNamespaces = srcStatus.ProgressMetrics.NumNamespaces

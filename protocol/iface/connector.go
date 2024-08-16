@@ -49,7 +49,8 @@ type ConnectorStatus struct {
 	// For the source, indicates whether the change stream is active
 	CDCActive bool
 
-	SyncState string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
+	SyncState      string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
+	AdditionalInfo string // connector-specific additional info on the connector status
 
 	ProgressMetrics ProgressMetrics // Progress Details for progress reporting interface, not required for all connectors
 }

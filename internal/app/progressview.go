@@ -108,6 +108,10 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 	case iface.ChangeStreamSyncState:
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d        %d/%d Namespaces synced\nProcessing change stream events\n\nChange Stream Events- %d		Deletes Caught- %d		Events to catch up: %d",
 			runnerProgress.SyncState, hours, minutes, seconds, runnerProgress.NumNamespacesCompleted, runnerProgress.TotalNamespaces, runnerProgress.ChangeStreamEvents, runnerProgress.DeletesCaught, runnerProgress.Lag)
+
+		if runnerProgress.SrcAdditionalStateInfo != "" {
+			headerString += "\n" + runnerProgress.SrcAdditionalStateInfo
+		}
 		header.SetText(headerString)
 
 		//set the indefinite progress bar
