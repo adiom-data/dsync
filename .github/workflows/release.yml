@@ -1,7 +1,10 @@
 name: Build and Release
+
 # On merge or push to main
 on:
   push:
+    tags:
+      - '*'
     branches:
       - main
   pull_request:
@@ -9,20 +12,24 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: write  # This ensures the GITHUB_TOKEN has write permissions to contents
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: 1.22
+
     - name: Build the binary
       run: go build -o dsync
+
     - name: Create a README with instructions
       run: |
         echo "# dsync Binary" > README.md
@@ -73,18 +80,25 @@ jobs:
         echo "   ```sh" >> README.md
         echo "   ./dsync ... --cleanup" >> README.md
         echo "   ```" >> README.md
+
     - name: Archive binary and README
       run: zip dsync.zip dsync README.md
+
+    - name: Extract GIT_TAG from ref
+      id: extract_tag
+      run: echo "::set-output name=GIT_TAG::${GITHUB_REF#refs/tags/}"
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: ${{ steps.extract_tag.outputs.GIT_TAG }}
+        release_name: Release ${{ steps.extract_tag.outputs.GIT_TAG }}
         draft: false
         prerelease: false
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
