@@ -1,18 +1,14 @@
 name: Build and Release
 
-# On merge or push to main
+# Trigger on push to the main branch
 on:
   push:
-    tags:
-      - '*'
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
-  contents: write  # This ensures the GITHUB_TOKEN has write permissions to contents
+  contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
 
 jobs:
   build:
@@ -35,23 +31,34 @@ jobs:
           output_name=dsync-$GOOS-$GOARCH
           env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name
         done
-    - name: Archive binaries
+    - name: Create a README with instructions
+      run: echo "# dsync Binary" > README.md
+    - name: Archive binaries and README
       run: |
-        zip dsync.zip dsync-*
-    - name: Get the latest tag name
+        zip dsync.zip dsync-* README.md
+    - name: Get the latest tag name and increment it
       id: get_tag_name
       run: |
-        TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        NEW_TAG=$(echo $TAG | awk -F. -v OFS=. '{$NF++;print}')
-        echo "GIT_TAG=$NEW_TAG" >> $GITHUB_ENV
+        TAGS=$(git ls-remote --tags origin | grep -o 'refs/tags/v[0-9]*\.[0-9]*\.[0-9]*' | sed 's|refs/tags/||' | sort -V)
+
+        increment_version() {
+           LATEST_TAG=$(echo "$TAGS" | tail -n 1)
+           IFS='.' read -r -a VERSION_PARTS <<< "${LATEST_TAG#v}"
+           VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
+           echo "v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+        }
+         
+        NEXT_TAG=$(increment_version)
+        echo $NEXT_TAG
+        echo "NEXT_TAG=$(increment_version)" >> $GITHUB_ENV
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ env.GIT_TAG }}
-        release_name: Release ${{ env.GIT_TAG }}
+        tag_name: ${{ env.NEXT_TAG }}
+        release_name: Release ${{ env.NEXT_TAG }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
