@@ -235,7 +235,7 @@ func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatu
 	cc.status.ProgressMetrics.TasksCompleted++
 	nsStatus.TasksCompleted++
 	//update the estimated docs copied count for the namespace to keep percentage proportional
-	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition)))
+	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition))) //TODO: should we use a persisted value here from the plan?
 	//check if namespace has been completed
 	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
 		cc.status.ProgressMetrics.NumNamespacesCompleted++

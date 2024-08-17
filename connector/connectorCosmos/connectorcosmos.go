@@ -81,7 +81,7 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	// Set default values
 	settings.serverConnectTimeout = 15 * time.Second
 	settings.pingTimeout = 2 * time.Second
-	settings.initialSyncNumParallelCopiers = 8
+	settings.initialSyncNumParallelCopiers = 16
 	settings.writerMaxBatchSize = 0
 	settings.numParallelWriters = 4
 	settings.numParallelIntegrityCheckTasks = 4
@@ -388,7 +388,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 						batch_idx++
 
 						if cursor.RemainingBatchLength() == 0 { //no more left in the batch
-							dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc}
+							dataChannel <- iface.DataMessage{DataBatch: &dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc}
 							//TODO (AK, 6/2024): is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
 							dataBatch = nil
 						}

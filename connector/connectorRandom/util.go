@@ -161,7 +161,7 @@ func (rc *RandomReadConnector) BatchInsertDataMessage(loc iface.Location, docs [
 	}
 	return iface.DataMessage{
 		Loc:          loc,
-		DataBatch:    dataBatch,
+		DataBatch:    &dataBatch,
 		MutationType: iface.MutationType_InsertBatch,
 	}, nil
 }
