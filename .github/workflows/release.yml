@@ -53,16 +53,15 @@ jobs:
          
         NEXT_TAG=$(increment_version)
         echo $NEXT_TAG
-        echo ::set-output name=next_tag::$NEXT_TAG
+        echo "NEXT_TAG=$(increment_version)" >> $GITHUB_ENV
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.get_tag_name.outputs.next_tag }}
-        release_name: Release ${{ steps.get_tag_name.outputs.next_tag }}
-        commitish: true
+        tag_name: ${{ env.NEXT_TAG }}
+        release_name: Release ${{ env.NEXT_TAG }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
