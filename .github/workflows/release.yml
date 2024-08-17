@@ -73,9 +73,3 @@ jobs:
         asset_path: ./dsync.zip
         asset_name: dsync.zip
         asset_content_type: application/zip
-    - name: Create new tag
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git tag ${{ steps.get_tag_name.outputs.next_tag }}
-        git push origin ${{ steps.get_tag_name.outputs.next_tag }}
