@@ -91,7 +91,12 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 
 			table.SetCell(row+1, 0, tview.NewTableCell(nsString).SetAlign(tview.AlignLeft).SetExpansion(1))
 			table.SetCell(row+1, 1, tview.NewTableCell(fmt.Sprintf("%.0f%%", percentComplete)).SetAlign(tview.AlignLeft).SetExpansion(1))
-			table.SetCell(row+1, 2, tview.NewTableCell(fmt.Sprintf("%d/%d", atomic.LoadInt64(&ns.TasksCompleted), len(ns.Tasks))).SetAlign(tview.AlignLeft).SetExpansion(1))
+
+			tasksInProgressString := ""
+			if ns.TasksStarted > 0 {
+				tasksInProgressString = fmt.Sprintf(" (%d active)", ns.TasksStarted)
+			}
+			table.SetCell(row+1, 2, tview.NewTableCell(fmt.Sprintf("%d/%d%s", atomic.LoadInt64(&ns.TasksCompleted), len(ns.Tasks), tasksInProgressString)).SetAlign(tview.AlignLeft).SetExpansion(1))
 			table.SetCell(row+1, 3, tview.NewTableCell(fmt.Sprintf("%d", docsCopied)).SetAlign(tview.AlignLeft).SetExpansion(1))
 			table.SetCell(row+1, 4, tview.NewTableCell(fmt.Sprintf("%.0f", ns.Throughput)).SetAlign(tview.AlignLeft).SetExpansion(1))
 		}
