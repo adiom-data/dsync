@@ -49,18 +49,19 @@ jobs:
            IFS='.' read -r -a VERSION_PARTS <<< "${LATEST_TAG#v}"
            VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
            echo "v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
-         }
+        }
          
-         NEXT_TAG=$(increment_version)
-         echo $NEXT_TAG
+        NEXT_TAG=$(increment_version)
+        echo $NEXT_TAG
+        echo ::set-output name=next_tag::$NEXT_TAG
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ env.NEW_TAG }}
-        release_name: Release ${{ env.NEW_TAG }}
+        tag_name: ${{ steps.get_tag_name.outputs.next_tag }}
+        release_name: Release ${{ steps.get_tag_name.outputs.next_tag }}
         commitish: true
         draft: false
         prerelease: false
@@ -77,5 +78,5 @@ jobs:
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
-        git tag ${{ env.NEW_TAG }}
-        git push origin ${{ env.NEW_TAG }}
+        git tag ${{ steps.get_tag_name.outputs.next_tag }}
+        git push origin ${{ steps.get_tag_name.outputs.next_tag }}
