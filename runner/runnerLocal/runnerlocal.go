@@ -57,6 +57,8 @@ type RunnerLocalSettings struct {
 	CosmosDeletesEmuRequestedFlag bool
 
 	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+
+	LoadLevel string
 }
 
 const (
@@ -82,6 +84,11 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			cosmosSettings.EmulateDeletes = true
 			// the destination is a MongoDB database otherwise the Options check would have failed
 			cosmosSettings.WitnessMongoConnString = settings.DstConnString
+		}
+		if settings.LoadLevel != "" {
+			btc := getBaseThreadCount(settings.LoadLevel)
+			cosmosSettings.InitialSyncNumParallelCopiers = btc
+			cosmosSettings.NumParallelWriters = btc / 2
 		}
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
@@ -259,4 +266,20 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
+}
+
+// Determines the base thread count for the connector based on the provided load level
+func getBaseThreadCount(loadLevel string) int {
+	switch loadLevel {
+	case "Low":
+		return 4
+	case "Medium":
+		return 8
+	case "High":
+		return 16
+	case "Beast":
+		return 32
+	}
+
+	return 0
 }

@@ -61,9 +61,9 @@ type CosmosConnectorSettings struct {
 
 	serverConnectTimeout           time.Duration
 	pingTimeout                    time.Duration
-	initialSyncNumParallelCopiers  int
+	InitialSyncNumParallelCopiers  int
 	writerMaxBatchSize             int //0 means no limit (in # of documents)
-	numParallelWriters             int
+	NumParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
 
@@ -81,9 +81,16 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	// Set default values
 	settings.serverConnectTimeout = 15 * time.Second
 	settings.pingTimeout = 2 * time.Second
-	settings.initialSyncNumParallelCopiers = 16
+
+	if settings.InitialSyncNumParallelCopiers == 0 { //default to 8
+		settings.InitialSyncNumParallelCopiers = 8
+	}
+
 	settings.writerMaxBatchSize = 0
-	settings.numParallelWriters = 4
+
+	if settings.NumParallelWriters == 0 { //default to 4
+		settings.NumParallelWriters = 4
+	}
 	settings.numParallelIntegrityCheckTasks = 4
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
@@ -337,10 +344,10 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		taskChannel := make(chan iface.ReadPlanTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
-		wg.Add(cc.settings.initialSyncNumParallelCopiers)
+		wg.Add(cc.settings.InitialSyncNumParallelCopiers)
 
 		//start 4 copiers
-		for i := 0; i < cc.settings.initialSyncNumParallelCopiers; i++ {
+		for i := 0; i < cc.settings.InitialSyncNumParallelCopiers; i++ {
 			go func() {
 				defer wg.Done()
 				for task := range taskChannel {

@@ -22,6 +22,8 @@ var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
 
+var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
+
 type ListFlag struct {
 	Values []string
 }
@@ -106,6 +108,17 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:  "logfile",
 			Usage: "log file path, sends logs to file instead of stdout, default logs to stdout",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "load-level",
+			Usage: fmt.Sprintf("load level (%s). When not specified, will default to connector-specific settings", strings.Join(validLoadLevels, ",")),
+			Action: func(ctx *cli.Context, source string) error {
+				if !slices.Contains(validLoadLevels, source) {
+					return fmt.Errorf("unsupported load level setting %v", source)
+				}
+				return nil
+			},
+			Required: false,
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "pprof",

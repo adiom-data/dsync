@@ -31,6 +31,8 @@ type Options struct {
 	CosmosDeletesEmu bool
 
 	Pprof bool
+
+	LoadLevel string
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -47,6 +49,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Cleanup = c.Bool("cleanup")
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
+	o.LoadLevel = c.String("load-level")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
