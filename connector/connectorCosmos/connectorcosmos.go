@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -352,17 +351,14 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
-					atomic.AddInt64(&cc.status.ProgressMetrics.TasksStarted, 1)
 					db := task.Def.Db
 					col := task.Def.Col
 
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 
-					cc.muProgressMetrics.Lock()
 					nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
-					nsStatus.TasksStarted++ //update number of tasks started in the namespace
-					cc.muProgressMetrics.Unlock()
+					cc.taskStartedProgressUpdate(nsStatus)
 
 					collection := cc.client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.flowCtx, collection, task)

@@ -228,6 +228,14 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 
 }
 
+// Updates the progress metrics once a task has been started
+func (cc *CosmosConnector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus) {
+	cc.muProgressMetrics.Lock()
+	cc.status.ProgressMetrics.TasksStarted++
+	nsStatus.TasksStarted++
+	cc.muProgressMetrics.Unlock()
+}
+
 // Updates the progress metrics once a task has been completed
 func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Lock()
@@ -235,11 +243,14 @@ func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatu
 	cc.status.ProgressMetrics.TasksCompleted++
 	nsStatus.TasksCompleted++
 	//update the estimated docs copied count for the namespace to keep percentage proportional
-	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*cc.settings.targetDocCountPerPartition))) //TODO: should we use a persisted value here from the plan?
+	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*nsStatus.Tasks[0].EstimatedDocCount)))
 	//check if namespace has been completed
 	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
 		cc.status.ProgressMetrics.NumNamespacesCompleted++
 	}
+	//decrement the tasks started counter
+	cc.status.ProgressMetrics.TasksStarted--
+	nsStatus.TasksStarted--
 	cc.muProgressMetrics.Unlock()
 }
 
