@@ -94,6 +94,7 @@ func runDsync(c *cli.Context) error {
 		FlowStatusReportingInterval:    10,
 		CosmosDeletesEmuRequestedFlag:  o.CosmosDeletesEmu,
 		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
+		LoadLevel:                      o.LoadLevel,
 	})
 
 	var wg sync.WaitGroup
