@@ -1,0 +1,72 @@
+name: Build and Release
+
+# Trigger on push to the main branch
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+    - name: Build binaries for multiple platforms
+      run: |
+        platforms=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64")
+        for platform in "${platforms[@]}"
+        do
+          os_arch=(${platform//\// })
+          GOOS=${os_arch[0]}
+          GOARCH=${os_arch[1]}
+          output_name=dsync-$GOOS-$GOARCH
+          env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name
+        done
+    - name: Create a README with instructions
+      run: echo "# dsync Binary" > README.md
+    - name: Archive binaries and README
+      run: |
+        zip dsync.zip dsync-* README.md
+    - name: Get the latest tag name and increment it
+      id: get_tag_name
+      run: |
+        TAGS=$(git ls-remote --tags origin | grep -o 'refs/tags/v[0-9]*\.[0-9]*\.[0-9]*' | sed 's|refs/tags/||' | sort -V)
+
+        increment_version() {
+           LATEST_TAG=$(echo "$TAGS" | tail -n 1)
+           IFS='.' read -r -a VERSION_PARTS <<< "${LATEST_TAG#v}"
+           VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
+           echo "v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+        }
+         
+        NEXT_TAG=$(increment_version)
+        echo $NEXT_TAG
+        echo "NEXT_TAG=$(increment_version)" >> $GITHUB_ENV
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.NEXT_TAG }}
+        release_name: Release ${{ env.NEXT_TAG }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dsync.zip
+        asset_name: dsync.zip
+        asset_content_type: application/zip
