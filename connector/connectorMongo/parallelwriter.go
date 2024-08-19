@@ -61,7 +61,7 @@ func (bwa *ParallelWriter) Start() {
 	// create and start the workers
 	bwa.workers = make([]writerWorker, bwa.numWorkers)
 	for i := 0; i < bwa.numWorkers; i++ {
-		bwa.workers[i] = newWriterWorker(bwa, i, 1000) //XXX: should we make the queue size configurable?
+		bwa.workers[i] = newWriterWorker(bwa, i, 10) //XXX: should we make the queue size configurable? WARNING: these could be batches and they could be big
 		go bwa.workers[i].run()
 	}
 }

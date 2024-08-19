@@ -99,7 +99,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	if nullWrite {
 		r.dst = connectorNull.NewNullConnector(destinationName)
 	} else {
-		r.dst = connectorMongo.NewMongoConnector(destinationName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString})
+		connSettings := connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString}
+		if settings.LoadLevel != "" {
+			btc := getBaseThreadCount(settings.LoadLevel)
+			connSettings.NumParallelWriters = btc / 2
+		}
+		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
 	}
 
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it

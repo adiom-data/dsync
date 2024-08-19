@@ -17,6 +17,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
+	"golang.org/x/exp/rand"
 )
 
 var (
@@ -71,7 +72,19 @@ func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.
 	}
 
 	partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)
+	//shuffle the tasks to ensure we balance the workload across different namespaces
+	if len(nsTasks) > 1 {
+		shuffleTasks(partitionedTasks)
+	}
 	return nsTasks, partitionedTasks, err
+}
+
+// function to shuffle the tasks
+func shuffleTasks(tasks []iface.ReadPlanTask) {
+	for i := range tasks {
+		j := rand.Intn(i + 1)
+		tasks[i], tasks[j] = tasks[j], tasks[i]
+	}
 }
 
 // partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
