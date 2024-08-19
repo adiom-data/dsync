@@ -54,7 +54,7 @@ func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
 			return err
 		}
 	case iface.MutationType_InsertBatch:
-		dataBatch := *dataMsg.DataBatch
+		dataBatch := dataMsg.DataBatch
 		slog.Debug(fmt.Sprintf("Inserting batch of %v documents into collection %v.%v", len(dataBatch), dbName, colName))
 		//explicitly cast to []bson.Raw to avoid type mismatch
 		dataBatchBson := make([]interface{}, len(dataBatch))

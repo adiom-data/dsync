@@ -15,7 +15,7 @@ type DataMessage struct {
 	// payload (CRDT state)
 	Data *[]byte
 	// special case payload for inserts to allow the reader to send the whole batch for a single location (for efficiency)
-	DataBatch *[][]byte
+	DataBatch [][]byte
 
 	// header for data messages
 	MutationType uint     //required
