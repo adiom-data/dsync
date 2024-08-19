@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -24,6 +25,10 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/urfave/cli/v2"
+)
+
+const (
+	memoryUsagePrintInterval = 10 * time.Second
 )
 
 // NewApp starts the dsync container process.
@@ -100,6 +105,19 @@ func runDsync(c *cli.Context) error {
 	var wg sync.WaitGroup
 	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
 
+	//start a goroutine to print memory usage
+	go func() {
+		for {
+			select {
+			case <-runnerCtx.Done():
+				return
+			default:
+				slog.Debug(GetMemUsageString())
+				time.Sleep(memoryUsagePrintInterval)
+			}
+		}
+	}()
+
 	var userInterrupted bool
 
 	if o.Progress {
@@ -173,4 +191,22 @@ func runDsync(c *cli.Context) error {
 	}
 
 	return runnerErr
+}
+
+// Gets the current, total and OS memory being used. As well as the number
+// of garage collection cycles completed.
+func GetMemUsageString() string {
+	var m runtime.MemStats
+	str := ""
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	str += fmt.Sprintf("Alloc = %v MiB", bToMb(m.Alloc))
+	str += fmt.Sprintf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	str += fmt.Sprintf("\tSys = %v MiB", bToMb(m.Sys))
+	str += fmt.Sprintf("\tNumGC = %v", m.NumGC)
+	return str
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }
