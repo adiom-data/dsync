@@ -111,7 +111,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
 		flowComplete <- struct{}{}
 	})
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	deleteMessageCount := 0
 
 	// Start a go routine to read from the data channel until it's closed
@@ -271,7 +271,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
 		flowComplete <- struct{}{}
 	})
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	deleteMessageCount := 0
 
 	// Start a go routine to read from the data channel until it's closed

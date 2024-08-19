@@ -7,7 +7,6 @@ package options
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/urfave/cli/v2"
@@ -21,12 +20,19 @@ type Options struct {
 	DstConnString        string
 	StateStoreConnString string
 
+	Logfile string
+
 	NamespaceFrom []string
 
-	Verify  bool
-	Cleanup bool
+	Verify   bool
+	Cleanup  bool
+	Progress bool
 
 	CosmosDeletesEmu bool
+
+	Pprof bool
+
+	LoadLevel string
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -37,9 +43,13 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.SrcConnString = c.String("source")
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
+	o.Logfile = c.String("logfile")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
 	o.Cleanup = c.Bool("cleanup")
+	o.Progress = c.Bool("progress")
+	o.Pprof = c.Bool("pprof")
+	o.LoadLevel = c.String("load-level")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
@@ -49,7 +59,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 		} else {
 			o.Sourcetype = "MongoDB"
 		}
-		slog.Info(fmt.Sprintf("Inferred source type: %v", o.Sourcetype))
+		fmt.Printf("Inferred source type: %v\n", o.Sourcetype)
 	}
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")

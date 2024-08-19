@@ -242,6 +242,7 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	// Check if we are resumable and have the flow plan already
 	if flowDet.ReadPlan.Tasks != nil && flowDet.Resumable {
 		slog.Debug("Using the existing read plan for a resumable flow. Flow ID: " + fmt.Sprintf("%v", fid))
+		//reset all in progress tasks to new
 	} else if flowDet.ReadPlan.Tasks != nil {
 		slog.Error("Flow is not resumable but we have found the old plan. Please clean the metadata before restarting. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("flow is not resumable but old plan")
@@ -378,7 +379,7 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID) error {
+func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -388,6 +389,10 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 	// Check if the connector corresponds to the source
 	if flowDet.Options.SrcId == conn {
 		slog.Debug("Task done notification from source connector for task ID: " + fmt.Sprintf("%v", taskId))
+		err := updateFlowTaskData(flowDet, taskId, taskData)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 

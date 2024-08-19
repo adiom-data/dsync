@@ -91,7 +91,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
 		flowComplete <- struct{}{}
 	})
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil).Run(func(args mock.Arguments) {
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		taskID := args.Get(2).(iface.ReadPlanTaskID)
 		// assert that the task was not already completed before
 		assert.False(suite.T(), completedTasks[taskID], "Task should not have been completed before")
@@ -301,7 +301,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
 		flowComplete <- struct{}{}
 	})
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil)
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageCount := 0
 	secondBarrierReceived := false
 
@@ -478,7 +478,7 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
 
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
-	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID")).Return(nil).Run(func(args mock.Arguments) {
+	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		taskDoneChannel <- struct{}{}
 	})
 
@@ -515,7 +515,7 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
 	time.Sleep(1 * time.Second)
 
 	// A notification should have been sent to the coordinator that the task is done
-	c.AssertCalled(suite.T(), "NotifyTaskDone", flowID, testConnectorID, testTaskID)
+	c.AssertCalled(suite.T(), "NotifyTaskDone", flowID, testConnectorID, testTaskID, mock.Anything)
 
 	connector.Teardown()
 }

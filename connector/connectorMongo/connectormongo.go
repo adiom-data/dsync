@@ -406,7 +406,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
-						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id)
+						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id, nil)
 						//send a barrier message to signal the end of the task
 						if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}

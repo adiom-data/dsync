@@ -5,7 +5,9 @@
  */
 package iface
 
-import "context"
+import (
+	"context"
+)
 
 type Runner interface {
 	// General

@@ -67,3 +67,17 @@ func updateFlowTaskStatus(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID,
 	}
 	return fmt.Errorf("task with ID %d not found", taskId)
 }
+
+func updateFlowTaskData(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
+	if taskData == nil {
+		return nil //nothing to update
+	}
+
+	for i, task := range flowDetails.ReadPlan.Tasks {
+		if task.Id == taskId {
+			flowDetails.ReadPlan.Tasks[i].DocsCopied = taskData.DocsCopied
+			return nil
+		}
+	}
+	return fmt.Errorf("task with ID %d not found", taskId)
+}

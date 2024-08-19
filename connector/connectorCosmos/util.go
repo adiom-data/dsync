@@ -31,6 +31,7 @@ type ReaderProgress struct {
 	initialSyncDocs    atomic.Uint64
 	changeStreamEvents uint64
 	tasksTotal         uint64
+	tasksStarted       uint64
 	tasksCompleted     uint64
 	deletesCaught      uint64
 }
@@ -128,11 +129,12 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 
 // update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum
 func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
-	cc.mutex.Lock()
-	defer cc.mutex.Unlock()
+	cc.muProgressMetrics.Lock()
+	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
 	*lsn++
 	cc.status.WriteLSN++
+	cc.status.ProgressMetrics.ChangeStreamEvents++
 	return cc.status.WriteLSN
 }
 
@@ -173,4 +175,90 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 			}},
 		})
 	}
+}
+
+func nsToString(ns iface.Namespace) string {
+	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
+}
+
+// restoreProgressDetails restores the progress metrics from the persisted tasks and progress
+func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
+	slog.Debug("Restoring progress metrics from tasks")
+	cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
+	for _, task := range tasks {
+		ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
+		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
+		//check if the namespace status exists, if not create it
+		if nsStatus == nil {
+			nsStatus = &iface.NamespaceStatus{
+				EstimatedDocCount:   0,
+				Throughput:          0,
+				Tasks:               []iface.ReadPlanTask{},
+				TasksCompleted:      0,
+				TasksStarted:        0,
+				DocsCopied:          0,
+				EstimatedDocsCopied: 0,
+			}
+			cc.status.ProgressMetrics.NamespaceProgress[ns] = nsStatus
+		}
+		nsStatus.Tasks = append(nsStatus.Tasks, task)
+		nsStatus.EstimatedDocCount += task.EstimatedDocCount
+		//if the task is completed, update the document counters
+		if task.Status == iface.ReadPlanTaskStatus_Completed {
+			cc.status.ProgressMetrics.TasksCompleted++
+			cc.status.ProgressMetrics.NumDocsSynced += task.DocsCopied
+
+			nsStatus.TasksCompleted++
+			nsStatus.DocsCopied += task.DocsCopied
+
+			nsStatus.EstimatedDocsCopied += task.EstimatedDocCount
+			slog.Debug(fmt.Sprintf("totalDocsCopied: %v, ns docs copied: %v", cc.status.ProgressMetrics.NumDocsSynced, nsStatus.DocsCopied))
+		}
+	}
+	cc.status.ProgressMetrics.NumNamespaces = int64(len(cc.status.ProgressMetrics.NamespaceProgress))
+
+	for ns, nsStatus := range cc.status.ProgressMetrics.NamespaceProgress {
+		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
+			cc.status.ProgressMetrics.NumNamespacesCompleted++
+		}
+		cc.status.ProgressMetrics.Namespaces = append(cc.status.ProgressMetrics.Namespaces, ns)
+	}
+
+	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.status.ProgressMetrics))
+
+}
+
+// Updates the progress metrics once a task has been started
+func (cc *CosmosConnector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus) {
+	cc.muProgressMetrics.Lock()
+	cc.status.ProgressMetrics.TasksStarted++
+	nsStatus.TasksStarted++
+	cc.muProgressMetrics.Unlock()
+}
+
+// Updates the progress metrics once a task has been completed
+func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus) {
+	cc.muProgressMetrics.Lock()
+	//update progress counters: num tasks completed
+	cc.status.ProgressMetrics.TasksCompleted++
+	nsStatus.TasksCompleted++
+	//update the estimated docs copied count for the namespace to keep percentage proportional
+	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(nsStatus.TasksCompleted*nsStatus.Tasks[0].EstimatedDocCount)))
+	//check if namespace has been completed
+	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
+		cc.status.ProgressMetrics.NumNamespacesCompleted++
+	}
+	//decrement the tasks started counter
+	cc.status.ProgressMetrics.TasksStarted--
+	nsStatus.TasksStarted--
+	cc.muProgressMetrics.Unlock()
+}
+
+// Updates the progress metrics once a task has been started
+func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
+	cc.muProgressMetrics.Lock()
+	nsStatus.DocsCopied++
+	nsStatus.EstimatedDocsCopied++
+	cc.status.ProgressMetrics.NumDocsSynced++
+	cc.muProgressMetrics.Unlock()
 }

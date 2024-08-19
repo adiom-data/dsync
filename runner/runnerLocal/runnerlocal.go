@@ -34,7 +34,11 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
+	runnerProgress RunnerSyncProgress //internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
+
 	ctx context.Context
+
+	activeFlowID iface.FlowID
 }
 
 type RunnerLocalSettings struct {
@@ -48,9 +52,13 @@ type RunnerLocalSettings struct {
 	VerifyRequestedFlag  bool
 	CleanupRequestedFlag bool
 
-	FlowStatusReportingIntervalSecs time.Duration
+	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
+
+	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+
+	LoadLevel string
 }
 
 const (
@@ -60,6 +68,13 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
+	r.runnerProgress = RunnerSyncProgress{
+		StartTime:     time.Now(),
+		CurrTime:      time.Now(),
+		SyncState:     iface.SetupSyncState,
+		NsProgressMap: make(map[iface.Namespace]*iface.NamespaceStatus),
+		Namespaces:    make([]iface.Namespace, 0),
+	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
@@ -69,6 +84,11 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			cosmosSettings.EmulateDeletes = true
 			// the destination is a MongoDB database otherwise the Options check would have failed
 			cosmosSettings.WitnessMongoConnString = settings.DstConnString
+		}
+		if settings.LoadLevel != "" {
+			btc := getBaseThreadCount(settings.LoadLevel)
+			cosmosSettings.InitialSyncNumParallelCopiers = btc
+			cosmosSettings.NumParallelWriters = btc / 2
 		}
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
@@ -166,16 +186,20 @@ func (r *RunnerLocal) Run() error {
 		slog.Error("Failed to create flow", err)
 		return err
 	}
+	r.activeFlowID = flowID
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
+		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
 		if err != nil {
 			slog.Error("Failed to perform flow integrity check", err)
 		} else {
 			if integrityCheckRes.Passed {
+				r.runnerProgress.VerificationResult = "OK"
 				slog.Info("Data integrity check: OK")
 			} else {
+				r.runnerProgress.VerificationResult = "FAIL"
 				slog.Error("Data integrity check: FAIL")
 			}
 		}
@@ -184,6 +208,7 @@ func (r *RunnerLocal) Run() error {
 
 	// destroy the flow if the cleanup flag is set
 	if r.settings.CleanupRequestedFlag {
+		r.runnerProgress.SyncState = "Cleanup"
 		slog.Info("Cleaning up metadata for the flow")
 		r.coord.FlowDestroy(flowID)
 		return nil
@@ -195,32 +220,36 @@ func (r *RunnerLocal) Run() error {
 		slog.Error("Failed to start flow", err)
 		return err
 	}
+
+	if r.settings.AdvancedProgressRecalcInterval > 0 {
+		// periodically update the throughout
+		go r.updateRunnerSyncThroughputRoutine(r.settings.AdvancedProgressRecalcInterval)
+	}
+
 	// periodically print the flow status for visibility
 	//XXX (AK, 6/2024): not sure if this is the best way to do it
 	go func() {
-		go func() {
-			for {
-				select {
-				case <-r.ctx.Done():
-					return
-				default:
-					flowStatus, err := r.coord.GetFlowStatus(flowID)
-					if err != nil {
-						slog.Error("Failed to get flow status", err)
-						break
-					}
-					slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))
-					if flowStatus.SrcStatus.CDCActive {
-						eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
-						if eventsDiff < 0 {
-							eventsDiff = 0
-						}
-						slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
-					}
-					time.Sleep(r.settings.FlowStatusReportingIntervalSecs * time.Second)
+		for {
+			select {
+			case <-r.ctx.Done():
+				return
+			default:
+				flowStatus, err := r.coord.GetFlowStatus(flowID)
+				if err != nil {
+					slog.Error("Failed to get flow status", err)
+					break
 				}
+				slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))
+				if flowStatus.SrcStatus.CDCActive {
+					eventsDiff := flowStatus.SrcStatus.WriteLSN - flowStatus.DstStatus.WriteLSN
+					if eventsDiff < 0 {
+						eventsDiff = 0
+					}
+					slog.Info(fmt.Sprintf("Number of events to fully catch up: %d", eventsDiff))
+				}
+				time.Sleep(r.settings.FlowStatusReportingInterval * time.Second)
 			}
-		}()
+		}
 	}()
 
 	// wait for the flow to finish
@@ -237,4 +266,20 @@ func (r *RunnerLocal) Teardown() {
 	r.src.Teardown()
 	r.dst.Teardown()
 	r.statestore.Teardown()
+}
+
+// Determines the base thread count for the connector based on the provided load level
+func getBaseThreadCount(loadLevel string) int {
+	switch loadLevel {
+	case "Low":
+		return 4
+	case "Medium":
+		return 8
+	case "High":
+		return 16
+	case "Beast":
+		return 32
+	}
+
+	return 0
 }
