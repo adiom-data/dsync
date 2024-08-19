@@ -7,7 +7,7 @@ package main
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,6 +33,8 @@ func main() {
 	app := dsync.NewApp()
 	err := app.RunContext(cancellableCtx, os.Args)
 	if err != nil {
-		slog.Error(err.Error())
+		fmt.Printf("dsync exited with error: %v\n", err)
+	} else {
+		fmt.Println("dsync exited successfully")
 	}
 }

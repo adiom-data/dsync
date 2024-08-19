@@ -58,6 +58,14 @@ type ReadPlanTask struct {
 		Low          interface{} // lower bound for the task (inclusive)
 		High         interface{} // upper bound for the task (exclusive)
 	}
+
+	//some metrics for reporting
+	EstimatedDocCount int64 // estimated number of documents in the task
+	DocsCopied        int64 // number of documents copied
+}
+
+type TaskDoneMeta struct {
+	DocsCopied int64
 }
 
 type ReadPlanTaskID uint
@@ -77,7 +85,8 @@ type CoordinatorIConnectorSignal interface {
 	NotifyDone(flowId FlowID, conn ConnectorID) error
 
 	// Done event for a task (for a connector to announce that they finished a task)
-	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID) error
+	// Accepts the opional taskData parameter which is a connector-specific task data to be persisted along the task
+	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID, taskData *TaskDoneMeta) error
 
 	// Planning completion event (for a connector to share the read plan)
 	PostReadPlanningResult(flowId FlowID, conn ConnectorID, res ConnectorReadPlanResult) error

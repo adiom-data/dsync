@@ -5,7 +5,9 @@
  */
 package iface
 
-import "context"
+import (
+	"context"
+)
 
 type ConnectorType struct {
 	DbType  string
@@ -46,6 +48,54 @@ type ConnectorStatus struct {
 	WriteLSN int64
 	// For the source, indicates whether the change stream is active
 	CDCActive bool
+
+	SyncState      string // "InitialSync", "ChangeStream", "ReadPlan", "Cleanup", "Verification"
+	AdditionalInfo string // connector-specific additional info on the connector status
+
+	ProgressMetrics ProgressMetrics // Progress Details for progress reporting interface, not required for all connectors
+}
+
+// XXX: we should separate the connector and the flow state instead of mixing them together
+const (
+	SetupSyncState        = "Setup"
+	VerifySyncState       = "Verify"
+	CleanupSyncState      = "Cleanup"
+	ReadPlanningSyncState = "ReadPlanning"
+
+	ChangeStreamSyncState = "ChangeStream"
+	InitialSyncSyncState  = "InitialSync"
+)
+
+type ProgressMetrics struct {
+	NumNamespaces          int64
+	NumNamespacesCompleted int64 //change name
+
+	NumDocsSynced      int64
+	ChangeStreamEvents int64
+	DeletesCaught      uint64
+
+	TasksTotal     int64
+	TasksStarted   int64
+	TasksCompleted int64
+
+	//progress reporting attributes
+	NamespaceProgress map[Namespace]*NamespaceStatus //map key is namespace: "db.col"
+	Namespaces        []Namespace
+}
+
+type Namespace struct {
+	Db  string
+	Col string
+}
+
+type NamespaceStatus struct {
+	EstimatedDocCount   int64
+	Throughput          float64
+	Tasks               []ReadPlanTask //all the tasks for the namespace
+	TasksCompleted      int64
+	TasksStarted        int64
+	DocsCopied          int64
+	EstimatedDocsCopied int64 //this is for calculating percentage complete based on approximate number of docs per task, not actual number of docs copied
 }
 
 // Pass options to use to the connector

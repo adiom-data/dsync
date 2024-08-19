@@ -22,6 +22,8 @@ var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
 
+var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
+
 type ListFlag struct {
 	Values []string
 }
@@ -99,6 +101,29 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:  "cosmos-deletes-cdc",
 			Usage: "generate CDC events for CosmosDB deletes",
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "progress",
+			Usage: "displays detailed progress of the sync, logfile required",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "logfile",
+			Usage: "log file path, sends logs to file instead of stdout, default logs to stdout",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "load-level",
+			Usage: fmt.Sprintf("load level (%s). When not specified, will default to connector-specific settings", strings.Join(validLoadLevels, ",")),
+			Action: func(ctx *cli.Context, source string) error {
+				if !slices.Contains(validLoadLevels, source) {
+					return fmt.Errorf("unsupported load level setting %v", source)
+				}
+				return nil
+			},
+			Required: false,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "enable pprof profiling on localhost:8080",
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
@@ -107,5 +132,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		cli.VersionFlag,
 	}
 
-	return flags, altsrc.InitInputSourceWithContext(flags, altsrc.NewYamlSourceFromFlagFunc("config"))
+	before := func(c *cli.Context) error {
+		if c.IsSet("progress") && !c.IsSet("logfile") {
+			return fmt.Errorf("logfile is required to display progress")
+		}
+		return altsrc.InitInputSourceWithContext(flags, altsrc.NewYamlSourceFromFlagFunc("config"))(c)
+	}
+	return flags, before
 }
