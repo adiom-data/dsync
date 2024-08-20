@@ -32,7 +32,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/brianvoe/gofakeit/v7 v7.0.3
+	github.com/brianvoe/gofakeit/v7 v7.0.4
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0
