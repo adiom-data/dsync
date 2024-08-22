@@ -46,10 +46,10 @@ export MDB_DEST='mongodb://localhost:27017'
 
 ./dsync -s $COSMOS_DEMO -d $MDB_DEST --progress --logfile dsync.log
 ```
-Now Dsync should be running! Feel free to interrupt the sync process (via Ctrl+C) it once the initial sync is done.
+Now Dsync should be running! Feel free to interrupt the sync process (via Ctrl+C) it once the initial sync is done. The demo database has a few million records and the resources are shared - allow 5-10 minutes for the process to complete.
 
 ## 4. Check the data
 ```
 mongosh $MDB_DEST
 ```
-Congratulations! You should be able to access the 'd3mo' database and see the collections in it that were migrated from the Cosmos DB.
+Congratulations! You should be able to access the 'odc' database and see the collections in it that were migrated from the Cosmos DB.
