@@ -5,13 +5,13 @@
 
 # Algorithms
 
-An integrity check algorithm is supposed to calculate a database-agnostic function of a dataset in a deterministic and unique way given the specific options, e.g. a list of provided namespaces. An example of such a function could be a COUNT(*) or XOR. As much as we can, we should be using functions and algorithms that are easily parallelizable and can be calculated server-side for effeciency.
+An integrity check algorithm is supposed to calculate a database-agnostic function of a dataset in a deterministic and unique way given the specific options, e.g. a list of provided namespaces. An example of such a function could be a COUNT(*) or XOR. As much as we can, we should be using functions and algorithms that are easily parallelizable and can be calculated server-side for efficiency.
 
 ## ONSL ("Ordered Namespace List Count")
 ### Description
 An efficient heuristic-based option that calculates the digest of (namespace-count) pairs and the total number of documents.
 ### Steps
-1. Identfiy the namespaces of the dataset in the form of "db.collection", excluding any system namespaces. 
+1. Identify the namespaces of the dataset in the form of "db.collection", excluding any system namespaces. 
     - If there are no namespaces, return 0 as the count and an empty string as the digest
 2. For each namespace, calculate the total number of documents
 3. Arrange the namespaces in a lexicographical order

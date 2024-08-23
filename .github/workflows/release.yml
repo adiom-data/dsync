@@ -1,10 +1,7 @@
 name: Build and Release
 
-# Trigger on push to the main branch
+# Trigger on manual trigger
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

@@ -35,7 +35,7 @@ We use a modular software architecture, consisting of independent and isolated c
 * Manages the execution of a task using setup, run, and cleanup methods
 
 #### Statestore Interface
-* Generic perstitent store
+* Generic persistent store
 * Allows coordinator to save and retrieve the state of things like a Flow to support resumability 
 
 ### Classes
@@ -45,7 +45,7 @@ We have the following classes:
 - **MongoConnector**  is a *Connector* implementation that connects to MongoDB databases and implements reading the Change Stream and writing changes to databases.
 - **SimpleCoordinator** is a *Coordinator* implementation and manages data flow between the connectors. 
 - **TransportLocal** is a *Transport* implementation using Go channels.
-- **RunnerLocal** is a *Runner* implementation which uses the above classes to run dsync locally, using *SimpleCoordinator* to start a data flow between source and destination *MongoConnectors*.
+- **RunnerLocal** is a *Runner* implementation which uses the above classes to run *dsync* locally, using *SimpleCoordinator* to start a data flow between source and destination *MongoConnectors*.
 - **StatestoreMongo** is a trivial *Statestore* implementation using MongoDB as a backend.
 
-We have the **CLIApp** wrapper class which uses an instance of *RunnerLocal* to run *Dsync* on the command line. 
+We have the **CLIApp** wrapper class which uses an instance of *RunnerLocal* to run *dsync* on the command line. 

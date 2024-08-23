@@ -287,7 +287,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 	testRecord := map[string]string{
 		"a": "1234",
 	}
-	err = dataStore.InsertDummy("test", "test1234", testRecord)
+	err = dataStore.InsertDummy("test", "test_dicrdc", testRecord)
 	assert.NoError(suite.T(), err)
 
 	// call the data integrity check method again to check that the result is different
@@ -473,7 +473,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultAlgorithm(
 
 	// Set the datastore up with the test data
 	testDB := "test"
-	testCol := "__test_431"
+	testCol := "test_dicra"
 	err = dataStore.DeleteNamespace(testDB, testCol)
 	assert.NoError(suite.T(), err)
 	testRecord := map[string]interface{}{
@@ -493,8 +493,8 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultAlgorithm(
 	phase := 0
 	checkComplete := make(chan struct{})
 
-	firstPhaseResult := iface.ConnectorDataIntegrityCheckResult{Digest: "0d57e7186955d2f58d4c3c7a822d00e918fe1cc1e0bccc11fc66717fdca2b363", Count: 2, Success: true}
-	secondPhaseResult := iface.ConnectorDataIntegrityCheckResult{Digest: "2a4f793b520e7297b85c3d926e21e4fc3a6d3781daa76ab3a3a0df917dbdfb0f", Count: 3, Success: true}
+	firstPhaseResult := iface.ConnectorDataIntegrityCheckResult{Digest: "9e7fa3592bde0f451c110300d0340e48f0882dd5dbe77ec005132e189c844eda", Count: 2, Success: true}
+	secondPhaseResult := iface.ConnectorDataIntegrityCheckResult{Digest: "7fabc1528fb4177ef7278f9bcebaa25ab6e0a660b6cd0f3237e9ffc6338dce2f", Count: 3, Success: true}
 
 	// var checkResult iface.ConnectorDataIntegrityCheckResult
 	c.On("PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult")).Return(nil).Run(func(args mock.Arguments) {
