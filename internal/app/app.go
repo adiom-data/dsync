@@ -79,6 +79,8 @@ func runDsync(c *cli.Context) error {
 	}
 	logger.Setup(lo)
 
+	slog.Info(fmt.Sprintf("Starting dsync %v", build.VersionInfo()))
+
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	var advancedProgressRecalcInterval time.Duration
