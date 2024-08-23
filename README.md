@@ -55,3 +55,11 @@ Now Dsync should be running! Feel free to interrupt the sync process (via Ctrl+C
 mongosh $MDB_DEST
 ```
 Congratulations! You should be able to access the 'odc' database and see the collections in it that were migrated from the Cosmos DB.
+
+# Questions and reporting issues
+
+Please report any bugs here in the GitHub project.
+
+For technical questions and discussions, please use the dsync-dev@adiom.io mailing list.
+
+For commercial inquires, please contact info@adiom.io
