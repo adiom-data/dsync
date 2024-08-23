@@ -22,7 +22,7 @@ For an example of creating a test for a connector, see [Mongo Connector test](..
 ## How to run tests
 Prerequisites: 
   - MongoDB Connector tests: a MongoDB replica set instance (MONGO_TEST environmental variable)
-  - Cosmos Connector tests: a Cosmos instance (COSMOS_TEST environmental variable)
+  - Cosmos Connector tests: a Cosmos DB instance (COSMOS_TEST environmental variable)
 
 To run all tests (will take under a minute or so):
 ```
