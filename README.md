@@ -62,4 +62,4 @@ Please report any bugs here in the GitHub project.
 
 For technical questions and discussions, please use the dsync-dev@adiom.io mailing list.
 
-For commercial inquires, please contact info@adiom.io
+For commercial inquires, please contact info@adiom.io.
