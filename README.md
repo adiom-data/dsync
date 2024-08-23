@@ -5,6 +5,8 @@ _Complete documentation can be found [here](https://docs.adiom.io)_
 We solve solve data migration and replication between NoSQL databases. We focus on challenges specific to large datasets and mission-critical applications. Our approach involves creating an open data object exchange protocol, a lightweight platform, and open-source tools to streamline data replication and movement.
 
 # Introduction to Dsync
+> **_NOTE: Dsync is currently in beta and is undergoing active development and testing._**
+
 
 Dsync is a data migration tool between NoSQL databases. Over time it will extend to many different databases including Azure Cosmos, MongoDB, and advanced features such as bidirectional communication and many-to-many flows. 
 
