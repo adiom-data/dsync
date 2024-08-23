@@ -7,6 +7,7 @@ package connectorMongo
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -18,9 +19,10 @@ import (
 )
 
 const (
-	// TestMongoConnectionString is the connection string for the test MongoDB
-	TestMongoConnectionString = "mongodb://localhost:27017"
+	MongoEnvironmentVariable = "MONGO_TEST"
 )
+
+var TestMongoConnectionString = os.Getenv(MongoEnvironmentVariable)
 
 // Standard test suite for the connector interface
 func TestMongoConnectorSuite(t *testing.T) {
