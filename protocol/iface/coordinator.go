@@ -62,7 +62,7 @@ type ReadPlanTask struct {
 
 	//some metrics for reporting
 	EstimatedDocCount int64 // estimated number of documents in the task
-	DocsCopied        int64 // number of documents
+	DocsCopied        int64 // number of documents copied
 }
 
 type TaskDoneMeta struct {
