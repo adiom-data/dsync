@@ -42,6 +42,7 @@ type ConnectorDetails struct {
 type ConnectorReadPlan struct {
 	Tasks          []ReadPlanTask
 	CdcResumeToken []byte // for cdc - we could generalize it as a task and the whole sequence as a DAG or something similar
+	CreatedAtEpoch int64  // real plan at this epoch time - used as a fallback for change stream creation
 }
 
 type ReadPlanTask struct {
@@ -61,7 +62,7 @@ type ReadPlanTask struct {
 
 	//some metrics for reporting
 	EstimatedDocCount int64 // estimated number of documents in the task
-	DocsCopied        int64 // number of documents copied
+	DocsCopied        int64 // number of documents
 }
 
 type TaskDoneMeta struct {
