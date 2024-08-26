@@ -1,107 +1,245 @@
 {
-    "connectionString": "mongodb://localhost:27017",
-    "http": {
-        "enabled": true,
-        "port": 3000,
-        "host": "localhost"
+  "connectionString": "mongodb://localhost:27017",
+  "http": {
+    "enabled": true,
+    "port": 3000,
+    "host": "localhost"
+  },
+  "reportInterval": 10000,
+  "templates": [
+    {
+      "name": "person",
+      "database": "test",
+      "collection": "people",
+      "drop": false,
+      "dictionaries": {
+        "words": {
+          "file": "/usr/share/dict/words",
+          "type": "text"
+        },
+        "names": [
+          "John",
+          "Jill",
+          "Joe",
+          "Janet"
+        ],
+        "statuses": [
+          "RUNNING",
+          {
+            "status": "DONE",
+            "substatus": "OK"
+          },
+          {
+            "status": "DONE",
+            "substatus": "NOK"
+          }
+        ],
+        "characters": {
+          "file": "characters.json",
+          "type": "json"
+        },
+        "locations": {
+          "file": "locations.txt",
+          "type": "text"
+        }
+      },
+      "variables": {
+        "num": {
+          "%number": {
+            "min": 0,
+            "max": 50
+          }
+        },
+        "createDate": {
+          "%date": {
+            "min": {
+              "$date": "2021-10-01"
+            },
+            "max": {
+              "$date": "2021-11-01"
+            }
+          }
+        }
+      },
+      "template": {
+        "_id": "%objectid",
+        "sequence": "%sequence",
+        "uuidstr": "%uuidString",
+        "uuidbin": "%uuidBinary",
+        "first": "%name.firstName",
+        "last": "%name.lastName",
+        "constant": 12.8,
+        "constantDate": {
+          "$date": "2010-02-26"
+        },
+        "birthday": "%date.birthday",
+        "embed": {
+          "key": "value",
+          "character": "%lordOfTheRings.character"
+        },
+        "words": "%lorem.words",
+        "sentence": "%lorem.sentence",
+        "array": [
+          98,
+          {
+            "%natural": {
+              "max": 100
+            }
+          },
+          {
+            "now": "%now"
+          },
+          {
+            "%long": {
+              "min": 1.00001,
+              "max": 1.99999
+            }
+          },
+          {
+            "%double": {
+              "min": -1,
+              "max": 1
+            }
+          },
+          {
+            "%decimal": {
+              "min": -1000,
+              "max": 1000
+            }
+          }
+        ],
+        "payload": {
+          "%binary": {
+            "size": 32
+          }
+        },
+        "num": "#num",
+        "num+": {
+          "%number": {
+            "min": "#num",
+            "max": 200
+          }
+        },
+        "variableArray": {
+          "%array": {
+            "min": "#num",
+            "max": "#num",
+            "of": {
+              "date": "%date",
+              "num": "%natural"
+            }
+          }
+        },
+        "createdAt": "#createDate",
+        "updateAt": {
+          "%date": {
+            "min": "#createDate",
+            "max": {
+              "$date": "2021-11-01"
+            }
+          }
+        },
+        "dictionary": {
+          "name": {
+            "%dictionary": {
+              "name": "names"
+            }
+          },
+          "statuses": {
+            "%dictionary": {
+              "name": "statuses"
+            }
+          },
+          "character": {
+            "%dictionary": {
+              "name": "characters"
+            }
+          },
+          "location": {
+            "%dictionary": {
+              "name": "locations"
+            }
+          }
+        },
+        "gaussianInt": {
+          "%gaussian": {
+            "mean": 10,
+            "sd": 1.0,
+            "type": "int"
+          }
+        },
+        "gaussianDouble": {
+          "%gaussian": {
+            "mean": 1,
+            "sd": 0.000005,
+            "type": "double"
+          }
+        },
+        "longlat": {
+          "%longlat": {
+            "countries": [
+              "FR",
+              "DE"
+            ],
+            "jitter": 0.5
+          }
+        },
+        "dictionaryConcat": {
+          "%dictionaryConcat": {
+            "from": "words",
+            "length": {
+              "%natural": {
+                "max": 10
+              }
+            },
+            "sep": " "
+          }
+        }
+      },
+      "indexes": [
+        {
+          "num": 1
+        }
+      ]
+    }
+  ],
+  "workloads": [
+    {
+      "name": "Insert",
+      "template": "person",
+      "op": "insert",
+      "threads": 1,
+      "batch": 1,
+      "pace": 100
     },
-    "reportInterval": 10000,
-    "templates": [
-        {
-            "name": "person",
-            "database": "test",
-            "collection": "people",
-            "drop": false,
-            "dictionaries": {
-                "words": {"file": "/usr/share/dict/words", "type":"text"},
-                "names": ["John", "Jill", "Joe", "Janet"],
-                "statuses": ["RUNNING", {"status": "DONE", "substatus": "OK"}, {"status": "DONE", "substatus": "NOK"}],
-                "characters": {"file": "characters.json", "type": "json"},
-                "locations": {"file": "locations.txt", "type": "text"}
-            },
-            "variables": {
-                "num": {"%number": {"min": 0, "max": 50}},
-                "createDate": {"%date":{"min": {"$date": "2021-10-01"}, "max": {"$date": "2021-11-01"}}}
-            },
-            "template": {
-                "_id": "%objectid",
-                "sequence": "%sequence",
-                "uuidstr": "%uuidString",
-                "uuidbin": "%uuidBinary",
-                "first": "%name.firstName",
-                "last": "%name.lastName",
-                "constant": 12.8,
-                "constantDate": {"$date": "2010-02-26"},
-                "birthday": "%date.birthday",
-                "embed": {
-                    "key": "value",
-                    "character": "%lordOfTheRings.character"
-                },
-                "words": "%lorem.words",
-                "sentence": "%lorem.sentence",
-                "array": [
-                    98,
-                    {"%natural": {"max": 100}},
-                    {"now": "%now"},
-                    {"%long": {"min": 1.00001, "max": 1.99999}},
-                    {"%double": {"min": -1, "max": 1}},
-                    {"%decimal": {"min": -1000, "max": 1000}}
-                ],
-                "payload": {"%binary": {"size": 32}},
-                "num": "#num",
-                "num+": {"%number": {"min": "#num", "max": 200}},
-                "variableArray": {
-                    "%array": {
-                        "min": "#num", "max": "#num",
-                        "of": { "date": "%date", "num": "%natural" }
-                    }
-                },
-                "createdAt": "#createDate",
-                "updateAt": {"%date": {"min": "#createDate", "max": {"$date": "2021-11-01"}}},
-                "dictionary": {
-                    "name": {"%dictionary": {"name": "names"}},
-                    "statuses": {"%dictionary": {"name": "statuses"}},
-                    "character": {"%dictionary": {"name": "characters"}},
-                    "location": {"%dictionary": {"name": "locations"}}
-                },
-                "gaussianInt": {"%gaussian": {"mean": 10, "sd": 1.0, "type": "int"}},
-                "gaussianDouble" : {"%gaussian": {"mean": 1, "sd": 0.000005, "type": "double"}},
-                "longlat": {"%longlat": {"countries": ["FR", "DE"], "jitter": 0.5}},
-                "dictionaryConcat": {"%dictionaryConcat": {"from": "words", "length": {"%natural": {"max": 10}}, "sep": " "}}
-             },
-            "indexes": [ { "num": 1} ]
-        }
-    ],
-    "workloads": [
-
-        {
-            "name": "Insert",
-            "template": "person",
-            "op": "insert",
-            "threads": 1,
-            "batch": 1,
-            "pace": 100
+    {
+      "name": "Update last name",
+      "template": "person",
+      "op": "updateOne",
+      "params": {
+        "filter": {
+          "num": "#num"
         },
-        {
-            "name": "Update last name",
-            "template": "person",
-            "op": "updateOne",
-            "params": {
-                "filter": { "num": "#num"},
-                "update": { "$set": { "last": "%name.lastName"}},
-                "upsert": true
-            },
-            "pace": 100
+        "update": {
+          "$set": {
+            "last": "%name.lastName"
+          }
         },
-        {
-            "name": "Delete",
-            "template": "person",
-            "op": "deleteOne",
-            "threads": 1,
-            "params": {
-                "filter": { "num": "#num"}
-            },
-            "pace": 100
+        "upsert": true
+      },
+      "pace": 100
+    },
+    {
+      "name": "Delete",
+      "template": "person",
+      "op": "deleteOne",
+      "threads": 1,
+      "params": {
+        "filter": {
+          "num": "#num"
         }
-    ]
+      },
+      "pace": 100
+    }
+  ]
 }

@@ -15,11 +15,11 @@ import (
 )
 
 type Options struct {
-	Verbosity  string   //log verbosity
-	Logfile    *os.File //log file handle. When not provided, logs are written to stderr
+	Verbosity  string   // log verbosity
+	Logfile    *os.File // log file handle. When not provided, logs are written to stderr
 	FormatJSON bool     // false = human readable, true = json
 
-	ErrorView io.Writer //error view for UI
+	ErrorView io.Writer // error view for UI
 }
 
 func Setup(o Options) {
@@ -50,7 +50,7 @@ func Setup(o Options) {
 			slogHandler = tint.NewHandler(os.Stderr, &tint.Options{
 				NoColor:   false, // colorize output
 				Level:     level,
-				AddSource: (level < 0), //only for debugging
+				AddSource: (level < 0), // only for debugging
 			})
 		}
 	} else { // log to file and potentially send errors to the UI
@@ -63,7 +63,7 @@ func Setup(o Options) {
 			slogHandler = tint.NewHandler(o.Logfile, &tint.Options{
 				NoColor:   true, // no colors
 				Level:     level,
-				AddSource: (level < 0), //only for debugging
+				AddSource: (level < 0), // only for debugging
 			})
 		}
 
@@ -71,7 +71,7 @@ func Setup(o Options) {
 			// create a dedicated error handler and fanout
 			slogHandlerEV := tint.NewHandler(o.ErrorView, &tint.Options{
 				NoColor: true,           // no colors
-				Level:   slog.LevelWarn, //only warnings and errors
+				Level:   slog.LevelWarn, // only warnings and errors
 			})
 			slogHandler = slogmulti.Fanout(slogHandler, slogHandlerEV)
 		}

@@ -8,8 +8,9 @@ package options
 import (
 	"fmt"
 
-	"github.com/adiom-data/dsync/connector/connectorMongo"
 	"github.com/urfave/cli/v2"
+
+	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 )
 
 type Options struct {

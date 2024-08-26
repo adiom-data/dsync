@@ -18,18 +18,18 @@ type DataMessage struct {
 	DataBatch [][]byte
 
 	// header for data messages
-	MutationType uint     //required
-	Loc          Location //required
-	Id           *[]byte  //required except for batch inserts (for efficiency)
-	IdType       byte     //required when Id is present
-	SeqNum       int64    //optional field to provide a global ordering of messages
+	MutationType uint     // required
+	Loc          Location // required
+	Id           *[]byte  // required except for batch inserts (for efficiency)
+	IdType       byte     // required when Id is present
+	SeqNum       int64    // optional field to provide a global ordering of messages
 
 	// header for barriers (task completion signals)
 	// combining them in a single struct to allow for a single channel for both data and barriers
 	// for barriers MutationType will be set to MutationType_Barrier
-	BarrierType           uint   //required for barriers
-	BarrierTaskId         uint   //required for barriers related to initial data copy
-	BarrierCdcResumeToken []byte //required for barriers related to CDC
+	BarrierType           uint   // required for barriers
+	BarrierTaskId         uint   // required for barriers related to initial data copy
+	BarrierCdcResumeToken []byte // required for barriers related to CDC
 }
 
 const (

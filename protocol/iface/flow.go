@@ -26,6 +26,6 @@ type FlowDataIntegrityCheckResult struct {
 }
 
 type FlowStatus struct {
-	//For uni-directional flows
+	// For uni-directional flows
 	SrcStatus, DstStatus ConnectorStatus
 }

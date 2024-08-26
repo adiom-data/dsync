@@ -10,21 +10,21 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"sync"
 	"time"
 
-	"net/http"
-	_ "net/http/pprof"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+	"github.com/urfave/cli/v2"
 
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
-	runner "github.com/adiom-data/dsync/runner/runnerLocal"
-	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
-	"github.com/urfave/cli/v2"
+	"github.com/adiom-data/dsync/runners"
 )
 
 const (
@@ -90,7 +90,7 @@ func runDsync(c *cli.Context) error {
 		advancedProgressRecalcInterval = throughputUpdateInterval
 	}
 
-	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
+	r := runners.NewRunnerLocal(runners.RunnerLocalSettings{
 		SrcConnString:                  o.SrcConnString,
 		DstConnString:                  o.DstConnString,
 		SrcType:                        o.Sourcetype,
@@ -107,7 +107,7 @@ func runDsync(c *cli.Context) error {
 	var wg sync.WaitGroup
 	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
 
-	//start a goroutine to print memory usage
+	// start a goroutine to print memory usage
 	go func() {
 		for {
 			select {
@@ -137,7 +137,7 @@ func runDsync(c *cli.Context) error {
 				if event.Key() == tcell.KeyCtrlC {
 					userInterrupted = true
 					tviewApp.Stop()
-					runnerCancelFunc() // Cancel the runner
+					runnerCancelFunc() // Cancel the runners
 					return nil
 				}
 				return event
@@ -150,7 +150,7 @@ func runDsync(c *cli.Context) error {
 				for {
 					select {
 					case <-runnerCtx.Done():
-						tviewApp.Stop() //need to make sure we stop the tview app when context is cancelled
+						tviewApp.Stop() // need to make sure we stop the tview app when context is cancelled
 						return
 					default:
 						r.UpdateRunnerProgress()
@@ -175,12 +175,12 @@ func runDsync(c *cli.Context) error {
 		err := r.Setup(runnerCtx)
 		if err == nil {
 			err = r.Run()
-			if !o.Verify { //if verification was requested, the user should be able to see the results
+			if !o.Verify { // if verification was requested, the user should be able to see the results
 				runnerCancelFunc()
 			}
 		} else {
 			slog.Error(fmt.Sprintf("%v", err))
-			runnerCancelFunc() //stop tview since we failed
+			runnerCancelFunc() // stop tview since we failed
 		}
 		r.Teardown()
 		runnerErr = err

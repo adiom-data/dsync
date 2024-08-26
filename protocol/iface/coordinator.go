@@ -45,10 +45,10 @@ type ConnectorReadPlan struct {
 }
 
 type ReadPlanTask struct {
-	Id     ReadPlanTaskID //should always start with 1 to avoid confusion with an uninitialized value
+	Id     ReadPlanTaskID // should always start with 1 to avoid confusion with an uninitialized value
 	Status uint
 
-	//XXX: this should be interface{} - a connector-specific task definition (implementation-specific) but making simple for now
+	// XXX: this should be interface{} - a connector-specific task definition (implementation-specific) but making simple for now
 	Def struct {
 		Db  string
 		Col string
@@ -59,7 +59,7 @@ type ReadPlanTask struct {
 		High         interface{} // upper bound for the task (exclusive)
 	}
 
-	//some metrics for reporting
+	// some metrics for reporting
 	EstimatedDocCount int64 // estimated number of documents in the task
 	DocsCopied        int64 // number of documents copied
 }

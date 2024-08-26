@@ -10,10 +10,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/adiom-data/dsync/protocol/iface/mocks"
 )
 
 /*

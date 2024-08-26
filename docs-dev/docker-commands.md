@@ -30,7 +30,6 @@ var dbs = db.getMongo().getDBNames()
 for (var i in dbs) { db = db.getMongo().getDB(dbs[i]); print("dropping db " + db.getName()); (!['admin','config','local'].includes(db.getName())) && db.dropDatabase(); }
 ```
 
-
 ## Building After Code Changes
 
 Currently, there is no hot reloading, so you must rebuild the containers after any code changes

@@ -10,10 +10,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/adiom-data/dsync/protocol/iface/mocks"
 )
 
 /*
@@ -63,7 +64,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 
 	// Check if the connector supports resume capabilities
 	if !caps.Resumability {
-		//XXX: should we check that setting the capabilities fails?
+		// XXX: should we check that setting the capabilities fails?
 		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
 	}
 
@@ -77,7 +78,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 	phase := 0
 	flowComplete := make(chan struct{})
 	allTasksComplete := make(chan struct{})
-	completedTasks := make(map[iface.ReadPlanTaskID]bool) //for easier tracking of completed tasks
+	completedTasks := make(map[iface.ReadPlanTaskID]bool) // for easier tracking of completed tasks
 
 	// Do some prep
 	flowID := iface.FlowID("1234")
@@ -124,7 +125,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 			if msg.MutationType != iface.MutationType_Barrier {
 				// This is a data message
 				messageCount++
-				//MaxMessageCount has to be less than number of data messages in the test data, otherwise will error due to timeout
+				// MaxMessageCount has to be less than number of data messages in the test data, otherwise will error due to timeout
 				if phase == 0 && messageCount == MaxMessageCount {
 					// let's interrupt the flow
 					err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
@@ -274,7 +275,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 
 	// Check if the connector supports resume capabilities
 	if !caps.Resumability {
-		//XXX: should we check that setting the capabilities fails?
+		// XXX: should we check that setting the capabilities fails?
 		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
 	}
 
@@ -464,7 +465,7 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
 
 	// Check if the connector supports resume capabilities
 	if !caps.Resumability {
-		//XXX: should we check that setting the capabilities fails?
+		// XXX: should we check that setting the capabilities fails?
 		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
 	}
 
@@ -561,7 +562,7 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeCDC() {
 
 	// Check if the connector supports resume capabilities
 	if !caps.Resumability {
-		//XXX: should we check that setting the capabilities fails?
+		// XXX: should we check that setting the capabilities fails?
 		suite.T().Skip("Skipping test because this connector does not support resume capabilities")
 	}
 

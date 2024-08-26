@@ -21,7 +21,7 @@ func calcSharedCapabilities(c1Caps iface.ConnectorCapabilities, c2Caps iface.Con
 
 	// Source and Sink are always true as they don't need to be shared
 	// we only care about resumability right now
-	//TODO: integrity check should follow the same path
+	// TODO: integrity check should follow the same path
 	caps.Resumability = c1Caps.Resumability && c2Caps.Resumability
 
 	return caps

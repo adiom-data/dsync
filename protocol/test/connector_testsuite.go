@@ -10,12 +10,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/adiom-data/dsync/protocol/iface/mocks"
 )
 
 /**
@@ -26,7 +27,7 @@ import (
 type ConnectorTestSuite struct {
 	suite.Suite
 	connectorFactoryFunc func() iface.Connector
-	datastoreFactoryFunc func() TestDataStore //optional and might be nil
+	datastoreFactoryFunc func() TestDataStore // optional and might be nil
 }
 
 func NewConnectorTestSuite(connectorFunc func() iface.Connector, datastoreFactoryFunc func() TestDataStore) *ConnectorTestSuite {
@@ -220,7 +221,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 		lsn := int64(0)
 		// write a number of messages to the channel
 		for i := 0; i < messageIterCount; i++ {
-			//do a simple 'pre-fix' random message sequence
+			// do a simple 'pre-fix' random message sequence
 			id := i
 			doc := bson.M{"_id": id, "test": i}
 			updatedDoc := bson.M{"_id": id, "test": i + 1}

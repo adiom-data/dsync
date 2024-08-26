@@ -68,7 +68,7 @@ const (
 
 type ProgressMetrics struct {
 	NumNamespaces          int64
-	NumNamespacesCompleted int64 //change name
+	NumNamespacesCompleted int64 // change name
 
 	NumDocsSynced      int64
 	ChangeStreamEvents int64
@@ -78,8 +78,8 @@ type ProgressMetrics struct {
 	TasksStarted   int64
 	TasksCompleted int64
 
-	//progress reporting attributes
-	NamespaceProgress map[Namespace]*NamespaceStatus //map key is namespace: "db.col"
+	// progress reporting attributes
+	NamespaceProgress map[Namespace]*NamespaceStatus // map key is namespace: "db.col"
 	Namespaces        []Namespace
 }
 
@@ -91,11 +91,11 @@ type Namespace struct {
 type NamespaceStatus struct {
 	EstimatedDocCount   int64
 	Throughput          float64
-	Tasks               []ReadPlanTask //all the tasks for the namespace
+	Tasks               []ReadPlanTask // all the tasks for the namespace
 	TasksCompleted      int64
 	TasksStarted        int64
 	DocsCopied          int64
-	EstimatedDocsCopied int64 //this is for calculating percentage complete based on approximate number of docs per task, not actual number of docs copied
+	EstimatedDocsCopied int64 // this is for calculating percentage complete based on approximate number of docs per task, not actual number of docs copied
 }
 
 // Pass options to use to the connector

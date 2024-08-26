@@ -9,9 +9,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/google/uuid"
 	"github.com/mitchellh/hashstructure"
+
+	"github.com/adiom-data/dsync/protocol/iface"
 )
 
 type ConnectorDetailsWithEp struct {
@@ -37,13 +38,13 @@ type FlowDetails struct {
 
 	dataChannels []iface.DataChannelID
 
-	doneNotificationChannels   []chan struct{}                                //for connectors to let us know they're done with the flow
-	integrityCheckDoneChannels []chan iface.ConnectorDataIntegrityCheckResult //for connectors to post the results of the integrity check (this can be a continious stream in the future, hence a channel)
+	doneNotificationChannels   []chan struct{}                                // for connectors to let us know they're done with the flow
+	integrityCheckDoneChannels []chan iface.ConnectorDataIntegrityCheckResult // for connectors to post the results of the integrity check (this can be a continious stream in the future, hence a channel)
 
-	flowDone chan struct{} //for everyone else to know the flow is done
+	flowDone chan struct{} // for everyone else to know the flow is done
 
-	ReadPlan         iface.ConnectorReadPlan //read plan for the flow
-	readPlanningDone chan struct{}           //for source connector to let us know they're done with read planning
+	ReadPlan         iface.ConnectorReadPlan // read plan for the flow
+	readPlanningDone chan struct{}           // for source connector to let us know they're done with read planning
 
 	Resumable bool
 }
@@ -70,7 +71,7 @@ func updateFlowTaskStatus(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID,
 
 func updateFlowTaskData(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
 	if taskData == nil {
-		return nil //nothing to update
+		return nil // nothing to update
 	}
 
 	for i, task := range flowDetails.ReadPlan.Tasks {

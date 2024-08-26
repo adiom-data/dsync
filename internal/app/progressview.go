@@ -13,9 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/runner/runnerLocal"
 	"github.com/rivo/tview"
+
+	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/adiom-data/dsync/runners/runnerLocal"
 )
 
 const (
@@ -43,13 +44,13 @@ func (tv *TViewDetails) SetUpDisplay(app *tview.Application, errorText *tview.Te
 		AddItem(table, 0, 1, false).
 		AddItem(progressBarTextView, 1, 1, false).
 		AddItem(errorText, 0, 1, false)
-	tv.root = root //indices are 0, 1, 2, 3, corresponding to header, table, progressBar, and errorLogs respectively
+	tv.root = root // indices are 0, 1, 2, 3, corresponding to header, table, progressBar, and errorLogs respectively
 	tv.app.SetRoot(root, true)
 }
 
-// Get the latest status report based on the runner progress struct and update the tview components accoringly
+// Get the latest status report based on the runners progress struct and update the tview components accoringly
 func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncProgress) {
-	//get tview components and clear them
+	// get tview components and clear them
 	header := tv.root.GetItem(0).(*tview.TextView)
 	header.Clear()
 
@@ -59,7 +60,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 	progressBar := tv.root.GetItem(2).(*tview.TextView)
 	progressBar.Clear()
 
-	//get the time elapsed
+	// get the time elapsed
 	totalTimeElapsed := time.Since(runnerProgress.StartTime)
 	hours := int(totalTimeElapsed.Hours())
 	minutes := int(totalTimeElapsed.Minutes()) % 60
@@ -76,7 +77,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d		%d/%d Namespaces synced		Docs Synced: %d	\n", runnerProgress.SyncState, hours, minutes, seconds, runnerProgress.NumNamespacesCompleted, runnerProgress.TotalNamespaces, runnerProgress.NumDocsSynced)
 		header.SetText(headerString)
 
-		//set the table
+		// set the table
 		table.SetCell(0, 0, tview.NewTableCell("Namespace").SetAlign(tview.AlignLeft).SetExpansion(1))
 		table.SetCell(0, 1, tview.NewTableCell("Percent Complete").SetAlign(tview.AlignLeft).SetExpansion(1))
 		table.SetCell(0, 2, tview.NewTableCell("Tasks Completed").SetAlign(tview.AlignLeft).SetExpansion(1))
@@ -101,7 +102,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 			table.SetCell(row+1, 4, tview.NewTableCell(fmt.Sprintf("%.0f", ns.Throughput)).SetAlign(tview.AlignLeft).SetExpansion(1))
 		}
 
-		//set the progress bar
+		// set the progress bar
 		progressBarWidth := 80
 
 		totalPercentComplete := percentCompleteTotal(runnerProgress)
@@ -119,7 +120,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		}
 		header.SetText(headerString)
 
-		//set the indefinite progress bar
+		// set the indefinite progress bar
 		progressBarWidth := 80
 		cdcPaginatorPosition = (cdcPaginatorPosition + 5) % (progressBarWidth - 4)
 		progressBarString := fmt.Sprintf("[%s%s%s] %.2f events/sec\n\n", strings.Repeat(string('-'), cdcPaginatorPosition), strings.Repeat(">", 3), strings.Repeat("-", progressBarWidth-cdcPaginatorPosition-2), runnerProgress.Throughput)
@@ -130,7 +131,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		header.SetText(headerString)
 
 	case iface.VerifySyncState:
-		//set the header text
+		// set the header text
 		stateString := "Performing Data Integrity Check"
 		if runnerProgress.VerificationResult != "" {
 			stateString = fmt.Sprintf("Data Integrity Check: %s        Press Ctrl+C to exit", runnerProgress.VerificationResult)
@@ -165,7 +166,7 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 	var percentComplete float64
 	var numerator, denominator float64
 	if len(nsStatus.Tasks) == 1 {
-		//no partitioning
+		// no partitioning
 		docCount := nsStatus.EstimatedDocCount
 		if docCount == 0 {
 			percentComplete = 100
@@ -177,7 +178,7 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 			denominator = float64(docCount)
 		}
 	} else {
-		//partitioning
+		// partitioning
 		numDocsCopied := atomic.LoadInt64(&nsStatus.EstimatedDocsCopied)
 
 		docsPerTask := nsStatus.Tasks[0].EstimatedDocCount
@@ -187,7 +188,7 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		numDocsInProgress := numDocsCopied - numCompletedDocs
 		numDocsLeft := (int64(len(nsStatus.Tasks)) - nsStatus.TasksCompleted) * docsPerTask
 		if numDocsInProgress >= int64(numInProgressDocsMax) && len(nsStatus.Tasks) != int(atomic.LoadInt64(&nsStatus.TasksCompleted)) {
-			//we are in the middle of a task
+			// we are in the middle of a task
 			numDocsInProgress = int64(numInProgressDocsMax - 1)
 		} else if numDocsInProgress > int64(numInProgressDocsMax) && len(nsStatus.Tasks) == int(atomic.LoadInt64(&nsStatus.TasksCompleted)) {
 			numDocsInProgress = int64(numInProgressDocsMax)

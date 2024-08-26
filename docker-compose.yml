@@ -11,7 +11,7 @@ services:
       - ./scripts/start-mongo.sh:/start-mongo.sh
     environment:
       - REPL_SET_NAME=data1
-    command: ["/start-mongo.sh"]
+    command: [ "/start-mongo.sh" ]
     healthcheck:
       test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
       interval: 10s
@@ -29,7 +29,7 @@ services:
       - ./scripts/start-mongo.sh:/start-mongo.sh
     environment:
       - REPL_SET_NAME=data2
-    command: ["/start-mongo.sh"]
+    command: [ "/start-mongo.sh" ]
     healthcheck:
       test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
       interval: 10s
@@ -43,9 +43,7 @@ services:
         condition: service_healthy
       mongo2:
         condition: service_healthy
-    volumes:
-      - ./scripts/wait-for-mongo.sh:/wait-for-mongo.sh
-    command: ["/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27017/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO"]
+    command: [ "/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27017/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO" ]
 
 volumes:
   data1:
