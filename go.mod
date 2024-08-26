@@ -7,7 +7,7 @@ require (
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b
-	github.com/samber/slog-multi v1.2.0
+	github.com/samber/slog-multi v1.2.1
 	github.com/stretchr/testify v1.9.0
 	github.com/tryvium-travels/memongo v0.12.0
 	github.com/urfave/cli/v2 v2.27.4
