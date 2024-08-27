@@ -32,7 +32,7 @@ type nsCountResult struct {
 
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
-func (cc *CosmosConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) {
+func (cc *Connector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) {
 	// XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult
@@ -134,7 +134,7 @@ func (cc *CosmosConnector) doIntegrityCheck_sync(flowId iface.FlowID, options if
 }
 
 // Returns a list of fully qualified namespaces
-func (cc *CosmosConnector) getFQNamespaceList(namespacesFilter []string) ([]namespace, error) {
+func (cc *Connector) getFQNamespaceList(namespacesFilter []string) ([]namespace, error) {
 	var dbsToResolve []string // database names that we need to resolve
 
 	var namespaces []namespace

@@ -16,7 +16,7 @@ import (
 
 const (
 	progressReportingIntervalSec = 10
-	batch_size                   = 100 // used for change stream batch inserts
+	batchSize                    = 100 // used for change stream batch inserts
 )
 
 type ReaderProgress struct {
@@ -30,7 +30,7 @@ type ReaderProgress struct {
 	 	function processes a data generation task for the initial generation.
 		It generates random documents for the specified collection in the task and sends them as single data messages to the channel
 */
-func (rc *RandomReadConnector) ProcessDataGenerationTask(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
+func (rc *ReadConnector) ProcessDataGenerationTask(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
 	loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
 	// task is to generate the specified number of documents in rc.settings for the given collection
 	for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ {
@@ -52,7 +52,7 @@ func (rc *RandomReadConnector) ProcessDataGenerationTask(task iface.ReadPlanTask
 	 	function processes a data generation task for the initial data generation.
 		It generates random documents for the specified collection in the task and sends them in a batch data messages to the channel
 */
-func (rc *RandomReadConnector) ProcessDataGenerationTaskBatch(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
+func (rc *ReadConnector) ProcessDataGenerationTaskBatch(task iface.ReadPlanTask, channel chan iface.DataMessage, readerProgress *ReaderProgress) {
 	loc := iface.Location{Database: task.Def.Db, Collection: task.Def.Col}
 	var docs []map[string]interface{}
 	// create slice of random documents
@@ -76,7 +76,7 @@ func (rc *RandomReadConnector) ProcessDataGenerationTaskBatch(task iface.ReadPla
 		a single task is generated for each collection in each database, number of tasks = numDatabases * numCollectionsPerDatabase
 		returns slice of DataCopyTasks
 */
-func (rc *RandomReadConnector) CreateInitialGenerationTasks() []iface.ReadPlanTask {
+func (rc *ReadConnector) CreateInitialGenerationTasks() []iface.ReadPlanTask {
 	var tasks []iface.ReadPlanTask
 
 	for i := 1; i <= rc.settings.numDatabases; i++ {
@@ -95,7 +95,7 @@ func (rc *RandomReadConnector) CreateInitialGenerationTasks() []iface.ReadPlanTa
 	 	function generates random document with the specified number of fields in rc.settings and values consisting of random strings of length docSize using gofakeit
 		XXX: Possible improvement: allow user to specify field names and types in settings for more customization, maybe through a template
 */
-func (rc *RandomReadConnector) generateRandomDocument() map[string]interface{} {
+func (rc *ReadConnector) generateRandomDocument() map[string]interface{} {
 	doc := make(map[string]interface{})
 	for i := 1; i <= rc.settings.numFields; i++ {
 		doc[fmt.Sprintf("field%d", i)] = gofakeit.LetterN(rc.settings.docSize)
@@ -107,7 +107,7 @@ func (rc *RandomReadConnector) generateRandomDocument() map[string]interface{} {
 	 	function generates a single insert data message with a random document for the specified location
 		generates an id for the document and updates the given location's IndexMap with the id
 */
-func (rc *RandomReadConnector) SingleInsertDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
+func (rc *ReadConnector) SingleInsertDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
 	// checks if the location key exists in the map, if not creates a new IndexMap for the given location to store ids
 	docMap, exists := rc.docMap[loc]
 	if !exists {
@@ -135,7 +135,7 @@ function generates a batch insert data message with a slice of random documents 
 generates an id for each document and updates the given location's IndexMap with the ids
 sends all of the documents in a single batch insert data message to optimize performance
 */
-func (rc *RandomReadConnector) BatchInsertDataMessage(loc iface.Location, docs []map[string]interface{}) (iface.DataMessage, error) {
+func (rc *ReadConnector) BatchInsertDataMessage(loc iface.Location, docs []map[string]interface{}) (iface.DataMessage, error) {
 	var dataBatch [][]byte
 	var err error
 	dataBatch = make([][]byte, len(docs)) // create slice of byte slices to store marshaled documents for data message
@@ -166,7 +166,7 @@ func (rc *RandomReadConnector) BatchInsertDataMessage(loc iface.Location, docs [
 
 /* Generates a random change stream event based on the given operation, updates the ReaderProgress and lsn
  */
-func (rc *RandomReadConnector) generateChangeStreamEvent(operation string, readerProgress *ReaderProgress, lsn *int64) (iface.DataMessage, error) {
+func (rc *ReadConnector) generateChangeStreamEvent(operation string, readerProgress *ReaderProgress, lsn *int64) (iface.DataMessage, error) {
 	// generate random location
 	db := gofakeit.Number(1, rc.settings.numDatabases)
 	col := gofakeit.Number(1, rc.settings.numCollectionsPerDatabase)
@@ -188,17 +188,17 @@ func (rc *RandomReadConnector) generateChangeStreamEvent(operation string, reade
 
 	// insertBatch case generates a batch insert data message with a slice of random documents
 	case "insertBatch":
-		docMap := rc.docMap[loc]                                               // get the IndexMap for the generated collection
-		if docMap.GetNumDocs() > rc.settings.maxDocsPerCollection-batch_size { // if the collection is almost full and cannot fit a batch, no op and return
-			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert %d docs max reached, lsn %d", docMap.GetNumDocs(), batch_size, *lsn))
+		docMap := rc.docMap[loc]                                              // get the IndexMap for the generated collection
+		if docMap.GetNumDocs() > rc.settings.maxDocsPerCollection-batchSize { // if the collection is almost full and cannot fit a batch, no op and return
+			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert %d docs max reached, lsn %d", docMap.GetNumDocs(), batchSize, *lsn))
 			return iface.DataMessage{}, nil
 		}
 		var docs []map[string]interface{}
-		for i := 0; i < batch_size; i++ { // generate a slice of random documents
+		for i := 0; i < batchSize; i++ { // generate a slice of random documents
 			docs = append(docs, rc.generateRandomDocument())
 			rc.incrementProgress(readerProgress, lsn)
 		}
-		slog.Debug(fmt.Sprintf("Generated batch insert change stream event (%d inserts) in collection %v.%v", batch_size, loc.Database, loc.Collection))
+		slog.Debug(fmt.Sprintf("Generated batch insert change stream event (%d inserts) in collection %v.%v", batchSize, loc.Database, loc.Collection))
 		return rc.BatchInsertDataMessage(loc, docs)
 
 	// update case generates an update data message with a random document by generating a random id from the IndexMap
@@ -229,7 +229,7 @@ func (rc *RandomReadConnector) generateChangeStreamEvent(operation string, reade
 Randomly generates a database operation [insert, insertBatch, update, delete] based on probabilities given in the settings
 Errors if given probabilities do not sum to 1.0
 */
-func (rc *RandomReadConnector) generateOperation() (string, error) {
+func (rc *ReadConnector) generateOperation() (string, error) {
 	// generate random operation based on probabilities
 	options := []string{"insert", "insertBatch", "update", "delete"}
 	// check if probabilities sum to 1.0, if not error
@@ -254,7 +254,7 @@ func (rc *RandomReadConnector) generateOperation() (string, error) {
 }
 
 // increment progress counters for change stream events and lsn, cleans up the change stream generation code
-func (rc *RandomReadConnector) incrementProgress(reader *ReaderProgress, lsn *int64) {
+func (rc *ReadConnector) incrementProgress(reader *ReaderProgress, lsn *int64) {
 	reader.changeStreamEvents++
 	*lsn++
 	rc.status.WriteLSN++

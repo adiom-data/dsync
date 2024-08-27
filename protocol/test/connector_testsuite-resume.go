@@ -26,13 +26,13 @@ import (
 func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("1")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -220,7 +220,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 	// We should have gotten some data in the channel
 	assert.True(suite.T(), messageCount > 0, "Should have read some data")
 
-	// A notification should have been sent to the coordinator that the job is done
+	// A notification should have been sent to the coordinators that the job is done
 	c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
 
 	connector.Teardown()
@@ -237,13 +237,13 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("1")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -422,18 +422,18 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 }
 
 /*
-* Check that a resumable writer signals to coordinator when a task complete barrier is received
+* Check that a resumable writer signals to coordinators when a task complete barrier is received
  */
 func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("2")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -512,25 +512,25 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeInitialCopy() {
 	// Sleep for 1 second to ensure that the interruption took effect
 	time.Sleep(1 * time.Second)
 
-	// A notification should have been sent to the coordinator that the task is done
+	// A notification should have been sent to the coordinators that the task is done
 	c.AssertCalled(suite.T(), "NotifyTaskDone", flowID, testConnectorID, testTaskID, mock.Anything)
 
 	connector.Teardown()
 }
 
 /*
-* Check that a resumable writer signals to coordinator when a cdc resume token barrier is received
+* Check that a resumable writer signals to coordinators when a cdc resume token barrier is received
  */
 func (suite *ConnectorTestSuite) TestConnectorWriteResumeCDC() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("2")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -609,7 +609,7 @@ func (suite *ConnectorTestSuite) TestConnectorWriteResumeCDC() {
 	// Sleep for 1 second to ensure that the interruption took effect
 	time.Sleep(1 * time.Second)
 
-	// A notification should have been sent to the coordinator that the task is done
+	// A notification should have been sent to the coordinators that the task is done
 	c.AssertCalled(suite.T(), "UpdateCDCResumeToken", flowID, testConnectorID, testResumeToken)
 
 	connector.Teardown()

@@ -10,15 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/adiom-data/dsync/statestores/statestoreTemp"
-
-	"github.com/adiom-data/dsync/connectors/connectorNull"
 	"github.com/adiom-data/dsync/connectors/cosmos"
+	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
+	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/random"
-	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
+	"github.com/adiom-data/dsync/coordinators/simple"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/runners/runnerLocal"
-	"github.com/adiom-data/dsync/transport"
+	"github.com/adiom-data/dsync/statestores"
+	"github.com/adiom-data/dsync/transports"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -33,7 +32,7 @@ type RunnerLocal struct {
 	coord      iface.Coordinator
 	src, dst   iface.Connector
 
-	runnerProgress runnerLocal.RunnerSyncProgress // internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
+	runnerProgress RunnerSyncProgress // internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
 
 	ctx context.Context
 
@@ -67,7 +66,7 @@ const (
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	r := &RunnerLocal{}
-	r.runnerProgress = runnerLocal.RunnerSyncProgress{
+	r.runnerProgress = RunnerSyncProgress{
 		StartTime:     time.Now(),
 		CurrTime:      time.Now(),
 		SyncState:     iface.SetupSyncState,
@@ -76,9 +75,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
-		r.src = random.NewRandomReadConnector(sourceName, random.RandomConnectorSettings{})
+		r.src = random.NewRandomReadConnector(sourceName, random.ConnectorSettings{})
 	} else if settings.SrcType == "CosmosDB" {
-		cosmosSettings := cosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString}
+		cosmosSettings := cosmos.ConnectorSettings{ConnectionString: settings.SrcConnString}
 		if settings.CosmosDeletesEmuRequestedFlag {
 			cosmosSettings.EmulateDeletes = true
 			// the destination is a MongoDB database otherwise the Options check would have failed
@@ -91,14 +90,14 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		}
 		r.src = cosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
-		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
 	}
 	// null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
-		r.dst = connectorNull.NewNullConnector(destinationName)
+		r.dst = null.NewNullConnector(destinationName)
 	} else {
-		connSettings := connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString}
+		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			connSettings.NumParallelWriters = btc / 2
@@ -107,16 +106,16 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	}
 
 	if settings.StateStoreConnString != "" { // if the statestores is explicitly set, use it
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+		r.statestore = statestores.NewMongoStateStore(statestores.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	} else if !nullWrite { // if the destination is stateful, we can use it as statestores
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.DstConnString})
+		r.statestore = statestores.NewMongoStateStore(statestores.MongoStateStoreSettings{ConnectionString: settings.DstConnString})
 	} else {
 		// otherwise, use a stub statestores because no statestores is needed
-		r.statestore = statestoreTemp.NewMongoStateStore()
+		r.statestore = statestores.NewMongoStateStore(statestores.MongoStateStoreSettings{})
 	}
 
-	r.coord = coordinatorSimple.NewSimpleCoordinator()
-	r.trans = transport.NewLocalTransport(r.coord)
+	r.coord = simple.NewSimpleCoordinator()
+	r.trans = transports.NewLocalTransport(r.coord)
 	r.settings = settings
 
 	return r
@@ -154,7 +153,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 func (r *RunnerLocal) Run() error {
 	slog.Debug("RunnerLocal Run")
 
-	// get available connectors from the coordinator
+	// get available connectors from the coordinators
 	connectors := r.coord.GetConnectors()
 	// print the available connectors
 	slog.Debug(fmt.Sprintf("Connectors: %v", connectors))
@@ -317,7 +316,7 @@ type RunnerSyncProgress struct {
 }
 
 // Update the runners progress struct with the latest progress metrics from the flow status
-func (r *runner.RunnerLocal) UpdateRunnerProgress() {
+func (r *RunnerLocal) UpdateRunnerProgress() {
 	if r.activeFlowID == iface.FlowID("") { // no active flow - probably not active yet
 		return
 	}
@@ -358,12 +357,12 @@ func (r *runner.RunnerLocal) UpdateRunnerProgress() {
 }
 
 // Get the latest runners progress struct
-func (r *runner.RunnerLocal) GetRunnerProgress() RunnerSyncProgress {
+func (r *RunnerLocal) GetRunnerProgress() RunnerSyncProgress {
 	return r.runnerProgress
 }
 
 // Loops to update the status and throughput metrics for the runners progress struct
-func (r *runner.RunnerLocal) updateRunnerSyncThroughputRoutine(throughputUpdateInterval time.Duration) {
+func (r *RunnerLocal) updateRunnerSyncThroughputRoutine(throughputUpdateInterval time.Duration) {
 	r.UpdateRunnerProgress()
 	ticker := time.NewTicker(throughputUpdateInterval)
 	currTime := time.Now()

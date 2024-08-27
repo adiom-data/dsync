@@ -19,35 +19,10 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-// XXX (AK, 6/2024): this is not going to work on anything but a dedicated Mongo cluster
-/*
-func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timestamp, error) {
-	appendOplogNoteCmd := bson.D{
-		{"appendOplogNote", 1},
-		{"data", bson.D{{"adiom-connector", "lastOpTime"}}},
-	}
-	res := client.Database("admin").RunCommand(ctx, appendOplogNoteCmd)
-
-	var responseRaw bson.Raw
-	var err error
-	if responseRaw, err = res.Raw(); err != nil {
-		return nil, fmt.Errorf("failed to append oplog note: %v", err)
-	}
-
-	opTimeRaw, lookupErr := responseRaw.LookupErr("operationTime")
-	if lookupErr != nil {
-		return nil, fmt.Errorf("failed to get operationTime from appendOplogNote response: %v", lookupErr)
-	}
-
-	t, i := opTimeRaw.Timestamp()
-	return &primitive.Timestamp{T: t, I: i}, nil
-}
-*/
-
 const (
 	connectorDBType string = "MongoDB" // We're a MongoDB-compatible connector
 	connectorSpec   string = "Genuine"
-	// specific, not compatible with Cosmos DB
+	// Specific, not compatible with Cosmos DB
 	dummyDB                      string = "adiom-internal-dummy" // note that this must be different from the metadata DB - that one is excluded from copying, while this one isn't
 	dummyCol                     string = "dummy"
 	progressReportingIntervalSec        = 10
@@ -104,9 +79,9 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-// COSMOS_DB_REGEX Checks if the MongoDB is genuine based on the connection string
-var COSMOS_DB_REGEX = regexp.MustCompile(`(?i)\.cosmos\.azure\.com$`)
-var DOCUMENT_DB_REGEX = regexp.MustCompile(`(?i)docdb(-elastic)?\.amazonaws\.com$`)
+// CosmosDBRegex Checks if the MongoDB is genuine based on the connection string
+var CosmosDBRegex = regexp.MustCompile(`(?i)\.cosmos\.azure\.com$`)
+var DocumentDBRegex = regexp.MustCompile(`(?i)docdb(-elastic)?\.amazonaws\.com$`)
 
 func getHostnameFromHost(host string) string {
 	if strings.HasPrefix(host, "[") {
@@ -143,11 +118,11 @@ func GetMongoFlavor(connectionString string) MongoFlavor {
 	hostname := getHostnameFromUrl(connectionString)
 
 	// check if the connection string matches the regex for Cosmos DB
-	if COSMOS_DB_REGEX.MatchString(hostname) {
+	if CosmosDBRegex.MatchString(hostname) {
 		return FlavorCosmosDB
 	}
 	// check if the connection string matches the regex for Document DB
-	if DOCUMENT_DB_REGEX.MatchString(hostname) {
+	if DocumentDBRegex.MatchString(hostname) {
 		return FlavorDocumentDB
 	}
 	return FlavorMongoDB

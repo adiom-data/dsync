@@ -9,17 +9,17 @@ import (
 )
 
 const (
-	// Default timeout for running a method to assert that the method is non-blocking
+	// NonBlockingTimeout Default timeout for running a method to assert that the method is non-blocking
 	NonBlockingTimeout = 100 * time.Millisecond
-	// Read planning timeout
+	// ReadPlanningTimeout Read planning timeout
 	ReadPlanningTimeout = 5 * time.Second
-	// Flow completion timeout
+	// FlowCompletionTimeout Flow completion timeout
 	FlowCompletionTimeout = 10 * time.Second
-	// Event reaction timeout
+	// EventReactionTimeout Event reaction timeout
 	EventReactionTimeout = 5 * time.Second
-	// Data integrity check timeout
+	// DataIntegrityCheckTimeout Data integrity check timeout
 	DataIntegrityCheckTimeout = 5 * time.Second
-	// Max Message Count until we interrupt the flow
+	// MaxMessageCount Max Message Count until we interrupt the flow
 	MaxMessageCount = 4
 )
 

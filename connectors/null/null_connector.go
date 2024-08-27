@@ -13,7 +13,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type NullWriteConnector struct {
+type Connector struct {
 	desc string
 	ctx  context.Context
 
@@ -22,10 +22,10 @@ type NullWriteConnector struct {
 	coord                 iface.CoordinatorIConnectorSignal
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
+
 	// TODO (AK, 6/2024): this should be per-flow (as well as the other bunch of things)
-	// ducktaping for now
 	status         iface.ConnectorStatus
-	flowctx        context.Context
+	flowCtx        context.Context
 	flowCancelFunc context.CancelFunc
 }
 
@@ -34,13 +34,13 @@ const (
 	progressReportingIntervalSec = 10
 )
 
-func NewNullConnector(desc string) *NullWriteConnector {
-	return &NullWriteConnector{
+func NewNullConnector(desc string) *Connector {
+	return &Connector{
 		desc: desc,
 	}
 }
 
-func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (nc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	nc.ctx = ctx
 	nc.t = t
 	// Instantiate ConnectorType
@@ -49,10 +49,10 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 	nc.connectorCapabilities = iface.ConnectorCapabilities{Source: false, Sink: true, IntegrityCheck: false}
 	// Instantiate ConnectorStatus
 	nc.status = iface.ConnectorStatus{WriteLSN: 0}
-	// Get the coordinator endpoint
+	// Get the coordinators endpoint
 	coord, err := nc.t.GetCoordinatorEndpoint("local")
 	if err != nil {
-		return errors.New("Failed to get coordinator endpoint: " + err.Error())
+		return errors.New("Failed to get coordinators endpoint: " + err.Error())
 	}
 	nc.coord = coord
 
@@ -69,23 +69,23 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 	return nil
 }
 
-func (nc *NullWriteConnector) Teardown() {
+func (nc *Connector) Teardown() {
 	// does nothing, no server connections to close
 	slog.Info(fmt.Sprintf("Null Write Connector %s is completed", nc.id))
 }
 
-func (nc *NullWriteConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (nc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// not necessary - Null write connector is always a destination connector and doesn't set parameters
 }
 
-func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (nc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// does nothing, no read from channel
 	return fmt.Errorf("null write connector does not support read from channel")
 }
 
-func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (nc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	// write null to destination
-	nc.flowctx, nc.flowCancelFunc = context.WithCancel(nc.ctx)
+	nc.flowCtx, nc.flowCancelFunc = context.WithCancel(nc.ctx)
 	dataChannel, err := nc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
@@ -107,7 +107,7 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 		for {
 
 			select {
-			case <-nc.flowctx.Done():
+			case <-nc.flowCtx.Done():
 				return
 			case <-ticker.C:
 				// Print writer progress
@@ -119,7 +119,7 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 	go func() {
 		for loop := true; loop; {
 			select {
-			case <-nc.flowctx.Done():
+			case <-nc.flowCtx.Done():
 				loop = false
 			case dataMsg, ok := <-dataChannel:
 				if !ok {
@@ -134,26 +134,26 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 		}
 		err := nc.coord.NotifyDone(flowId, nc.id)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", nc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinators that the connector %s is done writing for flow %s: %v", nc.id, flowId, err))
 		}
 
 	}()
 	return nil
 }
 
-func (nc *NullWriteConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	// does nothing, no data to check
 	return fmt.Errorf("null write connector does not support data integrity check")
 }
-func (nc *NullWriteConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (nc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return nc.status
 }
-func (nc *NullWriteConnector) Interrupt(flowId iface.FlowID) error {
+func (nc *Connector) Interrupt(flowId iface.FlowID) error {
 	// TODO: Put code here
 	nc.flowCancelFunc()
 	return nil
 }
 
-func (nc *NullWriteConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	return fmt.Errorf("null write connector does not make plans for reads")
 }

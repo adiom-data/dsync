@@ -15,7 +15,7 @@ import (
 // Standard test suite for the connector interface
 func TestRandomConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
-		return NewRandomReadConnector("test", RandomConnectorSettings{})
+		return NewRandomReadConnector("test", ConnectorSettings{})
 	}, nil)
 	suite.Run(t, tSuite)
 }

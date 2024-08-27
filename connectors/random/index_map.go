@@ -6,6 +6,8 @@ package random
 import (
 	"log/slog"
 	"sync"
+
+	"github.com/brianvoe/gofakeit/v7"
 )
 
 type IndexMap struct {

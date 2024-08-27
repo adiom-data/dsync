@@ -18,8 +18,8 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-// Creates a single changestream compatible with CosmosDB with the provided options
-func (cc *CosmosConnector) createChangeStream(ctx context.Context, namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
+// Creates a single change stream compatible with CosmosDB with the provided options
+func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
 	collection := cc.client.Database(db).Collection(col)
@@ -35,8 +35,8 @@ func (cc *CosmosConnector) createChangeStream(ctx context.Context, namespace ifa
 	return changeStream, nil
 }
 
-// Creates parallel change streams for each task in the read plan, and processes the events concurrently
-func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
+// StartConcurrentChangeStreams dCreates parallel change streams for each task in the read plan, and processes the events concurrently
+func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
 	// global atomic lsn counter
 	var lsn int64 = 0
@@ -57,7 +57,7 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, nam
 			}
 			var opts *moptions.ChangeStreamOptions
 			if token != nil {
-				// set the change stream options to start from the resume token
+				// set the chan^ge stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
 			} else { // we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
@@ -80,7 +80,7 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, nam
 			cc.processChangeStreamEvents(ctx, readerProgress, changeStream, loc, channel, &lsn)
 
 			if err := changeStream.Err(); err != nil {
-				if ctx.Err() == context.Canceled {
+				if errors.Is(ctx.Err(), context.Canceled) {
 					slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 				} else {
 					slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -94,7 +94,7 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, nam
 }
 
 // Reads and processes change stream events, and sends messages to the data channel
-func (cc *CosmosConnector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *int64) {
+func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *int64) {
 	for changeStream.Next(ctx) {
 		var change bson.M
 		if err := changeStream.Decode(&change); err != nil {
@@ -122,7 +122,7 @@ func (cc *CosmosConnector) processChangeStreamEvents(ctx context.Context, reader
 
 }
 
-func (cc *CosmosConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
+func (cc *Connector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
 	// slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
 	db := change["ns"].(bson.M)["db"].(string)

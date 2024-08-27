@@ -29,10 +29,10 @@ const (
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 
 var connectorFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 }
 var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -46,7 +46,7 @@ func TestCosmosConnectorSuite(t *testing.T) {
 	}
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+			return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -69,18 +69,18 @@ func TestCosmosConnectorSuite(t *testing.T) {
 func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorFactoryFunc().(*CosmosConnector)
+	connector := connectorFactoryFunc().(*Connector)
 
 	// setup the connector and make sure it returns no errors
 	err := connector.Setup(ctx, t)
@@ -229,18 +229,18 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 		testState.Fatal(err)
 	}
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*CosmosConnector)
+	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*Connector)
 
 	// setup the connector and make sure it returns no errors
 	err = connector.Setup(ctx, t)

@@ -19,14 +19,14 @@ import (
 )
 
 var (
-	// System databases that we don't want to copy
+	// ExcludedDBListForIC System databases that we don't want to copy
 	ExcludedDBListForIC = []string{"local", "config", "admin", "adiom-internal"}
-	// System collections that we don't want to copy (regex pattern)
+	// ExcludedSystemCollPattern System collections that we don't want to copy (regex pattern)
 	ExcludedSystemCollPattern = "^system[.]"
 )
 
 // returns the list of namespaces and the tasks to be executed (partitioned if necessary)
-func (cc *CosmosConnector) createInitialCopyTasks(namespaces []string) ([]iface.Namespace, []iface.ReadPlanTask, error) {
+func (cc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.Namespace, []iface.ReadPlanTask, error) {
 	var dbsToResolve []string // database names that we need to resolve
 
 	var nsTasks []iface.Namespace
@@ -87,7 +87,7 @@ func shuffleTasks(tasks []iface.ReadPlanTask) {
 
 // partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
 // returns the final list of tasks to be executed with unique task ids
-func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.Namespace) ([]iface.ReadPlanTask, error) {
+func (cc *Connector) partitionTasksIfNecessary(namespaceTasks []iface.Namespace) ([]iface.ReadPlanTask, error) {
 	countCheckChannel := make(chan iface.Namespace, len(namespaceTasks))
 	approxTasksChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
 
@@ -119,9 +119,9 @@ func (cc *CosmosConnector) partitionTasksIfNecessary(namespaceTasks []iface.Name
 
 // In parallel clarifies bounds for tasks that have approximate boundaries
 // Replaces the approximate bound with the closest lower or equal value found
-// Disconiues the task if the bounds are the same
+// Discontinues the task if the bounds are the same
 // Outputs finalized tasks into the finalTasksChannel
-func (cc *CosmosConnector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
+func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
 	// define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(cc.settings.numParallelPartitionWorkers)
@@ -162,7 +162,7 @@ func (cc *CosmosConnector) parallelTaskBoundsClarifier(approxTasksChannel <-chan
 	close(finalTasksChannel)
 }
 
-func (cc *CosmosConnector) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanTask {
+func (cc *Connector) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanTask {
 	task := iface.ReadPlanTask{}
 	task.Def.Db = ns.Db
 	task.Def.Col = ns.Col
@@ -173,7 +173,7 @@ func (cc *CosmosConnector) createReadPlanTaskForNs(ns iface.Namespace) iface.Rea
 
 // In parallel checks the count of the namespace and segregates them into two channels
 // One for finalized tasks, and another for partitioned tasks with approximate bounds that need to be clarified
-func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.Namespace, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
+func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.Namespace, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
 	// define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(cc.settings.numParallelPartitionWorkers)
@@ -239,7 +239,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 					finalTasksChannel <- minTask
 					finalTasksChannel <- maxTask
 
-					// send the tasks with approx bounaries downstream
+					// send the tasks with approx eboundaries downstream
 					for i := 0; i < len(approxBounds)-1; i++ {
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.PartitionKey = cc.settings.partitionKey
@@ -261,7 +261,7 @@ func (cc *CosmosConnector) parallelNamespaceTaskPreparer(countCheckChannel <-cha
 }
 
 // get all database names except system databases
-func (cc *CosmosConnector) getAllDatabases() ([]string, error) {
+func (cc *Connector) getAllDatabases() ([]string, error) {
 	dbNames, err := cc.client.ListDatabaseNames(cc.ctx, bson.M{})
 	if err != nil {
 		return nil, err
@@ -275,7 +275,7 @@ func (cc *CosmosConnector) getAllDatabases() ([]string, error) {
 }
 
 // get all collections in a database except system collections
-func (cc *CosmosConnector) getAllCollections(dbName string) ([]string, error) {
+func (cc *Connector) getAllCollections(dbName string) ([]string, error) {
 	collectionsAll, err := cc.client.Database(dbName).ListCollectionNames(cc.ctx, bson.M{})
 	if err != nil {
 		return nil, err

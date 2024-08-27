@@ -112,10 +112,10 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorStatus
 	mc.status = iface.ConnectorStatus{WriteLSN: 0}
 
-	// Get the coordinator endpoint
+	// Get the coordinators endpoint
 	coord, err := mc.t.GetCoordinatorEndpoint("local")
 	if err != nil {
-		return errors.New("Failed to get coordinator endpoint: " + err.Error())
+		return errors.New("Failed to get coordinators endpoint: " + err.Error())
 	}
 	mc.coord = coord
 
@@ -406,7 +406,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						cursor.Close(mc.flowCtx)
 						readerProgress.tasksCompleted++ // XXX Should we do atomic add here as well, shared variable multiple threads
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
-						// notify the coordinator that the task is done from our side
+						// notify the coordinators that the task is done from our side
 						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id, nil)
 						// send a barrier message to signal the end of the task
 						if mc.flowConnCapabilities.Resumability { // send only if the flow supports resumability otherwise who knows what will happen on the recieving side
@@ -443,7 +443,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id) // TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinators that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
 
@@ -522,7 +522,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
 		err := mc.coord.NotifyDone(flowId, mc.id)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", mc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinators that the connector %s is done writing for flow %s: %v", mc.id, flowId, err))
 		}
 	}()
 
@@ -565,7 +565,7 @@ func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 
 		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+			slog.Error(fmt.Sprintf("Failed notifying coordinators about read planning done: %v", err))
 		}
 	}()
 	return nil

@@ -21,13 +21,13 @@ import (
 func (mc *Connector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
 	switch barrierMsg.BarrierType {
 	case iface.BarrierType_TaskComplete:
-		// notify the coordinator that the task is done from our side
+		// notify the coordinators that the task is done from our side
 		if err := mc.coord.NotifyTaskDone(mc.flowId, mc.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
 		}
 		return nil
 	case iface.BarrierType_CdcResumeTokenUpdate:
-		// notify the coordinator that the task is done from our side
+		// notify the coordinators that the task is done from our side
 		mc.coord.UpdateCDCResumeToken(mc.flowId, mc.id, barrierMsg.BarrierCdcResumeToken)
 		if err := mc.coord.UpdateCDCResumeToken(mc.flowId, mc.id, barrierMsg.BarrierCdcResumeToken); err != nil {
 			return err

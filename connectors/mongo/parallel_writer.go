@@ -16,7 +16,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-// A parallelized writes processor
+// ParallelWriter A parallelized writes processor
 // Preserves sequence of operations for a given _id
 // Supports barriers
 // Automatically winds down when the context is done
@@ -91,7 +91,7 @@ func (bwa *ParallelWriter) ScheduleDataMessage(dataMsg iface.DataMessage) error 
 	return nil
 }
 
-// Processes a barrier
+// ScheduleBarrier Processes a barrier
 func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 	// For task barriers, initialize the countdown for the task based on task ID
 	// Error out if the barrier is already present in the map
@@ -119,7 +119,7 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 	return nil
 }
 
-// Broadcasts message to all workers
+// BroadcastMessage Broadcasts message to all workers
 func (bwa *ParallelWriter) BroadcastMessage(dataMsg iface.DataMessage) {
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i].addMessage(dataMsg)

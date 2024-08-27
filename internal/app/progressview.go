@@ -13,7 +13,6 @@ import (
 	"github.com/rivo/tview"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/runners/runnerLocal"
 )
 
 const (

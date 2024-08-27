@@ -9,7 +9,7 @@ import (
 
 type ConnectorID string
 
-// General coordinator interface
+// General coordinators interface
 type Coordinator interface {
 	// General
 	Setup(ctx context.Context, t Transport, s Statestore)
@@ -74,7 +74,7 @@ const (
 	ReadPlanTaskStatus_Completed
 )
 
-// Singalling coordinator interface for use by connectors
+// Singalling coordinators interface for use by connectors
 type CoordinatorIConnectorSignal interface {
 	// Register a connector with type, capabilities, and endpoint for its signalling interface
 	RegisterConnector(details ConnectorDetails, cep ConnectorICoordinatorSignal) (ConnectorID, error)

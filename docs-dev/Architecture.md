@@ -62,10 +62,10 @@ We have the following classes:
 
 - **MongoConnector**  is a *Connector* implementation that connects to MongoDB databases and implements reading the
   Change Stream and writing changes to databases.
-- **SimpleCoordinator** is a *Coordinator* implementation and manages data flow between the connectors.
+- **Coordinator** is a *Coordinator* implementation and manages data flow between the connectors.
 - **TransportLocal** is a *Transport* implementation using Go channels.
 - **RunnerLocal** is a *Runner* implementation which uses the above classes to run *dsync* locally, using
-  *SimpleCoordinator* to start a data flow between source and destination *MongoConnectors*.
+  *Coordinator* to start a data flow between source and destination *MongoConnectors*.
 - **StatestoreMongo** is a trivial *Statestore* implementation using MongoDB as a backend.
 
 We have the **CLIApp** wrapper class which uses an instance of *RunnerLocal* to run *dsync* on the command line. 

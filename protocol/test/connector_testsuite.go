@@ -46,13 +46,13 @@ func (suite *ConnectorTestSuite) TearDownSuite() {
 func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("1")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -150,7 +150,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	// We should have gotten some data in the channel
 	assert.True(suite.T(), messageCount > 0, "Should have read some data")
 
-	// A notification should have been sent to the coordinator that the job is done
+	// A notification should have been sent to the coordinators that the job is done
 	c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
 
 	connector.Teardown()
@@ -160,13 +160,13 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("2")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -259,7 +259,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	// We should have written some data from the channel, so the LSN should be greater than 0
 	assert.True(suite.T(), connector.GetConnectorStatus(flowID).WriteLSN > 0, "Should have written some data")
-	// A notification should have been sent to the coordinator that the job is done
+	// A notification should have been sent to the coordinators that the job is done
 	c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
 
 	connector.Teardown()

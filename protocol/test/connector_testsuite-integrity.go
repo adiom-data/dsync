@@ -15,18 +15,18 @@ import (
 )
 
 /*
-* Check that the connector can perform a data integrity check and posts result to the coordinator
+* Check that the connector can perform a data integrity check and posts result to the coordinators
  */
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -83,7 +83,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 		suite.T().FailNow()
 	}
 
-	// A notification should have been sent to the coordinator that the check is done
+	// A notification should have been sent to the coordinators that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 
 	connector.Teardown()
@@ -95,13 +95,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistency() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -187,7 +187,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 		suite.T().FailNow()
 	}
 
-	// A notification should have been sent to the coordinator that the check is done
+	// A notification should have been sent to the coordinators that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 	// The result callback should've been called twice
 	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)
@@ -201,13 +201,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceChange() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -305,7 +305,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 		suite.T().FailNow()
 	}
 
-	// A notification should have been sent to the coordinator that the check is done
+	// A notification should have been sent to the coordinators that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 	// The result callback should've been called twice
 	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)
@@ -320,13 +320,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceNamespace() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -415,7 +415,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 		suite.T().FailNow()
 	}
 
-	// A notification should have been sent to the coordinator that the check is done
+	// A notification should have been sent to the coordinators that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 	// The result callback should've been called twice
 	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)
@@ -431,13 +431,13 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultAlgorithm() {
 	ctx := context.Background()
 
-	// create mocks for the transports and coordinator
+	// create mocks for the transports and coordinators
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transports should return the mock coordinator endpoint
+	// transports should return the mock coordinators endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
-	// coordinator should return a connector ID on registration
+	// coordinators should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
 	var caps iface.ConnectorCapabilities
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil).Run(func(args mock.Arguments) {
@@ -552,7 +552,7 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultAlgorithm(
 		suite.T().FailNow()
 	}
 
-	// A notification should have been sent to the coordinator that the check is done
+	// A notification should have been sent to the coordinators that the check is done
 	c.AssertCalled(suite.T(), "PostDataIntegrityCheckResult", flowID, testConnectorID, mock.AnythingOfType("iface.ConnectorDataIntegrityCheckResult"))
 	// The result callback should've been called twice
 	c.AssertNumberOfCalls(suite.T(), "PostDataIntegrityCheckResult", 2)

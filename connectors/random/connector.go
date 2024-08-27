@@ -15,10 +15,10 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type RandomReadConnector struct {
+type ReadConnector struct {
 	desc string
 
-	settings RandomConnectorSettings
+	settings ConnectorSettings
 	ctx      context.Context
 
 	t      iface.Transport
@@ -37,7 +37,7 @@ type RandomReadConnector struct {
 	flowCancelFunc context.CancelFunc
 }
 
-type RandomConnectorSettings struct {
+type ConnectorSettings struct {
 	numParallelGenerators int // number of parallel data generators
 
 	numDatabases                     int  // must be at least 1
@@ -52,7 +52,7 @@ type RandomConnectorSettings struct {
 	probabilities []float64
 }
 
-func NewRandomReadConnector(desc string, settings RandomConnectorSettings) *RandomReadConnector {
+func NewRandomReadConnector(desc string, settings ConnectorSettings) *ReadConnector {
 	// Set default values
 
 	settings.numParallelGenerators = 4
@@ -67,10 +67,10 @@ func NewRandomReadConnector(desc string, settings RandomConnectorSettings) *Rand
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
 
-	return &RandomReadConnector{desc: desc, settings: settings}
+	return &ReadConnector{desc: desc, settings: settings}
 }
 
-func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (rc *ReadConnector) Setup(ctx context.Context, t iface.Transport) error {
 	// setup the connector
 	rc.ctx = ctx
 	rc.t = t
@@ -84,10 +84,10 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 	// Instantiate docMap
 	rc.docMap = make(map[iface.Location]*IndexMap)
 
-	// Get the coordinator endpoint
+	// Get the coordinators endpoint
 	coord, err := rc.t.GetCoordinatorEndpoint("local")
 	if err != nil {
-		return errors.New("Failed to get coordinator endpoint: " + err.Error())
+		return errors.New("Failed to get coordinators endpoint: " + err.Error())
 	}
 	rc.coord = coord
 
@@ -99,20 +99,20 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("RandomReadConnector has been configured with ID " + (string)(rc.id))
+	slog.Info("ReadConnector has been configured with ID " + (string)(rc.id))
 
 	return nil
 }
 
-func (rc *RandomReadConnector) Teardown() {
+func (rc *ReadConnector) Teardown() {
 	// does nothing, no client to disconnect
 }
 
-func (rc *RandomReadConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (rc *ReadConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// not necessary always source
 }
 
-func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (rc *ReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
 
 	tasks := readPlan.Tasks
@@ -244,43 +244,43 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 
 		close(dataChannel) // send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
-		slog.Info(fmt.Sprintf("RandomReadConnector %s is done generating data for flow %s", rc.id, flowId))
+		slog.Info(fmt.Sprintf("ReadConnector %s is done generating data for flow %s", rc.id, flowId))
 		err := rc.coord.NotifyDone(flowId, rc.id) // TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", rc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinators that the connector %s is done reading for flow %s: %v", rc.id, flowId, err))
 		}
 	}()
 	return nil
 }
 
-func (rc *RandomReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (rc *ReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	// never writes to destination, errors
-	return errors.New("RandomReadConnector does not write to destination")
+	return errors.New("ReadConnector does not write to destination")
 }
 
-func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *ReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	// no client, errors
-	return errors.New("RandomReadConnector does not have a client to request data integrity check")
+	return errors.New("ReadConnector does not have a client to request data integrity check")
 }
 
-func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (rc *ReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	// get connector status
 	return rc.status
 }
 
-func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
+func (rc *ReadConnector) Interrupt(flowId iface.FlowID) error {
 	// TODO: implement for testing
 	rc.flowCancelFunc()
 	return nil
 }
 
-func (rc *RandomReadConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *ReadConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		tasks := rc.CreateInitialGenerationTasks()
 		plan := iface.ConnectorReadPlan{Tasks: tasks}
 		err := rc.coord.PostReadPlanningResult(flowId, rc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+			slog.Error(fmt.Sprintf("Failed notifying coordinators about read planning done: %v", err))
 		}
 	}()
 	return nil

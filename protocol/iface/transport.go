@@ -56,7 +56,7 @@ type BarrierMessage struct {
 type DataChannelID string
 
 type Transport interface {
-	// Gives the coordinator endpoint as a signalling interface
+	// Gives the coordinators endpoint as a signalling interface
 	GetCoordinatorEndpoint(location string) (CoordinatorIConnectorSignal, error)
 
 	// Creates a data channel
