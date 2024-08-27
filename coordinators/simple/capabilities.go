@@ -39,7 +39,7 @@ func calcReqCapabilities(origCaps iface.ConnectorCapabilities, sharedCaps iface.
 }
 
 // validate connector capabilities for flow
-func (c *SimpleCoordinator) validateConnectorCapabilitiesForFlow(o iface.FlowOptions) error {
+func (c *Simple) validateConnectorCapabilitiesForFlow(o iface.FlowOptions) error {
 	// Get the source and destination connectors
 	src, ok := c.getConnector(o.SrcId)
 	if !ok {

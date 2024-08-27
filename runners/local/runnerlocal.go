@@ -116,7 +116,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.statestore = statestoreTemp.NewTempStateStore()
 	}
 
-	r.coord = coordinatorSimple.NewSimpleCoordinator()
+	r.coord = coordinatorSimple.NewCoordinatorSimple()
 	r.trans = transportLocal.NewTransportLocal(r.coord)
 	r.settings = settings
 

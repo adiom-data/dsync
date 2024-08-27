@@ -14,7 +14,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type SimpleCoordinator struct {
+type Simple struct {
 	// Implement the necessary fields here
 	ctx context.Context
 	t   iface.Transport
@@ -27,9 +27,9 @@ type SimpleCoordinator struct {
 	mu_flows sync.RWMutex // to make the map thread-safe
 }
 
-func NewSimpleCoordinator() *SimpleCoordinator {
+func NewCoordinatorSimple() *Simple {
 	// Implement the NewSimpleCoordinator function
-	return &SimpleCoordinator{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]*FlowDetails)}
+	return &Simple{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]*FlowDetails)}
 }
 
 // *****
@@ -37,7 +37,7 @@ func NewSimpleCoordinator() *SimpleCoordinator {
 // *****
 
 // gets a connector by id
-func (c *SimpleCoordinator) getConnector(cid iface.ConnectorID) (ConnectorDetailsWithEp, bool) {
+func (c *Simple) getConnector(cid iface.ConnectorID) (ConnectorDetailsWithEp, bool) {
 	c.mu_connectors.RLock()
 	defer c.mu_connectors.RUnlock()
 	connector, ok := c.connectors[cid]
@@ -45,14 +45,14 @@ func (c *SimpleCoordinator) getConnector(cid iface.ConnectorID) (ConnectorDetail
 }
 
 // deletes a connector from the map
-func (c *SimpleCoordinator) delConnector(cid iface.ConnectorID) {
+func (c *Simple) delConnector(cid iface.ConnectorID) {
 	c.mu_connectors.Lock()
 	defer c.mu_connectors.Unlock()
 	delete(c.connectors, cid)
 }
 
 // adds a connector with a unique ID and returns the ID
-func (c *SimpleCoordinator) addConnector(connector ConnectorDetailsWithEp) iface.ConnectorID {
+func (c *Simple) addConnector(connector ConnectorDetailsWithEp) iface.ConnectorID {
 	c.mu_connectors.Lock()
 	defer c.mu_connectors.Unlock()
 
@@ -80,7 +80,7 @@ func (c *SimpleCoordinator) addConnector(connector ConnectorDetailsWithEp) iface
 }
 
 // return a list of ConnectorDetails for all known connectors
-func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
+func (c *Simple) GetConnectors() []iface.ConnectorDetails {
 	c.mu_connectors.RLock()
 	defer c.mu_connectors.RUnlock()
 	connectors := make([]iface.ConnectorDetails, 0, len(c.connectors))
@@ -95,7 +95,7 @@ func (c *SimpleCoordinator) GetConnectors() []iface.ConnectorDetails {
 // *****
 
 // gets a flow by id
-func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
+func (c *Simple) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
 	c.mu_flows.RLock()
 	defer c.mu_flows.RUnlock()
 	flow, ok := c.flows[fid]
@@ -103,7 +103,7 @@ func (c *SimpleCoordinator) getFlow(fid iface.FlowID) (*FlowDetails, bool) {
 }
 
 // adds a flow that must already have the ID set (since it's static)
-func (c *SimpleCoordinator) addFlow(details *FlowDetails) {
+func (c *Simple) addFlow(details *FlowDetails) {
 	c.mu_flows.Lock()
 	defer c.mu_flows.Unlock()
 
@@ -112,7 +112,7 @@ func (c *SimpleCoordinator) addFlow(details *FlowDetails) {
 }
 
 // removes a flow from the map
-func (c *SimpleCoordinator) delFlow(fid iface.FlowID) {
+func (c *Simple) delFlow(fid iface.FlowID) {
 	c.mu_flows.Lock()
 	defer c.mu_flows.Unlock()
 	delete(c.flows, fid)
@@ -122,18 +122,18 @@ func (c *SimpleCoordinator) delFlow(fid iface.FlowID) {
 // Implement the Coordinator interface methods
 // *****
 
-func (c *SimpleCoordinator) Setup(ctx context.Context, t iface.Transport, s iface.Statestore) {
+func (c *Simple) Setup(ctx context.Context, t iface.Transport, s iface.Statestore) {
 	// Implement the Setup method
 	c.ctx = ctx
 	c.t = t
 	c.s = s
 }
 
-func (c *SimpleCoordinator) Teardown() {
+func (c *Simple) Teardown() {
 	// Implement the Teardown method
 }
 
-func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, cep iface.ConnectorICoordinatorSignal) (iface.ConnectorID, error) {
+func (c *Simple) RegisterConnector(details iface.ConnectorDetails, cep iface.ConnectorICoordinatorSignal) (iface.ConnectorID, error) {
 	slog.Info("Registering connector with details: " + fmt.Sprintf("%+v", details))
 
 	// Add the connector to the list
@@ -144,14 +144,14 @@ func (c *SimpleCoordinator) RegisterConnector(details iface.ConnectorDetails, ce
 	return cid, nil
 }
 
-func (c *SimpleCoordinator) DelistConnector(cid iface.ConnectorID) {
+func (c *Simple) DelistConnector(cid iface.ConnectorID) {
 	slog.Info("Deregistering connector with ID: " + fmt.Sprintf("%v", cid))
 
 	// Implement the DelistConnector method
 	c.delConnector(cid)
 }
 
-func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
+func (c *Simple) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 	// attempt to get the persistent flow state from the statestore
 	fid := generateFlowID(o)
 	fdet_temp := FlowDetails{}
@@ -210,7 +210,7 @@ func (c *SimpleCoordinator) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, 
 	return fid, nil
 }
 
-func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
+func (c *Simple) FlowStart(fid iface.FlowID) error {
 	slog.Info("Starting flow with ID: " + fmt.Sprintf("%v", fid))
 
 	// Get the flow details
@@ -309,7 +309,7 @@ func (c *SimpleCoordinator) FlowStart(fid iface.FlowID) error {
 	return nil
 }
 
-func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
+func (c *Simple) WaitForFlowDone(flowId iface.FlowID) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -322,11 +322,11 @@ func (c *SimpleCoordinator) WaitForFlowDone(flowId iface.FlowID) error {
 	return nil
 }
 
-func (c *SimpleCoordinator) FlowStop(fid iface.FlowID) {
+func (c *Simple) FlowStop(fid iface.FlowID) {
 	//TODO (AK, 6/2024): Implement the FlowStop method
 }
 
-func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
+func (c *Simple) FlowDestroy(fid iface.FlowID) {
 
 	slog.Debug("Destroying flow with ID: " + fmt.Sprintf("%v", fid))
 
@@ -355,7 +355,7 @@ func (c *SimpleCoordinator) FlowDestroy(fid iface.FlowID) {
 	}
 }
 
-func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
+func (c *Simple) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -379,7 +379,7 @@ func (c *SimpleCoordinator) NotifyDone(flowId iface.FlowID, conn iface.Connector
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
+func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -420,7 +420,7 @@ func (c *SimpleCoordinator) NotifyTaskDone(flowId iface.FlowID, conn iface.Conne
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
+func (c *Simple) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
 	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
 
 	res := iface.FlowDataIntegrityCheckResult{}
@@ -494,7 +494,7 @@ func (c *SimpleCoordinator) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.F
 	return res, nil
 }
 
-func (c *SimpleCoordinator) PostDataIntegrityCheckResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResult) error {
+func (c *Simple) PostDataIntegrityCheckResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorDataIntegrityCheckResult) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -518,7 +518,7 @@ func (c *SimpleCoordinator) PostDataIntegrityCheckResult(flowId iface.FlowID, co
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
+func (c *Simple) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
 	res := iface.FlowStatus{}
 
 	// Get the flow details
@@ -544,7 +544,7 @@ func (c *SimpleCoordinator) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, e
 	return flowDet.flowStatus, nil
 }
 
-func (c *SimpleCoordinator) UpdateConnectorStatus(flowId iface.FlowID, conn iface.ConnectorID, status iface.ConnectorStatus) error {
+func (c *Simple) UpdateConnectorStatus(flowId iface.FlowID, conn iface.ConnectorID, status iface.ConnectorStatus) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -566,7 +566,7 @@ func (c *SimpleCoordinator) UpdateConnectorStatus(flowId iface.FlowID, conn ifac
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *SimpleCoordinator) PostReadPlanningResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorReadPlanResult) error {
+func (c *Simple) PostReadPlanningResult(flowId iface.FlowID, conn iface.ConnectorID, res iface.ConnectorReadPlanResult) error {
 	slog.Debug(fmt.Sprintf("Got read plan result from connector %v for flow %v", conn, flowId))
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
@@ -589,7 +589,7 @@ func (c *SimpleCoordinator) PostReadPlanningResult(flowId iface.FlowID, conn ifa
 	return nil
 }
 
-func (c *SimpleCoordinator) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken []byte) error {
+func (c *Simple) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorID, resumeToken []byte) error {
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
