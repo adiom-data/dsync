@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type TransportLocal struct {
+type Local struct {
 	coordEP iface.CoordinatorIConnectorSignal
 
 	dataChannels map[iface.DataChannelID]chan iface.DataMessage
@@ -25,19 +25,19 @@ func generateDataChannelID() iface.DataChannelID {
 	return iface.DataChannelID(id.String())
 }
 
-func NewTransportLocal(coordEP iface.CoordinatorIConnectorSignal) *TransportLocal {
+func NewTransportLocal(coordEP iface.CoordinatorIConnectorSignal) *Local {
 	dataChannels := make(map[iface.DataChannelID]chan iface.DataMessage)
-	return &TransportLocal{coordEP: coordEP, dataChannels: dataChannels}
+	return &Local{coordEP: coordEP, dataChannels: dataChannels}
 }
 
-func (t *TransportLocal) GetCoordinatorEndpoint(location string) (iface.CoordinatorIConnectorSignal, error) {
+func (t *Local) GetCoordinatorEndpoint(location string) (iface.CoordinatorIConnectorSignal, error) {
 	if location != "local" {
 		return nil, errors.New("local transport only supports the 'local' location")
 	}
 	return t.coordEP, nil
 }
 
-func (t *TransportLocal) CreateDataChannel() (iface.DataChannelID, error) {
+func (t *Local) CreateDataChannel() (iface.DataChannelID, error) {
 	t.mu_dc.Lock()
 	defer t.mu_dc.Unlock()
 
@@ -54,7 +54,7 @@ func (t *TransportLocal) CreateDataChannel() (iface.DataChannelID, error) {
 	return cid, nil
 }
 
-func (t *TransportLocal) CloseDataChannel(dcid iface.DataChannelID) {
+func (t *Local) CloseDataChannel(dcid iface.DataChannelID) {
 	t.mu_dc.Lock()
 	defer t.mu_dc.Unlock()
 
@@ -65,7 +65,7 @@ func (t *TransportLocal) CloseDataChannel(dcid iface.DataChannelID) {
 	delete(t.dataChannels, dcid)
 }
 
-func (t *TransportLocal) GetDataChannelEndpoint(dcid iface.DataChannelID) (chan iface.DataMessage, error) {
+func (t *Local) GetDataChannelEndpoint(dcid iface.DataChannelID) (chan iface.DataMessage, error) {
 	t.mu_dc.RLock()
 	defer t.mu_dc.RUnlock()
 
