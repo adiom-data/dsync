@@ -59,6 +59,8 @@ type RunnerLocalSettings struct {
 	AdvancedProgressRecalcInterval time.Duration //0 means disabled
 
 	LoadLevel string
+
+	MaxNumNamespaces int
 }
 
 const (
@@ -89,6 +91,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			cosmosSettings.InitialSyncNumParallelCopiers = btc
 			cosmosSettings.NumParallelWriters = btc / 2
+		}
+		if settings.MaxNumNamespaces != 8 {
+			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {

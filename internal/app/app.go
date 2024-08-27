@@ -102,6 +102,7 @@ func runDsync(c *cli.Context) error {
 		CosmosDeletesEmuRequestedFlag:  o.CosmosDeletesEmu,
 		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
 		LoadLevel:                      o.LoadLevel,
+		MaxNumNamespaces: 			    o.MaxNumNamespaces,
 	})
 
 	var wg sync.WaitGroup

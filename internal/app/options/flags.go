@@ -130,6 +130,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage:   "specify the path of the config file",
 		},
 		cli.VersionFlag,
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "num-namespaces",
+			Usage: "Maximum number of namespaces that can be copied. Recommended to keep this number under 15 to avoid performance issues",
+			Required: false,
+		}),
 	}
 
 	before := func(c *cli.Context) error {

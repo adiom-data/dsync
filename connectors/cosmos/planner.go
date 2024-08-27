@@ -67,8 +67,8 @@ func (cc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.Namesp
 		}
 	}
 
-	if len(nsTasks) > cc.settings.maxNumNamespaces {
-		return nil, nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.maxNumNamespaces)
+	if len(nsTasks) > cc.settings.MaxNumNamespaces {
+		return nil, nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.MaxNumNamespaces)
 	}
 
 	partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)

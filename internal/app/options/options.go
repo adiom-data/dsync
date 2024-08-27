@@ -33,6 +33,7 @@ type Options struct {
 	Pprof bool
 
 	LoadLevel string
+	MaxNumNamespaces int
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -50,6 +51,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
 	o.LoadLevel = c.String("load-level")
+	o.MaxNumNamespaces = c.Int("num-namespaces")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

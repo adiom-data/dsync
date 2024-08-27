@@ -66,7 +66,7 @@ type ConnectorSettings struct {
 	CdcResumeTokenUpdateInterval   time.Duration
 	numParallelIntegrityCheckTasks int
 
-	maxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
+	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
 	targetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	numParallelPartitionWorkers int    //number of workers used for partitioning
 	partitionKey                string //partition key to use for collections
@@ -96,7 +96,9 @@ func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	}
 	settings.deletesCheckInterval = 60 * time.Second
 
-	settings.maxNumNamespaces = 8
+	if settings.MaxNumNamespaces == 0 { // if not set, default to 8
+		settings.MaxNumNamespaces = 8
+	}
 	settings.targetDocCountPerPartition = 512 * 1000
 	settings.numParallelPartitionWorkers = 4
 	settings.partitionKey = "_id"
