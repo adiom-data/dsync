@@ -11,10 +11,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/adiom-data/dsync/connectors/connectorCosmos"
 	"github.com/adiom-data/dsync/connectors/connectorMongo"
 	"github.com/adiom-data/dsync/connectors/connectorNull"
 	"github.com/adiom-data/dsync/connectors/connectorRandom"
+	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/coordinators/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestores/statestoreMongo"
