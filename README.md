@@ -41,7 +41,7 @@ mongod --dbpath data_d --logpath mongod_d.log --fork --port 27017
 ## 3. Start dsync
 ```
 # You can use our publicly accessible (read-only) Cosmos DB instance
-export COSMOS_DEMO='mongodb://cosmosdb-demo-instance:JHbEjQobdZm7abDpZvS6kXzA04W50IwexBiPbuIXT6LIf6HlWexajaC8dwN6DBvaXzj0grQkvL3cACDbN67qeg==@cosmosdb-demo-instance.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@cosmosdb-demo-instance@'
+export COSMOS_DEMO=$(echo bW9uZ29kYjovL2Nvc21vc2RiLWRlbW8taW5zdGFuY2U6SkhiRWpRb2JkWm03YWJEcFp2UzZrWHpBMDRXNTBJd2V4QmlQYnVJWFQ2TElmNkhsV2V4YWphQzhkd042REJ2YVh6ajBnclFrdkwzY0FDRGJONjdxZWc9PUBjb3Ntb3NkYi1kZW1vLWluc3RhbmNlLm1vbmdvLmNvc21vcy5henVyZS5jb206MTAyNTUvP3NzbD10cnVlJnJlcGxpY2FTZXQ9Z2xvYmFsZGImcmV0cnl3cml0ZXM9ZmFsc2UmbWF4SWRsZVRpbWVNUz0xMjAwMDAmYXBwTmFtZT1AY29zbW9zZGItZGVtby1pbnN0YW5jZUA= | base64 --decode)
 
 # Feel free to use your own MongoDB connection string
 export MDB_DEST='mongodb://localhost:27017' 
