@@ -17,9 +17,9 @@ import (
 	connectorRandom "github.com/adiom-data/dsync/connectors/random"
 	coordinatorSimple "github.com/adiom-data/dsync/coordinators/simple"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/statestores/statestoreMongo"
-	"github.com/adiom-data/dsync/statestores/statestoreTemp"
-	"github.com/adiom-data/dsync/transports/transportLocal"
+	statestoreMongo "github.com/adiom-data/dsync/statestores/mongo"
+	statestoreTemp "github.com/adiom-data/dsync/statestores/temp"
+	transportLocal "github.com/adiom-data/dsync/transports/local"
 )
 
 // Implements the protocol.iface.Runner interface
