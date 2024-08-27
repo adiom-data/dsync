@@ -76,7 +76,7 @@ const (
 	ReadPlanTaskStatus_Completed
 )
 
-// Singalling coordinator interface for use by connectors
+// Signalling coordinator interface for use by connectors
 type CoordinatorIConnectorSignal interface {
 	// Register a connector with type, capabilities, and endpoint for its signalling interface
 	RegisterConnector(details ConnectorDetails, cep ConnectorICoordinatorSignal) (ConnectorID, error)
