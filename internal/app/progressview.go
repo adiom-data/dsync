@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/runner/runnerLocal"
+	"github.com/adiom-data/dsync/runners/runnerLocal"
 	"github.com/rivo/tview"
 )
 

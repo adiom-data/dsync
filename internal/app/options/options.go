@@ -8,7 +8,7 @@ package options
 import (
 	"fmt"
 
-	"github.com/adiom-data/dsync/connector/connectorMongo"
+	"github.com/adiom-data/dsync/connectors/connectorMongo"
 	"github.com/urfave/cli/v2"
 )
 

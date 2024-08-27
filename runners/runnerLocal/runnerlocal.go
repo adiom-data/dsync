@@ -11,15 +11,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/adiom-data/dsync/connector/connectorCosmos"
-	"github.com/adiom-data/dsync/connector/connectorMongo"
-	"github.com/adiom-data/dsync/connector/connectorNull"
-	"github.com/adiom-data/dsync/connector/connectorRandom"
-	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
+	"github.com/adiom-data/dsync/connectors/connectorCosmos"
+	"github.com/adiom-data/dsync/connectors/connectorMongo"
+	"github.com/adiom-data/dsync/connectors/connectorNull"
+	"github.com/adiom-data/dsync/connectors/connectorRandom"
+	"github.com/adiom-data/dsync/coordinators/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"github.com/adiom-data/dsync/statestore/statestoreMongo"
-	"github.com/adiom-data/dsync/statestore/statestoreTemp"
-	"github.com/adiom-data/dsync/transport/transportLocal"
+	"github.com/adiom-data/dsync/statestores/statestoreMongo"
+	"github.com/adiom-data/dsync/statestores/statestoreTemp"
+	"github.com/adiom-data/dsync/transports/transportLocal"
 )
 
 // Implements the protocol.iface.Runner interface

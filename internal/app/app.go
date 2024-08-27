@@ -21,7 +21,7 @@ import (
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
-	runner "github.com/adiom-data/dsync/runner/runnerLocal"
+	runner "github.com/adiom-data/dsync/runners/runnerLocal"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/urfave/cli/v2"

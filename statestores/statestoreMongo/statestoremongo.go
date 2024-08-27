@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/adiom-data/dsync/connector/connectorMongo"
+	"github.com/adiom-data/dsync/connectors/connectorMongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
