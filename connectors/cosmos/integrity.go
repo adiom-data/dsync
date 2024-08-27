@@ -70,7 +70,7 @@ func (cc *Connector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.Co
 	resultChannel := make(chan nsCountResult, len(namespaces))
 
 	// start 4 copiers
-	for i := 0; i < cc.settings.numParallelIntegrityCheckTasks; i++ {
+	for i := 0; i < cc.settings.NumParallelIntegrityCheckTasks; i++ {
 		go func() {
 			for ns := range taskChannel {
 				collection := cc.client.Database(ns.db).Collection(ns.col)

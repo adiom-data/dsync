@@ -126,9 +126,9 @@ func (cc *Connector) partitionTasksIfNecessary(namespaceTasks []iface.Namespace)
 func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
 	//define workgroup
 	wg := sync.WaitGroup{}
-	wg.Add(cc.settings.numParallelPartitionWorkers)
+	wg.Add(cc.settings.NumParallelPartitionWorkers)
 	// create workers to do the work
-	for i := 0; i < cc.settings.numParallelPartitionWorkers; i++ {
+	for i := 0; i < cc.settings.NumParallelPartitionWorkers; i++ {
 		go func() {
 			for task := range approxTasksChannel {
 				collection := cc.client.Database(task.Def.Db).Collection(task.Def.Col)
@@ -151,7 +151,7 @@ func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface
 				if !valLow.Equal(valHigh) {
 					task.Def.Low = valLow
 					task.Def.High = valHigh
-					task.EstimatedDocCount = cc.settings.targetDocCountPerPartition
+					task.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
 					finalTasksChannel <- task
 				}
 			}
@@ -178,9 +178,9 @@ func (cc *Connector) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanT
 func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.Namespace, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
 	//define workgroup
 	wg := sync.WaitGroup{}
-	wg.Add(cc.settings.numParallelPartitionWorkers)
+	wg.Add(cc.settings.NumParallelPartitionWorkers)
 	// create workers to do the counting
-	for i := 0; i < cc.settings.numParallelPartitionWorkers; i++ {
+	for i := 0; i < cc.settings.NumParallelPartitionWorkers; i++ {
 		go func() {
 			for nsTask := range countCheckChannel {
 				collection := cc.client.Database(nsTask.Db).Collection(nsTask.Col)
@@ -199,7 +199,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 					}
 				}
 
-				if count < cc.settings.targetDocCountPerPartition*2 { //not worth doing anything
+				if count < cc.settings.TargetDocCountPerPartition*2 { //not worth doing anything
 					task := cc.createReadPlanTaskForNs(nsTask)
 					task.EstimatedDocCount = count
 					finalTasksChannel <- task
@@ -216,7 +216,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 					}
 					slog.Debug(fmt.Sprintf("Min and max boundaries for task %v: %v, %v", nsTask, min, max))
 					// find approximate split points
-					numParts := int(count / cc.settings.targetDocCountPerPartition)
+					numParts := int(count / cc.settings.TargetDocCountPerPartition)
 					approxBounds, err := splitRange(min, max, numParts)
 					if err != nil {
 						slog.Warn(fmt.Sprintf("Failed to split range for task %v so not splitting: %v", nsTask, err))
@@ -231,12 +231,12 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 					minTask := cc.createReadPlanTaskForNs(nsTask)
 					minTask.Def.PartitionKey = cc.settings.partitionKey
 					minTask.Def.High = min //only setting the high boundary indicating that we want (-INF, min)
-					minTask.EstimatedDocCount = cc.settings.targetDocCountPerPartition
+					minTask.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
 
 					maxTask := cc.createReadPlanTaskForNs(nsTask)
 					maxTask.Def.PartitionKey = cc.settings.partitionKey
 					maxTask.Def.Low = max //only setting the low boundary indicating that we want (max, INF)
-					maxTask.EstimatedDocCount = cc.settings.targetDocCountPerPartition
+					maxTask.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
 
 					finalTasksChannel <- minTask
 					finalTasksChannel <- maxTask
@@ -247,7 +247,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 						task.Def.PartitionKey = cc.settings.partitionKey
 						task.Def.Low = approxBounds[i]
 						task.Def.High = approxBounds[i+1]
-						task.EstimatedDocCount = cc.settings.targetDocCountPerPartition
+						task.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
 						approxTasksChannel <- task
 					}
 

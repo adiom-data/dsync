@@ -99,7 +99,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			cosmosSettings.InitialSyncNumParallelCopiers = btc
-			cosmosSettings.NumParallelWriters = btc / 2
+			cosmosSettings.NumParallelWriters = btc / 2 // default for writer, integrity check, and partition workers are the same 
 			cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
 			cosmosSettings.NumParallelPartitionWorkers = btc / 2
 		}
