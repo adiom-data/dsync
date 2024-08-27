@@ -1,8 +1,6 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package runners
 
 import (
@@ -16,7 +14,6 @@ import (
 
 	"github.com/adiom-data/dsync/connectors/connectorNull"
 	"github.com/adiom-data/dsync/connectors/cosmos"
-	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/random"
 	"github.com/adiom-data/dsync/coordinator/coordinatorSimple"
 	"github.com/adiom-data/dsync/protocol/iface"

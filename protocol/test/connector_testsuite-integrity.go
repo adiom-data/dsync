@@ -1,8 +1,5 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package test
 
@@ -23,11 +20,11 @@ import (
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 	ctx := context.Background()
 
-	// create mocks for the transport and coordinator
+	// create mocks for the transports and coordinator
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transport should return the mock coordinator endpoint
+	// transports should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
@@ -98,11 +95,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckPostResult() {
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistency() {
 	ctx := context.Background()
 
-	// create mocks for the transport and coordinator
+	// create mocks for the transports and coordinator
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transport should return the mock coordinator endpoint
+	// transports should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
@@ -204,11 +201,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultConsistenc
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceChange() {
 	ctx := context.Background()
 
-	// create mocks for the transport and coordinator
+	// create mocks for the transports and coordinator
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transport should return the mock coordinator endpoint
+	// transports should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
@@ -323,11 +320,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifferenceNamespace() {
 	ctx := context.Background()
 
-	// create mocks for the transport and coordinator
+	// create mocks for the transports and coordinator
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transport should return the mock coordinator endpoint
+	// transports should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")
@@ -434,11 +431,11 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultDifference
 func (suite *ConnectorTestSuite) TestConnectorDataIntegrityCheckResultAlgorithm() {
 	ctx := context.Background()
 
-	// create mocks for the transport and coordinator
+	// create mocks for the transports and coordinator
 	t := new(mocks.Transport)
 	c := new(mocks.Coordinator)
 
-	// transport should return the mock coordinator endpoint
+	// transports should return the mock coordinator endpoint
 	t.On("GetCoordinatorEndpoint", mock.Anything).Return(c, nil)
 	// coordinator should return a connector ID on registration
 	testConnectorID := iface.ConnectorID("3")

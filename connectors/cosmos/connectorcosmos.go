@@ -1,8 +1,5 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cosmos
 
@@ -244,7 +241,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 		namespaces = append(namespaces, namespace{db: loc.Database, col: loc.Collection})
 	}
 
-	// Get data channel from transport interface based on the provided ID
+	// Get data channel from transports interface based on the provided ID
 	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))

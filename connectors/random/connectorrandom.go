@@ -1,8 +1,6 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package random
 
 import (
@@ -123,7 +121,7 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 	}
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
 
-	// Get data channel from transport interface based on the provided ID
+	// Get data channel from transports interface based on the provided ID
 	dataChannel, err := rc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))

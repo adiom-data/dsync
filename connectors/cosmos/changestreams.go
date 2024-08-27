@@ -1,8 +1,6 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package cosmos
 
 import (
@@ -61,7 +59,7 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, nam
 			if token != nil {
 				// set the change stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
-			} else { //we need to start from the read plan creation time to be safe
+			} else { // we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
 				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))

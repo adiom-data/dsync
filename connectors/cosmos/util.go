@@ -1,8 +1,5 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cosmos
 
@@ -91,7 +88,7 @@ func (cc *CosmosConnector) getLatestResumeToken(ctx context.Context, location if
 
 	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {
-		if err.(mongo.WriteException).WriteErrors[0].Code == 13 { //unauthorized
+		if err.(mongo.WriteException).WriteErrors[0].Code == 13 { // unauthorized
 			slog.Warn(fmt.Sprintf("Not authorized to insert dummy record for %v, skipping resume token retrieval - is the namespace read-only?", location))
 			return nil, nil
 		}

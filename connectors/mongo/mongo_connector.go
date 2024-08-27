@@ -1,8 +1,6 @@
-/*
- * Copyright (C) 2024 Adiom, Inc.
- *
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
+// Copyright (c) 2024. Adiom, Inc.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package mongo
 
 import (
@@ -165,7 +163,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
-	// Get data channel from transport interface based on the provided ID
+	// Get data channel from transports interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
@@ -457,7 +455,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 	mc.flowId = flowId
 
-	// Get data channel from transport interface based on the provided ID
+	// Get data channel from transports interface based on the provided ID
 	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))

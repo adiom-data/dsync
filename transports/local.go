@@ -1,7 +1,7 @@
 // Copyright (c) 2024. Adiom, Inc.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package transport
+package transports
 
 import (
 	"errors"
@@ -31,7 +31,7 @@ func NewLocalTransport(coordEP iface.CoordinatorIConnectorSignal) *Local {
 
 func (t *Local) GetCoordinatorEndpoint(location string) (iface.CoordinatorIConnectorSignal, error) {
 	if location != "local" {
-		return nil, errors.New("local transport only supports the 'local' location")
+		return nil, errors.New("local transports only supports the 'local' location")
 	}
 	return t.coordEP, nil
 }
