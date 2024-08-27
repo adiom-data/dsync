@@ -16,29 +16,29 @@ import (
  * Does exactly nothing - pure stub
  */
 
-type TempStateStore struct {
+type StateStore struct {
 }
 
-func NewMongoStateStore() *TempStateStore {
-	return &TempStateStore{}
+func NewTempStateStore() *StateStore {
+	return &StateStore{}
 }
 
-func (s *TempStateStore) Setup(ctx context.Context) error {
+func (s *StateStore) Setup(ctx context.Context) error {
 	slog.Debug("Setting up temp state store")
 	return nil
 }
 
-func (s *TempStateStore) Teardown() {
+func (s *StateStore) Teardown() {
 }
 
-func (s *TempStateStore) PersistObject(storeName string, id interface{}, obj interface{}) error {
+func (s *StateStore) PersistObject(storeName string, id interface{}, obj interface{}) error {
 	return nil
 }
 
-func (s *TempStateStore) RetrieveObject(storeName string, id interface{}, obj interface{}) error {
+func (s *StateStore) RetrieveObject(storeName string, id interface{}, obj interface{}) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (s *TempStateStore) DeleteObject(storeName string, id interface{}) error {
+func (s *StateStore) DeleteObject(storeName string, id interface{}) error {
 	return nil
 }

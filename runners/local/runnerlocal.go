@@ -108,12 +108,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	}
 
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.StateStoreConnString})
+		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.StateStoreConnString})
 	} else if !nullWrite { //if the destination is stateful, we can use it as statestore
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.MongoStateStoreSettings{ConnectionString: settings.DstConnString})
+		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.DstConnString})
 	} else {
 		// otherwise, use a stub statestore because no statestore is needed
-		r.statestore = statestoreTemp.NewMongoStateStore()
+		r.statestore = statestoreTemp.NewTempStateStore()
 	}
 
 	r.coord = coordinatorSimple.NewSimpleCoordinator()

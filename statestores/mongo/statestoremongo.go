@@ -22,29 +22,29 @@ import (
 // default db name if not set in the connection string
 const defaultInternalDbName = "adiom-internal"
 
-type MongoStateStore struct {
-	settings MongoStateStoreSettings
+type StateStore struct {
+	settings StateStoreSettings
 	client   *mongo.Client
 	ctx      context.Context
 
 	db *mongo.Database
 }
 
-type MongoStateStoreSettings struct {
+type StateStoreSettings struct {
 	ConnectionString string
 
 	serverConnectTimeout time.Duration
 	pingTimeout          time.Duration
 }
 
-func NewMongoStateStore(settings MongoStateStoreSettings) *MongoStateStore {
+func NewMongoStateStore(settings StateStoreSettings) *StateStore {
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
 
-	return &MongoStateStore{settings: settings}
+	return &StateStore{settings: settings}
 }
 
-func (s *MongoStateStore) Setup(ctx context.Context) error {
+func (s *StateStore) Setup(ctx context.Context) error {
 	s.ctx = ctx
 
 	// Check that the provided connection string is pointing to a genuine MongoDB instance
@@ -89,7 +89,7 @@ func (s *MongoStateStore) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (s *MongoStateStore) Teardown() {
+func (s *StateStore) Teardown() {
 	if s.client != nil {
 		if err := s.client.Disconnect(s.ctx); err != nil {
 			panic(err)
@@ -97,17 +97,17 @@ func (s *MongoStateStore) Teardown() {
 	}
 }
 
-func (s *MongoStateStore) getStore(name string) *mongo.Collection {
+func (s *StateStore) getStore(name string) *mongo.Collection {
 	return s.db.Collection(name)
 }
 
-func (s *MongoStateStore) PersistObject(storeName string, id interface{}, obj interface{}) error {
+func (s *StateStore) PersistObject(storeName string, id interface{}, obj interface{}) error {
 	coll := s.getStore(storeName)
 	_, err := coll.ReplaceOne(s.ctx, bson.M{"_id": id}, obj, options.Replace().SetUpsert(true))
 	return err
 }
 
-func (s *MongoStateStore) RetrieveObject(storeName string, id interface{}, obj interface{}) error {
+func (s *StateStore) RetrieveObject(storeName string, id interface{}, obj interface{}) error {
 	coll := s.getStore(storeName)
 	result := coll.FindOne(s.ctx, bson.M{"_id": id})
 	if result.Err() != nil {
@@ -122,7 +122,7 @@ func (s *MongoStateStore) RetrieveObject(storeName string, id interface{}, obj i
 	return nil
 }
 
-func (s *MongoStateStore) DeleteObject(storeName string, id interface{}) error {
+func (s *StateStore) DeleteObject(storeName string, id interface{}) error {
 	coll := s.getStore(storeName)
 	_, err := coll.DeleteOne(s.ctx, bson.M{"_id": id})
 	return err
