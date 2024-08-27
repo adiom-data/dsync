@@ -25,10 +25,10 @@ const (
 	connectorSpec   string = "MongoDB Provisioned RU" // Only compatible with MongoDB API and provisioned deployments
 )
 
-type CosmosConnector struct {
+type Connector struct {
 	desc string
 
-	settings CosmosConnectorSettings
+	settings ConnectorSettings
 	client   *mongo.Client
 	ctx      context.Context
 
@@ -55,7 +55,7 @@ type CosmosConnector struct {
 	witnessMongoClient *mongo.Client //for use in emulating deletes
 }
 
-type CosmosConnectorSettings struct {
+type ConnectorSettings struct {
 	ConnectionString string
 
 	serverConnectTimeout           time.Duration
@@ -76,7 +76,7 @@ type CosmosConnectorSettings struct {
 	WitnessMongoConnString string
 }
 
-func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosConnector {
+func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
 	settings.serverConnectTimeout = 15 * time.Second
 	settings.pingTimeout = 2 * time.Second
@@ -101,10 +101,10 @@ func NewCosmosConnector(desc string, settings CosmosConnectorSettings) *CosmosCo
 	settings.numParallelPartitionWorkers = 4
 	settings.partitionKey = "_id"
 
-	return &CosmosConnector{desc: desc, settings: settings}
+	return &Connector{desc: desc, settings: settings}
 }
 
-func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ctx = ctx
 	cc.t = t
 
@@ -193,7 +193,7 @@ func (cc *CosmosConnector) Setup(ctx context.Context, t iface.Transport) error {
 	return nil
 }
 
-func (cc *CosmosConnector) Teardown() {
+func (cc *Connector) Teardown() {
 	if cc.client != nil {
 		cc.client.Disconnect(cc.ctx)
 	}
@@ -203,14 +203,14 @@ func (cc *CosmosConnector) Teardown() {
 	}
 }
 
-func (cc *CosmosConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (cc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// this is what came for the flow
 	cc.flowConnCapabilities = reqCap
 	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", cc.id, flowId, reqCap))
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
-func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	cc.flowCtx, cc.flowCancelFunc = context.WithCancel(cc.ctx)
 	cc.flowId = flowId
@@ -455,25 +455,25 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 	return nil
 }
 
-func (cc *CosmosConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	return errors.New("CosmosConnector does not write to destination yet")
 }
 
-func (cc *CosmosConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (cc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go cc.doIntegrityCheck_sync(flowId, options)
 	return nil
 }
 
-func (cc *CosmosConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (cc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return cc.status
 }
 
-func (cc *CosmosConnector) Interrupt(flowId iface.FlowID) error {
+func (cc *Connector) Interrupt(flowId iface.FlowID) error {
 	cc.flowCancelFunc()
 	return nil
 }
 
-func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (cc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream

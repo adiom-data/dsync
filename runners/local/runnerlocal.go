@@ -79,7 +79,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
 	} else if settings.SrcType == "CosmosDB" {
-		cosmosSettings := connectorCosmos.CosmosConnectorSettings{ConnectionString: settings.SrcConnString}
+		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.SrcConnString}
 		if settings.CosmosDeletesEmuRequestedFlag {
 			cosmosSettings.EmulateDeletes = true
 			// the destination is a MongoDB database otherwise the Options check would have failed

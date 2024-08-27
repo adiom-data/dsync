@@ -30,10 +30,10 @@ const (
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 
 var connectorFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 }
 var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
-	return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -47,7 +47,7 @@ func TestCosmosConnectorSuite(t *testing.T) {
 	}
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return NewCosmosConnector("test", CosmosConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+			return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -81,7 +81,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorFactoryFunc().(*CosmosConnector)
+	connector := connectorFactoryFunc().(*Connector)
 
 	// setup the connector and make sure it returns no errors
 	err := connector.Setup(ctx, t)
@@ -241,7 +241,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*CosmosConnector)
+	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*Connector)
 
 	// setup the connector and make sure it returns no errors
 	err = connector.Setup(ctx, t)

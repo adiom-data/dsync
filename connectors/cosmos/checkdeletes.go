@@ -34,7 +34,7 @@ const (
 /**
 * Trigger a check for deletes in Cosmos
  */
-func (cc *CosmosConnector) CheckForDeletesTrigger(flowId iface.FlowID) {
+func (cc *Connector) CheckForDeletesTrigger(flowId iface.FlowID) {
 	if !cc.settings.EmulateDeletes {
 		slog.Debug("EmulateDeletes is disabled, skipping check for deletes")
 		return
@@ -54,7 +54,7 @@ func (cc *CosmosConnector) CheckForDeletesTrigger(flowId iface.FlowID) {
  * Returns the number of deletes generated
  */
 //TODO: Could there be a race condition here when a doc with the same _id is recreated?
-func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) uint64 {
+func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) uint64 {
 	// Preparations
 	mismatchedNamespaces := make(chan namespace)
 	idsToCheck := make(chan idsWithLocation)  //channel to post ids to check
@@ -81,7 +81,7 @@ func (cc *CosmosConnector) checkForDeletes_sync(flowId iface.FlowID, options ifa
 
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
 // The channel is closed at the end to signal that all comparisons are done
-func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []namespace, mismatchedNamespaces chan<- namespace) {
+func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []namespace, mismatchedNamespaces chan<- namespace) {
 	for _, ns := range namespaces {
 		// get the count from the source
 		sourceCount, err := cc.client.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
@@ -109,7 +109,7 @@ func (cc *CosmosConnector) compareDocCountWithWitness(witnessClient *mongo.Clien
 // Reads namespaces from the channel with 4 workers and scans the Witness index in parallel
 // Sends the ids to the channel for checking against the source
 // Exits when the channel is closed
-func (cc *CosmosConnector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, mismatchedNamespaces <-chan namespace, idsToCheck chan<- idsWithLocation) {
+func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, mismatchedNamespaces <-chan namespace, idsToCheck chan<- idsWithLocation) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(numParallelWitnessScanTasks)
@@ -129,7 +129,7 @@ func (cc *CosmosConnector) parallelScanWitnessNamespaces(witnessClient *mongo.Cl
 }
 
 // Scans the Witness index for the given namespace and sends the ids to the channel (in batches for efficiency)
-func (cc *CosmosConnector) scanWitnessNamespace(witnessClient *mongo.Client, ns namespace, idsToCheck chan<- idsWithLocation) {
+func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns namespace, idsToCheck chan<- idsWithLocation) {
 	slog.Debug(fmt.Sprintf("Scanning witness index namespace %v", ns))
 	// get all ids from the source
 	opts := options.Find().SetProjection(bson.M{"_id": 1})
@@ -171,7 +171,7 @@ func (cc *CosmosConnector) scanWitnessNamespace(witnessClient *mongo.Client, ns 
 // Reads ids to check from the channel, checks if they exist in the source, and sends those don't to the delete channel
 // Uses 4 workers to parallelize the checks
 // Exits when the channel is closed
-func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan idsWithLocation, idsToDelete chan<- idsWithLocation) {
+func (cc *Connector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan idsWithLocation, idsToDelete chan<- idsWithLocation) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(numParallelSourceScanTasks)
@@ -189,7 +189,7 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan id
 }
 
 // Checks if the ids exist in the source and sends those that don't to the delete channel
-func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLocation, idsToDelete chan<- idsWithLocation) {
+func (cc *Connector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLocation, idsToDelete chan<- idsWithLocation) {
 	slog.Debug(fmt.Sprintf("Checking source for ids: %+v (first: %v, last: %v, n: %v)", idsWithLoc.loc, idsWithLoc.ids[0], idsWithLoc.ids[len(idsWithLoc.ids)-1], len(idsWithLoc.ids)))
 	// we will take advatage of the $setDifference MongoDB aggregation operator to find the ids that are not in the source
 	// it does work in Cosmos, which is great!
@@ -243,7 +243,7 @@ func (cc *CosmosConnector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc ids
 // Reads ids from one channel and sends delete event messages to the other
 // Exits when the channel is closed
 // Returns the number of delete messages generated
-func (cc *CosmosConnector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) uint64 {
+func (cc *Connector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) uint64 {
 	var totalDeletes uint64
 	for idWithLoc := range idsToDelete {
 		for i := 0; i < len(idWithLoc.ids); i++ {

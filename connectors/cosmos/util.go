@@ -46,7 +46,7 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
+func (cc *Connector) printProgress(readerProgress *ReaderProgress) {
 	ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
 	defer ticker.Stop()
 	startTime := time.Now()
@@ -75,7 +75,7 @@ func (cc *CosmosConnector) printProgress(readerProgress *ReaderProgress) {
 	}
 }
 
-func (cc *CosmosConnector) getLatestResumeToken(ctx context.Context, location iface.Location) (bson.Raw, error) {
+func (cc *Connector) getLatestResumeToken(ctx context.Context, location iface.Location) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := cc.createChangeStream(ctx, location, opts)
@@ -132,7 +132,7 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 }
 
 // update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum
-func (cc *CosmosConnector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
+func (cc *Connector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
 	cc.muProgressMetrics.Lock()
 	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
@@ -186,7 +186,7 @@ func nsToString(ns iface.Namespace) string {
 }
 
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
-func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
+func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
 	slog.Debug("Restoring progress metrics from tasks")
 	cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
 	for _, task := range tasks {
@@ -233,7 +233,7 @@ func (cc *CosmosConnector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
 }
 
 // Updates the progress metrics once a task has been started
-func (cc *CosmosConnector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus) {
+func (cc *Connector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Lock()
 	cc.status.ProgressMetrics.TasksStarted++
 	nsStatus.TasksStarted++
@@ -241,7 +241,7 @@ func (cc *CosmosConnector) taskStartedProgressUpdate(nsStatus *iface.NamespaceSt
 }
 
 // Updates the progress metrics once a task has been completed
-func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus) {
+func (cc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Lock()
 	//update progress counters: num tasks completed
 	cc.status.ProgressMetrics.TasksCompleted++
@@ -259,7 +259,7 @@ func (cc *CosmosConnector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatu
 }
 
 // Updates the progress metrics once a task has been started
-func (cc *CosmosConnector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
+func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Lock()
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++
