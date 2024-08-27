@@ -17,7 +17,7 @@ mockery --output ./mocks --name Transport
 ```
 Tests for specific connectors should be in "_test.go" files next to the actual implementation as per the Go convention.
 
-For an example of creating a test for a connector, see [Mongo Connector test](../connector/connectorMongo/connectormongo_test.go)
+For an example of creating a test for a connector, see [Mongo Connector test](../connectors/mongo/connectormongo_test.go)
 
 ## How to run tests
 Prerequisites: 
@@ -30,10 +30,10 @@ go test ./...
 ```
 To run all tests for a specific connector (e.g. connector Mongo):
 ```
-go test -v github.com/adiom-data/dsync/connector/connectorMongo
+go test -v github.com/adiom-data/dsync/connector/mongo
 ```
 
 To run a specific test for a specific connector (e.g. TestConnectorWriteResumeInitialCopy for Mongo connector):
 ```
-go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestConnectorWriteResumeInitialCopy$ github.com/adiom-data/dsync/connector/connectorMongo
+go test -v -timeout 30s -run ^TestMongoConnectorSuite/TestConnectorWriteResumeInitialCopy$ github.com/adiom-data/dsync/connectors/mongo
 ```
