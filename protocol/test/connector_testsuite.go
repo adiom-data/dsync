@@ -209,10 +209,12 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	dbName := "test"
 	colName := "test_tcw"
 	// Connect the test data store
-	dataStore := suite.datastoreFactoryFunc()
-	err = dataStore.Setup()
-	assert.NoError(suite.T(), err)
-	dataStore.DeleteNamespace(dbName, colName)
+	if suite.datastoreFactoryFunc != nil {
+		dataStore := suite.datastoreFactoryFunc()
+		err = dataStore.Setup()
+		assert.NoError(suite.T(), err)
+		dataStore.DeleteNamespace(dbName, colName)
+	}
 
 	// Start a go routine to write to the data channel
 	go func() {
