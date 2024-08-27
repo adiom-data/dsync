@@ -91,6 +91,10 @@ func (cc *CosmosConnector) getLatestResumeToken(ctx context.Context, location if
 
 	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {
+		if err.(mongo.WriteException).WriteErrors[0].Code == 13 { //unauthorized
+			slog.Warn(fmt.Sprintf("Not authorized to insert dummy record for %v, skipping resume token retrieval - is the namespace read-only?", location))
+			return nil, nil
+		}
 		slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
 		return nil, fmt.Errorf("failed to insert dummy record")
 	}

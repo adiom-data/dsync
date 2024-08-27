@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 
@@ -37,7 +38,7 @@ func (cc *CosmosConnector) createChangeStream(ctx context.Context, namespace ifa
 }
 
 // Creates parallel change streams for each task in the read plan, and processes the events concurrently
-func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, channel chan<- iface.DataMessage) error {
+func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
 	// global atomic lsn counter
 	var lsn int64 = 0
@@ -56,8 +57,16 @@ func (cc *CosmosConnector) StartConcurrentChangeStreams(ctx context.Context, nam
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
 			}
-			// set the change stream options to start from the resume token
-			opts := moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
+			var opts *moptions.ChangeStreamOptions
+			if token != nil {
+				// set the change stream options to start from the resume token
+				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
+			} else { //we need to start from the read plan creation time to be safe
+				// create timestamp from read plan start time
+				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
+				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
+				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
+			}
 			changeStream, err := cc.createChangeStream(ctx, loc, opts)
 			if err != nil {
 				if errors.Is(context.Canceled, ctx.Err()) {

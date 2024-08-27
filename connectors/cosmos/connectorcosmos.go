@@ -330,7 +330,7 @@ func (cc *CosmosConnector) StartReadToChannel(flowId iface.FlowID, options iface
 			}
 		}()
 		// start the concurrent change streams
-		cc.StartConcurrentChangeStreams(cc.flowCtx, namespaces, &readerProgress, dataChannel)
+		cc.StartConcurrentChangeStreams(cc.flowCtx, namespaces, &readerProgress, readPlan.CreatedAtEpoch, dataChannel)
 	}()
 
 	// kick off the initial sync
@@ -513,7 +513,7 @@ func (cc *CosmosConnector) RequestCreateReadPlan(flowId iface.FlowID, options if
 			slog.Error(fmt.Sprintf("Failed to serialize the resume token map: %v", err))
 		}
 
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: flowCDCResumeToken, CreatedAtEpoch: time.Now().Unix()}
 
 		err = cc.coord.PostReadPlanningResult(flowId, cc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
