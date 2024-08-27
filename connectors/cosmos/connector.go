@@ -64,11 +64,11 @@ type ConnectorSettings struct {
 	writerMaxBatchSize             int //0 means no limit (in # of documents)
 	NumParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
-	numParallelIntegrityCheckTasks int
+	NumParallelIntegrityCheckTasks int
 
 	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
 	targetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
-	numParallelPartitionWorkers int    //number of workers used for partitioning
+	NumParallelPartitionWorkers int    //number of workers used for partitioning
 	partitionKey                string //partition key to use for collections
 
 	EmulateDeletes         bool // if true, we will generate delete events
@@ -87,20 +87,24 @@ func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 
 	settings.writerMaxBatchSize = 0
 
-	if settings.NumParallelWriters == 0 { //default to 4
+	if settings.NumParallelWriters == 0 { // default to 4
 		settings.NumParallelWriters = 4
 	}
-	settings.numParallelIntegrityCheckTasks = 4
+	if settings.NumParallelIntegrityCheckTasks == 0 { // default to 4
+		settings.NumParallelIntegrityCheckTasks = 4
+	}
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
 	settings.deletesCheckInterval = 60 * time.Second
 
-	if settings.MaxNumNamespaces == 0 { // if not set, default to 8
+	if settings.MaxNumNamespaces == 0 { // default to 8
 		settings.MaxNumNamespaces = 8
 	}
 	settings.targetDocCountPerPartition = 512 * 1000
-	settings.numParallelPartitionWorkers = 4
+	if settings.NumParallelPartitionWorkers == 0 {
+		settings.NumParallelPartitionWorkers = 4
+	} 
 	settings.partitionKey = "_id"
 
 	return &Connector{desc: desc, settings: settings}

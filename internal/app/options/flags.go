@@ -18,6 +18,8 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "INFO"
 
+var DefaultMaxNumNamespaces = 8
+
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
@@ -132,8 +134,15 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "num-namespaces",
-			Usage: "Maximum number of namespaces that can be copied. Recommended to keep this number under 15 to avoid performance issues",
+			Usage: "maximum number of namespaces that can be copied. Recommended to keep this number under 15 to avoid performance issues",
+			Value: DefaultMaxNumNamespaces,
 			Required: false,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "server-connect-timeout",
+			Usage: "duration for Cosmos server connection timeout",
+			Required: false,
+			Hidden: true,
 		}),
 	}
 

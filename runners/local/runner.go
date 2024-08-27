@@ -91,6 +91,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			cosmosSettings.InitialSyncNumParallelCopiers = btc
 			cosmosSettings.NumParallelWriters = btc / 2
+			cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
+			cosmosSettings.NumParallelPartitionWorkers = btc / 2
 		}
 		if settings.MaxNumNamespaces != 8 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
