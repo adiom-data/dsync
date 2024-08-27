@@ -27,7 +27,7 @@ type Simple struct {
 	mu_flows sync.RWMutex // to make the map thread-safe
 }
 
-func NewCoordinatorSimple() *Simple {
+func NewSimpleCoordinator() *Simple {
 	// Implement the NewSimpleCoordinator function
 	return &Simple{connectors: make(map[iface.ConnectorID]ConnectorDetailsWithEp), flows: make(map[iface.FlowID]*FlowDetails)}
 }
