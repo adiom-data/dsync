@@ -55,12 +55,20 @@ type RunnerLocalSettings struct {
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
+	DeletesCheckInterval time.Duration
 
 	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+	ServerConnectTimeout time.Duration
+	PingTimeout time.Duration
+	CdcResumeTokenUpdateInterval time.Duration
 
 	LoadLevel string
-
+	NumParallelPartitionWorkers int
+	NumParallelIntegrityCheckTasks int
+	
 	MaxNumNamespaces int
+	WriterMaxBatchSize int
+	TargetDocCountPerPartition int64
 }
 
 const (
@@ -87,6 +95,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			// the destination is a MongoDB database otherwise the Options check would have failed
 			cosmosSettings.WitnessMongoConnString = settings.DstConnString
 		}
+		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			cosmosSettings.InitialSyncNumParallelCopiers = btc
@@ -97,6 +106,25 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		if settings.MaxNumNamespaces != 8 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}
+		if settings.ServerConnectTimeout != time.Second * 60 {
+			cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		}
+		if settings.PingTimeout != time.Second * 2 {
+			cosmosSettings.PingTimeout = settings.PingTimeout
+		}
+		if settings.CdcResumeTokenUpdateInterval != time.Second * 60 {
+			cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
+		}
+		if settings.WriterMaxBatchSize != 0 {
+			cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		}
+		if settings.TargetDocCountPerPartition != (512 * 1000) {
+			cosmosSettings.TargetDocCountPerPartition = settings.TargetDocCountPerPartition
+		}
+		if settings.DeletesCheckInterval != time.Second * 60 {
+			cosmosSettings.DeletesCheckInterval = settings.DeletesCheckInterval
+		}
+		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})

@@ -103,6 +103,9 @@ func runDsync(c *cli.Context) error {
 		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
 		LoadLevel:                      o.LoadLevel,
 		MaxNumNamespaces: 			    o.MaxNumNamespaces,
+		ServerConnectTimeout:           o.ServerConnectTimeout, 
+		PingTimeout:                    o.PingTimeout, 
+		CdcResumeTokenUpdateInterval:   o.CdcResumeTokenUpdateInterval,
 	})
 
 	var wg sync.WaitGroup

@@ -7,6 +7,7 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/urfave/cli/v2"
@@ -34,6 +35,12 @@ type Options struct {
 
 	LoadLevel string
 	MaxNumNamespaces int
+	ServerConnectTimeout time.Duration
+	PingTimeout time.Duration
+	WriterMaxBatchSize int
+	CdcResumeTokenUpdateInterval time.Duration
+	TargetDocCountPerPartition int64
+	DeletesCheckInterval time.Duration
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -52,6 +59,12 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Pprof = c.Bool("pprof")
 	o.LoadLevel = c.String("load-level")
 	o.MaxNumNamespaces = c.Int("num-namespaces")
+	o.ServerConnectTimeout = c.Duration("server-timeout")
+	o.PingTimeout = c.Duration("ping-timeout")
+	o.WriterMaxBatchSize = c.Int("writer-batch-size")
+	o.CdcResumeTokenUpdateInterval = c.Duration("resume-token-interval")
+	o.TargetDocCountPerPartition = c.Int64("doc-partition")
+	o.DeletesCheckInterval = c.Duration("deletesCheckInterval")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

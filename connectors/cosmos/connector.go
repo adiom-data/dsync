@@ -58,35 +58,37 @@ type Connector struct {
 type ConnectorSettings struct {
 	ConnectionString string
 
-	serverConnectTimeout           time.Duration
-	pingTimeout                    time.Duration
+	ServerConnectTimeout           time.Duration
+	PingTimeout                    time.Duration
 	InitialSyncNumParallelCopiers  int
-	writerMaxBatchSize             int //0 means no limit (in # of documents)
+	WriterMaxBatchSize             int //0 means no limit (in # of documents)
 	NumParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
 	NumParallelIntegrityCheckTasks int
 
 	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
-	targetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	TargetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	NumParallelPartitionWorkers int    //number of workers used for partitioning
 	partitionKey                string //partition key to use for collections
 
 	EmulateDeletes         bool // if true, we will generate delete events
-	deletesCheckInterval   time.Duration
+	DeletesCheckInterval   time.Duration
 	WitnessMongoConnString string
 }
 
 func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	settings.serverConnectTimeout = 15 * time.Second
-	settings.pingTimeout = 2 * time.Second
-
+	if settings.ServerConnectTimeout == 0 { // do i need these?? already set default values in flag
+		settings.ServerConnectTimeout = 15 * time.Second
+	} 
+	if settings.PingTimeout == 0 {
+		settings.PingTimeout = 2 * time.Second
+	}
 	if settings.InitialSyncNumParallelCopiers == 0 { //default to 8
 		settings.InitialSyncNumParallelCopiers = 8
 	}
-
-	settings.writerMaxBatchSize = 0
-
+	settings.WriterMaxBatchSize = 0 
+	
 	if settings.NumParallelWriters == 0 { // default to 4
 		settings.NumParallelWriters = 4
 	}
@@ -96,12 +98,15 @@ func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
-	settings.deletesCheckInterval = 60 * time.Second
-
+	if settings.DeletesCheckInterval == 0 {
+		settings.DeletesCheckInterval = 60 * time.Second
+	}
 	if settings.MaxNumNamespaces == 0 { // default to 8
 		settings.MaxNumNamespaces = 8
+	} 
+	if settings.TargetDocCountPerPartition == 0 {
+		settings.TargetDocCountPerPartition = 512 * 1000
 	}
-	settings.targetDocCountPerPartition = 512 * 1000
 	if settings.NumParallelPartitionWorkers == 0 {
 		settings.NumParallelPartitionWorkers = 4
 	} 
@@ -116,9 +121,9 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 
 	// Connect to the witness MongoDB instance
 	if cc.settings.EmulateDeletes {
-		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
+		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.ServerConnectTimeout)
 		defer cancel()
-		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString).SetConnectTimeout(cc.settings.serverConnectTimeout)
+		clientOptions := moptions.Client().ApplyURI(cc.settings.WitnessMongoConnString).SetConnectTimeout(cc.settings.ServerConnectTimeout)
 		client, err := mongo.Connect(ctxConnect, clientOptions)
 		if err != nil {
 			return err
@@ -127,9 +132,9 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	// Connect to the MongoDB instance
-	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.serverConnectTimeout)
+	ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.ServerConnectTimeout)
 	defer cancel()
-	clientOptions := moptions.Client().ApplyURI(cc.settings.ConnectionString).SetConnectTimeout(cc.settings.serverConnectTimeout)
+	clientOptions := moptions.Client().ApplyURI(cc.settings.ConnectionString).SetConnectTimeout(cc.settings.ServerConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
@@ -137,7 +142,7 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.client = client
 
 	// Check the connection
-	ctxPing, cancel := context.WithTimeout(cc.ctx, cc.settings.pingTimeout)
+	ctxPing, cancel := context.WithTimeout(cc.ctx, cc.settings.PingTimeout)
 	defer cancel()
 	err = cc.client.Ping(ctxPing, nil)
 	if err != nil {
@@ -287,7 +292,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 			//start the worker that will emulate deletes
 			cc.flowDeletesTriggerChannel <- struct{}{} //trigger the first cycle
 			go func() {
-				ticker := time.NewTicker(cc.settings.deletesCheckInterval)
+				ticker := time.NewTicker(cc.settings.DeletesCheckInterval)
 				defer ticker.Stop()
 				for {
 					select {
@@ -305,7 +310,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						readerProgress.deletesCaught += cc.checkForDeletes_sync(flowId, options, dataChannel)
 						cc.status.ProgressMetrics.DeletesCaught = readerProgress.deletesCaught
 						// reset the timer - no point in checking too often
-						ticker.Reset(cc.settings.deletesCheckInterval)
+						ticker.Reset(cc.settings.DeletesCheckInterval)
 
 						slog.Debug(fmt.Sprintf("Done checking for deletes for flow %s", flowId))
 						cc.status.AdditionalInfo = ""
