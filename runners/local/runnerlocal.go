@@ -15,7 +15,7 @@ import (
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	connectorNull "github.com/adiom-data/dsync/connectors/null"
 	connectorRandom "github.com/adiom-data/dsync/connectors/random"
-	"github.com/adiom-data/dsync/coordinators/coordinatorSimple"
+	coordinatorSimple "github.com/adiom-data/dsync/coordinators/simple"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/statestores/statestoreMongo"
 	"github.com/adiom-data/dsync/statestores/statestoreTemp"
