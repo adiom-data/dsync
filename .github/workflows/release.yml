@@ -1,11 +1,9 @@
-name: Build and Release
+name: Build artifacts for release
 
-# Trigger on a new tag
+# Trigger on a new release
 on:
-  push:
-    # Pattern matched against refs/tags
-    tags:        
-      - '*'           # Push events to every tag not containing /
+  release:
+    types: [published]
 
 permissions:
   contents: write  # Ensuring the GITHUB_TOKEN has write permissions to contents
@@ -36,26 +34,12 @@ jobs:
     - name: Archive binaries and README
       run: |
         zip dsync.zip dsync-* README.md
-    - name: Get the tag name
-      id: get_tag_name
-      run: |
-        echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> $GITHUB_ENV
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ env.RELEASE_TAG }}
-        release_name: Release ${{ env.RELEASE_TAG }}
-        draft: false
-        prerelease: false
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ github.event.release.upload_url }}
         asset_path: ./dsync.zip
         asset_name: dsync.zip
         asset_content_type: application/zip
