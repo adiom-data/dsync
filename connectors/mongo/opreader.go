@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (mc *MongoConnector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
+func (mc *Connector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
 	db := change["ns"].(bson.M)["db"].(string)
 	col := change["ns"].(bson.M)["coll"].(string)
 
@@ -26,7 +26,7 @@ func (mc *MongoConnector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
 	return false
 }
 
-func (mc *MongoConnector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
+func (mc *Connector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {
 	slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
 	db := change["ns"].(bson.M)["db"].(string)

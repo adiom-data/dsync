@@ -17,10 +17,10 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type RandomReadConnector struct {
+type Connector struct {
 	desc string
 
-	settings RandomConnectorSettings
+	settings ConnectorSettings
 	ctx      context.Context
 
 	t      iface.Transport
@@ -39,7 +39,7 @@ type RandomReadConnector struct {
 	flowCancelFunc context.CancelFunc
 }
 
-type RandomConnectorSettings struct {
+type ConnectorSettings struct {
 	numParallelGenerators int //number of parallel data generators
 
 	numDatabases                     int  //must be at least 1
@@ -54,7 +54,7 @@ type RandomConnectorSettings struct {
 	probabilities []float64
 }
 
-func NewRandomReadConnector(desc string, settings RandomConnectorSettings) *RandomReadConnector {
+func NewRandomReadConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
 
 	settings.numParallelGenerators = 4
@@ -69,10 +69,10 @@ func NewRandomReadConnector(desc string, settings RandomConnectorSettings) *Rand
 
 	settings.probabilities = []float64{0.25, 0.25, 0.25, 0.25}
 
-	return &RandomReadConnector{desc: desc, settings: settings}
+	return &Connector{desc: desc, settings: settings}
 }
 
-func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (rc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	//setup the connector
 	rc.ctx = ctx
 	rc.t = t
@@ -106,15 +106,15 @@ func (rc *RandomReadConnector) Setup(ctx context.Context, t iface.Transport) err
 	return nil
 }
 
-func (rc *RandomReadConnector) Teardown() {
+func (rc *Connector) Teardown() {
 	//does nothing, no client to disconnect
 }
 
-func (rc *RandomReadConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (rc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	//not necessary always source
 }
 
-func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (rc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
 
 	tasks := readPlan.Tasks
@@ -255,28 +255,28 @@ func (rc *RandomReadConnector) StartReadToChannel(flowId iface.FlowID, options i
 	return nil
 }
 
-func (rc *RandomReadConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (rc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	//never writes to destination, errors
 	return errors.New("RandomReadConnector does not write to destination")
 }
 
-func (rc *RandomReadConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//no client, errors
 	return errors.New("RandomReadConnector does not have a client to request data integrity check")
 }
 
-func (rc *RandomReadConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (rc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	//get connector status
 	return rc.status
 }
 
-func (rc *RandomReadConnector) Interrupt(flowId iface.FlowID) error {
+func (rc *Connector) Interrupt(flowId iface.FlowID) error {
 	//TODO: implement for testing
 	rc.flowCancelFunc()
 	return nil
 }
 
-func (rc *RandomReadConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (rc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		tasks := rc.CreateInitialGenerationTasks()
 		plan := iface.ConnectorReadPlan{Tasks: tasks}

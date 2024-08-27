@@ -36,7 +36,7 @@ type nsCountResult struct {
 
 // doIntegrityCheck performs a data integrity check on the underlying data store
 // _sync is a synchronous version of this function
-func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *Connector) doIntegrityCheck_sync(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//XXX: should we use/create flowContext here in case it becomes a part of the flow and we want to have ability to interrupt?
 
 	var res iface.ConnectorDataIntegrityCheckResult
@@ -148,7 +148,7 @@ func (mc *MongoConnector) doIntegrityCheck_sync(flowId iface.FlowID, options ifa
 }
 
 // Returns a list of fully qualified namespaces
-func (mc *MongoConnector) getFQNamespaceList(namespacesFilter []string) ([]namespace, error) {
+func (mc *Connector) getFQNamespaceList(namespacesFilter []string) ([]namespace, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
 	var namespaces []namespace

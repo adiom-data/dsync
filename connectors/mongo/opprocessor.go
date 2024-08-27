@@ -19,7 +19,7 @@ import (
 )
 
 // TODO: this needs to be synchronized with the actual processing of the data messages
-func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
+func (mc *Connector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
 	switch barrierMsg.BarrierType {
 	case iface.BarrierType_TaskComplete:
 		// notify the coordinator that the task is done from our side
@@ -39,7 +39,7 @@ func (mc *MongoConnector) handleBarrierMessage(barrierMsg iface.DataMessage) err
 	return nil
 }
 
-func (mc *MongoConnector) processDataMessage(dataMsg iface.DataMessage) error {
+func (mc *Connector) processDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
 

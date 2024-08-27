@@ -29,7 +29,7 @@ var (
 	ExcludedSystemCollPatternCS = `^(?!system.)`
 )
 
-func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPlanTask, error) {
+func (mc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPlanTask, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
 	var tasks []iface.ReadPlanTask
@@ -83,7 +83,7 @@ func (mc *MongoConnector) createInitialCopyTasks(namespaces []string) ([]iface.R
 }
 
 // get all database names except system databases
-func (mc *MongoConnector) getAllDatabases() ([]string, error) {
+func (mc *Connector) getAllDatabases() ([]string, error) {
 	dbNames, err := mc.client.ListDatabaseNames(mc.ctx, bson.M{})
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (mc *MongoConnector) getAllDatabases() ([]string, error) {
 }
 
 // get all collections in a database except system collections
-func (mc *MongoConnector) getAllCollections(dbName string) ([]string, error) {
+func (mc *Connector) getAllCollections(dbName string) ([]string, error) {
 	collectionsAll, err := mc.client.Database(dbName).ListCollectionNames(mc.ctx, bson.M{})
 	if err != nil {
 		return nil, err

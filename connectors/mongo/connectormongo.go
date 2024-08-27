@@ -22,10 +22,10 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoConnector struct {
+type Connector struct {
 	desc string
 
-	settings MongoConnectorSettings
+	settings ConnectorSettings
 	client   *mongo.Client
 	ctx      context.Context
 
@@ -47,7 +47,7 @@ type MongoConnector struct {
 	flowCDCResumeToken   bson.Raw
 }
 
-type MongoConnectorSettings struct {
+type ConnectorSettings struct {
 	ConnectionString string
 
 	serverConnectTimeout           time.Duration
@@ -59,7 +59,7 @@ type MongoConnectorSettings struct {
 	numParallelIntegrityCheckTasks int
 }
 
-func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConnector {
+func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
 	settings.serverConnectTimeout = 10 * time.Second
 	settings.pingTimeout = 2 * time.Second
@@ -73,10 +73,10 @@ func NewMongoConnector(desc string, settings MongoConnectorSettings) *MongoConne
 	}
 	settings.numParallelIntegrityCheckTasks = 4
 
-	return &MongoConnector{desc: desc, settings: settings}
+	return &Connector{desc: desc, settings: settings}
 }
 
-func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.ctx = ctx
 	mc.t = t
 
@@ -136,7 +136,7 @@ func (mc *MongoConnector) Setup(ctx context.Context, t iface.Transport) error {
 	return nil
 }
 
-func (mc *MongoConnector) Teardown() {
+func (mc *Connector) Teardown() {
 	if mc.client != nil {
 		if err := mc.client.Disconnect(mc.ctx); err != nil {
 			slog.Warn(fmt.Sprintf("Failed to disconnect from MongoDB: %v", err))
@@ -144,14 +144,14 @@ func (mc *MongoConnector) Teardown() {
 	}
 }
 
-func (mc *MongoConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (mc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// this is what came for the flow
 	mc.flowConnCapabilities = reqCap
 	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", mc.id, flowId, reqCap))
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
-func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 	mc.flowId = flowId
@@ -451,7 +451,7 @@ func (mc *MongoConnector) StartReadToChannel(flowId iface.FlowID, options iface.
 	return nil
 }
 
-func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
 	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
 	mc.flowId = flowId
@@ -530,23 +530,23 @@ func (mc *MongoConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannel
 	return nil
 }
 
-func (mc *MongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	// need to make this async to honor the spec
 	go mc.doIntegrityCheck_sync(flowId, options)
 
 	return nil
 }
 
-func (mc *MongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (mc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return mc.status
 }
 
-func (mc *MongoConnector) Interrupt(flowId iface.FlowID) error {
+func (mc *Connector) Interrupt(flowId iface.FlowID) error {
 	mc.flowCancelFunc()
 	return nil
 }
 
-func (mc *MongoConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream

@@ -27,7 +27,7 @@ type ParallelWriter struct {
 	ctx context.Context
 
 	// MongoConnector
-	connector *MongoConnector
+	connector *Connector
 
 	// Number of parallel workers
 	numWorkers int
@@ -48,7 +48,7 @@ type ParallelWriter struct {
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector *MongoConnector, numWorkers int) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector *Connector, numWorkers int) *ParallelWriter {
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,

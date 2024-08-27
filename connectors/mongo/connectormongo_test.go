@@ -28,7 +28,7 @@ var TestMongoConnectionString = os.Getenv(MongoEnvironmentVariable)
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return NewMongoConnector("test", MongoConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+			return NewMongoConnector("test", ConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewMongoTestDataStore(TestMongoConnectionString)

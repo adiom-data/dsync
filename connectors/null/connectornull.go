@@ -15,7 +15,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 )
 
-type NullWriteConnector struct {
+type Connector struct {
 	desc string
 	ctx  context.Context
 
@@ -36,13 +36,13 @@ const (
 	progressReportingIntervalSec = 10
 )
 
-func NewNullConnector(desc string) *NullWriteConnector {
-	return &NullWriteConnector{
+func NewNullConnector(desc string) *Connector {
+	return &Connector{
 		desc: desc,
 	}
 }
 
-func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) error {
+func (nc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	nc.ctx = ctx
 	nc.t = t
 	// Instantiate ConnectorType
@@ -71,21 +71,21 @@ func (nc *NullWriteConnector) Setup(ctx context.Context, t iface.Transport) erro
 	return nil
 }
 
-func (nc *NullWriteConnector) Teardown() {
+func (nc *Connector) Teardown() {
 	// does nothing, no server connections to close
 	slog.Info(fmt.Sprintf("Null Write Connector %s is completed", nc.id))
 }
 
-func (nc *NullWriteConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (nc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// not necessary - Null write connector is always a destination connector and doesn't set parameters
 }
 
-func (nc *NullWriteConnector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
+func (nc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// does nothing, no read from channel
 	return fmt.Errorf("null write connector does not support read from channel")
 }
 
-func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
+func (nc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	//write null to destination
 	nc.flowctx, nc.flowCancelFunc = context.WithCancel(nc.ctx)
 	dataChannel, err := nc.t.GetDataChannelEndpoint(dataChannelId)
@@ -143,19 +143,19 @@ func (nc *NullWriteConnector) StartWriteFromChannel(flowId iface.FlowID, dataCha
 	return nil
 }
 
-func (nc *NullWriteConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	//does nothing, no data to check
 	return fmt.Errorf("null write connector does not support data integrity check")
 }
-func (nc *NullWriteConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+func (nc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return nc.status
 }
-func (nc *NullWriteConnector) Interrupt(flowId iface.FlowID) error {
+func (nc *Connector) Interrupt(flowId iface.FlowID) error {
 	//TODO: Put code here
 	nc.flowCancelFunc()
 	return nil
 }
 
-func (nc *NullWriteConnector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	return fmt.Errorf("null write connector does not make plans for reads")
 }

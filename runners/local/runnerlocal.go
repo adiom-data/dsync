@@ -77,7 +77,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	}
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
-		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.RandomConnectorSettings{})
+		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.ConnectorSettings{})
 	} else if settings.SrcType == "CosmosDB" {
 		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.SrcConnString}
 		if settings.CosmosDeletesEmuRequestedFlag {
@@ -92,14 +92,14 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		}
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
-		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.MongoConnectorSettings{ConnectionString: settings.SrcConnString})
+		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
 		r.dst = connectorNull.NewNullConnector(destinationName)
 	} else {
-		connSettings := connectorMongo.MongoConnectorSettings{ConnectionString: settings.DstConnString}
+		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			connSettings.NumParallelWriters = btc / 2
