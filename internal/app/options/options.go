@@ -34,6 +34,10 @@ type Options struct {
 	Pprof bool
 
 	LoadLevel string
+	InitialSyncNumParallelCopiers int
+	NumParallelWriters int
+	NumParallelIntegrityCheckTasks int
+	NumParallelPartitionWorkers int
 	MaxNumNamespaces int
 	ServerConnectTimeout time.Duration
 	PingTimeout time.Duration
@@ -64,7 +68,11 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CdcResumeTokenUpdateInterval = c.Duration("resume-token-interval")
 	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.TargetDocCountPerPartition = c.Int64("doc-partition")
-	o.DeletesCheckInterval = c.Duration("deletesCheckInterval")
+	o.DeletesCheckInterval = c.Duration("delete-interval")
+	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
+	o.NumParallelWriters = c.Int("parallel-writers")
+	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
+	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

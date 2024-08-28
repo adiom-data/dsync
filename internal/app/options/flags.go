@@ -173,6 +173,30 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden: true,
 		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "parallel-copiers",
+			Usage: "number of initial sync parallel copiers",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "parallel-writers",
+			Usage: "number of initial sync parallel writers",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "parallel-integrity-check",
+			Usage: "number of parallel integrity check tasks",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "parallel-partition-workers",
+			Usage: "number of parallel partition workers",
+			Required: false,
+			Hidden: true,
+		}),
 	}
 
 	before := func(c *cli.Context) error {

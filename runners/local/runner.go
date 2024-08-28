@@ -57,15 +57,16 @@ type RunnerLocalSettings struct {
 	CosmosDeletesEmuRequestedFlag bool
 	DeletesCheckInterval time.Duration
 
-	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 	ServerConnectTimeout time.Duration
 	PingTimeout time.Duration
 	CdcResumeTokenUpdateInterval time.Duration
 
 	LoadLevel string
-	NumParallelPartitionWorkers int
+	InitialSyncNumParallelCopiers int
+	NumParallelWriters int
 	NumParallelIntegrityCheckTasks int
-	
+	NumParallelPartitionWorkers int
 	MaxNumNamespaces int
 	WriterMaxBatchSize int
 	TargetDocCountPerPartition int64
@@ -98,11 +99,28 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			cosmosSettings.InitialSyncNumParallelCopiers = btc
-			cosmosSettings.NumParallelWriters = btc / 2 // default for writer, integrity check, and partition workers are the same 
-			cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
-			cosmosSettings.NumParallelPartitionWorkers = btc / 2
+			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			} else {
+				cosmosSettings.InitialSyncNumParallelCopiers = btc
+			}
+			if settings.NumParallelWriters != 0 {
+				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+			} else { // default for writer, integrity check, and partition workers are the same 
+				cosmosSettings.NumParallelWriters = btc / 2
+			} 
+			if settings.NumParallelIntegrityCheckTasks != 0 {
+				cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+			} else {
+				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
+			}
+			if settings.NumParallelPartitionWorkers != 0 {
+				cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
+			} else {
+				cosmosSettings.NumParallelPartitionWorkers = btc / 2
+			}
 		}
+		
 		if settings.MaxNumNamespaces != 0 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}
