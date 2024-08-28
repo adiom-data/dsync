@@ -78,36 +78,36 @@ type ConnectorSettings struct {
 
 func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	if settings.ServerConnectTimeout == 0 { // do i need these?? already set default values in flag
+	if settings.ServerConnectTimeout == 0 { // default 15 seconds
 		settings.ServerConnectTimeout = 15 * time.Second
 	} 
-	if settings.PingTimeout == 0 {
+	if settings.PingTimeout == 0 { // default 2 seconds
 		settings.PingTimeout = 2 * time.Second
 	}
-	if settings.InitialSyncNumParallelCopiers == 0 { //default to 8
+	if settings.InitialSyncNumParallelCopiers == 0 { // default 8 copiers
 		settings.InitialSyncNumParallelCopiers = 8
 	}
-	settings.WriterMaxBatchSize = 0 
+	// settings.WriterMaxBatchSize = 0 // default 0, no limit
 	
-	if settings.NumParallelWriters == 0 { // default to 4
+	if settings.NumParallelWriters == 0 { // default 4 writers
 		settings.NumParallelWriters = 4
 	}
 	if settings.NumParallelIntegrityCheckTasks == 0 { // default to 4
 		settings.NumParallelIntegrityCheckTasks = 4
 	}
-	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
+	if settings.CdcResumeTokenUpdateInterval == 0 { // default 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
-	if settings.DeletesCheckInterval == 0 {
-		settings.DeletesCheckInterval = 60 * time.Second
-	}
-	if settings.MaxNumNamespaces == 0 { // default to 8
+	if settings.MaxNumNamespaces == 0 { // default 8 namespaces
 		settings.MaxNumNamespaces = 8
 	} 
-	if settings.TargetDocCountPerPartition == 0 {
+	if settings.TargetDocCountPerPartition == 0 { // default 512k docs
 		settings.TargetDocCountPerPartition = 512 * 1000
 	}
-	if settings.NumParallelPartitionWorkers == 0 {
+	if settings.DeletesCheckInterval == 0 { // default 60 seconds
+		settings.DeletesCheckInterval = 60 * time.Second
+	}
+	if settings.NumParallelPartitionWorkers == 0 { // default 4 parition workers
 		settings.NumParallelPartitionWorkers = 4
 	} 
 	settings.partitionKey = "_id"

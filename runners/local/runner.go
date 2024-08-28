@@ -103,25 +103,25 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
 			cosmosSettings.NumParallelPartitionWorkers = btc / 2
 		}
-		if settings.MaxNumNamespaces != 8 {
+		if settings.MaxNumNamespaces != 0 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}
-		if settings.ServerConnectTimeout != time.Second * 60 {
+		if settings.ServerConnectTimeout != 0 {
 			cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		}
-		if settings.PingTimeout != time.Second * 2 {
+		if settings.PingTimeout != 0 {
 			cosmosSettings.PingTimeout = settings.PingTimeout
 		}
-		if settings.CdcResumeTokenUpdateInterval != time.Second * 60 {
+		if settings.CdcResumeTokenUpdateInterval != 0 {
 			cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		}
 		if settings.WriterMaxBatchSize != 0 {
 			cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		}
-		if settings.TargetDocCountPerPartition != (512 * 1000) {
+		if settings.TargetDocCountPerPartition != 0 {
 			cosmosSettings.TargetDocCountPerPartition = settings.TargetDocCountPerPartition
 		}
-		if settings.DeletesCheckInterval != time.Second * 60 {
+		if settings.DeletesCheckInterval != 0 {
 			cosmosSettings.DeletesCheckInterval = settings.DeletesCheckInterval
 		}
 		// set all other settings to default

@@ -37,8 +37,8 @@ type Options struct {
 	MaxNumNamespaces int
 	ServerConnectTimeout time.Duration
 	PingTimeout time.Duration
-	WriterMaxBatchSize int
 	CdcResumeTokenUpdateInterval time.Duration
+	WriterMaxBatchSize int
 	TargetDocCountPerPartition int64
 	DeletesCheckInterval time.Duration
 }
@@ -61,8 +61,8 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.MaxNumNamespaces = c.Int("num-namespaces")
 	o.ServerConnectTimeout = c.Duration("server-timeout")
 	o.PingTimeout = c.Duration("ping-timeout")
-	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.CdcResumeTokenUpdateInterval = c.Duration("resume-token-interval")
+	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.TargetDocCountPerPartition = c.Int64("doc-partition")
 	o.DeletesCheckInterval = c.Duration("deletesCheckInterval")
 

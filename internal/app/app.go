@@ -106,6 +106,8 @@ func runDsync(c *cli.Context) error {
 		ServerConnectTimeout:           o.ServerConnectTimeout, 
 		PingTimeout:                    o.PingTimeout, 
 		CdcResumeTokenUpdateInterval:   o.CdcResumeTokenUpdateInterval,
+		WriterMaxBatchSize:       	    o.WriterMaxBatchSize,
+		TargetDocCountPerPartition: 	o.TargetDocCountPerPartition,
 	})
 
 	var wg sync.WaitGroup
