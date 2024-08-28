@@ -106,7 +106,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 
 		totalPercentComplete := percentCompleteTotal(runnerProgress)
 
-		progress := int(math.Floor((totalPercentComplete / 100 * float64(progressBarWidth))))
+		progress := int(math.Floor(totalPercentComplete / 100 * float64(progressBarWidth)))
 		progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete, runnerProgress.Throughput)
 		progressBar.SetText(progressBarString)
 
@@ -156,7 +156,7 @@ func percentCompleteTotal(progress runnerLocal.RunnerSyncProgress) float64 {
 	}
 	percentComplete = docsCopied / totalDocs * 100
 
-	return percentComplete
+	return min(100, percentComplete)
 
 }
 
@@ -196,5 +196,5 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		numerator = float64(numCompletedDocs + numDocsInProgress)
 		denominator = float64(numCompletedDocs + numDocsLeft)
 	}
-	return percentComplete, numerator, denominator
+	return min(100, percentComplete), numerator, denominator
 }
