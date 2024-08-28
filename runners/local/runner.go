@@ -102,7 +102,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			connSettings.NumParallelWriters = btc / 2
+			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 		}
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
 	}
