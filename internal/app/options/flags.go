@@ -157,7 +157,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "writer-batch-size",
-			Usage: "number of documents to write in a batch",
+			Usage: "number of documents to write in a batch. Defaults to 0 for no limit",
 			Required: false,
 			Hidden: true,
 		}),

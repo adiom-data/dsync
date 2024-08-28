@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"sync"
 	"time"
@@ -200,6 +201,9 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
+	log.Printf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces)
+	log.Printf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout)
+	log.Printf("NumParallelWriters: %d", cc.settings.NumParallelWriters)
 
 	return nil
 }
