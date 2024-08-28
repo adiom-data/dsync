@@ -119,10 +119,6 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ctx = ctx
 	cc.t = t
 
-	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
-	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
-	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
-
 	// Connect to the witness MongoDB instance
 	if cc.settings.EmulateDeletes {
 		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.ServerConnectTimeout)
@@ -352,6 +348,10 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		defer close(initialSyncDone)
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", cc.id, flowId))
+		slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
+		slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
+		slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
+	
 		cc.status.SyncState = iface.InitialSyncSyncState
 
 		//create a channel to distribute tasks to copiers
