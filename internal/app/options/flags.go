@@ -143,7 +143,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage: "duration for Cosmos server connection timeout",
 			Value: 15,
 			Required: false,
-			Hidden: true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "ping-timeout",
