@@ -120,7 +120,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 				cosmosSettings.NumParallelPartitionWorkers = btc / 2
 			}
 		}
-		
+
 		if settings.MaxNumNamespaces != 0 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}

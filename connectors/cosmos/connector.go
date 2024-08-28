@@ -119,6 +119,10 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ctx = ctx
 	cc.t = t
 
+	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
+	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
+	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
+
 	// Connect to the witness MongoDB instance
 	if cc.settings.EmulateDeletes {
 		ctxConnect, cancel := context.WithTimeout(cc.ctx, cc.settings.ServerConnectTimeout)
@@ -200,9 +204,6 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
-	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
-	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
-	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
 
 	return nil
 }
