@@ -67,7 +67,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
 	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
 	o.MaxNumNamespaces = c.Int("num-namespaces")
-	o.ServerConnectTimeout = c.Duration("server-timeout")
+	o.ServerConnectTimeout = time.Duration(c.Int("server-timeout")) * time.Second
 	o.PingTimeout = c.Duration("ping-timeout")
 	o.CdcResumeTokenUpdateInterval = c.Duration("resume-token-interval")
 	o.WriterMaxBatchSize = c.Int("writer-batch-size")
