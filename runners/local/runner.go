@@ -55,12 +55,8 @@ type RunnerLocalSettings struct {
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
-	DeletesCheckInterval time.Duration
-
+	
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
-	ServerConnectTimeout time.Duration
-	PingTimeout time.Duration
-	CdcResumeTokenUpdateInterval time.Duration
 
 	LoadLevel string
 	InitialSyncNumParallelCopiers int
@@ -68,8 +64,12 @@ type RunnerLocalSettings struct {
 	NumParallelIntegrityCheckTasks int
 	NumParallelPartitionWorkers int
 	MaxNumNamespaces int
+	ServerConnectTimeout time.Duration
+	PingTimeout time.Duration
+	CdcResumeTokenUpdateInterval time.Duration
 	WriterMaxBatchSize int
 	TargetDocCountPerPartition int64
+	DeletesCheckInterval time.Duration
 }
 
 const (
@@ -120,7 +120,6 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 				cosmosSettings.NumParallelPartitionWorkers = btc / 2
 			}
 		}
-
 		if settings.MaxNumNamespaces != 0 {
 			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
 		}

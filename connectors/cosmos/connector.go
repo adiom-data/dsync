@@ -200,6 +200,10 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
+	
+	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
+	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
+	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
 
 	return nil
 }
@@ -225,10 +229,6 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// create new context so that the flow can be cancelled gracefully if needed
 	cc.flowCtx, cc.flowCancelFunc = context.WithCancel(cc.ctx)
 	cc.flowId = flowId
-
-	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
-	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
-	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
 
 	tasks := readPlan.Tasks
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))

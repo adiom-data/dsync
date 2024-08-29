@@ -18,8 +18,6 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "INFO"
 
-var DefaultMaxNumNamespaces = 8
-
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
@@ -134,42 +132,42 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "num-namespaces",
-			Usage: "maximum number of namespaces that can be copied. Recommended to keep this number under 15 to avoid performance issues",
+			Usage: "maximum number of namespaces that can be copied. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
 			Required: false,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "server-timeout",
-			Usage: "duration for Cosmos server connection timeout. Set a higher value for slower connections",
+			Usage: "duration for Cosmos server connection timeout. Set a higher value for slower connections. Defaults to 15 seconds.",
 			Required: false,
 			Hidden: true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "ping-timeout",
-			Usage: "duration for ping request timeout. Set a higher value for slower connections",
+			Usage: "duration for ping request timeout. Set a higher value for slower connections. Defaults to 2 seconds.",
 			Required: false,
 			Hidden: true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "resume-token-interval",
-			Usage: "interval in seconds to update the resume token",
+			Usage: "interval in seconds to update the resume token. Defaults to 60 seconds",
 			Required: false,
 			Hidden: true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "writer-batch-size",
-			Usage: "number of documents to write in a batch. Defaults to 0 for no limit",
+			Usage: "number of documents to write in a batch. Defaults to 0 for no limit.",
 			Required: false,
 			Hidden: true,
 		}),
 		altsrc.NewInt64Flag(&cli.Int64Flag{
 			Name:  "doc-partition",
-			Usage: "target number of docs per partition. 0 means no limit in # of documents",
+			Usage: "target number of docs per partition. Defaults to 512k.",
 			Required: false,
 			Hidden: true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:  "delete-interval",
-			Usage: "interval in seconds to check and emulate deletes",
+			Usage: "interval in seconds to check and emulate deletes. Defaults to 60 seconds.",
 			Required: false,
 			Hidden: true,
 		}),
