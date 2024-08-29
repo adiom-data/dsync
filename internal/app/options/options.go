@@ -68,11 +68,11 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
 	o.MaxNumNamespaces = c.Int("num-namespaces")
 	o.ServerConnectTimeout = time.Duration(c.Int("server-timeout")) * time.Second
-	o.PingTimeout = c.Duration("ping-timeout")
-	o.CdcResumeTokenUpdateInterval = c.Duration("resume-token-interval")
+	o.PingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
+	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("resume-token-interval")) * time.Second
 	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.TargetDocCountPerPartition = c.Int64("doc-partition")
-	o.DeletesCheckInterval = c.Duration("delete-interval")
+	o.DeletesCheckInterval = time.Duration(c.Int("delete-interval")) * time.Second
 	
 
 	// Infer source type if not provided
