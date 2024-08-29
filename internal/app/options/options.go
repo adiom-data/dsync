@@ -62,6 +62,10 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
 	o.LoadLevel = c.String("load-level")
+	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
+	o.NumParallelWriters = c.Int("parallel-writers")
+	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
+	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
 	o.MaxNumNamespaces = c.Int("num-namespaces")
 	o.ServerConnectTimeout = c.Duration("server-timeout")
 	o.PingTimeout = c.Duration("ping-timeout")
@@ -69,10 +73,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.TargetDocCountPerPartition = c.Int64("doc-partition")
 	o.DeletesCheckInterval = c.Duration("delete-interval")
-	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
-	o.NumParallelWriters = c.Int("parallel-writers")
-	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
-	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
+	
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

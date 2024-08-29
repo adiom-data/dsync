@@ -141,6 +141,20 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		if settings.DeletesCheckInterval != 0 {
 			cosmosSettings.DeletesCheckInterval = settings.DeletesCheckInterval
 		}
+		if settings.InitialSyncNumParallelCopiers != 0 { 
+			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+		}
+		if settings.NumParallelWriters != 0 {
+			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+			slog.Info(fmt.Sprintf("CosmosNumParallelWriters: %d", cosmosSettings.NumParallelWriters))
+			slog.Info(fmt.Sprintf("SettingsNumParallelWriters: %d", settings.NumParallelWriters))
+		}
+		if settings.NumParallelIntegrityCheckTasks != 0 {
+			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+		}
+		if settings.NumParallelPartitionWorkers != 0 {
+			cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
+		}
 		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
