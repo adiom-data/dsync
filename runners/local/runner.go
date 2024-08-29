@@ -125,8 +125,6 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		}
 		if settings.ServerConnectTimeout != 0 {
 			cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-			slog.Info(fmt.Sprintf("CosmosServerConnectTimeout: %d", cosmosSettings.ServerConnectTimeout))
-			slog.Info(fmt.Sprintf("SettingsServerConnectTimeout: %d", settings.ServerConnectTimeout))
 		}
 		if settings.PingTimeout != 0 {
 			cosmosSettings.PingTimeout = settings.PingTimeout

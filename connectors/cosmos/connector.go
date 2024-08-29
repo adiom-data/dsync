@@ -88,7 +88,6 @@ func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 		settings.InitialSyncNumParallelCopiers = 8
 	}
 	// settings.WriterMaxBatchSize = 0 // default 0, no limit
-	
 	if settings.NumParallelWriters == 0 { // default 4 writers
 		settings.NumParallelWriters = 4
 	}
@@ -201,18 +200,18 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
 	
-	slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces))
-	slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
-	slog.Info(fmt.Sprintf("PingTimeout: %d", cc.settings.PingTimeout))
-	slog.Info(fmt.Sprintf("CdcResumeTokenUpdateInterval: %d", cc.settings.CdcResumeTokenUpdateInterval))
-	slog.Info(fmt.Sprintf("InitialSyncNumParallelCopiers: %d", cc.settings.InitialSyncNumParallelCopiers))
-	slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
-	slog.Info(fmt.Sprintf("NumParallelIntegrityCheckTasks: %d", cc.settings.NumParallelIntegrityCheckTasks))
-	slog.Info(fmt.Sprintf("NumParallelPartitionWorkers: %d", cc.settings.NumParallelPartitionWorkers))
-
-	slog.Info(fmt.Sprintf("WriterMaxBatchSize: %d", cc.settings.WriterMaxBatchSize))
-	slog.Info(fmt.Sprintf("TargetDocCountPerPartition: %d", cc.settings.TargetDocCountPerPartition))
-	slog.Info(fmt.Sprintf("DeletesCheckInterval: %d", cc.settings.DeletesCheckInterval))
+	// for debugging configurations:
+	// slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces)) 
+	// slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
+	// slog.Info(fmt.Sprintf("PingTimeout: %d", cc.settings.PingTimeout))
+	// slog.Info(fmt.Sprintf("CdcResumeTokenUpdateInterval: %d", cc.settings.CdcResumeTokenUpdateInterval))
+	// slog.Info(fmt.Sprintf("InitialSyncNumParallelCopiers: %d", cc.settings.InitialSyncNumParallelCopiers))
+	// slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
+	// slog.Info(fmt.Sprintf("NumParallelIntegrityCheckTasks: %d", cc.settings.NumParallelIntegrityCheckTasks))
+	// slog.Info(fmt.Sprintf("NumParallelPartitionWorkers: %d", cc.settings.NumParallelPartitionWorkers))
+	// slog.Info(fmt.Sprintf("WriterMaxBatchSize: %d", cc.settings.WriterMaxBatchSize))
+	// slog.Info(fmt.Sprintf("TargetDocCountPerPartition: %d", cc.settings.TargetDocCountPerPartition))
+	// slog.Info(fmt.Sprintf("DeletesCheckInterval: %d", cc.settings.DeletesCheckInterval))
 
 	return nil
 }
