@@ -7,6 +7,7 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/urfave/cli/v2"
@@ -33,6 +34,17 @@ type Options struct {
 	Pprof bool
 
 	LoadLevel string
+	InitialSyncNumParallelCopiers int
+	NumParallelWriters int
+	NumParallelIntegrityCheckTasks int
+	NumParallelPartitionWorkers int
+	MaxNumNamespaces int
+	ServerConnectTimeout time.Duration
+	PingTimeout time.Duration
+	CdcResumeTokenUpdateInterval time.Duration
+	WriterMaxBatchSize int
+	TargetDocCountPerPartition int64
+	DeletesCheckInterval time.Duration
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -50,6 +62,18 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
 	o.LoadLevel = c.String("load-level")
+	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
+	o.NumParallelWriters = c.Int("parallel-writers")
+	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
+	o.NumParallelPartitionWorkers = c.Int("parallel-partition-workers")
+	o.MaxNumNamespaces = c.Int("num-namespaces")
+	o.ServerConnectTimeout = time.Duration(c.Int("server-timeout")) * time.Second
+	o.PingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
+	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("resume-token-interval")) * time.Second
+	o.WriterMaxBatchSize = c.Int("writer-batch-size")
+	o.TargetDocCountPerPartition = c.Int64("doc-partition")
+	o.DeletesCheckInterval = time.Duration(c.Int("delete-interval")) * time.Second
+	
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

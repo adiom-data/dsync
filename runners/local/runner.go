@@ -55,10 +55,21 @@ type RunnerLocalSettings struct {
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
-
-	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+	
+	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
 	LoadLevel string
+	InitialSyncNumParallelCopiers int
+	NumParallelWriters int
+	NumParallelIntegrityCheckTasks int
+	NumParallelPartitionWorkers int
+	MaxNumNamespaces int
+	ServerConnectTimeout time.Duration
+	PingTimeout time.Duration
+	CdcResumeTokenUpdateInterval time.Duration
+	WriterMaxBatchSize int
+	TargetDocCountPerPartition int64
+	DeletesCheckInterval time.Duration
 }
 
 const (
@@ -85,11 +96,64 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			// the destination is a MongoDB database otherwise the Options check would have failed
 			cosmosSettings.WitnessMongoConnString = settings.DstConnString
 		}
+		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			cosmosSettings.InitialSyncNumParallelCopiers = btc
-			cosmosSettings.NumParallelWriters = btc / 2
+			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			} else {
+				cosmosSettings.InitialSyncNumParallelCopiers = btc
+			}
+			if settings.NumParallelWriters != 0 {
+				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+			} else { // default for writer, integrity check, and partition workers are the same 
+				cosmosSettings.NumParallelWriters = btc / 2
+			} 
+			if settings.NumParallelIntegrityCheckTasks != 0 {
+				cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+			} else {
+				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
+			}
+			if settings.NumParallelPartitionWorkers != 0 {
+				cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
+			} else {
+				cosmosSettings.NumParallelPartitionWorkers = btc / 2
+			}
 		}
+		if settings.MaxNumNamespaces != 0 {
+			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
+		}
+		if settings.ServerConnectTimeout != 0 {
+			cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		}
+		if settings.PingTimeout != 0 {
+			cosmosSettings.PingTimeout = settings.PingTimeout
+		}
+		if settings.CdcResumeTokenUpdateInterval != 0 {
+			cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
+		}
+		if settings.WriterMaxBatchSize != 0 {
+			cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		}
+		if settings.TargetDocCountPerPartition != 0 {
+			cosmosSettings.TargetDocCountPerPartition = settings.TargetDocCountPerPartition
+		}
+		if settings.DeletesCheckInterval != 0 {
+			cosmosSettings.DeletesCheckInterval = settings.DeletesCheckInterval
+		}
+		if settings.InitialSyncNumParallelCopiers != 0 { 
+			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+		}
+		if settings.NumParallelWriters != 0 {
+			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+		}
+		if settings.NumParallelIntegrityCheckTasks != 0 {
+			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+		}
+		if settings.NumParallelPartitionWorkers != 0 {
+			cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
+		}
+		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
