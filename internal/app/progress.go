@@ -7,6 +7,7 @@
 package dsync
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io"
@@ -202,7 +203,7 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 }
 
 // generate an html page for the progress report
-func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
+func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffer, w io.Writer) string {
 	const tmpl = `
 	<!DOCTYPE html>
 	<html>
@@ -221,6 +222,11 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 				border-radius: 25px;
 				margin-right: 20px;
 				position: relative;
+			}
+			.progress {
+				height: 20px;
+				background-color: #4caf50;
+				border-radius: 25px;
 			}
 			.indeterminate {
 				position: relative;
@@ -267,13 +273,13 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 			}
 			#logBox {
 				width: 100%;
-				height: 200px;
+				height: 400px;
 				overflow-y: scroll;
 				border: 1px solid #ccc;
-				padding: 10px;
 				font-family: monospace;
 				background-color: #f9f9f9;
 				margin-top: 20px;
+				padding: 10px;
 			}
 		</style>
 	</head>
@@ -327,20 +333,10 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
 		{{ end }}
 
-		<h2>Live Logs</h2>
-		<div id="logBox"></div>
-
-		<script>
-			const logBox = document.getElementById('logBox');
-			const eventSource = new EventSource('/logs');
-
-			eventSource.onmessage = function(event) {
-				const logEntry = document.createElement('div');
-				logEntry.textContent = event.data;
-				logBox.appendChild(logEntry);
-				logBox.scrollTop = logBox.scrollHeight; // Auto-scroll to the bottom
-			};
-		</script>
+		<h2>Errors</h2>
+		<div id="logBox">
+		<pre> {{ .ErrorLogString }} </pre>
+		</div>
 	</body>
 	<script>
 		function autoRefresh() {
@@ -371,11 +367,13 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		Elapsed         string
 		TotalProgress   int64
 		TotalThroughput float64
+		ErrorLogString  string
 	}{
 		RunnerSyncProgress: progress,
 		Elapsed:            elapsed.String(),
 		TotalProgress:      (progress.NumNamespacesCompleted * 100 / progress.TotalNamespaces),
 		TotalThroughput:    progress.Throughput,
+		ErrorLogString:     errorLog.String(),
 	}
 
 	var htmlOutput string

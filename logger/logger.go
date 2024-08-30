@@ -40,41 +40,35 @@ func Setup(o Options) {
 
 	var slogHandler slog.Handler
 
-	if o.Logfile == nil { // just log to stderr
-		if o.FormatJSON {
-			slogHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-				Level:     level,
-				AddSource: (level < 0), // only for debugging
-			})
-		} else {
-			slogHandler = tint.NewHandler(os.Stderr, &tint.Options{
-				NoColor:   false, // colorize output
-				Level:     level,
-				AddSource: (level < 0), //only for debugging
-			})
-		}
-	} else { // log to file and potentially send errors to the UI
-		if o.FormatJSON {
-			slogHandler = slog.NewTextHandler(o.Logfile, &slog.HandlerOptions{
-				Level:     level,
-				AddSource: (level < 0), // only for debugging
-			})
-		} else {
-			slogHandler = tint.NewHandler(o.Logfile, &tint.Options{
-				NoColor:   true, // no colors
-				Level:     level,
-				AddSource: (level < 0), //only for debugging
-			})
-		}
+	var writer io.Writer
 
-		if o.ErrorView != nil {
-			// create a dedicated error handler and fanout
-			slogHandlerEV := tint.NewHandler(o.ErrorView, &tint.Options{
-				NoColor: true,           // no colors
-				Level:   slog.LevelWarn, //only warnings and errors
-			})
-			slogHandler = slogmulti.Fanout(slogHandler, slogHandlerEV)
-		}
+	if o.Logfile == nil {
+		writer = os.Stderr
+	} else {
+		writer = o.Logfile
+	}
+
+	// just log to stderr
+	if o.FormatJSON {
+		slogHandler = slog.NewTextHandler(writer, &slog.HandlerOptions{
+			Level:     level,
+			AddSource: (level < 0), // only for debugging
+		})
+	} else {
+		slogHandler = tint.NewHandler(writer, &tint.Options{
+			NoColor:   o.Logfile != nil, // no colors if logging to file
+			Level:     level,
+			AddSource: (level < 0), //only for debugging
+		})
+	}
+
+	if o.ErrorView != nil {
+		// create a dedicated error handler and fanout
+		slogHandlerEV := tint.NewHandler(o.ErrorView, &tint.Options{
+			NoColor: true,           // no colors
+			Level:   slog.LevelWarn, //only warnings and errors
+		})
+		slogHandler = slogmulti.Fanout(slogHandler, slogHandlerEV)
 	}
 
 	logger := slog.New(slogHandler)

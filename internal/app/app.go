@@ -7,6 +7,7 @@
 package dsync
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -61,6 +62,12 @@ func runDsync(c *cli.Context) error {
 		}()
 	}
 
+	var needWebServer bool
+	var wsErrorLog *bytes.Buffer
+	if !o.Progress { // if no CLI progress requested, we need to start a web server
+		needWebServer = true
+	}
+
 	// set up logging
 	lo := logger.Options{Verbosity: o.Verbosity}
 
@@ -76,6 +83,10 @@ func runDsync(c *cli.Context) error {
 		if o.Progress { // log to tview as well
 			lo.ErrorView = errorTextView
 		}
+	}
+	if needWebServer {
+		wsErrorLog = new(bytes.Buffer)
+		lo.ErrorView = wsErrorLog
 	}
 	logger.Setup(lo)
 
@@ -176,13 +187,15 @@ func runDsync(c *cli.Context) error {
 				slog.Error(fmt.Sprintf("Error running tview app: %v", err))
 			}
 		}()
-	} else {
+	}
+
+	if needWebServer {
 		//start a web server to serve progress report
 		go func() {
 			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
 				r.UpdateRunnerProgress()
-				generateHTML(r.GetRunnerProgress(), w)
+				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
 			})
 			http.ListenAndServe("localhost:8080", nil)
 		}()
