@@ -63,8 +63,8 @@ func runDsync(c *cli.Context) error {
 	}
 
 	var needWebServer bool
-	var wsErrorLog *bytes.Buffer
-	if !o.Progress { // if no CLI progress requested, we need to start a web server
+	var wsErrorLog *bytes.Buffer // web server error log
+	if !o.Progress {             // if no CLI progress requested, we need to start a web server
 		needWebServer = true
 	}
 
@@ -192,11 +192,14 @@ func runDsync(c *cli.Context) error {
 	if needWebServer {
 		//start a web server to serve progress report
 		go func() {
+			fs := http.FileServer(http.Dir("./web_static"))
+
 			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
 				r.UpdateRunnerProgress()
 				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
 			})
+			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
 			http.ListenAndServe("localhost:8080", nil)
 		}()
 	}

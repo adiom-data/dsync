@@ -209,6 +209,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 	<html>
 	<head>
 		<title>Sync Progress</title>
+		<link rel="icon" href="/web_static/favicon.ico" type="image/x-icon">
 		<style>
 			.container {
 				display: flex;
