@@ -265,6 +265,16 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 			th {
 				background-color: #f2f2f2;
 			}
+			#logBox {
+				width: 100%;
+				height: 200px;
+				overflow-y: scroll;
+				border: 1px solid #ccc;
+				padding: 10px;
+				font-family: monospace;
+				background-color: #f9f9f9;
+				margin-top: 20px;
+			}
 		</style>
 	</head>
 	<body>
@@ -316,6 +326,21 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		<h2>Verification Result</h2>
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
 		{{ end }}
+
+		<h2>Live Logs</h2>
+		<div id="logBox"></div>
+
+		<script>
+			const logBox = document.getElementById('logBox');
+			const eventSource = new EventSource('/logs');
+
+			eventSource.onmessage = function(event) {
+				const logEntry = document.createElement('div');
+				logEntry.textContent = event.data;
+				logBox.appendChild(logEntry);
+				logBox.scrollTop = logBox.scrollHeight; // Auto-scroll to the bottom
+			};
+		</script>
 	</body>
 	<script>
 		function autoRefresh() {
