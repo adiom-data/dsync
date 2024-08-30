@@ -209,16 +209,28 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 	<head>
 		<title>Sync Progress</title>
 		<style>
-			.progress-bar {
+			.container {
+				display: flex;
+				align-items: center;
 				width: 100%;
+				margin: 20px 0;
+			}
+			.progress-bar {
+				width: 33.33%;
 				background-color: #f3f3f3;
 				border-radius: 25px;
-				margin: 10px 0;
+				margin-right: 20px;
+				position: relative;
 			}
 			.progress {
 				height: 20px;
 				background-color: #4caf50;
 				border-radius: 25px;
+			}
+			.info {
+				display: flex;
+				flex-direction: column;
+				font-size: 14px;
 			}
 			.indeterminate {
 				background: linear-gradient(to right, #4caf50, #8bc34a);
@@ -230,6 +242,21 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 				0% { background-position: -200% 0; }
 				100% { background-position: 200% 0; }
 			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				margin: 20px 0;
+			}
+			table, th, td {
+				border: 1px solid #ddd;
+			}
+			th, td {
+				padding: 8px;
+				text-align: left;
+			}
+			th {
+				background-color: #f2f2f2;
+			}
 		</style>
 	</head>
 	<body>
@@ -240,24 +267,45 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		<p><strong>Documents Synced:</strong> {{ .NumDocsSynced }}</p>
 
 		{{ if eq .SyncState "InitialSync" }}
-		<h2>Total Progress</h2>
-		<div class="progress-bar">
-			<div class="progress" style="width: {{ .TotalProgress }}%"></div>
+		<div class="container">
+			<div class="progress-bar">
+				<div class="progress" style="width: {{ .TotalProgress }}%"></div>
+			</div>
+			<div class="info">
+				<p><strong>Total % Complete:</strong> {{ .TotalProgress }}%</p>
+				<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+			</div>
 		</div>
-		<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
-		{{ range $ns, $status := .NsProgressMap }}
-			<h3>Namespace: {{ $ns }}</h3>
-			<p><strong>Percent Complete:</strong> {{ calcPercent $status.DocsCopied $status.EstimatedDocCount }}%</p>
-			<p><strong>Tasks Completed:</strong> {{ $status.TasksCompleted }} / {{ $status.TasksStarted }} (Active: {{ sub $status.TasksStarted $status.TasksCompleted }})</p>
-			<p><strong>Documents Synced:</strong> {{ $status.DocsCopied }}</p>
-			<p><strong>Throughput:</strong> {{ $status.Throughput }} ops/sec</p>
-		{{ end }}
+		<h2>Per-Namespace Progress</h2>
+		<table>
+			<tr>
+				<th>Namespace</th>
+				<th>Percent Complete</th>
+				<th>Tasks Completed</th>
+				<th>Active Tasks</th>
+				<th>Documents Synced</th>
+				<th>Throughput (ops/sec)</th>
+			</tr>
+			{{ range $ns, $status := .NsProgressMap }}
+			<tr>
+				<td>{{ $ns }}</td>
+				<td>{{ calcPercent $status.DocsCopied $status.EstimatedDocCount }}%</td>
+				<td>{{ $status.TasksCompleted }} / {{ $status.TasksStarted }}</td>
+				<td>{{ sub $status.TasksStarted $status.TasksCompleted }}</td>
+				<td>{{ $status.DocsCopied }}</td>
+				<td>{{ $status.Throughput }}</td>
+			</tr>
+			{{ end }}
+		</table>
 		{{ else if eq .SyncState "ChangeStream" }}
-		<h2>Change Stream Progress</h2>
-		<div class="progress-bar">
-			<div class="indeterminate"></div>
+		<div class="container">
+			<div class="progress-bar">
+				<div class="indeterminate"></div>
+			</div>
+			<div class="info">
+				<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+			</div>
 		</div>
-		<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
 		{{ else if eq .SyncState "Verify" }}
 		<h2>Verification Result</h2>
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
@@ -267,7 +315,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		function autoRefresh() {
 			window.location = window.location.href;
 		}
-		setInterval('autoRefresh()', 1000);
+		setInterval('autoRefresh()', 3000);
 	</script>
 	</html>`
 
