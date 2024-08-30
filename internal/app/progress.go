@@ -222,36 +222,44 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 				margin-right: 20px;
 				position: relative;
 			}
-			.progress {
+			.indeterminate {
+				position: relative;
+				width: 100%;
 				height: 20px;
-				background-color: #4caf50;
+				background-color: #f3f3f3;
+				overflow: hidden;
 				border-radius: 25px;
+			}
+			.indeterminate::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 150%;
+				height: 100%;
+				background: linear-gradient(to right, #4caf50, #8bc34a, #4caf50);
+				animation: move 1.5s linear infinite;
+			}
+			@keyframes move {
+				0% { left: -150%; }
+				100% { left: 100%; }
 			}
 			.info {
 				display: flex;
 				flex-direction: column;
 				font-size: 14px;
 			}
-			.indeterminate {
-				background: linear-gradient(to right, #4caf50, #8bc34a);
-				width: 100%;
-				height: 20px;
-				animation: indeterminate 1.5s infinite;
-			}
-			@keyframes indeterminate {
-				0% { background-position: -200% 0; }
-				100% { background-position: 200% 0; }
-			}
 			table {
-				width: 100%;
+				width: auto;
 				border-collapse: collapse;
 				margin: 20px 0;
+				font-size: 14px;
 			}
 			table, th, td {
 				border: 1px solid #ddd;
 			}
 			th, td {
-				padding: 8px;
+				padding: 4px 6px;
 				text-align: left;
 			}
 			th {
@@ -280,11 +288,11 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		<table>
 			<tr>
 				<th>Namespace</th>
-				<th>Percent Complete</th>
-				<th>Tasks Completed</th>
-				<th>Active Tasks</th>
-				<th>Documents Synced</th>
-				<th>Throughput (ops/sec)</th>
+				<th>% Complete</th>
+				<th>Tasks</th>
+				<th>Active</th>
+				<th>Docs</th>
+				<th>Throughput</th>
 			</tr>
 			{{ range $ns, $status := .NsProgressMap }}
 			<tr>
@@ -299,9 +307,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		</table>
 		{{ else if eq .SyncState "ChangeStream" }}
 		<div class="container">
-			<div class="progress-bar">
-				<div class="indeterminate"></div>
-			</div>
+			<div class="indeterminate"></div>
 			<div class="info">
 				<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
 			</div>
