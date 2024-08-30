@@ -8,6 +8,8 @@ package dsync
 
 import (
 	"fmt"
+	"html/template"
+	"io"
 	"math"
 	"strings"
 	"sync/atomic"
@@ -197,4 +199,106 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		denominator = float64(numCompletedDocs + numDocsLeft)
 	}
 	return min(100, percentComplete), numerator, denominator
+}
+
+// generate an html page for the progress report
+func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
+	const tmpl = `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Sync Progress</title>
+		<style>
+			.progress-bar {
+				width: 100%;
+				background-color: #f3f3f3;
+				border-radius: 25px;
+				margin: 10px 0;
+			}
+			.progress {
+				height: 20px;
+				background-color: #4caf50;
+				border-radius: 25px;
+			}
+			.indeterminate {
+				background: linear-gradient(to right, #4caf50, #8bc34a);
+				width: 100%;
+				height: 20px;
+				animation: indeterminate 1.5s infinite;
+			}
+			@keyframes indeterminate {
+				0% { background-position: -200% 0; }
+				100% { background-position: 200% 0; }
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Sync Progress</h1>
+		<p><strong>State:</strong> {{ .SyncState }}</p>
+		<p><strong>Time Elapsed:</strong> {{ .Elapsed }}</p>
+		<p><strong>Namespaces Synced:</strong> {{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</p>
+		<p><strong>Documents Synced:</strong> {{ .NumDocsSynced }}</p>
+
+		{{ if eq .SyncState "InitialSync" }}
+		<h2>Total Progress</h2>
+		<div class="progress-bar">
+			<div class="progress" style="width: {{ .TotalProgress }}%"></div>
+		</div>
+		<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+		{{ range $ns, $status := .NsProgressMap }}
+			<h3>Namespace: {{ $ns }}</h3>
+			<p><strong>Percent Complete:</strong> {{ calcPercent $status.DocsCopied $status.EstimatedDocCount }}%</p>
+			<p><strong>Tasks Completed:</strong> {{ $status.TasksCompleted }} / {{ $status.TasksStarted }} (Active: {{ sub $status.TasksStarted $status.TasksCompleted }})</p>
+			<p><strong>Documents Synced:</strong> {{ $status.DocsCopied }}</p>
+			<p><strong>Throughput:</strong> {{ $status.Throughput }} ops/sec</p>
+		{{ end }}
+		{{ else if eq .SyncState "ChangeStream" }}
+		<h2>Change Stream Progress</h2>
+		<div class="progress-bar">
+			<div class="indeterminate"></div>
+		</div>
+		<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+		{{ else if eq .SyncState "Verify" }}
+		<h2>Verification Result</h2>
+		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
+		{{ end }}
+	</body>
+	</html>`
+
+	funcMap := template.FuncMap{
+		"calcPercent": func(copied, estimated int64) int64 {
+			if estimated == 0 {
+				return 0
+			}
+			return copied * 100 / estimated
+		},
+		"sub": func(a, b int64) int64 {
+			return a - b
+		},
+	}
+
+	t := template.Must(template.New("syncProgress").Funcs(funcMap).Parse(tmpl))
+
+	elapsed := time.Since(progress.StartTime).Round(time.Second)
+
+	data := struct {
+		runnerLocal.RunnerSyncProgress
+		Elapsed         string
+		TotalProgress   int64
+		TotalThroughput float64
+	}{
+		RunnerSyncProgress: progress,
+		Elapsed:            elapsed.String(),
+		TotalProgress:      (progress.NumNamespacesCompleted * 100 / progress.TotalNamespaces),
+		TotalThroughput:    progress.Throughput,
+	}
+
+	var htmlOutput string
+	err := t.Execute(w, data)
+	if err != nil {
+		fmt.Println("Error executing template:", err)
+		return ""
+	}
+
+	return htmlOutput
 }

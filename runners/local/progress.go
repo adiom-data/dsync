@@ -14,31 +14,31 @@ import (
 )
 
 type RunnerSyncProgress struct {
-	StartTime time.Time
-	CurrTime  time.Time
-	SyncState string
+	StartTime time.Time // start of the sync process
+	CurrTime  time.Time // current time
+	SyncState string    // current state of the sync process
 
-	TotalNamespaces        int64
-	NumNamespacesCompleted int64
+	TotalNamespaces        int64 // total number of namespaces to sync
+	NumNamespacesCompleted int64 // number of namespaces completed
 
-	NumDocsSynced int64
+	NumDocsSynced int64 // number of documents synced
 
-	ChangeStreamEvents int64
-	DeletesCaught      uint64
+	ChangeStreamEvents int64  // number of change stream events processed
+	DeletesCaught      uint64 // number of deletes caught
 
-	Throughput    float64
-	NsProgressMap map[iface.Namespace]*iface.NamespaceStatus
-	Namespaces    []iface.Namespace //use map and get the keys so print order is consistent
+	Throughput    float64                                    // throughput in operations per second
+	NsProgressMap map[iface.Namespace]*iface.NamespaceStatus // map key is namespace: "db.col"
+	Namespaces    []iface.Namespace                          //use map and get the keys so print order is consistent
 
-	TasksTotal     int64
-	TasksStarted   int64
-	TasksCompleted int64
+	TasksTotal     int64 // total number of tasks
+	TasksStarted   int64 // number of tasks started
+	TasksCompleted int64 // number of tasks completed
 
-	Lag int64
+	Lag int64 // replication lag as number of events
 
-	VerificationResult string
+	VerificationResult string // verification result (if running in the verify mode)
 
-	SrcAdditionalStateInfo string
+	SrcAdditionalStateInfo string // additional state info from the source connector
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status

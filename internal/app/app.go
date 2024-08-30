@@ -179,9 +179,10 @@ func runDsync(c *cli.Context) error {
 	} else {
 		//start a web server to serve progress report
 		go func() {
-			http.HandleFunc("/progress", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte("XXXX"))
+			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				r.UpdateRunnerProgress()
+				generateHTML(r.GetRunnerProgress(), w)
 			})
 			http.ListenAndServe("localhost:8080", nil)
 		}()
