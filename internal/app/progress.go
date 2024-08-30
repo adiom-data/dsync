@@ -263,6 +263,12 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, w io.Writer) string {
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
 		{{ end }}
 	</body>
+	<script>
+		function autoRefresh() {
+			window.location = window.location.href;
+		}
+		setInterval('autoRefresh()', 1000);
+	</script>
 	</html>`
 
 	funcMap := template.FuncMap{
