@@ -57,7 +57,7 @@ func runDsync(c *cli.Context) error {
 
 	if o.Pprof {
 		go func() {
-			http.ListenAndServe("localhost:8080", nil)
+			http.ListenAndServe("localhost:8081", nil)
 		}()
 	}
 
@@ -175,6 +175,15 @@ func runDsync(c *cli.Context) error {
 			if err := tviewApp.Run(); err != nil {
 				slog.Error(fmt.Sprintf("Error running tview app: %v", err))
 			}
+		}()
+	} else {
+		//start a web server to serve progress report
+		go func() {
+			http.HandleFunc("/progress", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte("XXXX"))
+			})
+			http.ListenAndServe("localhost:8080", nil)
 		}()
 	}
 
