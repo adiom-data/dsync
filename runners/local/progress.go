@@ -14,6 +14,9 @@ import (
 )
 
 type RunnerSyncProgress struct {
+	SourceDescription      string
+	DestinationDescription string
+
 	StartTime time.Time // start of the sync process
 	CurrTime  time.Time // current time
 	SyncState string    // current state of the sync process

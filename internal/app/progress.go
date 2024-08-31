@@ -157,6 +157,10 @@ func percentCompleteTotal(progress runnerLocal.RunnerSyncProgress) float64 {
 		docsCopied += numerator
 		totalDocs += denominator
 	}
+	if totalDocs == 0 { // don't divide by 0
+		return 0
+	}
+
 	percentComplete = docsCopied / totalDocs * 100
 
 	return min(100, percentComplete)
@@ -286,10 +290,15 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 	</head>
 	<body>
 		<h1>Sync Progress</h1>
+		<p><strong>Source:</strong> {{ .SourceDescription }}</p>
+		<p><strong>Destination:</strong> {{ .DestinationDescription }}</p>
 		<p><strong>State:</strong> {{ .SyncState }}</p>
 		<p><strong>Time Elapsed:</strong> {{ .Elapsed }}</p>
+
+		{{ if ne .SyncState "" }}
 		<p><strong>Namespaces Synced:</strong> {{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</p>
 		<p><strong>Documents Synced:</strong> {{ .NumDocsSynced }}</p>
+		{{ end }}
 
 		{{ if eq .SyncState "InitialSync" }}
 		<div class="container">
@@ -372,7 +381,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 	}{
 		RunnerSyncProgress: progress,
 		Elapsed:            elapsed.String(),
-		TotalProgress:      (progress.NumNamespacesCompleted * 100 / progress.TotalNamespaces),
+		TotalProgress:      int64(percentCompleteTotal(progress)),
 		TotalThroughput:    progress.Throughput,
 		ErrorLogString:     errorLog.String(),
 	}

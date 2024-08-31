@@ -89,6 +89,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.ConnectorSettings{})
+		r.runnerProgress.SourceDescription = "/dev/null"
 	} else if settings.SrcType == "CosmosDB" {
 		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.SrcConnString}
 		if settings.CosmosDeletesEmuRequestedFlag {
@@ -135,13 +136,16 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	
 		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
+		r.runnerProgress.SourceDescription = "Cosmos DB: " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
+		r.runnerProgress.SourceDescription = "MongoDB: " + redactMongoConnString(settings.SrcConnString)
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
 		r.dst = connectorNull.NewNullConnector(destinationName)
+		r.runnerProgress.DestinationDescription = "/dev/null"
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
@@ -149,6 +153,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 		}
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
+		r.runnerProgress.DestinationDescription = "MongoDB: " + redactMongoConnString(settings.DstConnString)
 	}
 
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
@@ -331,4 +336,10 @@ func getBaseThreadCount(loadLevel string) int {
 	}
 
 	return 0
+}
+
+// redacts mongodb connection string
+// removes everything but the hosts and ports
+func redactMongoConnString(connectionString string) string {
+	return connectionString
 }
