@@ -321,11 +321,12 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 				<th>Throughput</th>
 			</tr>
 			{{ range $ns, $status := .NsProgressMap }}
+			{{ $tasksTotalNS := len $status.Tasks }}
 			<tr>
 				<td>{{ $ns }}</td>
 				<td>{{ calcPercentNS $status }}%</td>
-				<td>{{ $status.TasksCompleted }} / {{ $status.TasksStarted }}</td>
-				<td>{{ sub $status.TasksStarted $status.TasksCompleted }}</td>
+				<td>{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</td>
+				<td>{{ $status.TasksStarted }}</td>
 				<td>{{ $status.DocsCopied }}</td>
 				<td>{{ $status.Throughput }}</td>
 			</tr>
