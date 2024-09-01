@@ -222,7 +222,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 				margin: 20px 0;
 			}
 			.progress-bar {
-				width: 33.33%;
+				width: 50%;
 				background-color: #f3f3f3;
 				border-radius: 25px;
 				margin-right: 20px;
@@ -246,7 +246,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 				position: absolute;
 				top: 0;
 				left: 0;
-				width: 150%;
+				width: 50%;
 				height: 100%;
 				background: linear-gradient(to right, #4caf50, #8bc34a, #4caf50);
 				animation: move 1.5s linear infinite;
