@@ -38,6 +38,7 @@ type ReaderProgress struct {
 
 // Generates static connector ID based on connection string
 // XXX: is this the best place to do this? - move to overall connector util file
+// TODO: this should be just the hostname:port
 func generateConnectorID(connectionString string) iface.ConnectorID {
 	id, err := hashstructure.Hash(connectionString, nil)
 	if err != nil {

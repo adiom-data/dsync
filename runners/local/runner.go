@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
@@ -20,6 +21,7 @@ import (
 	statestoreMongo "github.com/adiom-data/dsync/statestores/mongo"
 	statestoreTemp "github.com/adiom-data/dsync/statestores/temp"
 	transportLocal "github.com/adiom-data/dsync/transports/local"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -136,10 +138,10 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	
 		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
-		r.runnerProgress.SourceDescription = "Cosmos DB: " + redactMongoConnString(settings.SrcConnString)
+		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
-		r.runnerProgress.SourceDescription = "MongoDB: " + redactMongoConnString(settings.SrcConnString)
+		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
@@ -153,7 +155,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 		}
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
-		r.runnerProgress.DestinationDescription = "MongoDB: " + redactMongoConnString(settings.DstConnString)
+		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
 
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
@@ -338,8 +340,18 @@ func getBaseThreadCount(loadLevel string) int {
 	return 0
 }
 
-// redacts mongodb connection string
-// removes everything but the hosts and ports
-func redactMongoConnString(connectionString string) string {
-	return connectionString
+// redacts mongodb connection string and keeps only hostname:port
+// XXX: is this the right place for it or connectors should expose the redacted string themselves?
+func redactMongoConnString(url string) string {
+	var hosts string
+
+	connString, err := connstring.Parse(url)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to parse connection string: %v", err))
+		hosts = url //assume it's a hostname
+	} else {
+		hosts = strings.Join(connString.Hosts, ",")
+	}
+
+	return hosts
 }
