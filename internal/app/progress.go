@@ -7,7 +7,6 @@
 package dsync
 
 import (
-	"bytes"
 	"fmt"
 	"html/template"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/adiom-data/dsync/logger"
 	"github.com/adiom-data/dsync/protocol/iface"
 	runnerLocal "github.com/adiom-data/dsync/runners/local"
 	"github.com/rivo/tview"
@@ -207,7 +207,7 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 }
 
 // generate an html page for the progress report
-func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffer, w io.Writer) string {
+func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.ReverseBuffer, w io.Writer) string {
 	const tmpl = `
 	<!DOCTYPE html>
 	<html>
@@ -283,7 +283,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 				border: 1px solid #ccc;
 				font-family: monospace;
 				background-color: #f9f9f9;
-				margin-top: 20px;
+				margin-top: 5px;
 				padding: 10px;
 			}
 		</style>
@@ -346,7 +346,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 
 		<h2>Errors</h2>
 		<div id="logBox">
-		<pre> {{ .ErrorLogString }} </pre>
+		<pre>{{ .ErrorLogString }}</pre>
 		</div>
 	</body>
 	<script>

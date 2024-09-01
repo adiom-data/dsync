@@ -7,7 +7,6 @@
 package dsync
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -63,7 +62,7 @@ func runDsync(c *cli.Context) error {
 	}
 
 	var needWebServer bool
-	var wsErrorLog *bytes.Buffer // web server error log
+	var wsErrorLog *logger.ReverseBuffer // web server error log
 	//XXX: potentially need a better way to express that can have either CLI, web, or neither. But not both because of error log capture.
 	if !o.Progress { // if no CLI progress requested, we need to start a web server
 		needWebServer = true
@@ -86,7 +85,7 @@ func runDsync(c *cli.Context) error {
 		}
 	}
 	if needWebServer {
-		wsErrorLog = new(bytes.Buffer)
+		wsErrorLog = new(logger.ReverseBuffer)
 		lo.ErrorView = wsErrorLog
 	}
 	logger.Setup(lo)
