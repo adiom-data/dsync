@@ -64,7 +64,8 @@ func runDsync(c *cli.Context) error {
 
 	var needWebServer bool
 	var wsErrorLog *bytes.Buffer // web server error log
-	if !o.Progress {             // if no CLI progress requested, we need to start a web server
+	//XXX: potentially need a better way to express that can have either CLI, web, or neither. But not both because of error log capture.
+	if !o.Progress { // if no CLI progress requested, we need to start a web server
 		needWebServer = true
 	}
 
