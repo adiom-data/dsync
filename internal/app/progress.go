@@ -323,7 +323,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 			{{ range $ns, $status := .NsProgressMap }}
 			<tr>
 				<td>{{ $ns }}</td>
-				<td>{{ calcPercent $status.DocsCopied $status.EstimatedDocCount }}%</td>
+				<td>{{ calcPercentNS $status }}%</td>
 				<td>{{ $status.TasksCompleted }} / {{ $status.TasksStarted }}</td>
 				<td>{{ sub $status.TasksStarted $status.TasksCompleted }}</td>
 				<td>{{ $status.DocsCopied }}</td>
@@ -357,11 +357,9 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 	</html>`
 
 	funcMap := template.FuncMap{
-		"calcPercent": func(copied, estimated int64) int64 {
-			if estimated == 0 {
-				return 0
-			}
-			return copied * 100 / estimated
+		"calcPercentNS": func(ns *iface.NamespaceStatus) int64 {
+			pct, _, _ := percentCompleteNamespace(ns)
+			return int64(pct)
 		},
 		"sub": func(a, b int64) int64 {
 			return a - b
