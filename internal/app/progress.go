@@ -277,7 +277,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 				background-color: #f2f2f2;
 			}
 			#logBox {
-				width: 100%;
+				width: 65%;
 				height: 400px;
 				overflow-y: scroll;
 				border: 1px solid #ccc;
