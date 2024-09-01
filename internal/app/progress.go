@@ -362,9 +362,6 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *bytes.Buffe
 			pct, _, _ := percentCompleteNamespace(ns)
 			return int64(pct)
 		},
-		"sub": func(a, b int64) int64 {
-			return a - b
-		},
 	}
 
 	t := template.Must(template.New("syncProgress").Funcs(funcMap).Parse(tmpl))
