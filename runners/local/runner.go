@@ -59,17 +59,17 @@ type RunnerLocalSettings struct {
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
 	LoadLevel string
-	InitialSyncNumParallelCopiers int
-	NumParallelWriters int
-	NumParallelIntegrityCheckTasks int
-	NumParallelPartitionWorkers int
-	MaxNumNamespaces int
-	ServerConnectTimeout time.Duration
-	PingTimeout time.Duration
-	CdcResumeTokenUpdateInterval time.Duration
-	WriterMaxBatchSize int
-	TargetDocCountPerPartition int64
-	DeletesCheckInterval time.Duration
+	CosmosInitialSyncNumParallelCopiers int
+	CosmosNumParallelWriters int
+	CosmosNumParallelIntegrityCheckTasks int
+	CosmosNumParallelPartitionWorkers int
+	CosmosMaxNumNamespaces int
+	CosmosServerConnectTimeout time.Duration
+	CosmosPingTimeout time.Duration
+	CosmosCdcResumeTokenUpdateInterval time.Duration
+	CosmosWriterMaxBatchSize int
+	CosmosTargetDocCountPerPartition int64
+	CosmosDeletesCheckInterval time.Duration
 }
 
 const (
@@ -99,60 +99,40 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
-				cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			if settings.CosmosInitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
 			} else {
 				cosmosSettings.InitialSyncNumParallelCopiers = btc
 			}
-			if settings.NumParallelWriters != 0 {
-				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+			if settings.CosmosNumParallelWriters != 0 {
+				cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
 			} else { // default for writer, integrity check, and partition workers are the same 
 				cosmosSettings.NumParallelWriters = btc / 2
 			} 
-			if settings.NumParallelIntegrityCheckTasks != 0 {
-				cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+			if settings.CosmosNumParallelIntegrityCheckTasks != 0 {
+				cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
 			} else {
 				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
 			}
-			if settings.NumParallelPartitionWorkers != 0 {
-				cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
+			if settings.CosmosNumParallelPartitionWorkers != 0 {
+				cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 			} else {
 				cosmosSettings.NumParallelPartitionWorkers = btc / 2
 			}
+		} else {
+			cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
+			cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
+			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
-		if settings.MaxNumNamespaces != 0 {
-			cosmosSettings.MaxNumNamespaces = settings.MaxNumNamespaces
-		}
-		if settings.ServerConnectTimeout != 0 {
-			cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-		}
-		if settings.PingTimeout != 0 {
-			cosmosSettings.PingTimeout = settings.PingTimeout
-		}
-		if settings.CdcResumeTokenUpdateInterval != 0 {
-			cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
-		}
-		if settings.WriterMaxBatchSize != 0 {
-			cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		}
-		if settings.TargetDocCountPerPartition != 0 {
-			cosmosSettings.TargetDocCountPerPartition = settings.TargetDocCountPerPartition
-		}
-		if settings.DeletesCheckInterval != 0 {
-			cosmosSettings.DeletesCheckInterval = settings.DeletesCheckInterval
-		}
-		if settings.InitialSyncNumParallelCopiers != 0 { 
-			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
-		}
-		if settings.NumParallelWriters != 0 {
-			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
-		}
-		if settings.NumParallelIntegrityCheckTasks != 0 {
-			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
-		}
-		if settings.NumParallelPartitionWorkers != 0 {
-			cosmosSettings.NumParallelPartitionWorkers = settings.NumParallelPartitionWorkers
-		}
+		cosmosSettings.MaxNumNamespaces = settings.CosmosMaxNumNamespaces
+		cosmosSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
+		cosmosSettings.PingTimeout = settings.CosmosPingTimeout
+		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CosmosCdcResumeTokenUpdateInterval
+		cosmosSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
+		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
+		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
+	
 		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {

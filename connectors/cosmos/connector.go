@@ -76,39 +76,27 @@ type ConnectorSettings struct {
 	WitnessMongoConnString string
 }
 
+func setDefault[T comparable](field *T, defaultValue T) {
+	if *field == *new(T) {
+		*field = defaultValue
+	}
+}
+
 func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	if settings.ServerConnectTimeout == 0 { // default 15 seconds
-		settings.ServerConnectTimeout = 15 * time.Second
-	} 
-	if settings.PingTimeout == 0 { // default 2 seconds
-		settings.PingTimeout = 2 * time.Second
-	}
-	if settings.InitialSyncNumParallelCopiers == 0 { // default 8 copiers
-		settings.InitialSyncNumParallelCopiers = 8
-	}
+	setDefault(&settings.ServerConnectTimeout, 15*time.Second)
+	setDefault(&settings.PingTimeout, 2*time.Second)
+	setDefault(&settings.InitialSyncNumParallelCopiers, 8)
+	setDefault(&settings.WriterMaxBatchSize, 0)
+	setDefault(&settings.NumParallelWriters, 4)
+	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
+	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
+	setDefault(&settings.MaxNumNamespaces, 8)
+	setDefault(&settings.TargetDocCountPerPartition, 512*1000)
+	setDefault(&settings.NumParallelPartitionWorkers, 4)
+	setDefault(&settings.DeletesCheckInterval, 60*time.Second)
 	// settings.WriterMaxBatchSize = 0 // default 0, no limit
-	if settings.NumParallelWriters == 0 { // default 4 writers
-		settings.NumParallelWriters = 4
-	}
-	if settings.NumParallelIntegrityCheckTasks == 0 { // default to 4
-		settings.NumParallelIntegrityCheckTasks = 4
-	}
-	if settings.CdcResumeTokenUpdateInterval == 0 { // default 60 seconds
-		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
-	}
-	if settings.MaxNumNamespaces == 0 { // default 8 namespaces
-		settings.MaxNumNamespaces = 8
-	} 
-	if settings.TargetDocCountPerPartition == 0 { // default 512k docs
-		settings.TargetDocCountPerPartition = 512 * 1000
-	}
-	if settings.DeletesCheckInterval == 0 { // default 60 seconds
-		settings.DeletesCheckInterval = 60 * time.Second
-	}
-	if settings.NumParallelPartitionWorkers == 0 { // default 4 parition workers
-		settings.NumParallelPartitionWorkers = 4
-	} 
+
 	settings.partitionKey = "_id"
 
 	return &Connector{desc: desc, settings: settings}
@@ -199,19 +187,7 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
-	
-	// for debugging configurations:
-	// slog.Info(fmt.Sprintf("MaxNumNamespaces: %d", cc.settings.MaxNumNamespaces)) 
-	// slog.Info(fmt.Sprintf("ServerConnectTimeout: %d", cc.settings.ServerConnectTimeout))
-	// slog.Info(fmt.Sprintf("PingTimeout: %d", cc.settings.PingTimeout))
-	// slog.Info(fmt.Sprintf("CdcResumeTokenUpdateInterval: %d", cc.settings.CdcResumeTokenUpdateInterval))
-	// slog.Info(fmt.Sprintf("InitialSyncNumParallelCopiers: %d", cc.settings.InitialSyncNumParallelCopiers))
-	// slog.Info(fmt.Sprintf("NumParallelWriters: %d", cc.settings.NumParallelWriters))
-	// slog.Info(fmt.Sprintf("NumParallelIntegrityCheckTasks: %d", cc.settings.NumParallelIntegrityCheckTasks))
-	// slog.Info(fmt.Sprintf("NumParallelPartitionWorkers: %d", cc.settings.NumParallelPartitionWorkers))
-	// slog.Info(fmt.Sprintf("WriterMaxBatchSize: %d", cc.settings.WriterMaxBatchSize))
-	// slog.Info(fmt.Sprintf("TargetDocCountPerPartition: %d", cc.settings.TargetDocCountPerPartition))
-	// slog.Info(fmt.Sprintf("DeletesCheckInterval: %d", cc.settings.DeletesCheckInterval))
+	slog.Debug(fmt.Sprintf("Connector config: %+v", cc.settings))
 
 	return nil
 }
