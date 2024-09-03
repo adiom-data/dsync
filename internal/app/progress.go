@@ -307,7 +307,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 			</div>
 			<div class="info">
 				<p><strong>Total % Complete:</strong> {{ .TotalProgress }}%</p>
-				<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+				<p><strong>Total Throughput:</strong> {{ round .TotalThroughput }} ops/sec</p>
 			</div>
 		</div>
 		<h2>Per-Namespace Progress</h2>
@@ -328,7 +328,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 				<td>{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</td>
 				<td>{{ $status.TasksStarted }}</td>
 				<td>{{ $status.DocsCopied }}</td>
-				<td>{{ $status.Throughput }}</td>
+				<td>{{ round $status.Throughput }}</td>
 			</tr>
 			{{ end }}
 		</table>
@@ -336,7 +336,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 		<div class="container">
 			<div class="indeterminate"></div>
 			<div class="info">
-				<p><strong>Total Throughput:</strong> {{ .TotalThroughput }} ops/sec</p>
+				<p><strong>Total Throughput:</strong> {{ round .TotalThroughput }} ops/sec</p>
 			</div>
 		</div>
 		{{ else if eq .SyncState "Verify" }}
@@ -361,6 +361,9 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 		"calcPercentNS": func(ns *iface.NamespaceStatus) int64 {
 			pct, _, _ := percentCompleteNamespace(ns)
 			return int64(pct)
+		},
+		"round": func(f float64) int {
+			return int(math.Round(f))
 		},
 	}
 
