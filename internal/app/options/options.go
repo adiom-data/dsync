@@ -66,7 +66,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CosmosNumParallelWriters = c.Int("cosmos-parallel-writers")
 	o.CosmosNumParallelIntegrityCheckTasks = c.Int("cosmos-parallel-integrity-check")
 	o.CosmosNumParallelPartitionWorkers = c.Int("cosmos-parallel-partition-workers")
-	o.CosmosMaxNumNamespaces = c.Int("cosmos-max-num-namespaces")
+	o.CosmosMaxNumNamespaces = c.Int("cosmos-max-namespaces")
 	o.CosmosServerConnectTimeout = time.Duration(c.Int("cosmos-server-timeout")) * time.Second
 	o.CosmosPingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
 	o.CosmosCdcResumeTokenUpdateInterval = time.Duration(c.Int("cosmos-resume-token-interval")) * time.Second

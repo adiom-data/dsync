@@ -131,7 +131,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-num-namespaces",
+			Name:  "cosmos-max-namespaces",
 			Usage: "maximum number of namespaces that can be copied from the CosmosDB conenctor. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
 			Required: false,
 		}),
