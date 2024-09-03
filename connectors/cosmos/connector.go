@@ -187,7 +187,7 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("Cosmos Connector has been configured with ID " + (string)(cc.id))
-	slog.Info(fmt.Sprintf("Connector config: %+v", cc.settings))
+	slog.Debug(fmt.Sprintf("Connector config: %+v", cc.settings))
 
 	return nil
 }
