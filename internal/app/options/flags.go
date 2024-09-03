@@ -130,6 +130,61 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage:   "specify the path of the config file",
 		},
 		cli.VersionFlag,
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-max-namespaces",
+			Usage: "maximum number of namespaces that can be copied from the CosmosDB conenctor. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
+			Required: false,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-server-timeout",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-ping-timeout",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-resume-token-interval",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-writer-batch-size",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:  "cosmos-doc-partition",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-delete-interval",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-parallel-copiers",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-parallel-writers",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-parallel-integrity-check",
+			Required: false,
+			Hidden: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "cosmos-parallel-partition-workers",
+			Required: false,
+			Hidden: true,
+		}),
 	}
 
 	before := func(c *cli.Context) error {

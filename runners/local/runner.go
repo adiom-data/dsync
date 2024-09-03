@@ -55,10 +55,21 @@ type RunnerLocalSettings struct {
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
-
-	AdvancedProgressRecalcInterval time.Duration //0 means disabled
+	
+	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
 	LoadLevel string
+	CosmosInitialSyncNumParallelCopiers int
+	CosmosNumParallelWriters int
+	CosmosNumParallelIntegrityCheckTasks int
+	CosmosNumParallelPartitionWorkers int
+	CosmosMaxNumNamespaces int
+	CosmosServerConnectTimeout time.Duration
+	CosmosPingTimeout time.Duration
+	CosmosCdcResumeTokenUpdateInterval time.Duration
+	CosmosWriterMaxBatchSize int
+	CosmosTargetDocCountPerPartition int64
+	CosmosDeletesCheckInterval time.Duration
 }
 
 const (
@@ -85,11 +96,44 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			// the destination is a MongoDB database otherwise the Options check would have failed
 			cosmosSettings.WitnessMongoConnString = settings.DstConnString
 		}
+		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			cosmosSettings.InitialSyncNumParallelCopiers = btc
-			cosmosSettings.NumParallelWriters = btc / 2
+			if settings.CosmosInitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
+			} else {
+				cosmosSettings.InitialSyncNumParallelCopiers = btc
+			}
+			if settings.CosmosNumParallelWriters != 0 {
+				cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			} else { // default for writer, integrity check, and partition workers are the same 
+				cosmosSettings.NumParallelWriters = btc / 2
+			} 
+			if settings.CosmosNumParallelIntegrityCheckTasks != 0 {
+				cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
+			} else {
+				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
+			}
+			if settings.CosmosNumParallelPartitionWorkers != 0 {
+				cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
+			} else {
+				cosmosSettings.NumParallelPartitionWorkers = btc / 2
+			}
+		} else {
+			cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
+			cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
+			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
+		cosmosSettings.MaxNumNamespaces = settings.CosmosMaxNumNamespaces
+		cosmosSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
+		cosmosSettings.PingTimeout = settings.CosmosPingTimeout
+		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CosmosCdcResumeTokenUpdateInterval
+		cosmosSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
+		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
+		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
+	
+		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 	} else if settings.SrcType == "MongoDB" {
 		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})

@@ -102,6 +102,17 @@ func runDsync(c *cli.Context) error {
 		CosmosDeletesEmuRequestedFlag:  o.CosmosDeletesEmu,
 		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
 		LoadLevel:                      o.LoadLevel,
+		CosmosInitialSyncNumParallelCopiers:  o.CosmosInitialSyncNumParallelCopiers,
+		CosmosNumParallelWriters:			 	o.CosmosNumParallelWriters,
+		CosmosNumParallelIntegrityCheckTasks: o.CosmosNumParallelIntegrityCheckTasks,
+		CosmosNumParallelPartitionWorkers:    o.CosmosNumParallelPartitionWorkers,
+		CosmosMaxNumNamespaces: 			    o.CosmosMaxNumNamespaces,
+		CosmosServerConnectTimeout:           o.CosmosServerConnectTimeout, 
+		CosmosPingTimeout:                    o.CosmosPingTimeout, 
+		CosmosCdcResumeTokenUpdateInterval:   o.CosmosCdcResumeTokenUpdateInterval,
+		CosmosWriterMaxBatchSize:       	    o.CosmosWriterMaxBatchSize,
+		CosmosTargetDocCountPerPartition: 	o.CosmosTargetDocCountPerPartition,
+		CosmosDeletesCheckInterval:           o.CosmosDeletesCheckInterval,
 	})
 
 	var wg sync.WaitGroup
