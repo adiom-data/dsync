@@ -50,7 +50,7 @@ func (tv *TViewDetails) SetUpDisplay(app *tview.Application, errorText *tview.Te
 	tv.app.SetRoot(root, true)
 }
 
-// Get the latest status report based on the runner progress struct and update the tview components accoringly
+// Get the latest status report based on the runner progress struct and update the tview components accordingly
 func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncProgress) {
 	//get tview components and clear them
 	header := tv.root.GetItem(0).(*tview.TextView)
@@ -114,6 +114,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		progressBar.SetText(progressBarString)
 
 	case iface.ChangeStreamSyncState:
+		//TODO: Don't print deletes info if deletes emulation isn't enabled (applies to the web server as well)
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d        %d/%d Namespaces synced\nProcessing change stream events\n\nChange Stream Events- %d		Deletes Caught- %d		Events to catch up: %d",
 			runnerProgress.SyncState, hours, minutes, seconds, runnerProgress.NumNamespacesCompleted, runnerProgress.TotalNamespaces, runnerProgress.ChangeStreamEvents, runnerProgress.DeletesCaught, runnerProgress.Lag)
 
@@ -235,7 +236,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 			}
 			.indeterminate {
 				position: relative;
-				width: 100%;
+				width: 50%;
 				height: 20px;
 				background-color: #f3f3f3;
 				overflow: hidden;
@@ -339,6 +340,19 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 				<p><strong>Total Throughput:</strong> {{ round .TotalThroughput }} ops/sec</p>
 			</div>
 		</div>
+		<table>
+			<tr>
+				<th>Change Stream Events</th>
+				<th>Deletes Caught</th>
+				<th>Events To Catch Up</th>
+			</tr>
+			<tr>
+				<td>{{ .ChangeStreamEvents }}</td>
+				<td>{{ .DeletesCaught }}</td>
+				<td>{{ .Lag }}</td>
+			</tr>
+		</table>
+		<p>{{ .SrcAdditionalStateInfo }}</p>
 		{{ else if eq .SyncState "Verify" }}
 		<h2>Verification Result</h2>
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
