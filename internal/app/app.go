@@ -94,6 +94,7 @@ func runDsync(c *cli.Context) error {
 		SrcConnString:                  o.SrcConnString,
 		DstConnString:                  o.DstConnString,
 		SrcType:                        o.Sourcetype,
+		DstType:						o.Destinationtype,
 		StateStoreConnString:           o.StateStoreConnString,
 		NsFromString:                   o.NamespaceFrom,
 		VerifyRequestedFlag:            o.Verify,

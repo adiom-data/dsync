@@ -45,6 +45,7 @@ type RunnerLocalSettings struct {
 	SrcConnString        string
 	DstConnString        string
 	SrcType              string
+	DstType 			 string
 	StateStoreConnString string
 
 	NsFromString []string
@@ -142,6 +143,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
 		r.dst = connectorNull.NewNullConnector(destinationName)
+	} else if settings.DstType == "CosmosDB" {
+		connSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.DstConnString}
+		if settings.LoadLevel != "" {
+			btc := getBaseThreadCount(settings.LoadLevel)
+			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
+		}
+		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {

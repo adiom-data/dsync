@@ -14,8 +14,9 @@ import (
 )
 
 type Options struct {
-	Verbosity  string
-	Sourcetype string
+	Verbosity       string
+	Sourcetype      string
+	Destinationtype string
 
 	SrcConnString        string
 	DstConnString        string
@@ -33,18 +34,18 @@ type Options struct {
 
 	Pprof bool
 
-	LoadLevel string
-	CosmosInitialSyncNumParallelCopiers int
-	CosmosNumParallelWriters int
+	LoadLevel                            string
+	CosmosInitialSyncNumParallelCopiers  int
+	CosmosNumParallelWriters             int
 	CosmosNumParallelIntegrityCheckTasks int
-	CosmosNumParallelPartitionWorkers int
-	CosmosMaxNumNamespaces int
-	CosmosServerConnectTimeout time.Duration
-	CosmosPingTimeout time.Duration
-	CosmosCdcResumeTokenUpdateInterval time.Duration
-	CosmosWriterMaxBatchSize int
-	CosmosTargetDocCountPerPartition int64
-	CosmosDeletesCheckInterval time.Duration
+	CosmosNumParallelPartitionWorkers    int
+	CosmosMaxNumNamespaces               int
+	CosmosServerConnectTimeout           time.Duration
+	CosmosPingTimeout                    time.Duration
+	CosmosCdcResumeTokenUpdateInterval   time.Duration
+	CosmosWriterMaxBatchSize             int
+	CosmosTargetDocCountPerPartition     int64
+	CosmosDeletesCheckInterval           time.Duration
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -52,6 +53,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 
 	o.Verbosity = c.String("verbosity")
 	o.Sourcetype = c.String("sourcetype")
+	o.Destinationtype = c.String("destinationtype")
 	o.SrcConnString = c.String("source")
 	o.DstConnString = c.String("destination")
 	o.StateStoreConnString = c.String("metadata")
@@ -73,7 +75,6 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CosmosWriterMaxBatchSize = c.Int("cosmos-writer-batch-size")
 	o.CosmosTargetDocCountPerPartition = c.Int64("cosmos-doc-partition")
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
-	
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
@@ -84,6 +85,17 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 			o.Sourcetype = "MongoDB"
 		}
 		fmt.Printf("Inferred source type: %v\n", o.Sourcetype)
+	}
+
+	// Infer destination type if not provided
+	if o.Destinationtype == "" && o.DstConnString != "/dev/null" {
+		mongoFlavor := connectorMongo.GetMongoFlavor(o.DstConnString)
+		if mongoFlavor == connectorMongo.FlavorCosmosDB {
+			o.Destinationtype = "CosmosDB"
+		} else {
+			o.Destinationtype = "MongoDB"
+		}
+		fmt.Printf("Inferred destination type: %v\n", o.Destinationtype)
 	}
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
