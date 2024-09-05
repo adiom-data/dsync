@@ -57,8 +57,17 @@ func runDsync(c *cli.Context) error {
 
 	if o.Pprof {
 		go func() {
-			http.ListenAndServe("localhost:8080", nil)
+			host := fmt.Sprintf("localhost:%d", o.PprofPort)
+			slog.Info("Starting pprof server on " + host)
+			http.ListenAndServe(host, nil)
 		}()
+	}
+
+	var needWebServer bool
+	var wsErrorLog *logger.ReverseBuffer // web server error log
+	//XXX: potentially need a better way to express that can have either CLI, web, or neither. But not both because of error log capture.
+	if !o.Progress { // if no CLI progress requested, we need to start a web server
+		needWebServer = true
 	}
 
 	// set up logging
@@ -77,18 +86,15 @@ func runDsync(c *cli.Context) error {
 			lo.ErrorView = errorTextView
 		}
 	}
+	if needWebServer {
+		wsErrorLog = new(logger.ReverseBuffer)
+		lo.ErrorView = wsErrorLog
+	}
 	logger.Setup(lo)
 
 	slog.Info(fmt.Sprintf("Starting dsync %v", build.VersionInfo()))
 
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
-
-	var advancedProgressRecalcInterval time.Duration
-	if !o.Progress {
-		advancedProgressRecalcInterval = 0
-	} else {
-		advancedProgressRecalcInterval = throughputUpdateInterval
-	}
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
 		SrcConnString:                  o.SrcConnString,
@@ -100,7 +106,7 @@ func runDsync(c *cli.Context) error {
 		CleanupRequestedFlag:           o.Cleanup,
 		FlowStatusReportingInterval:    10,
 		CosmosDeletesEmuRequestedFlag:  o.CosmosDeletesEmu,
-		AdvancedProgressRecalcInterval: advancedProgressRecalcInterval,
+		AdvancedProgressRecalcInterval: throughputUpdateInterval,
 		LoadLevel:                      o.LoadLevel,
 		CosmosInitialSyncNumParallelCopiers:  o.CosmosInitialSyncNumParallelCopiers,
 		CosmosNumParallelWriters:			 	o.CosmosNumParallelWriters,
@@ -175,6 +181,23 @@ func runDsync(c *cli.Context) error {
 			if err := tviewApp.Run(); err != nil {
 				slog.Error(fmt.Sprintf("Error running tview app: %v", err))
 			}
+		}()
+	}
+
+	if needWebServer {
+		//start a web server to serve progress report
+		go func() {
+			host := fmt.Sprintf("localhost:%d", o.WebPort)
+			slog.Info("Starting web server to serve progress report on " + host + "/progress")
+			fs := http.FileServer(http.Dir("./web_static"))
+
+			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				r.UpdateRunnerProgress()
+				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
+			})
+			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
+			http.ListenAndServe(host, nil)
 		}()
 	}
 

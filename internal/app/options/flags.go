@@ -24,6 +24,15 @@ var validSources = []string{"MongoDB", "CosmosDB"}
 
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
 
+const (
+	// DefaultPprofPort is the default port for pprof profiling.
+	DefaultPprofPort = 8081
+	// DefaultWebPort is the default port for the web server.
+	DefaultWebPort = 8080
+	// DefaultMaxNumNamespaces is the default maximum number of namespaces that can be copied from the CosmosDB connector.
+	cosmosDefaultMaxNumNamespaces = 8
+)
+
 type ListFlag struct {
 	Values []string
 }
@@ -63,43 +72,51 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				}
 				return nil
 			},
+			Category: "Endpoint Configuration",
 			Required: false,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "source",
 			Usage:    "source connection string",
 			Aliases:  []string{"s"},
+			Category: "Endpoint Configuration",
 			Required: true,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "destination",
 			Usage:    "destination connection string",
 			Aliases:  []string{"d"},
+			Category: "Endpoint Configuration",
 			Required: true,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "metadata",
 			Usage:    "metadata store connection string. Will default to the destination if not provided",
 			Aliases:  []string{"m"},
+			Category: "Endpoint Configuration",
 			Required: false,
 		}),
 		altsrc.NewGenericFlag(&cli.GenericFlag{
-			Name:    "namespace",
-			Usage:   "list of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
-			Aliases: []string{"ns", "nsFrom"},
-			Value:   &ListFlag{},
+			Name:     "namespace",
+			Usage:    "list of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
+			Aliases:  []string{"ns", "nsFrom"},
+			Category: "Flow Options",
+			Value:    &ListFlag{},
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:  "verify",
-			Usage: "perform a data integrity check for an existing flow",
+			Name:     "verify",
+			Usage:    "perform a data integrity check for an existing flow",
+			Category: "Special Commands",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:  "cleanup",
-			Usage: "cleanup metadata for an existing flow",
+			Name:     "cleanup",
+			Usage:    "cleanup metadata for an existing flow",
+			Category: "Special Commands",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:  "cosmos-deletes-cdc",
-			Usage: "generate CDC events for CosmosDB deletes",
+			Name:     "cosmos-deletes-cdc",
+			Usage:    "generate CDC events for CosmosDB deletes",
+			Category: "Cosmos DB-specific Options",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "progress",
@@ -119,10 +136,21 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 				return nil
 			},
 			Required: false,
+			Category: "Flow Options",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "pprof",
-			Usage: "enable pprof profiling on localhost:8080",
+			Usage: "enable pprof profiling on localhost:8081",
+		}),
+		altsrc.NewUintFlag(&cli.UintFlag{
+			Name:  "pprof-port",
+			Usage: "specify the port for pprof profiling",
+			Value: DefaultPprofPort,
+		}),
+		altsrc.NewUintFlag(&cli.UintFlag{
+			Name:  "web-port",
+			Usage: "specify the port for web server",
+			Value: DefaultWebPort,
 		}),
 		&cli.StringFlag{
 			Name:    "config",
@@ -131,59 +159,61 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-max-namespaces",
-			Usage: "maximum number of namespaces that can be copied from the CosmosDB conenctor. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
+			Name:     "cosmos-max-namespaces",
+			Usage:    "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
+			Value:    cosmosDefaultMaxNumNamespaces,
 			Required: false,
+			Category: "Cosmos DB-specific Options",
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-server-timeout",
+			Name:     "cosmos-server-timeout",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-ping-timeout",
+			Name:     "cosmos-ping-timeout",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-resume-token-interval",
+			Name:     "cosmos-resume-token-interval",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-writer-batch-size",
+			Name:     "cosmos-writer-batch-size",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:  "cosmos-doc-partition",
+			Name:     "cosmos-doc-partition",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-delete-interval",
+			Name:     "cosmos-delete-interval",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-copiers",
+			Name:     "cosmos-parallel-copiers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-writers",
+			Name:     "cosmos-parallel-writers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-integrity-check",
+			Name:     "cosmos-parallel-integrity-check",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-partition-workers",
+			Name:     "cosmos-parallel-partition-workers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 	}
 
