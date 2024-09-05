@@ -199,7 +199,6 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	flowID := iface.FlowID("2234")
 	dataChannelID := iface.DataChannelID("4321")
 	dataChannel := make(chan iface.DataMessage)
-	defer close(dataChannel)
 
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
@@ -265,6 +264,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	assert.True(suite.T(), connector.GetConnectorStatus(flowID).WriteLSN > 0, "Should have written some data")
 	// A notification should have been sent to the coordinator that the job is done
 	c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
-
+	
+	defer close(dataChannel)
 	connector.Teardown()
 }

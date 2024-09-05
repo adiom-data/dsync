@@ -156,6 +156,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 		}
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
+		// writer max batch size, parallel writers, timeout
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
