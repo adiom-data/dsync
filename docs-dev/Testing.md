@@ -30,7 +30,7 @@ go test ./...
 ```
 To run all tests for a specific connector (e.g. connector Mongo):
 ```
-go test -v github.com/adiom-data/dsync/connector/mongo
+go test -v github.com/adiom-data/dsync/connectors/mongo
 ```
 
 To run a specific test for a specific connector (e.g. TestConnectorWriteResumeInitialCopy for Mongo connector):
