@@ -85,7 +85,7 @@ func setDefault[T comparable](field *T, defaultValue T) {
 func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
 	setDefault(&settings.ServerConnectTimeout, 15*time.Second)
-	setDefault(&settings.PingTimeout, 2*time.Second)
+	setDefault(&settings.PingTimeout, 10*time.Second)
 	setDefault(&settings.InitialSyncNumParallelCopiers, 8)
 	setDefault(&settings.WriterMaxBatchSize, 0)
 	setDefault(&settings.NumParallelWriters, 4)
