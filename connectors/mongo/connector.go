@@ -512,6 +512,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 				} else {
 					// Process the data message
 					writerProgress.dataMessages.Add(1)
+					mc.status.WriteLSN = max(dataMsg.SeqNum, mc.status.WriteLSN)
 					err := flowParallelWriter.ScheduleDataMessage(dataMsg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
