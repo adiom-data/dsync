@@ -57,7 +57,9 @@ func runDsync(c *cli.Context) error {
 
 	if o.Pprof {
 		go func() {
-			http.ListenAndServe("localhost:8081", nil)
+			host := fmt.Sprintf("localhost:%d", o.PprofPort)
+			slog.Info("Starting pprof server on " + host)
+			http.ListenAndServe(host, nil)
 		}()
 	}
 
@@ -185,6 +187,8 @@ func runDsync(c *cli.Context) error {
 	if needWebServer {
 		//start a web server to serve progress report
 		go func() {
+			host := fmt.Sprintf("localhost:%d", o.WebPort)
+			slog.Info("Starting web server to serve progress report on " + host + "/progress")
 			fs := http.FileServer(http.Dir("./web_static"))
 
 			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
@@ -193,7 +197,7 @@ func runDsync(c *cli.Context) error {
 				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
 			})
 			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
-			http.ListenAndServe("localhost:8080", nil)
+			http.ListenAndServe(host, nil)
 		}()
 	}
 

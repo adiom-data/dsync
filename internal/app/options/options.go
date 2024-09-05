@@ -33,18 +33,21 @@ type Options struct {
 
 	Pprof bool
 
-	LoadLevel string
-	CosmosInitialSyncNumParallelCopiers int
-	CosmosNumParallelWriters int
+	PprofPort uint
+	WebPort   uint
+
+	LoadLevel                            string
+	CosmosInitialSyncNumParallelCopiers  int
+	CosmosNumParallelWriters             int
 	CosmosNumParallelIntegrityCheckTasks int
-	CosmosNumParallelPartitionWorkers int
-	CosmosMaxNumNamespaces int
-	CosmosServerConnectTimeout time.Duration
-	CosmosPingTimeout time.Duration
-	CosmosCdcResumeTokenUpdateInterval time.Duration
-	CosmosWriterMaxBatchSize int
-	CosmosTargetDocCountPerPartition int64
-	CosmosDeletesCheckInterval time.Duration
+	CosmosNumParallelPartitionWorkers    int
+	CosmosMaxNumNamespaces               int
+	CosmosServerConnectTimeout           time.Duration
+	CosmosPingTimeout                    time.Duration
+	CosmosCdcResumeTokenUpdateInterval   time.Duration
+	CosmosWriterMaxBatchSize             int
+	CosmosTargetDocCountPerPartition     int64
+	CosmosDeletesCheckInterval           time.Duration
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -62,6 +65,9 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
 	o.LoadLevel = c.String("load-level")
+	o.PprofPort = c.Uint("pprof-port")
+	o.WebPort = c.Uint("web-port")
+
 	o.CosmosInitialSyncNumParallelCopiers = c.Int("cosmos-parallel-copiers")
 	o.CosmosNumParallelWriters = c.Int("cosmos-parallel-writers")
 	o.CosmosNumParallelIntegrityCheckTasks = c.Int("cosmos-parallel-integrity-check")
@@ -73,7 +79,6 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CosmosWriterMaxBatchSize = c.Int("cosmos-writer-batch-size")
 	o.CosmosTargetDocCountPerPartition = c.Int64("cosmos-doc-partition")
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
-	
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

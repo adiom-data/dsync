@@ -24,6 +24,13 @@ var validSources = []string{"MongoDB", "CosmosDB"}
 
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
 
+const (
+	// DefaultPprofPort is the default port for pprof profiling.
+	DefaultPprofPort = 8081
+	// DefaultWebPort is the default port for the web server.
+	DefaultWebPort = 8080
+)
+
 type ListFlag struct {
 	Values []string
 }
@@ -122,7 +129,17 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "pprof",
-			Usage: "enable pprof profiling on localhost:8080",
+			Usage: "enable pprof profiling on localhost:8081",
+		}),
+		altsrc.NewUintFlag(&cli.UintFlag{
+			Name:  "pprof-port",
+			Usage: "specify the port for pprof profiling",
+			Value: DefaultPprofPort,
+		}),
+		altsrc.NewUintFlag(&cli.UintFlag{
+			Name:  "web-port",
+			Usage: "specify the port for web server",
+			Value: DefaultWebPort,
 		}),
 		&cli.StringFlag{
 			Name:    "config",
