@@ -333,6 +333,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		}()
 		// start the concurrent change streams
 		//cc.StartConcurrentChangeStreams(cc.flowCtx, namespaces, &readerProgress, readPlan.CreatedAtEpoch, dataChannel)
+		time.Sleep(time.Minute)
 	}()
 
 	// kick off the initial sync
