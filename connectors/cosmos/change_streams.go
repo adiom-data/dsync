@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
@@ -113,7 +114,9 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 			continue
 		}
 		//send the data message
-		currLSN := cc.updateLSNTracking(readerProgress, lsn)
+		cc.updateChangeStreamProgressTracking(readerProgress)
+		//increment the global LSN
+		currLSN := atomic.AddInt64(lsn, 1)
 		dataMsg.SeqNum = currLSN
 		dataChannel <- dataMsg
 

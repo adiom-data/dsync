@@ -132,14 +132,13 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 	return fmt.Sprintf("%v", keyJsonMap["Rid"]), nil
 }
 
-// update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum
-func (cc *Connector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
+// update changeStreamEvents progress counters atomically
+func (cc *Connector) updateChangeStreamProgressTracking(reader *ReaderProgress) {
 	cc.muProgressMetrics.Lock()
 	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
-	*lsn++
 	cc.status.ProgressMetrics.ChangeStreamEvents++
-	return cc.status.WriteLSN
+	return
 }
 
 // create a find query for a task
