@@ -7,13 +7,16 @@ package cosmos
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -62,6 +65,20 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 
 			//process the change stream events for this change stream
 			for changeStream.Next(ctx) {
+				var change bson.M
+				if err := changeStream.Decode(&change); err != nil {
+					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
+					continue
+				}
+
+				//extract the continuation value from the change stream event
+				continuation, err := extractChangeStreamContinuationValue(change)
+				if err != nil {
+					slog.Debug(fmt.Sprintf("Change stream event cont: %v", continuation))
+				} else {
+					slog.Debug(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
+				}
+
 				//increment WriteLSN atomically
 				atomic.AddInt64(&cc.status.WriteLSN, 1)
 			}
@@ -78,4 +95,21 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 	}
 	wg.Wait()
 	return nil
+}
+
+// Get the continuation value from a change stream event
+// Example format of _id._data.Data: {"V":2,"Rid":"nGERANjum1c=","Continuation":[{"FeedRange":{"type":"Effective Partition Key Range","value":{"min":"","max":"FF"}},"State":{"type":"continuation","value":"\"291514\""}}]}
+func extractChangeStreamContinuationValue(change bson.M) (int, error) {
+	bytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+	var result map[string]interface{}
+
+	// Decode the JSON string
+	err := json.Unmarshal(bytes, &result)
+	if err != nil {
+		return 0, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	// Extract the continuation value
+	continuation := result["Continuation"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
+	return strconv.Atoi(continuation)
 }
