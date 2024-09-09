@@ -33,7 +33,7 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 			defer wg.Done()
 			//get task location and retrieve resume token
 			loc := iface.Location{Database: ns.db, Collection: ns.col}
-			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s at namespace %s.%s", cc.id, cc.flowId, loc.Database, loc.Collection))
+			slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s at namespace %s.%s", cc.id, cc.flowId, loc.Database, loc.Collection))
 
 			token, err := cc.flowCDCResumeTokenMap.GetToken(loc)
 			if err != nil {
