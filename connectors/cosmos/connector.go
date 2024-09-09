@@ -456,7 +456,6 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 }
 
 func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	// return errors.New("CosmosConnector does not write to destination yet")
 	// create new context so that the flow can be cancelled gracefully if needed
 	cc.flowCtx, cc.flowCancelFunc = context.WithCancel(cc.ctx)
 	cc.flowId = flowId
@@ -478,7 +477,6 @@ func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly for initializing/starting parallel writers
-	// use mongo parallel writer?? 
 	flowParallelWriter := NewParallelWriter(cc.flowCtx, cc, cc.settings.NumParallelWriters)
 	flowParallelWriter.Start()
 

@@ -49,8 +49,8 @@ func (s *StateStore) Setup(ctx context.Context) error {
 
 	// Check that the provided connection string is pointing to a genuine MongoDB instance
 	// Otherwise we might get strange errors later on
-	if connectorMongo.GetMongoFlavor(s.settings.ConnectionString) != connectorMongo.FlavorMongoDB {
-		return fmt.Errorf("statestore connection string should point to a genuine MongoDB instance")
+	if connectorMongo.GetMongoFlavor(s.settings.ConnectionString) != connectorMongo.FlavorMongoDB ||  connectorMongo.GetMongoFlavor(s.settings.ConnectionString) != connectorMongo.FlavorCosmosDB {
+		return fmt.Errorf("statestore connection string should point to a genuine MongoDB or CosmosDB instance")
 	}
 
 	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
