@@ -13,12 +13,14 @@ import (
 	"log/slog"
 	"math"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -264,4 +266,21 @@ func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	nsStatus.EstimatedDocsCopied++
 	cc.status.ProgressMetrics.NumDocsSynced++
 	cc.muProgressMetrics.Unlock()
+}
+
+// Get the continuation value from a change stream event
+// Example format of _id._data.Data: {"V":2,"Rid":"nGERANjum1c=","Continuation":[{"FeedRange":{"type":"Effective Partition Key Range","value":{"min":"","max":"FF"}},"State":{"type":"continuation","value":"\"291514\""}}]}
+func extractChangeStreamContinuationValue(change bson.M) (int, error) {
+	bytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+	var result map[string]interface{}
+
+	// Decode the JSON string
+	err := json.Unmarshal(bytes, &result)
+	if err != nil {
+		return 0, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	// Extract the continuation value
+	continuation := result["Continuation"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
+	return strconv.Atoi(strings.Trim(continuation, `"`))
 }

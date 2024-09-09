@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
@@ -116,7 +115,16 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 		//send the data message
 		cc.updateChangeStreamProgressTracking(readerProgress)
 		//increment the global LSN
-		currLSN := atomic.AddInt64(lsn, 1)
+		var currLSN int64
+		//extract the continuation value from the change stream event
+		continuation, err := extractChangeStreamContinuationValue(change)
+		if err != nil {
+			slog.Debug(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
+			currLSN = 0
+		} else {
+			currLSN = int64(continuation)
+		}
+
 		dataMsg.SeqNum = currLSN
 		dataChannel <- dataMsg
 

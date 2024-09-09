@@ -7,11 +7,9 @@ package cosmos
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -74,13 +72,12 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 				//extract the continuation value from the change stream event
 				continuation, err := extractChangeStreamContinuationValue(change)
 				if err != nil {
-					slog.Debug(fmt.Sprintf("Change stream event cont: %v", continuation))
-				} else {
 					slog.Debug(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
+					continue
 				}
 
-				//increment WriteLSN atomically
-				atomic.AddInt64(&cc.status.WriteLSN, 1)
+				//store the continuation value in the global LSN
+				atomic.StoreInt64(&cc.status.WriteLSN, int64(continuation))
 			}
 
 			if err := changeStream.Err(); err != nil {
@@ -95,21 +92,4 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 	}
 	wg.Wait()
 	return nil
-}
-
-// Get the continuation value from a change stream event
-// Example format of _id._data.Data: {"V":2,"Rid":"nGERANjum1c=","Continuation":[{"FeedRange":{"type":"Effective Partition Key Range","value":{"min":"","max":"FF"}},"State":{"type":"continuation","value":"\"291514\""}}]}
-func extractChangeStreamContinuationValue(change bson.M) (int, error) {
-	bytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
-	var result map[string]interface{}
-
-	// Decode the JSON string
-	err := json.Unmarshal(bytes, &result)
-	if err != nil {
-		return 0, fmt.Errorf("error decoding JSON: %v", err)
-	}
-
-	// Extract the continuation value
-	continuation := result["Continuation"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
-	return strconv.Atoi(continuation)
 }
