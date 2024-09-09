@@ -120,7 +120,6 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 		//update the last seen resume token
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
 	}
-
 }
 
 func (cc *Connector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {

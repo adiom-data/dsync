@@ -266,6 +266,10 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// start printing progress
 	go cc.printProgress(&readerProgress)
 
+	// kick off LSN tracking
+	// TODO (AK, 9/2024): implement this proper - this is a very BAD, bad placeholder.
+	go cc.startGlobalLsnWorkers(cc.flowCtx, namespaces, readPlan.CreatedAtEpoch)
+
 	// kick off the change stream reader
 	go func() {
 		//wait for the initial sync to finish

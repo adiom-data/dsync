@@ -138,7 +138,6 @@ func (cc *Connector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64
 	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
 	*lsn++
-	cc.status.WriteLSN++
 	cc.status.ProgressMetrics.ChangeStreamEvents++
 	return cc.status.WriteLSN
 }
