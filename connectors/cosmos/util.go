@@ -297,7 +297,7 @@ func extractJSONChangeStreamContinuationValue(jsonBytes []byte) (int, error) {
 
 // Extract the continuation value based on the kind of the changestream resume token
 func getChangeStreamContinuationValue(change bson.M) (int, error) {
-	kind := change["_id"].(bson.M)["kind"].(int)
+	kind := change["_id"].(bson.M)["_kind"].(int)
 	switch kind {
 	case 1: // JSON string in _data
 		jsonBytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
