@@ -188,12 +188,23 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		//partitioning
 		numDocsCopied := atomic.LoadInt64(&nsStatus.EstimatedDocsCopied)
 
-		docsPerTask := nsStatus.Tasks[0].EstimatedDocCount
-		numCompletedDocs := atomic.LoadInt64(&nsStatus.TasksCompleted) * docsPerTask
+		// iterate over the tasks and calculate the necessary totals
+		numCompletedDocs := int64(0)
+		numInProgressDocsMax := int64(0)
+		numDocsTotal := int64(0)
+		for _, task := range nsStatus.Tasks {
+			numDocsTotal += task.EstimatedDocCount
+			if task.Status == iface.ReadPlanTaskStatus_Completed {
+				numCompletedDocs += task.EstimatedDocCount
+			}
+			if nsStatus.ActiveTasksList[task.Id] {
+				numInProgressDocsMax += task.EstimatedDocCount
+			}
+		}
 
-		numInProgressDocsMax := int64(atomic.LoadInt64(&nsStatus.TasksStarted)) * docsPerTask
 		numDocsInProgress := numDocsCopied - numCompletedDocs
-		numDocsLeft := (int64(len(nsStatus.Tasks)) - nsStatus.TasksCompleted) * docsPerTask
+		numDocsLeft := numDocsTotal - numCompletedDocs
+
 		if numDocsInProgress >= int64(numInProgressDocsMax) && len(nsStatus.Tasks) != int(atomic.LoadInt64(&nsStatus.TasksCompleted)) {
 			//we are in the middle of a task
 			numDocsInProgress = int64(numInProgressDocsMax - 1)

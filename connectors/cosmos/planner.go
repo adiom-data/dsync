@@ -230,18 +230,18 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 					//send min and max tasks to finalized channel
 					minTask := cc.createReadPlanTaskForNs(nsTask)
 					minTask.Def.PartitionKey = cc.settings.partitionKey
-					minTask.Def.High = min //only setting the high boundary indicating that we want (-INF, min)
-					minTask.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
+					minTask.Def.High = min        //only setting the high boundary indicating that we want (-INF, min)
+					minTask.EstimatedDocCount = 0 //we don't expect anything to be there
 
 					maxTask := cc.createReadPlanTaskForNs(nsTask)
 					maxTask.Def.PartitionKey = cc.settings.partitionKey
-					maxTask.Def.Low = max //only setting the low boundary indicating that we want (max, INF)
-					maxTask.EstimatedDocCount = cc.settings.TargetDocCountPerPartition
+					maxTask.Def.Low = max         //only setting the low boundary indicating that we want (max, INF)
+					maxTask.EstimatedDocCount = 0 //we don't expect anything to be there
 
 					finalTasksChannel <- minTask
 					finalTasksChannel <- maxTask
 
-					//send the tasks with approx bounaries downstream
+					//send the tasks with approx boundaries downstream
 					for i := 0; i < len(approxBounds)-1; i++ {
 						task := cc.createReadPlanTaskForNs(nsTask)
 						task.Def.PartitionKey = cc.settings.partitionKey

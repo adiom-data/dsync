@@ -219,6 +219,8 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	namespaces := make([]namespace, 0)
 
 	cc.restoreProgressDetails(tasks)
+	// reset doc counts for all namespaces to actual for more accurate progress reporting
+	cc.resetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
@@ -360,7 +362,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					ns := iface.Namespace{Db: db, Col: col}
 
 					nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
-					cc.taskStartedProgressUpdate(nsStatus)
+					cc.taskStartedProgressUpdate(nsStatus, task.Id)
 
 					collection := cc.client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.flowCtx, collection, task)
@@ -409,14 +411,14 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 
 						//update the progress after completing the task and create task metadata to pass to coordinator to persist
-						cc.taskDoneProgressUpdate(nsStatus)
+						cc.taskDoneProgressUpdate(nsStatus, task.Id)
 
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
 						taskData := iface.TaskDoneMeta{DocsCopied: docs}
 						cc.coord.NotifyTaskDone(cc.flowId, cc.id, task.Id, &taskData)
 						//send a barrier message to signal the end of the task
-						if cc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
+						if cc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the receiving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
 						}
 					}
