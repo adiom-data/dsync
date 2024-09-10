@@ -219,6 +219,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	namespaces := make([]namespace, 0)
 
 	cc.restoreProgressDetails(tasks)
+	// reset doc counts for all namespaces to actual for more accurate progress reporting
 	cc.resetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 {
