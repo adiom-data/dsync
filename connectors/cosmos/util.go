@@ -189,6 +189,19 @@ func nsToString(ns iface.Namespace) string {
 	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
 }
 
+// update estimated namespace doc counts from the actual database
+func (cc *Connector) resetNsProgressEstimatedDocCounts() error {
+	for ns, nsStatus := range cc.status.ProgressMetrics.NamespaceProgress {
+		collection := cc.client.Database(ns.Db).Collection(ns.Col)
+		count, err := collection.EstimatedDocumentCount(cc.ctx)
+		if err != nil {
+			return fmt.Errorf("failed to count documents: %v", err)
+		}
+		nsStatus.EstimatedDocCount = int64(count)
+	}
+	return nil
+}
+
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
 func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
 	slog.Debug("Restoring progress metrics from tasks")

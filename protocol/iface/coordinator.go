@@ -86,7 +86,7 @@ type CoordinatorIConnectorSignal interface {
 	NotifyDone(flowId FlowID, conn ConnectorID) error
 
 	// Done event for a task (for a connector to announce that they finished a task)
-	// Accepts the opional taskData parameter which is a connector-specific task data to be persisted along the task
+	// Accepts the optional taskData parameter which is a connector-specific task data to be persisted along the task
 	NotifyTaskDone(flowId FlowID, conn ConnectorID, taskId ReadPlanTaskID, taskData *TaskDoneMeta) error
 
 	// Planning completion event (for a connector to share the read plan)

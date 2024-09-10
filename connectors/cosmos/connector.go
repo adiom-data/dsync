@@ -219,6 +219,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	namespaces := make([]namespace, 0)
 
 	cc.restoreProgressDetails(tasks)
+	cc.resetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 {
 		return errors.New("no tasks to copy")
