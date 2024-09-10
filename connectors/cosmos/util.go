@@ -281,6 +281,7 @@ func extractChangeStreamContinuationValue(change bson.M) (int, error) {
 	}
 
 	// Extract the continuation value
+	//TODO: we should check if it's always an array of one, especially for Cosmos namespaces with multiple partitions
 	continuation := result["Continuation"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
 	return strconv.Atoi(strings.Trim(continuation, `"`))
 }
