@@ -39,8 +39,7 @@ func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Loc
 // Creates parallel change streams for each task in the read plan, and processes the events concurrently
 func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
-	// global atomic lsn counter
-	var lsn int64 = 0
+	lsnTracker := NewMultiNsLSNTracker()
 
 	cc.status.CDCActive = true
 	// iterate over all tasks and start a change stream for each
@@ -78,7 +77,7 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 			defer changeStream.Close(ctx)
 
 			//process the change stream events for this change stream
-			cc.processChangeStreamEvents(ctx, readerProgress, changeStream, loc, channel, &lsn)
+			cc.processChangeStreamEvents(ctx, readerProgress, changeStream, loc, channel, lsnTracker)
 
 			if err := changeStream.Err(); err != nil {
 				if ctx.Err() == context.Canceled {
@@ -95,7 +94,7 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 }
 
 // Reads and processes change stream events, and sends messages to the data channel
-func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *int64) {
+func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsnTracker *MultiNsLSNTracker) {
 	for changeStream.Next(ctx) {
 		var change bson.M
 		if err := changeStream.Decode(&change); err != nil {
@@ -114,18 +113,18 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 		}
 		//send the data message
 		cc.updateChangeStreamProgressTracking(readerProgress)
-		//increment the global LSN
-		var currLSN int64
-		//extract the continuation value from the change stream event
+
+		//extract the continuation value from the change stream event and set it in the LSN tracker
 		continuation, err := extractChangeStreamContinuationValue(change)
 		if err != nil {
-			slog.Debug(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
-			currLSN = 0
+			slog.Warn(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
 		} else {
-			currLSN = int64(continuation)
+			ns := namespace{db: changeStreamLoc.Database, col: changeStreamLoc.Collection}
+			lsnTracker.SetLSN(ns, int64(continuation))
 		}
 
-		dataMsg.SeqNum = currLSN
+		//use the global LSN as a sequence number
+		dataMsg.SeqNum = lsnTracker.GetGlobalLSN()
 		dataChannel <- dataMsg
 
 		//update the last seen resume token

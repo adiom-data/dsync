@@ -19,14 +19,10 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// LsnTracker is a helper method to track the LSN of the CosmosDB change feed
-// It's simply the overall number of changes seen so far
-// It's used for replication lag calculation
-// We just run parallel changestream listeners for each namespace
-
 // Creates parallel change streams for each namespaces, and processes the events concurrently to increment global LSN
 func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []namespace, readPlanStartAt int64) error {
 	var wg sync.WaitGroup
+	lsnTracker := NewMultiNsLSNTracker()
 	// iterate over all namespaces and start a change stream for each
 	for _, ns := range namespaces {
 		wg.Add(1)
@@ -72,12 +68,14 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 				//extract the continuation value from the change stream event
 				continuation, err := extractChangeStreamContinuationValue(change)
 				if err != nil {
-					slog.Debug(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
+					slog.Warn(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
 					continue
 				}
 
-				//store the continuation value in the global LSN
-				atomic.StoreInt64(&cc.status.WriteLSN, int64(continuation))
+				//store the continuation value in the lsn tracker
+				lsnTracker.SetLSN(ns, int64(continuation))
+				//update the global LSN
+				atomic.StoreInt64(&cc.status.WriteLSN, lsnTracker.GetGlobalLSN())
 			}
 
 			if err := changeStream.Err(); err != nil {
@@ -92,4 +90,43 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 	}
 	wg.Wait()
 	return nil
+}
+
+// MultiNsLSNTracker is a thread-safe tracker for Last Sequence Numbers (LSN) across multiple namespaces.
+type MultiNsLSNTracker struct {
+	mu         sync.Mutex
+	namespaces map[namespace]int64 // Stores the LSNs for each namespace.
+}
+
+// NewMultiNsLSNTracker creates a new LSNTracker instance.
+func NewMultiNsLSNTracker() *MultiNsLSNTracker {
+	return &MultiNsLSNTracker{
+		namespaces: make(map[namespace]int64),
+	}
+}
+
+// SetLSN sets the LSN for a specific namespace.
+func (l *MultiNsLSNTracker) SetLSN(namespace namespace, lsn int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.namespaces[namespace] = lsn
+}
+
+// GetLSN gets the LSN for a specific namespace.
+func (l *MultiNsLSNTracker) GetLSN(namespace namespace) int64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.namespaces[namespace]
+}
+
+// GetGlobalLSN returns the sum of all LSNs across all namespaces.
+func (l *MultiNsLSNTracker) GetGlobalLSN() int64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var globalLSN int64
+	for _, lsn := range l.namespaces {
+		globalLSN += lsn
+	}
+	return globalLSN
 }
