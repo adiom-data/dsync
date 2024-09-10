@@ -39,8 +39,7 @@ func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Loc
 // Creates parallel change streams for each task in the read plan, and processes the events concurrently
 func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
-	// global atomic lsn counter
-	var lsn int64 = 0
+	lsnTracker := NewMultiNsLSNTracker()
 
 	cc.status.CDCActive = true
 	// iterate over all tasks and start a change stream for each
@@ -78,7 +77,7 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 			defer changeStream.Close(ctx)
 
 			//process the change stream events for this change stream
-			cc.processChangeStreamEvents(ctx, readerProgress, changeStream, loc, channel, &lsn)
+			cc.processChangeStreamEvents(ctx, readerProgress, changeStream, loc, channel, lsnTracker)
 
 			if err := changeStream.Err(); err != nil {
 				if ctx.Err() == context.Canceled {
@@ -95,7 +94,10 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 }
 
 // Reads and processes change stream events, and sends messages to the data channel
-func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsn *int64) {
+func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsnTracker *MultiNsLSNTracker) {
+
+	useCosmosContinuationToken := true //use cosmos continuation token until we fail to extract the continuation value
+
 	for changeStream.Next(ctx) {
 		var change bson.M
 		if err := changeStream.Decode(&change); err != nil {
@@ -113,14 +115,32 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 			continue
 		}
 		//send the data message
-		currLSN := cc.updateLSNTracking(readerProgress, lsn)
-		dataMsg.SeqNum = currLSN
+		cc.updateChangeStreamProgressTracking(readerProgress)
+
+		// extract the continuation value from the change stream event
+		// if we fail to extract the continuation value, we will stop using the Cosmos continuation token for this change stream
+		ns := namespace{db: changeStreamLoc.Database, col: changeStreamLoc.Collection}
+		if useCosmosContinuationToken {
+			continuation, err := getChangeStreamContinuationValue(change)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("Error extracting continuation value for namespace %v from change event: %v. Replication lag might be inaccurate", ns, err))
+				useCosmosContinuationToken = false //don't try to extract the continuation value anymore
+				lsnTracker.IncrementLSN(ns)        //increment the LSN
+			} else {
+				// store the continuation value in the lsn tracker
+				lsnTracker.SetLSN(ns, int64(continuation))
+			}
+		} else {
+			lsnTracker.IncrementLSN(ns)
+		}
+
+		//use the global LSN as a sequence number
+		dataMsg.SeqNum = lsnTracker.GetGlobalLSN()
 		dataChannel <- dataMsg
 
 		//update the last seen resume token
 		cc.flowCDCResumeTokenMap.AddToken(changeStreamLoc, changeStream.ResumeToken())
 	}
-
 }
 
 func (cc *Connector) convertChangeStreamEventToDataMessage(change bson.M) (iface.DataMessage, error) {

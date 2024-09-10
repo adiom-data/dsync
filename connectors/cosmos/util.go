@@ -7,18 +7,23 @@
 package cosmos
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -132,15 +137,13 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 	return fmt.Sprintf("%v", keyJsonMap["Rid"]), nil
 }
 
-// update LSN and changeStreamEvents counters atomically, returns the updated WriteLSN value after incrementing to use as the SeqNum
-func (cc *Connector) updateLSNTracking(reader *ReaderProgress, lsn *int64) int64 {
+// update changeStreamEvents progress counters atomically
+func (cc *Connector) updateChangeStreamProgressTracking(reader *ReaderProgress) {
 	cc.muProgressMetrics.Lock()
 	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
-	*lsn++
-	cc.status.WriteLSN++
 	cc.status.ProgressMetrics.ChangeStreamEvents++
-	return cc.status.WriteLSN
+	return
 }
 
 // create a find query for a task
@@ -266,4 +269,69 @@ func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	nsStatus.EstimatedDocsCopied++
 	cc.status.ProgressMetrics.NumDocsSynced++
 	cc.muProgressMetrics.Unlock()
+}
+
+// Get the continuation value from a change stream resume token
+// Example format of _id._data.Data: {"V":2,"Rid":"nGERANjum1c=","Continuation":[{"FeedRange":{"type":"Effective Partition Key Range","value":{"min":"","max":"FF"}},"State":{"type":"continuation","value":"\"291514\""}}]}
+func extractJSONChangeStreamContinuationValue(jsonBytes []byte) (int, error) {
+	var result map[string]interface{}
+
+	// Decode the JSON string
+	err := json.Unmarshal(jsonBytes, &result)
+	if err != nil {
+		return 0, fmt.Errorf("error decoding JSON: %v", err)
+	}
+	// Extract the continuation value
+	contArray := result["Continuation"].([]interface{})
+	contTotal := 0
+	for _, contValue := range contArray {
+		contString := contValue.(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
+		cont, err := strconv.Atoi(strings.Trim(contString, `"`))
+		if err != nil {
+			return 0, fmt.Errorf("error converting continuation value to int: %v", err)
+		}
+		contTotal += cont
+	}
+	return contTotal, nil
+}
+
+// Extract the continuation value based on the kind of the changestream resume token
+func getChangeStreamContinuationValue(change bson.M) (int, error) {
+	kind := change["_id"].(bson.M)["_kind"].(int32)
+	switch kind {
+	case 1: // JSON string in _data
+		jsonBytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+		return extractJSONChangeStreamContinuationValue(jsonBytes)
+	case 4: // GZIP compressed JSON string in _data
+		bytesCompressed := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+		jsonBytes, err := gzipDecompress(bytesCompressed)
+		if err != nil {
+			return 0, fmt.Errorf("error decompressing continuation value: %v", err)
+		}
+		return extractJSONChangeStreamContinuationValue(jsonBytes)
+	default:
+		return 0, fmt.Errorf("unsupported kind of change stream event: %v", kind)
+	}
+}
+
+// gzipDecompress decompresses the input gzipped byte array and returns the original data
+func gzipDecompress(compressedData []byte) ([]byte, error) {
+	// Create a bytes reader to read the compressed data
+	buffer := bytes.NewBuffer(compressedData)
+
+	// Create a new gzip reader
+	gz, err := gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+	defer gz.Close()
+
+	gz.Multistream(false)
+	// Decompress the data
+	var decompressedData bytes.Buffer
+	if _, err := io.Copy(&decompressedData, gz); err != nil {
+		return nil, err
+	}
+
+	return decompressedData.Bytes(), nil
 }
