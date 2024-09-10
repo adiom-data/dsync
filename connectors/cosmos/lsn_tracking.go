@@ -57,7 +57,9 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 			}
 			defer changeStream.Close(ctx)
 
-			//process the change stream events for this change stream
+			useCosmosContinuationToken := true
+
+			// process the change stream events for this change stream
 			for changeStream.Next(ctx) {
 				var change bson.M
 				if err := changeStream.Decode(&change); err != nil {
@@ -65,16 +67,23 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []nam
 					continue
 				}
 
-				//extract the continuation value from the change stream event
-				continuation, err := extractChangeStreamContinuationValue(change)
-				if err != nil {
-					slog.Warn(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
-					continue
+				// extract the continuation value from the change stream event
+				// if we fail to extract the continuation value, we will stop using the Cosmos continuation token for this change stream
+				if useCosmosContinuationToken {
+					continuation, err := getChangeStreamContinuationValue(change)
+					if err != nil {
+						slog.Warn(fmt.Sprintf("Error extracting continuation value for namespace %v from change event: %v. Replication lag might be inaccurate", ns, err))
+						useCosmosContinuationToken = false //don't try to extract the continuation value anymore
+						lsnTracker.IncrementLSN(ns)        //increment the LSN
+					} else {
+						// store the continuation value in the lsn tracker
+						lsnTracker.SetLSN(ns, int64(continuation))
+					}
+				} else {
+					lsnTracker.IncrementLSN(ns)
 				}
 
-				//store the continuation value in the lsn tracker
-				lsnTracker.SetLSN(ns, int64(continuation))
-				//update the global LSN
+				// update the global LSN
 				atomic.StoreInt64(&cc.status.WriteLSN, lsnTracker.GetGlobalLSN())
 			}
 
@@ -129,4 +138,11 @@ func (l *MultiNsLSNTracker) GetGlobalLSN() int64 {
 		globalLSN += lsn
 	}
 	return globalLSN
+}
+
+// IncrementLSN increments the LSN for a specific namespace.
+func (l *MultiNsLSNTracker) IncrementLSN(namespace namespace) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.namespaces[namespace]++
 }

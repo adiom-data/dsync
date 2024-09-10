@@ -95,6 +95,9 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 
 // Reads and processes change stream events, and sends messages to the data channel
 func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgress *ReaderProgress, changeStream *mongo.ChangeStream, changeStreamLoc iface.Location, dataChannel chan<- iface.DataMessage, lsnTracker *MultiNsLSNTracker) {
+
+	useCosmosContinuationToken := true //use cosmos continuation token until we fail to extract the continuation value
+
 	for changeStream.Next(ctx) {
 		var change bson.M
 		if err := changeStream.Decode(&change); err != nil {
@@ -114,13 +117,21 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 		//send the data message
 		cc.updateChangeStreamProgressTracking(readerProgress)
 
-		//extract the continuation value from the change stream event and set it in the LSN tracker
-		continuation, err := extractChangeStreamContinuationValue(change)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("Error extracting continuation value from change event: %v", err))
+		// extract the continuation value from the change stream event
+		// if we fail to extract the continuation value, we will stop using the Cosmos continuation token for this change stream
+		ns := namespace{db: changeStreamLoc.Database, col: changeStreamLoc.Collection}
+		if useCosmosContinuationToken {
+			continuation, err := getChangeStreamContinuationValue(change)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("Error extracting continuation value for namespace %v from change event: %v. Replication lag might be inaccurate", ns, err))
+				useCosmosContinuationToken = false //don't try to extract the continuation value anymore
+				lsnTracker.IncrementLSN(ns)        //increment the LSN
+			} else {
+				// store the continuation value in the lsn tracker
+				lsnTracker.SetLSN(ns, int64(continuation))
+			}
 		} else {
-			ns := namespace{db: changeStreamLoc.Database, col: changeStreamLoc.Collection}
-			lsnTracker.SetLSN(ns, int64(continuation))
+			lsnTracker.IncrementLSN(ns)
 		}
 
 		//use the global LSN as a sequence number

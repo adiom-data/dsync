@@ -7,9 +7,12 @@
 package cosmos
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"strconv"
@@ -268,23 +271,67 @@ func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Unlock()
 }
 
-// Get the continuation value from a change stream event
+// Get the continuation value from a change stream resume token
 // Example format of _id._data.Data: {"V":2,"Rid":"nGERANjum1c=","Continuation":[{"FeedRange":{"type":"Effective Partition Key Range","value":{"min":"","max":"FF"}},"State":{"type":"continuation","value":"\"291514\""}}]}
-func extractChangeStreamContinuationValue(change bson.M) (int, error) {
-	bytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+func extractJSONChangeStreamContinuationValue(jsonBytes []byte) (int, error) {
 	var result map[string]interface{}
 
 	// Decode the JSON string
-	err := json.Unmarshal(bytes, &result)
+	err := json.Unmarshal(jsonBytes, &result)
 	if err != nil {
 		return 0, fmt.Errorf("error decoding JSON: %v", err)
 	}
-
 	// Extract the continuation value
-	//TODO: we should check if it's always an array of one, especially for Cosmos namespaces with multiple partitions
-	continuation := result["Continuation"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
-	if len(result["Continuation"].([]interface{})) > 1 {
-		slog.Warn(fmt.Sprintf("Multiple continuations found: %+v", result["Continuation"]))
+	contArray := result["Continuation"].([]interface{})
+	contTotal := 0
+	for _, contValue := range contArray {
+		contString := contValue.(map[string]interface{})["State"].(map[string]interface{})["value"].(string)
+		cont, err := strconv.Atoi(strings.Trim(contString, `"`))
+		if err != nil {
+			return 0, fmt.Errorf("error converting continuation value to int: %v", err)
+		}
+		contTotal += cont
 	}
-	return strconv.Atoi(strings.Trim(continuation, `"`))
+	return contTotal, nil
+}
+
+// Extract the continuation value based on the kind of the changestream resume token
+func getChangeStreamContinuationValue(change bson.M) (int, error) {
+	kind := change["_id"].(bson.M)["kind"].(int)
+	switch kind {
+	case 1: // JSON string in _data
+		jsonBytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+		return extractJSONChangeStreamContinuationValue(jsonBytes)
+	case 4: // GZIP compressed JSON string in _data
+		bytesCompressed := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
+		jsonBytes, err := gzipDecompress(bytesCompressed)
+		if err != nil {
+			return 0, fmt.Errorf("error decompressing continuation value: %v", err)
+		}
+		return extractJSONChangeStreamContinuationValue(jsonBytes)
+	default:
+		return 0, fmt.Errorf("unsupported kind of change stream event: %v", kind)
+	}
+}
+
+// gzipDecompress decompresses the input gzipped byte array and returns the original data
+func gzipDecompress(compressedData []byte) ([]byte, error) {
+	// Create a bytes reader to read the compressed data
+	buffer := bytes.NewBuffer(compressedData)
+
+	// Create a new gzip reader
+	gz, err := gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+	defer gz.Close()
+
+	gz.Multistream(false)
+	// Decompress the data
+	var decompressedData bytes.Buffer
+	if _, err := io.Copy(&decompressedData, gz); err != nil {
+		return nil, err
+	}
+
+	return decompressedData.Bytes(), nil
 }
