@@ -111,5 +111,14 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 		return o, fmt.Errorf("cosmos-deletes-cdc flag cannot be used with /dev/null destination")
 	}
 
+	// can't use /dev/null connector as destination when reverse is enabled
+	if o.Reverse && o.DstConnString == "/dev/null" {
+		return o, fmt.Errorf("reverse flag cannot be used with /dev/null destination")
+	}
+	// can't use /dev/random connector as source when reverse is enabled
+	if o.Reverse && o.SrcConnString == "/dev/random" {
+		return o, fmt.Errorf("reverse flag cannot be used with /dev/random source")
+	}
+
 	return o, nil
 }
