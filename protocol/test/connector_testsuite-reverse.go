@@ -28,7 +28,7 @@ import (
 * Scenario:
 * 1) Start a flow in cdc-only mode
 * 2) Check the read plan
-* 3) Interrupt after a first CDC barrier
+* 3) Interrupt after the fist message on the data channel (that would be the first CDC barrier or the first write)
  */
 func (suite *ConnectorTestSuite) TestConnectorCDCOnly() {
 	ctx := context.Background()
@@ -82,29 +82,19 @@ func (suite *ConnectorTestSuite) TestConnectorCDCOnly() {
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
 		flowComplete <- struct{}{}
 	})
-	messageCount := 0
 
 	// Start a go routine to read from the data channel until it's closed
 	dataReader := func(channel chan iface.DataMessage) {
 		for {
-			msg, ok := <-channel
+			_, ok := <-channel
 			if !ok {
 				break
 			}
 
-			if msg.MutationType != iface.MutationType_Barrier {
-				// This is a data message
-				messageCount++
-			} else {
-				// it's a barrier
-				if msg.BarrierType == iface.BarrierType_CdcResumeTokenUpdate {
-					// let's interrupt the flow
-					err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
-						return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
-					}, NonBlockingTimeout, flowID)
-					assert.NoError(suite.T(), err)
-				}
-			}
+			err = RunWithTimeout(suite.T(), connector, func(receiver interface{}, args ...interface{}) error {
+				return receiver.(iface.ConnectorICoordinatorSignal).Interrupt(args[0].(iface.FlowID))
+			}, NonBlockingTimeout, flowID)
+			assert.NoError(suite.T(), err)
 		}
 	}
 	go dataReader(dataChannel)
