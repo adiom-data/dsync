@@ -221,7 +221,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 	cc.restoreProgressDetails(tasks)
 
-	if len(tasks) == 0 {
+	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
 	}
 
@@ -335,6 +335,12 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// kick off the initial sync
 	go func() {
 		defer close(initialSyncDone)
+
+		// if we are in CDC mode, we skip the initial sync
+		if options.Mode == iface.SyncModeCDC {
+			slog.Info(fmt.Sprintf("Connector %s is skipping initial sync for flow %s", cc.id, flowId))
+			return
+		}
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", cc.id, flowId))
 		cc.status.SyncState = iface.InitialSyncSyncState
@@ -471,7 +477,7 @@ func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	type WriterProgress struct {
 		dataMessages atomic.Uint64
 	}
-	writerProgress := WriterProgress{ }
+	writerProgress := WriterProgress{}
 
 	// initialize with 0 data messages
 	writerProgress.dataMessages.Store(0)
@@ -530,7 +536,7 @@ func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", cc.id, flowId, err))
 		}
-		
+
 	}()
 	return nil
 }
@@ -554,7 +560,7 @@ func (cc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
 		cc.status.SyncState = iface.ReadPlanningSyncState
-		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace)
+		namespaces, tasks, err := cc.createInitialCopyTasks(options.Namespace, options.Mode)
 
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))

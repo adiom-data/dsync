@@ -18,6 +18,7 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "INFO"
 
+// XXX: should these definitions be moved to the RunnerLocal?
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
@@ -25,6 +26,10 @@ var validSources = []string{"MongoDB", "CosmosDB"}
 var validDestinations = []string{"MongoDB", "CosmosDB"}
 
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
+
+var validModes = []string{"Full", "CDC"}
+
+const defaultMode = "Full"
 
 type ListFlag struct {
 	Values []string
@@ -111,6 +116,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage: "cleanup metadata for an existing flow",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:     "reverse",
+			Usage:    "start the flow in reverse mode - destination to source, and skip the initial data copy",
+			Category: "Special Commands",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "cosmos-deletes-cdc",
 			Usage: "generate CDC events for CosmosDB deletes",
 		}),
@@ -133,6 +143,19 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			},
 			Required: false,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "mode",
+			Usage: fmt.Sprintf("mode of operation: %s.", strings.Join(validModes, ",")),
+			Action: func(ctx *cli.Context, source string) error {
+				if !slices.Contains(validModes, source) {
+					return fmt.Errorf("unsupported mode setting %v", source)
+				}
+				return nil
+			},
+			DefaultText: defaultMode,
+			Required:    false,
+			Category:    "Flow Options",
+		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "pprof",
 			Usage: "enable pprof profiling on localhost:8080",
@@ -144,59 +167,59 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-max-namespaces",
-			Usage: "maximum number of namespaces that can be copied from the CosmosDB conenctor. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
+			Name:     "cosmos-max-namespaces",
+			Usage:    "maximum number of namespaces that can be copied from the CosmosDB conenctor. Recommended to keep this number under 15 to avoid performance issues. Defaults to 8.",
 			Required: false,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-server-timeout",
+			Name:     "cosmos-server-timeout",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-ping-timeout",
+			Name:     "cosmos-ping-timeout",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-resume-token-interval",
+			Name:     "cosmos-resume-token-interval",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-writer-batch-size",
+			Name:     "cosmos-writer-batch-size",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:  "cosmos-doc-partition",
+			Name:     "cosmos-doc-partition",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-delete-interval",
+			Name:     "cosmos-delete-interval",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-copiers",
+			Name:     "cosmos-parallel-copiers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-writers",
+			Name:     "cosmos-parallel-writers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-integrity-check",
+			Name:     "cosmos-parallel-integrity-check",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:  "cosmos-parallel-partition-workers",
+			Name:     "cosmos-parallel-partition-workers",
 			Required: false,
-			Hidden: true,
+			Hidden:   true,
 		}),
 	}
 
