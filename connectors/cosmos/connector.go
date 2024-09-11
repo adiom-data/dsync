@@ -336,8 +336,8 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	go func() {
 		defer close(initialSyncDone)
 
-		// if we are in CDC mode, we skip the initial sync
-		if options.Mode == iface.SyncModeCDC {
+		// if we have no tasks (e.g. we are in CDC mode), we skip the initial sync
+		if len(tasks) == 0 {
 			slog.Info(fmt.Sprintf("Connector %s is skipping initial sync for flow %s", cc.id, flowId))
 			return
 		}
