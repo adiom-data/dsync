@@ -205,7 +205,7 @@ func (c *Simple) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 
 	c.addFlow(&fdet)
 
-	slog.Debug("Initialized flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%v", o))
+	slog.Debug("Initialized flow with ID: " + fmt.Sprintf("%v", fid) + " and options: " + fmt.Sprintf("%+v", o))
 
 	return fid, nil
 }
