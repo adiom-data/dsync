@@ -39,7 +39,7 @@ type StateStoreSettings struct {
 
 func NewMongoStateStore(settings StateStoreSettings) *StateStore {
 	settings.serverConnectTimeout = 10 * time.Second
-	settings.pingTimeout = 2 * time.Second
+	settings.pingTimeout = 10 * time.Second
 
 	return &StateStore{settings: settings}
 }
@@ -61,7 +61,7 @@ func (s *StateStore) Setup(ctx context.Context) error {
 	// Connect to the MongoDB instance
 	ctxConnect, cancelConnectCtx := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
 	defer cancelConnectCtx()
-	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetRegistry(reg)
+	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetConnectTimeout(s.settings.serverConnectTimeout).SetRegistry(reg)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
