@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 )
@@ -36,9 +37,9 @@ const (
 	cosmosDefaultMaxNumNamespaces = 8
 )
 
-var validModes = []string{"Full", "CDC"}
+var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC}
 
-const defaultMode = "Full"
+const defaultMode = iface.SyncModeFull
 
 type ListFlag struct {
 	Values []string

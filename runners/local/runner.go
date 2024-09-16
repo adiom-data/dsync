@@ -388,6 +388,6 @@ func applyReverseIfNeeded(settings *RunnerLocalSettings) {
 		slog.Info("Reversing the flow")
 		settings.SrcConnString, settings.DstConnString = settings.DstConnString, settings.SrcConnString
 		settings.SrcType, settings.DstType = settings.DstType, settings.SrcType
-		settings.SyncMode = "CDC"
+		settings.SyncMode = iface.SyncModeCDC
 	}
 }
