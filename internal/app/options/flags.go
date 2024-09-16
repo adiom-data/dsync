@@ -22,6 +22,8 @@ var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
 
+var validDestinations = []string{"MongoDB", "CosmosDB"}
+
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
 
 const (
@@ -88,6 +90,17 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Aliases:  []string{"d"},
 			Category: "Endpoint Configuration",
 			Required: true,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "destinationtype",
+			Usage: fmt.Sprintf("destination database type (%s). When not specified, will autodetect using the destination URI", strings.Join(validDestinations, ",")),
+			Action: func(ctx *cli.Context, destination string) error {
+				if !slices.Contains(validDestinations, destination) {
+					return fmt.Errorf("unsupported destinationtype setting %v", destination)
+				}
+				return nil
+			},
+			Required: false,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "metadata",

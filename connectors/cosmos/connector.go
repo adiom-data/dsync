@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -147,7 +148,7 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	cc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities, current capabilities are source only
-	cc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: false, IntegrityCheck: true, Resumability: true}
+	cc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	progressMetrics := iface.ProgressMetrics{
 		NumDocsSynced:          0,
@@ -460,7 +461,83 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 }
 
 func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
-	return errors.New("CosmosConnector does not write to destination yet")
+	// create new context so that the flow can be cancelled gracefully if needed
+	cc.flowCtx, cc.flowCancelFunc = context.WithCancel(cc.ctx)
+	cc.flowId = flowId
+
+	// get data channel from transport interface based on the provided ID
+	dataChannel, err := cc.t.GetDataChannelEndpoint(dataChannelId)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
+		return err
+	}
+
+	// create writer progress for keeping track of number of data messages
+	type WriterProgress struct {
+		dataMessages atomic.Uint64
+	}
+	writerProgress := WriterProgress{ }
+
+	// initialize with 0 data messages
+	writerProgress.dataMessages.Store(0)
+
+	// create a batch assembly for initializing/starting parallel writers
+	flowParallelWriter := NewParallelWriter(cc.flowCtx, cc, cc.settings.NumParallelWriters)
+	flowParallelWriter.Start()
+
+	// start printing progress
+	go func() {
+		ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-cc.flowCtx.Done():
+				return
+			case <-ticker.C:
+				// print writer progress
+				slog.Debug(fmt.Sprintf("Writer Progress: Data Messages - %d", writerProgress.dataMessages.Load()))
+			}
+		}
+	}()
+
+	// start processing messages
+	go func() {
+		for loop := true; loop; {
+			select {
+			case <-cc.flowCtx.Done():
+				loop = false
+			case dataMsg, ok := <-dataChannel:
+				if !ok {
+					// channel is closed which is a signal for us to stop
+					loop = false
+					break
+				}
+				// check message is a barrier first
+				if dataMsg.MutationType == iface.MutationType_Barrier {
+					err := flowParallelWriter.ScheduleBarrier(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
+					}
+				} else {
+					// process the data message
+					writerProgress.dataMessages.Add(1)
+					cc.status.WriteLSN = max(dataMsg.SeqNum, cc.status.WriteLSN)
+					err := flowParallelWriter.ScheduleDataMessage(dataMsg)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
+					}
+				}
+			}
+		}
+
+		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", cc.id, flowId))
+		err := cc.coord.NotifyDone(flowId, cc.id)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", cc.id, flowId, err))
+		}
+		
+	}()
+	return nil
 }
 
 func (cc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {

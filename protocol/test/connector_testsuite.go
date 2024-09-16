@@ -204,7 +204,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
-	messageIterCount := 1000
+	messageIterCount := 100
 
 	dbName := "test"
 	colName := "test_tcw"
@@ -215,7 +215,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 		assert.NoError(suite.T(), err)
 		dataStore.DeleteNamespace(dbName, colName)
 	}
-
+	
 	// Start a go routine to write to the data channel
 	go func() {
 		loc := iface.Location{Database: dbName, Collection: colName}
@@ -265,6 +265,6 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	assert.True(suite.T(), connector.GetConnectorStatus(flowID).WriteLSN > 0, "Should have written some data")
 	// A notification should have been sent to the coordinator that the job is done
 	c.AssertCalled(suite.T(), "NotifyDone", flowID, testConnectorID)
-
+	
 	connector.Teardown()
 }

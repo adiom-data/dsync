@@ -32,14 +32,15 @@ type StateStore struct {
 
 type StateStoreSettings struct {
 	ConnectionString string
-
+	ConnectionStringType connectorMongo.MongoFlavor
 	serverConnectTimeout time.Duration
 	pingTimeout          time.Duration
 }
 
 func NewMongoStateStore(settings StateStoreSettings) *StateStore {
-	settings.serverConnectTimeout = 10 * time.Second
+	settings.serverConnectTimeout = 20 * time.Second
 	settings.pingTimeout = 2 * time.Second
+	settings.ConnectionStringType = connectorMongo.GetMongoFlavor(settings.ConnectionString);
 
 	return &StateStore{settings: settings}
 }
@@ -47,10 +48,10 @@ func NewMongoStateStore(settings StateStoreSettings) *StateStore {
 func (s *StateStore) Setup(ctx context.Context) error {
 	s.ctx = ctx
 
-	// Check that the provided connection string is pointing to a genuine MongoDB instance
+	// Check that the provided connection string is pointing to a genuine MongoDB or CosmosDB instance
 	// Otherwise we might get strange errors later on
-	if connectorMongo.GetMongoFlavor(s.settings.ConnectionString) != connectorMongo.FlavorMongoDB {
-		return fmt.Errorf("statestore connection string should point to a genuine MongoDB instance")
+	if s.settings.ConnectionStringType != connectorMongo.FlavorMongoDB && s.settings.ConnectionStringType != connectorMongo.FlavorCosmosDB {
+		return fmt.Errorf("statestore connection string should point to a genuine MongoDB or CosmosDB instance")
 	}
 
 	// Register bson.M as a type map entry to ensure proper decoding of interface{} types
@@ -64,6 +65,7 @@ func (s *StateStore) Setup(ctx context.Context) error {
 	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetRegistry(reg)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
+		slog.Debug("Error connecting to MongoDB instance")
 		return err
 	}
 	s.client = client
@@ -73,6 +75,7 @@ func (s *StateStore) Setup(ctx context.Context) error {
 	defer cancelPingCtx()
 	err = s.client.Ping(ctxPing, nil)
 	if err != nil {
+		slog.Debug("Error checking connection")
 		return err
 	}
 
