@@ -28,7 +28,7 @@ var (
 )
 
 // returns the list of namespaces and the tasks to be executed (partitioned if necessary)
-func (cc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.Namespace, []iface.ReadPlanTask, error) {
+func (cc *Connector) createInitialCopyTasks(namespaces []string, mode string) ([]iface.Namespace, []iface.ReadPlanTask, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
 	var nsTasks []iface.Namespace
@@ -71,12 +71,16 @@ func (cc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.Namesp
 		return nil, nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.MaxNumNamespaces)
 	}
 
-	partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)
-	//shuffle the tasks to ensure we balance the workload across different namespaces
-	if len(nsTasks) > 1 {
-		shuffleTasks(partitionedTasks)
+	if mode != iface.SyncModeCDC {
+		partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)
+		//shuffle the tasks to ensure we balance the workload across different namespaces
+		if len(nsTasks) > 1 {
+			shuffleTasks(partitionedTasks)
+		}
+		return nsTasks, partitionedTasks, err
 	}
-	return nsTasks, partitionedTasks, err
+
+	return nsTasks, nil, nil
 }
 
 // function to shuffle the tasks

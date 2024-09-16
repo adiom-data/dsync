@@ -29,6 +29,7 @@ type Options struct {
 	Verify   bool
 	Cleanup  bool
 	Progress bool
+	Reverse  bool
 
 	CosmosDeletesEmu bool
 
@@ -49,6 +50,7 @@ type Options struct {
 	CosmosWriterMaxBatchSize             int
 	CosmosTargetDocCountPerPartition     int64
 	CosmosDeletesCheckInterval           time.Duration
+	Mode                                 string
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -81,6 +83,8 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CosmosWriterMaxBatchSize = c.Int("cosmos-writer-batch-size")
 	o.CosmosTargetDocCountPerPartition = c.Int64("cosmos-doc-partition")
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
+	o.Mode = c.String("mode")
+	o.Reverse = c.Bool("reverse")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {
@@ -105,12 +109,21 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	}
 
 	o.CosmosDeletesEmu = c.Bool("cosmos-deletes-cdc")
-	if o.Sourcetype != "CosmosDB" && o.CosmosDeletesEmu {
+	if !o.Reverse && o.Sourcetype != "CosmosDB" && o.CosmosDeletesEmu {
 		return o, fmt.Errorf("cosmos-deletes-cdc flag is only valid for CosmosDB source")
 	}
-	if (o.DstConnString == "/dev/null") && o.CosmosDeletesEmu {
+	if !o.Reverse && (o.DstConnString == "/dev/null") && o.CosmosDeletesEmu {
 		// /dev/null doesn't offer a persistent index
 		return o, fmt.Errorf("cosmos-deletes-cdc flag cannot be used with /dev/null destination")
+	}
+
+	// can't use /dev/null connector as destination when reverse is enabled
+	if o.Reverse && o.DstConnString == "/dev/null" {
+		return o, fmt.Errorf("reverse flag cannot be used with /dev/null destination")
+	}
+	// can't use /dev/random connector as source when reverse is enabled
+	if o.Reverse && o.SrcConnString == "/dev/random" {
+		return o, fmt.Errorf("reverse flag cannot be used with /dev/random source")
 	}
 
 	return o, nil
