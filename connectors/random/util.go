@@ -28,6 +28,19 @@ type ReaderProgress struct {
 	tasksCompleted     atomic.Uint64
 }
 
+// checks if the location key exists in the map, if not creates a new IndexMap for the given location to store ids
+func (rc *Connector) getOrCreateLocIndexMap(loc iface.Location) *IndexMap {
+	rc.docMapMutex.Lock()
+	defer rc.docMapMutex.Unlock()
+
+	docMap, exists := rc.docMap[loc]
+	if !exists {
+		rc.docMap[loc] = NewIndexMap()
+		docMap = rc.docMap[loc]
+	}
+	return docMap
+}
+
 /*
 	 	function processes a data generation task for the initial generation.
 		It generates random documents for the specified collection in the task and sends them as single data messages to the channel
@@ -111,11 +124,7 @@ func (rc *Connector) generateRandomDocument() map[string]interface{} {
 */
 func (rc *Connector) SingleInsertDataMessage(loc iface.Location, doc map[string]interface{}) (iface.DataMessage, error) {
 	//checks if the location key exists in the map, if not creates a new IndexMap for the given location to store ids
-	docMap, exists := rc.docMap[loc]
-	if !exists {
-		rc.docMap[loc] = NewIndexMap()
-		docMap = rc.docMap[loc]
-	}
+	docMap := rc.getOrCreateLocIndexMap(loc)
 	id := docMap.AddRandomID() //generate random id and add to IndexMap
 	doc["_id"] = id            //add id field to document
 	data, err := bson.Marshal(doc)
@@ -142,13 +151,7 @@ func (rc *Connector) BatchInsertDataMessage(loc iface.Location, docs []map[strin
 	var err error
 	dataBatch = make([][]byte, len(docs)) //create slice of byte slices to store marshaled documents for data message
 
-	//Check if index map exists for the location, if not create a new one
-	//XXX: Should we make this atomic? With current implementation only one thread is writing to a given Index Map for a particular location, so no current concurrency issues
-	docMap, exists := rc.docMap[loc]
-	if !exists {
-		rc.docMap[loc] = NewIndexMap()
-		docMap = rc.docMap[loc]
-	}
+	docMap := rc.getOrCreateLocIndexMap(loc)
 
 	//prepare the dataBatch with marshaled documents
 	for i, doc := range docs {
@@ -174,11 +177,16 @@ func (rc *Connector) generateChangeStreamEvent(operation string, readerProgress 
 	col := gofakeit.Number(1, rc.settings.numCollectionsPerDatabase)
 	loc := iface.Location{Database: fmt.Sprintf("db%d", db), Collection: fmt.Sprintf("col%d", col)}
 
+	docMap := rc.getOrCreateLocIndexMap(loc)
+	if docMap.GetNumDocs() == 0 && (operation == "delete" || operation == "update") {
+		//do an insert instead
+		operation = "insert"
+	}
+
 	switch operation { //switch between single inserts, batch inserts, updates, and deletes, depends on the operation generated
 
 	//insert case generates a single insert data message with a random document
 	case "insert":
-		docMap := rc.docMap[loc]                                     //get the IndexMap for the generated collection
 		if docMap.GetNumDocs() >= rc.settings.maxDocsPerCollection { //if the collection is full, no op and return
 			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert more, lsn %d", docMap.GetNumDocs(), *lsn))
 			return iface.DataMessage{}, nil
@@ -190,7 +198,6 @@ func (rc *Connector) generateChangeStreamEvent(operation string, readerProgress 
 
 	//insertBatch case generates a batch insert data message with a slice of random documents
 	case "insertBatch":
-		docMap := rc.docMap[loc]                                               //get the IndexMap for the generated collection
 		if docMap.GetNumDocs() > rc.settings.maxDocsPerCollection-batch_size { //if the collection is almost full and cannot fit a batch, no op and return
 			slog.Debug(fmt.Sprintf("%d docs in collection, cannot insert %d docs max reached, lsn %d", docMap.GetNumDocs(), batch_size, *lsn))
 			return iface.DataMessage{}, nil
@@ -205,7 +212,6 @@ func (rc *Connector) generateChangeStreamEvent(operation string, readerProgress 
 
 	//update case generates an update data message with a random document by generating a random id from the IndexMap
 	case "update":
-		docMap := rc.docMap[loc]
 		id := docMap.GetRandomKey() //get random id from the IndexMap to update
 		doc := rc.generateRandomDocument()
 		doc["_id"] = id //generate new document for the given id and return update data message
@@ -217,7 +223,6 @@ func (rc *Connector) generateChangeStreamEvent(operation string, readerProgress 
 
 	//delete case generates a delete data message with a random id from the IndexMap
 	case "delete":
-		docMap := rc.docMap[loc]
 		id := docMap.DeleteRandomKey()
 		idType, idVal, _ := bson.MarshalValue(id)
 		rc.incrementProgress(readerProgress, lsn)

@@ -23,9 +23,10 @@ type Connector struct {
 	settings ConnectorSettings
 	ctx      context.Context
 
-	t      iface.Transport
-	id     iface.ConnectorID
-	docMap map[iface.Location]*IndexMap //map of locations to map of document IDs
+	t           iface.Transport
+	id          iface.ConnectorID
+	docMap      map[iface.Location]*IndexMap //map of locations to map of document IDs
+	docMapMutex sync.RWMutex
 
 	connectorType         iface.ConnectorType
 	connectorCapabilities iface.ConnectorCapabilities
@@ -118,7 +119,7 @@ func (rc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	rc.flowctx, rc.flowCancelFunc = context.WithCancel(rc.ctx)
 
 	tasks := readPlan.Tasks
-	if len(tasks) == 0 {
+	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
 	}
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %v", tasks))
@@ -170,6 +171,12 @@ func (rc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// Start the initial generation
 	go func() {
 		defer close(initialGenerationDone)
+
+		// if we have no tasks (e.g. we are in CDC mode), we skip the initial sync
+		if len(tasks) == 0 {
+			slog.Info(fmt.Sprintf("Null Read Connector %s is skipping initial sync for flow %s", rc.id, flowId))
+			return
+		}
 
 		slog.Info(fmt.Sprintf("Null Read Connector %s is starting initial data generation for flow %s", rc.id, flowId))
 		//create a channel to distribute tasks to copiers
@@ -278,8 +285,13 @@ func (rc *Connector) Interrupt(flowId iface.FlowID) error {
 
 func (rc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	go func() {
-		tasks := rc.CreateInitialGenerationTasks()
-		plan := iface.ConnectorReadPlan{Tasks: tasks}
+		var tasks []iface.ReadPlanTask
+		if options.Mode != iface.SyncModeCDC {
+			tasks = rc.CreateInitialGenerationTasks()
+		} else {
+			tasks = nil
+		}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: []byte{1}} //we supply a faux resume token to follow the spec
 		err := rc.coord.PostReadPlanningResult(flowId, rc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))

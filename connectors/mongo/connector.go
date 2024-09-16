@@ -157,7 +157,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	mc.flowId = flowId
 
 	tasks := readPlan.Tasks
-	if len(tasks) == 0 {
+	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
 	}
 	mc.flowCDCResumeToken = readPlan.CdcResumeToken
@@ -349,6 +349,11 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// kick off the initial sync
 	go func() {
 		defer close(initialSyncDone)
+		// if we have no tasks (e.g. we are in CDC mode), we skip the initial sync
+		if len(tasks) == 0 {
+			slog.Info(fmt.Sprintf("Connector %s is skipping initial sync for flow %s", mc.id, flowId))
+			return
+		}
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
 
@@ -556,10 +561,15 @@ func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 			return
 		}
 
-		tasks, err := mc.createInitialCopyTasks(options.Namespace)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
-			return
+		var tasks []iface.ReadPlanTask
+		if options.Mode == iface.SyncModeCDC {
+			tasks = nil
+		} else {
+			tasks, err = mc.createInitialCopyTasks(options.Namespace)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to create initial copy tasks: %v", err))
+				return
+			}
 		}
 		mc.flowCDCResumeToken = resumeToken
 		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: mc.flowCDCResumeToken}

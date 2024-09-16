@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 )
@@ -18,6 +19,7 @@ import (
 // DefaultVerbosity is the default verbosity level for the application.
 const DefaultVerbosity = "INFO"
 
+// XXX: should these definitions be moved to the RunnerLocal?
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
 var validSources = []string{"MongoDB", "CosmosDB"}
@@ -35,6 +37,10 @@ const (
 	cosmosDefaultMaxNumNamespaces = 8
 )
 
+var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC}
+
+const defaultMode = iface.SyncModeFull
+
 type ListFlag struct {
 	Values []string
 }
@@ -46,7 +52,7 @@ func (f *ListFlag) Set(value string) error {
 }
 
 func (f *ListFlag) String() string {
-	return strings.Join(f.Values, ",")
+	return strings.Join(f.Values, ", ")
 }
 
 // GetFlagsAndBeforeFunc defines all CLI options as flags and returns
@@ -127,6 +133,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Category: "Special Commands",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:     "reverse",
+			Usage:    "start the flow in reverse mode - destination to source, and skip the initial data copy",
+			Category: "Special Commands",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "cosmos-deletes-cdc",
 			Usage:    "generate CDC events for CosmosDB deletes",
 			Category: "Cosmos DB-specific Options",
@@ -150,6 +161,19 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			},
 			Required: false,
 			Category: "Flow Options",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "mode",
+			Usage: fmt.Sprintf("mode of operation: %s.", strings.Join(validModes, ",")),
+			Action: func(ctx *cli.Context, source string) error {
+				if !slices.Contains(validModes, source) {
+					return fmt.Errorf("unsupported mode setting %v", source)
+				}
+				return nil
+			},
+			DefaultText: defaultMode,
+			Required:    false,
+			Category:    "Flow Options",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "pprof",

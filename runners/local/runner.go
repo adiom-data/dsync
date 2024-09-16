@@ -47,32 +47,34 @@ type RunnerLocalSettings struct {
 	SrcConnString        string
 	DstConnString        string
 	SrcType              string
-	DstType 			 string
+	DstType              string
 	StateStoreConnString string
 
 	NsFromString []string
 
 	VerifyRequestedFlag  bool
 	CleanupRequestedFlag bool
+	ReverseRequestedFlag bool
 
 	FlowStatusReportingInterval time.Duration
 
 	CosmosDeletesEmuRequestedFlag bool
-	
+
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
-	LoadLevel string
-	CosmosInitialSyncNumParallelCopiers int
-	CosmosNumParallelWriters int
+	LoadLevel                            string
+	CosmosInitialSyncNumParallelCopiers  int
+	CosmosNumParallelWriters             int
 	CosmosNumParallelIntegrityCheckTasks int
-	CosmosNumParallelPartitionWorkers int
-	CosmosMaxNumNamespaces int
-	CosmosServerConnectTimeout time.Duration
-	CosmosPingTimeout time.Duration
-	CosmosCdcResumeTokenUpdateInterval time.Duration
-	CosmosWriterMaxBatchSize int
-	CosmosTargetDocCountPerPartition int64
-	CosmosDeletesCheckInterval time.Duration
+	CosmosNumParallelPartitionWorkers    int
+	CosmosMaxNumNamespaces               int
+	CosmosServerConnectTimeout           time.Duration
+	CosmosPingTimeout                    time.Duration
+	CosmosCdcResumeTokenUpdateInterval   time.Duration
+	CosmosWriterMaxBatchSize             int
+	CosmosTargetDocCountPerPartition     int64
+	CosmosDeletesCheckInterval           time.Duration
+	SyncMode                             string
 }
 
 const (
@@ -81,6 +83,9 @@ const (
 )
 
 func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
+	// apply the reversal to the settings if needed
+	applyReverseIfNeeded(&settings)
+
 	r := &RunnerLocal{}
 	r.runnerProgress = RunnerSyncProgress{
 		StartTime:     time.Now(),
@@ -110,9 +115,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			}
 			if settings.CosmosNumParallelWriters != 0 {
 				cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
-			} else { // default for writer, integrity check, and partition workers are the same 
+			} else { // default for writer, integrity check, and partition workers are the same
 				cosmosSettings.NumParallelWriters = btc / 2
-			} 
+			}
 			if settings.CosmosNumParallelIntegrityCheckTasks != 0 {
 				cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
 			} else {
@@ -136,7 +141,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		cosmosSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
 		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
 		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
-	
+
 		// set all other settings to default
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
@@ -155,7 +160,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			if settings.CosmosNumParallelWriters != 0 {
 				connSettings.NumParallelWriters = settings.CosmosNumParallelWriters
-			} else {  
+			} else {
 				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 			}
 		} else {
@@ -172,15 +177,18 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
-		} 
+		}
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
 
+	//XXX: implement and use a function isStateful() from connectors to determine if a connector is stateful (although we may not care too much about it for SaaS deployments)
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
 		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.StateStoreConnString})
-	} else if !nullWrite { //if the destination is stateful, we can use it as statestore
+	} else if !nullWrite && !settings.ReverseRequestedFlag { //if the destination is stateful, we can use it as statestore
 		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.DstConnString})
+	} else if settings.ReverseRequestedFlag { //if we're reversing the flow, use the source as statestore (we assume it was stateful)
+		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.SrcConnString})
 	} else {
 		// otherwise, use a stub statestore because no statestore is needed
 		r.statestore = statestoreTemp.NewTempStateStore()
@@ -254,7 +262,7 @@ func (r *RunnerLocal) Run() error {
 		SrcId:               srcId,
 		DstId:               dstId,
 		Type:                iface.UnidirectionalFlowType,
-		SrcConnectorOptions: iface.ConnectorOptions{Namespace: r.settings.NsFromString},
+		SrcConnectorOptions: iface.ConnectorOptions{Namespace: r.settings.NsFromString, Mode: r.settings.SyncMode},
 	}
 	flowID, err := r.coord.FlowGetOrCreate(flowOptions)
 	if err != nil {
@@ -373,4 +381,13 @@ func redactMongoConnString(url string) string {
 	}
 
 	return hosts
+}
+
+func applyReverseIfNeeded(settings *RunnerLocalSettings) {
+	if settings.ReverseRequestedFlag {
+		slog.Info("Reversing the flow")
+		settings.SrcConnString, settings.DstConnString = settings.DstConnString, settings.SrcConnString
+		settings.SrcType, settings.DstType = settings.DstType, settings.SrcType
+		settings.SyncMode = iface.SyncModeCDC
+	}
 }

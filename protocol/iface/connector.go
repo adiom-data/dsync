@@ -66,6 +66,11 @@ const (
 	InitialSyncSyncState  = "InitialSync"
 )
 
+const (
+	SyncModeFull = "Full"
+	SyncModeCDC  = "CDC"
+)
+
 type ProgressMetrics struct {
 	NumNamespaces          int64
 	NumNamespacesCompleted int64 //change name
@@ -102,6 +107,7 @@ type NamespaceStatus struct {
 // Pass options to use to the connector
 type ConnectorOptions struct {
 	Namespace []string
+	Mode      string
 }
 
 // General Connector Interface
