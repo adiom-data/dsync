@@ -221,7 +221,8 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 	cc.restoreProgressDetails(tasks)
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
-	cc.resetNsProgressEstimatedDocCounts()
+	//XXX: is it safe to just do it async? we don't want to block the command from returning
+	go cc.resetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
