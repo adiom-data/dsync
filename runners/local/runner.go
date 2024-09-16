@@ -153,16 +153,26 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		connSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
+			if settings.CosmosNumParallelWriters != 0 {
+				connSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			} else {  
+				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
+			}
+		} else {
+			connSettings.NumParallelWriters = settings.CosmosNumParallelWriters
 		}
+		connSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
+		connSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
+		connSettings.PingTimeout = settings.CosmosPingTimeout
+
+		// set all other settings to default
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
-		// writer max batch size, parallel writers, timeout
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
-		}
+		} 
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
