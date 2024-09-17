@@ -34,7 +34,8 @@ type BaseMongoConnector struct {
 	ConnectorType         iface.ConnectorType
 	ConnectorCapabilities iface.ConnectorCapabilities
 
-	Coord iface.CoordinatorIConnectorSignal
+	Coord             iface.CoordinatorIConnectorSignal
+	muProgressMetrics sync.Mutex
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
@@ -115,7 +116,23 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorCapabilities
 	mc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
-	mc.Status = iface.ConnectorStatus{WriteLSN: 0}
+	progressMetrics := iface.ProgressMetrics{
+		NumDocsSynced:          0,
+		TasksTotal:             0,
+		TasksStarted:           0,
+		TasksCompleted:         0,
+		NumNamespaces:          0,
+		NumNamespacesCompleted: 0,
+		ChangeStreamEvents:     0,
+
+		NamespaceProgress: make(map[iface.Namespace]*iface.NamespaceStatus),
+		Namespaces:        make([]iface.Namespace, 0),
+	}
+
+	mc.Status = iface.ConnectorStatus{
+		WriteLSN:        0,
+		ProgressMetrics: progressMetrics,
+	}
 
 	// Get the coordinator endpoint
 	coord, err := mc.T.GetCoordinatorEndpoint("local")
@@ -161,6 +178,14 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	mc.FlowId = flowId
 
 	tasks := readPlan.Tasks
+	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
+	// create map to track progress for each namespace
+	// namespaces := make([]namespace, 0)
+
+	// reset doc counts for all namespaces to actual for more accurate progress reporting
+	mc.restoreProgressDetails(tasks)
+	go mc.resetNsProgressEstimatedDocCounts()
+
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
 	}
@@ -183,12 +208,14 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		initialSyncDocs    atomic.Uint64
 		changeStreamEvents uint64
 		tasksTotal         uint64
+		tasksStarted       uint64
 		tasksCompleted     uint64
 	}
 
 	readerProgress := ReaderProgress{ //XXX (AK, 6/2024): should we handle overflow? Also, should we use atomic types?
 		changeStreamEvents: 0,
 		tasksTotal:         uint64(len(tasks)),
+		tasksStarted:       0,
 		tasksCompleted:     0,
 	}
 
@@ -266,6 +293,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
+		mc.Status.SyncState = iface.ChangeStreamSyncState
 		defer close(changeStreamDone)
 
 		// start sending periodic barrier messages with cdc resume token updates
@@ -360,6 +388,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		}
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.ID, flowId))
+		mc.Status.SyncState = iface.InitialSyncSyncState
 
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan iface.ReadPlanTask)
@@ -377,6 +406,12 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					col := task.Def.Col
 					collection := mc.Client.Database(db).Collection(col)
 					cursor, err := collection.Find(mc.FlowCtx, bson.D{})
+
+					//retrieve namespace status struct for this namespace to update accordingly
+					ns := iface.Namespace{Db: db, Col: col}
+					nsStatus := mc.Status.ProgressMetrics.NamespaceProgress[ns]
+					mc.taskStartedProgressUpdate(nsStatus, task.Id)
+
 					if err != nil {
 						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
@@ -388,6 +423,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					loc := iface.Location{Database: db, Collection: col}
 					var dataBatch [][]byte
 					var batch_idx int
+					var docs int64
 					for cursor.Next(mc.FlowCtx) {
 						if dataBatch == nil {
 							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
@@ -396,6 +432,9 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						rawData := cursor.Current
 						data := []byte(rawData)
 						readerProgress.initialSyncDocs.Add(1)
+
+						mc.taskInProgressUpdate(nsStatus)
+						docs++
 
 						dataBatch[batch_idx] = data
 						batch_idx++
@@ -415,9 +454,12 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					} else {
 						cursor.Close(mc.FlowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
+						// update progress after completing the task and create task metadata to pass to coordinator to persist
+						mc.taskDoneProgressUpdate(nsStatus, task.Id)
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
-						mc.Coord.NotifyTaskDone(mc.FlowId, mc.ID, task.Id, nil)
+						taskData := iface.TaskDoneMeta{DocsCopied: docs}
+						mc.Coord.NotifyTaskDone(mc.FlowId, mc.ID, task.Id, &taskData)
 						//send a barrier message to signal the end of the task
 						if mc.FlowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
@@ -565,6 +607,7 @@ func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
+		mc.Status.SyncState = iface.ReadPlanningSyncState
 		resumeToken, err := getLatestResumeToken(mc.Ctx, mc.Client)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
