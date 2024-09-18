@@ -86,7 +86,7 @@ func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	settings.initialSyncNumParallelCopiers = 4
 	settings.writerMaxBatchSize = 0
 	if settings.NumParallelWriters == 0 {
-		settings.NumParallelWriters = 4 
+		settings.NumParallelWriters = 4
 	}
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
@@ -195,8 +195,6 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 	tasks := readPlan.Tasks
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
-	// create map to track progress for each namespace
-	// namespaces := make([]namespace, 0)
 
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
 	mc.restoreProgressDetails(tasks)
