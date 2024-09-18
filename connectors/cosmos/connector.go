@@ -233,7 +233,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	changeStreamDone := make(chan struct{})
 	initialSyncDone := make(chan struct{})
 
-	readerProgress := ReaderProgress{ // initialSyncDocs is atomic counters
+	readerProgress := ReaderProgress{ //initialSyncDocs is atomic counters
 		tasksTotal:         uint64(len(tasks)),
 		tasksStarted:       0,
 		tasksCompleted:     0,
