@@ -18,6 +18,11 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+type ParallelWriterConnector interface {
+	HandleBarrierMessage(iface.DataMessage) error
+	ProcessDataMessage(iface.DataMessage) error
+}
+
 // A parallelized writes processor
 // Preserves sequence of operations for a given _id
 // Supports barriers
@@ -27,7 +32,7 @@ type ParallelWriter struct {
 	ctx context.Context
 
 	// MongoConnector
-	connector *Connector
+	connector ParallelWriterConnector
 
 	// Number of parallel workers
 	numWorkers int
@@ -48,7 +53,7 @@ type ParallelWriter struct {
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector *Connector, numWorkers int) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int) *ParallelWriter {
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,
@@ -178,7 +183,7 @@ func (ww *writerWorker) run() {
 				}
 
 				if isLastWorker {
-					err := ww.parallelWriter.connector.handleBarrierMessage(msg)
+					err := ww.parallelWriter.connector.HandleBarrierMessage(msg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to handle barrier message: %v", ww.id, err))
 					}
@@ -188,7 +193,7 @@ func (ww *writerWorker) run() {
 			}
 
 			// process the data message
-			err := ww.parallelWriter.connector.processDataMessage(msg)
+			err := ww.parallelWriter.connector.ProcessDataMessage(msg)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Worker %v failed to process data message: %v", ww.id, err))
 			}

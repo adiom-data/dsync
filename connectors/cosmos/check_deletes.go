@@ -56,12 +56,12 @@ func (cc *Connector) CheckForDeletesTrigger(flowId iface.FlowID) {
 //TODO: Could there be a race condition here when a doc with the same _id is recreated?
 func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) uint64 {
 	// Preparations
-	mismatchedNamespaces := make(chan namespace)
+	mismatchedNamespaces := make(chan iface.Namespace)
 	idsToCheck := make(chan idsWithLocation)  //channel to post ids to check
 	idsToDelete := make(chan idsWithLocation) //channel to post ids to delete
 
 	// 1. Get namespaces list from the Witness
-	namespaces, err := getFQNamespaceListWitness(cc.flowCtx, cc.witnessMongoClient, options.Namespace)
+	namespaces, err := getFQNamespaceListWitness(cc.FlowCtx, cc.witnessMongoClient, options.Namespace)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list from the witness: %v", err))
 		return 0
@@ -81,17 +81,17 @@ func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.Con
 
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
 // The channel is closed at the end to signal that all comparisons are done
-func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []namespace, mismatchedNamespaces chan<- namespace) {
+func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []iface.Namespace, mismatchedNamespaces chan<- iface.Namespace) {
 	for _, ns := range namespaces {
 		// get the count from the source
-		sourceCount, err := cc.client.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
+		sourceCount, err := cc.Client.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(cc.FlowCtx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from source for %v: %v", ns, err))
 			continue
 		}
 
 		// get the count from the witness
-		witnessCount, err := witnessClient.Database(ns.db).Collection(ns.col).EstimatedDocumentCount(cc.flowCtx)
+		witnessCount, err := witnessClient.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(cc.FlowCtx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from witness for %v: %v", ns, err))
 			continue
@@ -109,7 +109,7 @@ func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, nam
 // Reads namespaces from the channel with 4 workers and scans the Witness index in parallel
 // Sends the ids to the channel for checking against the source
 // Exits when the channel is closed
-func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, mismatchedNamespaces <-chan namespace, idsToCheck chan<- idsWithLocation) {
+func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, mismatchedNamespaces <-chan iface.Namespace, idsToCheck chan<- idsWithLocation) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(numParallelWitnessScanTasks)
@@ -129,20 +129,20 @@ func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, 
 }
 
 // Scans the Witness index for the given namespace and sends the ids to the channel (in batches for efficiency)
-func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns namespace, idsToCheck chan<- idsWithLocation) {
+func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns iface.Namespace, idsToCheck chan<- idsWithLocation) {
 	slog.Debug(fmt.Sprintf("Scanning witness index namespace %v", ns))
 	// get all ids from the source
 	opts := options.Find().SetProjection(bson.M{"_id": 1})
-	cur, err := witnessClient.Database(ns.db).Collection(ns.col).Find(cc.flowCtx, bson.M{}, opts)
+	cur, err := witnessClient.Database(ns.Db).Collection(ns.Col).Find(cc.FlowCtx, bson.M{}, opts)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get all ids from source for %v: %v", ns, err))
 		return
 	}
-	defer cur.Close(cc.flowCtx)
+	defer cur.Close(cc.FlowCtx)
 
 	var ids []interface{}
 	count := 0
-	for cur.Next(cc.flowCtx) {
+	for cur.Next(cc.FlowCtx) {
 		var idDoc bson.M
 		err := cur.Decode(&idDoc)
 		if err != nil {
@@ -157,14 +157,14 @@ func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns namesp
 		ids = append(ids, idDoc["_id"])
 		count++
 		if count == idsBatchSize {
-			idsToCheck <- idsWithLocation{loc: iface.Location{Database: ns.db, Collection: ns.col}, ids: ids}
+			idsToCheck <- idsWithLocation{loc: iface.Location{Database: ns.Db, Collection: ns.Col}, ids: ids}
 			ids = nil
 			count = 0
 		}
 	}
 
 	if count > 0 {
-		idsToCheck <- idsWithLocation{loc: iface.Location{Database: ns.db, Collection: ns.col}, ids: ids}
+		idsToCheck <- idsWithLocation{loc: iface.Location{Database: ns.Db, Collection: ns.Col}, ids: ids}
 	}
 }
 
@@ -205,16 +205,16 @@ func (cc *Connector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLo
 		}}},
 	}
 
-	cur, err := cc.client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(cc.flowCtx, pipeline)
+	cur, err := cc.Client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(cc.FlowCtx, pipeline)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to aggregate: %v", err))
 		return
 	}
-	defer cur.Close(cc.flowCtx)
+	defer cur.Close(cc.FlowCtx)
 	// extract the missing ids
 	var missingIds []interface{}
 	var res bson.M
-	if cur.Next(cc.flowCtx) {
+	if cur.Next(cc.FlowCtx) {
 		err := cur.Decode(&res)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to decode missing ids: %v", err))
@@ -300,10 +300,10 @@ func getAllCollectionsWitness(ctx context.Context, witnessClient *mongo.Client, 
 }
 
 // Returns a list of fully qualified namespaces
-func getFQNamespaceListWitness(ctx context.Context, witnessClient *mongo.Client, namespacesFilter []string) ([]namespace, error) {
+func getFQNamespaceListWitness(ctx context.Context, witnessClient *mongo.Client, namespacesFilter []string) ([]iface.Namespace, error) {
 	var dbsToResolve []string //database names that we need to resolve
 
-	var namespaces []namespace
+	var namespaces []iface.Namespace
 
 	if namespacesFilter == nil {
 		var err error
@@ -318,7 +318,7 @@ func getFQNamespaceListWitness(ctx context.Context, witnessClient *mongo.Client,
 		for _, ns := range namespacesFilter {
 			db, col, isFQN := strings.Cut(ns, ".")
 			if isFQN {
-				namespaces = append(namespaces, namespace{db: db, col: col})
+				namespaces = append(namespaces, iface.Namespace{Db: db, Col: col})
 			} else {
 				dbsToResolve = append(dbsToResolve, ns)
 			}
@@ -333,7 +333,7 @@ func getFQNamespaceListWitness(ctx context.Context, witnessClient *mongo.Client,
 		}
 		//create tasks for these
 		for _, coll := range colls {
-			namespaces = append(namespaces, namespace{db: db, col: coll})
+			namespaces = append(namespaces, iface.Namespace{Db: db, Col: coll})
 		}
 	}
 

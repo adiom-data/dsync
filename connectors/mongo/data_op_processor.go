@@ -19,18 +19,18 @@ import (
 )
 
 // TODO: this needs to be synchronized with the actual processing of the data messages
-func (mc *Connector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
+func (mc *BaseMongoConnector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 	switch barrierMsg.BarrierType {
 	case iface.BarrierType_TaskComplete:
 		// notify the coordinator that the task is done from our side
-		if err := mc.coord.NotifyTaskDone(mc.flowId, mc.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
+		if err := mc.Coord.NotifyTaskDone(mc.FlowId, mc.ID, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
 		}
 		return nil
 	case iface.BarrierType_CdcResumeTokenUpdate:
 		// notify the coordinator that the task is done from our side
-		mc.coord.UpdateCDCResumeToken(mc.flowId, mc.id, barrierMsg.BarrierCdcResumeToken)
-		if err := mc.coord.UpdateCDCResumeToken(mc.flowId, mc.id, barrierMsg.BarrierCdcResumeToken); err != nil {
+		mc.Coord.UpdateCDCResumeToken(mc.FlowId, mc.ID, barrierMsg.BarrierCdcResumeToken)
+		if err := mc.Coord.UpdateCDCResumeToken(mc.FlowId, mc.ID, barrierMsg.BarrierCdcResumeToken); err != nil {
 			return err
 		}
 		return nil
@@ -39,16 +39,16 @@ func (mc *Connector) handleBarrierMessage(barrierMsg iface.DataMessage) error {
 	return nil
 }
 
-func (mc *Connector) processDataMessage(dataMsg iface.DataMessage) error {
+func (mc *BaseMongoConnector) ProcessDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
 
-	collection := mc.client.Database(dbName).Collection(colName)
+	collection := mc.Client.Database(dbName).Collection(colName)
 
 	switch dataMsg.MutationType {
 	case iface.MutationType_Insert:
 		data := *dataMsg.Data
-		err := insertBatchOverwrite(mc.ctx, collection, []interface{}{bson.Raw(data)})
+		err := insertBatchOverwrite(mc.Ctx, collection, []interface{}{bson.Raw(data)})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to insert document into collection: %v", err))
 			return err
@@ -63,31 +63,31 @@ func (mc *Connector) processDataMessage(dataMsg iface.DataMessage) error {
 		}
 
 		//XXX (AK, 6/2024): ugly hack to deal with rate limiting in Cosmos but might also be good for controlling impact on the dst
-		// we split in subbatches of mc.settings.writerMaxBatchSize if it's not 0
-		if (mc.settings.writerMaxBatchSize <= 0) || (len(dataBatch) <= mc.settings.writerMaxBatchSize) {
-			err := insertBatchOverwrite(mc.ctx, collection, dataBatchBson)
+		// we split in subbatches of mc.Settings.WriterMaxBatchSize if it's not 0
+		if (mc.Settings.WriterMaxBatchSize <= 0) || (len(dataBatch) <= mc.Settings.WriterMaxBatchSize) {
+			err := insertBatchOverwrite(mc.Ctx, collection, dataBatchBson)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
 				return err
 			}
 		} else {
-			slog.Debug(fmt.Sprintf("Splitting the batch because it's bigger than max size set: %v", mc.settings.writerMaxBatchSize))
+			slog.Debug(fmt.Sprintf("Splitting the batch because it's bigger than max size set: %v", mc.Settings.WriterMaxBatchSize))
 			batchSizeLeft := len(dataBatch)
 			idx := 0
-			for batchSizeLeft > mc.settings.writerMaxBatchSize {
-				slog.Debug(fmt.Sprintf("Inserting subbatch of %v documents (idx %v) into collection %v.%v", mc.settings.writerMaxBatchSize, idx, dbName, colName))
-				batchPart := dataBatchBson[idx : idx+mc.settings.writerMaxBatchSize]
-				err := insertBatchOverwrite(mc.ctx, collection, batchPart)
+			for batchSizeLeft > mc.Settings.WriterMaxBatchSize {
+				slog.Debug(fmt.Sprintf("Inserting subbatch of %v documents (idx %v) into collection %v.%v", mc.Settings.WriterMaxBatchSize, idx, dbName, colName))
+				batchPart := dataBatchBson[idx : idx+mc.Settings.WriterMaxBatchSize]
+				err := insertBatchOverwrite(mc.Ctx, collection, batchPart)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
 					return err
 				}
-				batchSizeLeft -= mc.settings.writerMaxBatchSize
-				idx += mc.settings.writerMaxBatchSize
+				batchSizeLeft -= mc.Settings.WriterMaxBatchSize
+				idx += mc.Settings.WriterMaxBatchSize
 			}
 			if batchSizeLeft > 0 {
 				slog.Debug(fmt.Sprintf("Inserting subbatch(tail-end) of %v documents (idx %v) into collection %v.%v", len(dataBatchBson[idx:]), idx, dbName, colName))
-				err := insertBatchOverwrite(mc.ctx, collection, dataBatchBson[idx:])
+				err := insertBatchOverwrite(mc.Ctx, collection, dataBatchBson[idx:])
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed inserting documents into collection: %v", err))
 					return err
@@ -98,14 +98,14 @@ func (mc *Connector) processDataMessage(dataMsg iface.DataMessage) error {
 		idType := bsontype.Type(dataMsg.IdType)
 		data := *dataMsg.Data
 		opts := options.Replace().SetUpsert(true) //compatibility with Cosmos, all change stream events are generalized to upserts
-		_, err := collection.ReplaceOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}, bson.Raw(data), opts)
+		_, err := collection.ReplaceOne(mc.Ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}, bson.Raw(data), opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to update document in the collection: %v", err))
 			return err
 		}
 	case iface.MutationType_Delete:
 		idType := bsontype.Type(dataMsg.IdType)
-		_, err := collection.DeleteOne(mc.ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}})
+		_, err := collection.DeleteOne(mc.Ctx, bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to delete document from collection: %v", err))
 			return err
@@ -114,7 +114,7 @@ func (mc *Connector) processDataMessage(dataMsg iface.DataMessage) error {
 		return fmt.Errorf("unsupported operation type: %v", dataMsg.MutationType)
 	}
 
-	mc.status.WriteLSN = max(dataMsg.SeqNum, mc.status.WriteLSN) //XXX (AK, 6/2024): this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
+	mc.Status.WriteLSN = max(dataMsg.SeqNum, mc.Status.WriteLSN) //XXX (AK, 6/2024): this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
 
 	return nil
 }

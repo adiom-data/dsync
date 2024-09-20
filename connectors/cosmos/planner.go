@@ -135,17 +135,17 @@ func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface
 	for i := 0; i < cc.settings.NumParallelPartitionWorkers; i++ {
 		go func() {
 			for task := range approxTasksChannel {
-				collection := cc.client.Database(task.Def.Db).Collection(task.Def.Col)
+				collection := cc.Client.Database(task.Def.Db).Collection(task.Def.Col)
 
 				// first, clarify the low value
-				valLow, errLow := findClosestLowerValue(cc.ctx, collection, task.Def.PartitionKey, task.Def.Low)
+				valLow, errLow := findClosestLowerValue(cc.Ctx, collection, task.Def.PartitionKey, task.Def.Low)
 				if errLow != nil {
 					slog.Error(fmt.Sprintf("Failed to clarify low value for task %v: %v", task, errLow))
 					continue //XXX: this task will be skipped, should we panic here?
 				}
 
 				// then, clarify the high value
-				valHigh, errHigh := findClosestLowerValue(cc.ctx, collection, task.Def.PartitionKey, task.Def.High)
+				valHigh, errHigh := findClosestLowerValue(cc.Ctx, collection, task.Def.PartitionKey, task.Def.High)
 				if errHigh != nil {
 					slog.Error(fmt.Sprintf("Failed to clarify high value for task %v: %v", task, errHigh))
 					continue //XXX: this task will be skipped, should we panic here?
@@ -187,12 +187,12 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 	for i := 0; i < cc.settings.NumParallelPartitionWorkers; i++ {
 		go func() {
 			for nsTask := range countCheckChannel {
-				collection := cc.client.Database(nsTask.Db).Collection(nsTask.Col)
-				count, err := collection.EstimatedDocumentCount(cc.ctx)
+				collection := cc.Client.Database(nsTask.Db).Collection(nsTask.Col)
+				count, err := collection.EstimatedDocumentCount(cc.Ctx)
 				slog.Debug(fmt.Sprintf("Count for task %v: %v", nsToString(nsTask), count))
 
 				if err != nil {
-					if cc.ctx.Err() == context.Canceled {
+					if cc.Ctx.Err() == context.Canceled {
 						slog.Debug(fmt.Sprintf("Count error: %v, but the context was cancelled", err))
 					} else {
 						slog.Warn(fmt.Sprintf("Failed to count documents, not splitting: %v", err))
@@ -210,7 +210,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 				} else { //we need to split it
 					slog.Debug(fmt.Sprintf("Need to split task %v with count %v", nsTask, count))
 					//get min and max bounds
-					min, max, err := cc.getMinAndMax(cc.ctx, nsTask, cc.settings.partitionKey)
+					min, max, err := cc.getMinAndMax(cc.Ctx, nsTask, cc.settings.partitionKey)
 					if err != nil {
 						slog.Warn(fmt.Sprintf("Failed to get min and max boundaries for a task %v so not splitting: %v", nsTask, err))
 						task := cc.createReadPlanTaskForNs(nsTask)
@@ -268,7 +268,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 
 // get all database names except system databases
 func (cc *Connector) getAllDatabases() ([]string, error) {
-	dbNames, err := cc.client.ListDatabaseNames(cc.ctx, bson.M{})
+	dbNames, err := cc.Client.ListDatabaseNames(cc.Ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (cc *Connector) getAllDatabases() ([]string, error) {
 
 // get all collections in a database except system collections
 func (cc *Connector) getAllCollections(dbName string) ([]string, error) {
-	collectionsAll, err := cc.client.Database(dbName).ListCollectionNames(cc.ctx, bson.M{})
+	collectionsAll, err := cc.Client.Database(dbName).ListCollectionNames(cc.Ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}

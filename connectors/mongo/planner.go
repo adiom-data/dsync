@@ -83,8 +83,8 @@ func (mc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPl
 }
 
 // get all database names except system databases
-func (mc *Connector) getAllDatabases() ([]string, error) {
-	dbNames, err := mc.client.ListDatabaseNames(mc.ctx, bson.M{})
+func (mc *BaseMongoConnector) getAllDatabases() ([]string, error) {
+	dbNames, err := mc.Client.ListDatabaseNames(mc.Ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +97,8 @@ func (mc *Connector) getAllDatabases() ([]string, error) {
 }
 
 // get all collections in a database except system collections
-func (mc *Connector) getAllCollections(dbName string) ([]string, error) {
-	collectionsAll, err := mc.client.Database(dbName).ListCollectionNames(mc.ctx, bson.M{})
+func (mc *BaseMongoConnector) getAllCollections(dbName string) ([]string, error) {
+	collectionsAll, err := mc.Client.Database(dbName).ListCollectionNames(mc.Ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}

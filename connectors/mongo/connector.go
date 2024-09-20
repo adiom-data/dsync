@@ -22,150 +22,154 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Connector struct {
-	desc string
+type BaseMongoConnector struct {
+	Desc string
 
-	settings ConnectorSettings
-	client   *mongo.Client
-	ctx      context.Context
+	Settings ConnectorSettings
+	Client   *mongo.Client
+	Ctx      context.Context
 
-	t  iface.Transport
-	id iface.ConnectorID
+	T  iface.Transport
+	ID iface.ConnectorID
 
-	connectorType         iface.ConnectorType
-	connectorCapabilities iface.ConnectorCapabilities
+	ConnectorType         iface.ConnectorType
+	ConnectorCapabilities iface.ConnectorCapabilities
 
-	coord iface.CoordinatorIConnectorSignal
+	Coord iface.CoordinatorIConnectorSignal
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
-	status               iface.ConnectorStatus
-	flowCtx              context.Context
-	flowCancelFunc       context.CancelFunc
-	flowId               iface.FlowID
-	flowConnCapabilities iface.ConnectorCapabilities
-	flowCDCResumeToken   bson.Raw
+	Status               iface.ConnectorStatus
+	FlowCtx              context.Context
+	FlowCancelFunc       context.CancelFunc
+	FlowId               iface.FlowID
+	FlowConnCapabilities iface.ConnectorCapabilities
+	FlowCDCResumeToken   bson.Raw
 }
 
 type ConnectorSettings struct {
 	ConnectionString string
 
-	serverConnectTimeout           time.Duration
-	pingTimeout                    time.Duration
-	initialSyncNumParallelCopiers  int
-	writerMaxBatchSize             int // applies to batch inserts only; 0 means no limit
+	ServerConnectTimeout           time.Duration
+	PingTimeout                    time.Duration
+	InitialSyncNumParallelCopiers  int
+	WriterMaxBatchSize             int // applies to batch inserts only; 0 means no limit
 	NumParallelWriters             int
 	CdcResumeTokenUpdateInterval   time.Duration
-	numParallelIntegrityCheckTasks int
+	NumParallelIntegrityCheckTasks int
+}
+
+type Connector struct {
+	BaseMongoConnector
 }
 
 func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	settings.serverConnectTimeout = 10 * time.Second
-	settings.pingTimeout = 2 * time.Second
-	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 0
+	settings.ServerConnectTimeout = 10 * time.Second
+	settings.PingTimeout = 2 * time.Second
+	settings.InitialSyncNumParallelCopiers = 4
+	settings.WriterMaxBatchSize = 0
 	if settings.NumParallelWriters == 0 {
 		settings.NumParallelWriters = 4
 	}
 	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
 		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
 	}
-	settings.numParallelIntegrityCheckTasks = 4
+	settings.NumParallelIntegrityCheckTasks = 4
 
-	return &Connector{desc: desc, settings: settings}
+	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings}}
 }
 
 func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
-	mc.ctx = ctx
-	mc.t = t
+	mc.Ctx = ctx
+	mc.T = t
 
 	// Connect to the MongoDB instance
-	ctxConnect, cancel := context.WithTimeout(mc.ctx, mc.settings.serverConnectTimeout)
+	ctxConnect, cancel := context.WithTimeout(mc.Ctx, mc.Settings.ServerConnectTimeout)
 	defer cancel()
-	clientOptions := options.Client().ApplyURI(mc.settings.ConnectionString).SetConnectTimeout(mc.settings.serverConnectTimeout)
+	clientOptions := options.Client().ApplyURI(mc.Settings.ConnectionString).SetConnectTimeout(mc.Settings.ServerConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
 	}
-	mc.client = client
+	mc.Client = client
 
 	// Check the connection
-	ctxPing, cancel := context.WithTimeout(mc.ctx, mc.settings.pingTimeout)
+	ctxPing, cancel := context.WithTimeout(mc.Ctx, mc.Settings.PingTimeout)
 	defer cancel()
-	err = mc.client.Ping(ctxPing, nil)
+	err = mc.Client.Ping(ctxPing, nil)
 	if err != nil {
 		return err
 	}
 
 	// Get version of the MongoDB server
 	var commandResult bson.M
-	err = mc.client.Database("admin").RunCommand(mc.ctx, bson.D{{Key: "buildInfo", Value: 1}}).Decode(&commandResult)
+	err = mc.Client.Database("admin").RunCommand(mc.Ctx, bson.D{{Key: "buildInfo", Value: 1}}).Decode(&commandResult)
 	if err != nil {
 		return err
 	}
 	version := commandResult["version"]
 
 	// Instantiate ConnectorType
-	mc.connectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
+	mc.ConnectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
-	mc.connectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
+	mc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
-	mc.status = iface.ConnectorStatus{WriteLSN: 0}
+	mc.Status = iface.ConnectorStatus{WriteLSN: 0}
 
 	// Get the coordinator endpoint
-	coord, err := mc.t.GetCoordinatorEndpoint("local")
+	coord, err := mc.T.GetCoordinatorEndpoint("local")
 	if err != nil {
 		return errors.New("Failed to get coordinator endpoint: " + err.Error())
 	}
-	mc.coord = coord
+	mc.Coord = coord
 
 	// Generate connector ID for resumability purposes
-	id := generateConnectorID(mc.settings.ConnectionString)
+	id := generateConnectorID(mc.Settings.ConnectionString)
 
 	// Create a new connector details structure
-	connectorDetails := iface.ConnectorDetails{Desc: mc.desc, Type: mc.connectorType, Cap: mc.connectorCapabilities, Id: id}
+	connectorDetails := iface.ConnectorDetails{Desc: mc.Desc, Type: mc.ConnectorType, Cap: mc.ConnectorCapabilities, Id: id}
 	// Register the connector
-	mc.id, err = coord.RegisterConnector(connectorDetails, mc)
+	mc.ID, err = coord.RegisterConnector(connectorDetails, mc)
 	if err != nil {
 		return errors.New("Failed registering the connector: " + err.Error())
 	}
 
-	slog.Info("MongoConnector has been configured with ID " + (string)(mc.id))
+	slog.Info("MongoConnector has been configured with ID " + (string)(mc.ID))
 
 	return nil
 }
 
 func (mc *Connector) Teardown() {
-	if mc.client != nil {
-		if err := mc.client.Disconnect(mc.ctx); err != nil {
-			slog.Warn(fmt.Sprintf("Failed to disconnect from MongoDB: %v", err))
+	if mc.Client != nil {
+		if err := mc.Client.Disconnect(mc.Ctx); err != nil {
+			slog.Warn(fmt.Sprintf("Failed to disconnect from MongoDb: %v", err))
 		}
 	}
 }
 
-func (mc *Connector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
+func (mc *BaseMongoConnector) SetParameters(flowId iface.FlowID, reqCap iface.ConnectorCapabilities) {
 	// this is what came for the flow
-	mc.flowConnCapabilities = reqCap
-	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", mc.id, flowId, reqCap))
+	mc.FlowConnCapabilities = reqCap
+	slog.Debug(fmt.Sprintf("Connector %s set capabilities for flow %s: %+v", mc.ID, flowId, reqCap))
 }
 
 // TODO (AK, 6/2024): this should be split to a separate class and/or functions
 func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
-	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
-	mc.flowId = flowId
+	mc.FlowCtx, mc.FlowCancelFunc = context.WithCancel(mc.Ctx)
+	mc.FlowId = flowId
 
 	tasks := readPlan.Tasks
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
 	}
-	mc.flowCDCResumeToken = readPlan.CdcResumeToken
+	mc.FlowCDCResumeToken = readPlan.CdcResumeToken
 
 	slog.Debug(fmt.Sprintf("StartReadToChannel Tasks: %+v", tasks))
 
 	// Get data channel from transport interface based on the provided ID
-	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
+	dataChannel, err := mc.T.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
 		return err
@@ -198,7 +202,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		operations := uint64(0)
 		for {
 			select {
-			case <-mc.flowCtx.Done():
+			case <-mc.FlowCtx.Done():
 				return
 			case <-ticker.C:
 				elapsedTime := time.Since(startTime).Seconds()
@@ -217,8 +221,8 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	// kick off LSN tracking
 	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
 	go func() {
-		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.id, flowId))
-		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken)
+		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", mc.ID, flowId))
+		opts := moptions.ChangeStream().SetStartAfter(mc.FlowCDCResumeToken)
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -226,16 +230,16 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 			nsFilter = createChangeStreamNamespaceFilter()
 		}
 
-		changeStream, err := mc.client.Watch(mc.flowCtx, mongo.Pipeline{
+		changeStream, err := mc.Client.Watch(mc.FlowCtx, mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
 			return
 		}
-		defer changeStream.Close(mc.flowCtx)
+		defer changeStream.Close(mc.FlowCtx)
 
-		for changeStream.Next(mc.flowCtx) {
+		for changeStream.Next(mc.FlowCtx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("LSN tracker: Failed to decode change stream event: %v", err))
@@ -246,11 +250,11 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 				continue
 			}
 
-			mc.status.WriteLSN++
+			mc.Status.WriteLSN++
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if errors.Is(context.Canceled, mc.flowCtx.Err()) {
+			if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -266,27 +270,27 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 		// start sending periodic barrier messages with cdc resume token updates
 		go func() {
-			ticker := time.NewTicker(mc.settings.CdcResumeTokenUpdateInterval)
+			ticker := time.NewTicker(mc.Settings.CdcResumeTokenUpdateInterval)
 			defer ticker.Stop()
 			for {
 				select {
-				case <-mc.flowCtx.Done():
+				case <-mc.FlowCtx.Done():
 					return
 				case <-changeStreamDone:
 					return
 				case <-ticker.C:
 					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: mc.flowCDCResumeToken}
+					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: mc.FlowCDCResumeToken}
 				}
 			}
 		}()
 
 		var lsn int64 = 0
 
-		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.id, flowId))
-		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.id, mc.flowCDCResumeToken))
+		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", mc.ID, flowId))
+		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", mc.ID, mc.FlowCDCResumeToken))
 
-		opts := moptions.ChangeStream().SetStartAfter(mc.flowCDCResumeToken).SetFullDocument("updateLookup")
+		opts := moptions.ChangeStream().SetStartAfter(mc.FlowCDCResumeToken).SetFullDocument("updateLookup")
 		var nsFilter bson.D
 		if options.Namespace != nil { //means namespace filtering was requested
 			nsFilter = createChangeStreamNamespaceFilterFromTasks(tasks)
@@ -295,18 +299,18 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		}
 		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 
-		changeStream, err := mc.client.Watch(mc.flowCtx, mongo.Pipeline{
+		changeStream, err := mc.Client.Watch(mc.FlowCtx, mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}, opts)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 			return
 		}
-		defer changeStream.Close(mc.flowCtx)
+		defer changeStream.Close(mc.FlowCtx)
 
-		mc.status.CDCActive = true
+		mc.Status.CDCActive = true
 
-		for changeStream.Next(mc.flowCtx) {
+		for changeStream.Next(mc.FlowCtx) {
 			var change bson.M
 			if err := changeStream.Decode(&change); err != nil {
 				slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
@@ -334,11 +338,11 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 			dataChannel <- dataMsg
 
 			//update the last seen resume token
-			mc.flowCDCResumeToken = changeStream.ResumeToken()
+			mc.FlowCDCResumeToken = changeStream.ResumeToken()
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if errors.Is(context.Canceled, mc.flowCtx.Err()) {
+			if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -351,30 +355,30 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		defer close(initialSyncDone)
 		// if we have no tasks (e.g. we are in CDC mode), we skip the initial sync
 		if len(tasks) == 0 {
-			slog.Info(fmt.Sprintf("Connector %s is skipping initial sync for flow %s", mc.id, flowId))
+			slog.Info(fmt.Sprintf("Connector %s is skipping initial sync for flow %s", mc.ID, flowId))
 			return
 		}
 
-		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.id, flowId))
+		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", mc.ID, flowId))
 
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan iface.ReadPlanTask)
 		//create a wait group to wait for all copiers to finish
 		var wg sync.WaitGroup
-		wg.Add(mc.settings.initialSyncNumParallelCopiers)
+		wg.Add(mc.Settings.InitialSyncNumParallelCopiers)
 
 		//start 4 copiers
-		for i := 0; i < mc.settings.initialSyncNumParallelCopiers; i++ {
+		for i := 0; i < mc.Settings.InitialSyncNumParallelCopiers; i++ {
 			go func() {
 				defer wg.Done()
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
 					db := task.Def.Db
 					col := task.Def.Col
-					collection := mc.client.Database(db).Collection(col)
-					cursor, err := collection.Find(mc.flowCtx, bson.D{})
+					collection := mc.Client.Database(db).Collection(col)
+					cursor, err := collection.Find(mc.FlowCtx, bson.D{})
 					if err != nil {
-						if errors.Is(context.Canceled, mc.flowCtx.Err()) {
+						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
@@ -384,7 +388,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					loc := iface.Location{Database: db, Collection: col}
 					var dataBatch [][]byte
 					var batch_idx int
-					for cursor.Next(mc.flowCtx) {
+					for cursor.Next(mc.FlowCtx) {
 						if dataBatch == nil {
 							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
 							batch_idx = 0
@@ -403,19 +407,19 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						}
 					}
 					if err := cursor.Err(); err != nil {
-						if errors.Is(context.Canceled, mc.flowCtx.Err()) {
+						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
 							slog.Debug(fmt.Sprintf("Cursor error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Cursor error: %v", err))
 						}
 					} else {
-						cursor.Close(mc.flowCtx)
+						cursor.Close(mc.FlowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
-						mc.coord.NotifyTaskDone(mc.flowId, mc.id, task.Id, nil)
+						mc.Coord.NotifyTaskDone(mc.FlowId, mc.ID, task.Id, nil)
 						//send a barrier message to signal the end of the task
-						if mc.flowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
+						if mc.FlowConnCapabilities.Resumability { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 							dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
 						}
 					}
@@ -446,10 +450,10 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
-		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.id, flowId))
-		err := mc.coord.NotifyDone(flowId, mc.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
+		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", mc.ID, flowId))
+		err := mc.Coord.NotifyDone(flowId, mc.ID) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", mc.ID, flowId, err))
 		}
 	}()
 
@@ -458,11 +462,11 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId iface.DataChannelID) error {
 	// create new context so that the flow can be cancelled gracefully if needed
-	mc.flowCtx, mc.flowCancelFunc = context.WithCancel(mc.ctx)
-	mc.flowId = flowId
+	mc.FlowCtx, mc.FlowCancelFunc = context.WithCancel(mc.Ctx)
+	mc.FlowId = flowId
 
 	// Get data channel from transport interface based on the provided ID
-	dataChannel, err := mc.t.GetDataChannelEndpoint(dataChannelId)
+	dataChannel, err := mc.T.GetDataChannelEndpoint(dataChannelId)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get data channel by ID: %v", err))
 		return err
@@ -478,7 +482,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowParallelWriter := NewParallelWriter(mc.flowCtx, mc, mc.settings.NumParallelWriters)
+	flowParallelWriter := NewParallelWriter(mc.FlowCtx, mc, mc.Settings.NumParallelWriters)
 	flowParallelWriter.Start()
 
 	// start printing progress
@@ -488,7 +492,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 		for {
 
 			select {
-			case <-mc.flowCtx.Done():
+			case <-mc.FlowCtx.Done():
 				return
 			case <-ticker.C:
 				// Print writer progress
@@ -500,7 +504,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	go func() {
 		for loop := true; loop; {
 			select {
-			case <-mc.flowCtx.Done():
+			case <-mc.FlowCtx.Done():
 				loop = false
 			case dataMsg, ok := <-dataChannel:
 				if !ok {
@@ -525,29 +529,29 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 			}
 		}
 
-		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.id, flowId))
-		err := mc.coord.NotifyDone(flowId, mc.id)
+		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.ID, flowId))
+		err := mc.Coord.NotifyDone(flowId, mc.ID)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", mc.id, flowId, err))
+			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done writing for flow %s: %v", mc.ID, flowId, err))
 		}
 	}()
 
 	return nil
 }
 
-func (mc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *BaseMongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
 	// need to make this async to honor the spec
 	go mc.doIntegrityCheck_sync(flowId, options)
 
 	return nil
 }
 
-func (mc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
-	return mc.status
+func (mc *BaseMongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
+	return mc.Status
 }
 
-func (mc *Connector) Interrupt(flowId iface.FlowID) error {
-	mc.flowCancelFunc()
+func (mc *BaseMongoConnector) Interrupt(flowId iface.FlowID) error {
+	mc.FlowCancelFunc()
 	return nil
 }
 
@@ -555,7 +559,7 @@ func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		resumeToken, err := getLatestResumeToken(mc.ctx, mc.client)
+		resumeToken, err := getLatestResumeToken(mc.Ctx, mc.Client)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 			return
@@ -571,10 +575,10 @@ func (mc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 				return
 			}
 		}
-		mc.flowCDCResumeToken = resumeToken
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: mc.flowCDCResumeToken}
+		mc.FlowCDCResumeToken = resumeToken
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: mc.FlowCDCResumeToken}
 
-		err = mc.coord.PostReadPlanningResult(flowId, mc.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+		err = mc.Coord.PostReadPlanningResult(flowId, mc.ID, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
 		}
