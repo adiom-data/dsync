@@ -26,7 +26,7 @@ func generateDataChannelID() iface.DataChannelID {
 }
 
 func NewTransportLocal(coordEP iface.CoordinatorIConnectorSignal) *Local {
-	dataChannels := make(map[iface.DataChannelID]chan iface.DataMessage)
+	dataChannels := make(map[iface.DataChannelID]chan iface.DataMessage, 1000)
 	return &Local{coordEP: coordEP, dataChannels: dataChannels}
 }
 

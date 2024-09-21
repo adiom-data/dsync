@@ -41,7 +41,7 @@ type RunnerSyncProgress struct {
 
 	VerificationResult string // verification result (if running in the verify mode)
 
-	SrcAdditionalStateInfo string // additional state info from the source connector
+	AdditionalStateInfo string // additional state info
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
@@ -60,7 +60,16 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	if r.runnerProgress.SyncState != iface.VerifySyncState && r.runnerProgress.SyncState != iface.CleanupSyncState { //XXX: if we're cleaning up or verifying, we don't want to overwrite the state
 		r.runnerProgress.SyncState = srcStatus.SyncState
 	}
-	r.runnerProgress.SrcAdditionalStateInfo = srcStatus.AdditionalInfo
+	stateInfo := ""
+	// if we're in change stream mode, but not all tasks have been fully completed, we need to keep the state as Initial Sync
+	if r.runnerProgress.SyncState == iface.ChangeStreamSyncState && !flowStatus.AllTasksCompleted {
+		r.runnerProgress.SyncState = iface.InitialSyncSyncState
+		stateInfo += "Finalizing initial sync... "
+	}
+
+	stateInfo += srcStatus.AdditionalInfo
+
+	r.runnerProgress.AdditionalStateInfo = stateInfo
 
 	r.runnerProgress.CurrTime = time.Now()
 	r.runnerProgress.NumNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesCompleted

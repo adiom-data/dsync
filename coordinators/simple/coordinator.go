@@ -541,6 +541,12 @@ func (c *Simple) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
 	flowDet.flowStatus.SrcStatus = src.Endpoint.GetConnectorStatus(fid)
 	flowDet.flowStatus.DstStatus = dst.Endpoint.GetConnectorStatus(fid)
 
+	// set the status flag if all the tasks are completed
+	// XXX: should we persist this somewhere to make avoid recomputation every time?
+	if isFlowReadPlanDone(flowDet) {
+		flowDet.flowStatus.AllTasksCompleted = true
+	}
+
 	return flowDet.flowStatus, nil
 }
 

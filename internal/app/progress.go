@@ -77,6 +77,9 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		header.SetText(headerString)
 	case iface.InitialSyncSyncState:
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d		%d/%d Namespaces synced		Docs Synced: %d\n", runnerProgress.SyncState, hours, minutes, seconds, runnerProgress.NumNamespacesCompleted, runnerProgress.TotalNamespaces, runnerProgress.NumDocsSynced)
+		if runnerProgress.AdditionalStateInfo != "" {
+			headerString += "\n" + runnerProgress.AdditionalStateInfo
+		}
 		header.SetText(headerString)
 
 		//set the table
@@ -118,8 +121,8 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d        %d/%d Namespaces synced\nProcessing change stream events\n\nChange Stream Events- %d		Deletes Caught- %d		Events to catch up: %d",
 			runnerProgress.SyncState, hours, minutes, seconds, runnerProgress.NumNamespacesCompleted, runnerProgress.TotalNamespaces, runnerProgress.ChangeStreamEvents, runnerProgress.DeletesCaught, runnerProgress.Lag)
 
-		if runnerProgress.SrcAdditionalStateInfo != "" {
-			headerString += "\n" + runnerProgress.SrcAdditionalStateInfo
+		if runnerProgress.AdditionalStateInfo != "" {
+			headerString += "\n" + runnerProgress.AdditionalStateInfo
 		}
 		header.SetText(headerString)
 
@@ -311,6 +314,7 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 		<p><strong>Namespaces Synced:</strong> {{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</p>
 		<p><strong>Documents Synced:</strong> {{ .NumDocsSynced }}</p>
 		{{ end }}
+		<p>{{ .AdditionalStateInfo }}</p>
 
 		{{ if eq .SyncState "InitialSync" }}
 		<div class="container">
@@ -363,7 +367,6 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 				<td>{{ .Lag }}</td>
 			</tr>
 		</table>
-		<p>{{ .SrcAdditionalStateInfo }}</p>
 		{{ else if eq .SyncState "Verify" }}
 		<h2>Verification Result</h2>
 		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
