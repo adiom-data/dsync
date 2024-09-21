@@ -23,7 +23,7 @@ import (
 func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
-	collection := cc.client.Database(db).Collection(col)
+	collection := cc.Client.Database(db).Collection(col)
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{
 			{Key: "operationType", Value: bson.D{{Key: "$in", Value: bson.A{"insert", "update", "replace"}}}}}}},
@@ -37,19 +37,19 @@ func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Loc
 }
 
 // Creates parallel change streams for each task in the read plan, and processes the events concurrently
-func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespaces []namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
+func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespaces []iface.Namespace, readerProgress *ReaderProgress, readPlanStartAt int64, channel chan<- iface.DataMessage) error {
 	var wg sync.WaitGroup
 	lsnTracker := NewMultiNsLSNTracker()
 
-	cc.status.CDCActive = true
+	cc.Status.CDCActive = true
 	// iterate over all tasks and start a change stream for each
 	for _, ns := range namespaces {
 		wg.Add(1)
-		go func(ns namespace) {
+		go func(ns iface.Namespace) {
 			defer wg.Done()
 			//get task location and retrieve resume token
-			loc := iface.Location{Database: ns.db, Collection: ns.col}
-			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s at namespace %s.%s", cc.id, cc.flowId, loc.Database, loc.Collection))
+			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
+			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s at namespace %s.%s", cc.ID, cc.FlowId, loc.Database, loc.Collection))
 
 			token, err := cc.flowCDCResumeTokenMap.GetToken(loc)
 			if err != nil {
@@ -119,7 +119,7 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 
 		// extract the continuation value from the change stream event
 		// if we fail to extract the continuation value, we will stop using the Cosmos continuation token for this change stream
-		ns := namespace{db: changeStreamLoc.Database, col: changeStreamLoc.Collection}
+		ns := iface.Namespace{Db: changeStreamLoc.Database, Col: changeStreamLoc.Collection}
 		if useCosmosContinuationToken {
 			continuation, err := getChangeStreamContinuationValue(change)
 			if err != nil {

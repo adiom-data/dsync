@@ -99,7 +99,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.ConnectorSettings{})
 		r.runnerProgress.SourceDescription = "/dev/null"
 	} else if settings.SrcType == "CosmosDB" {
-		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.SrcConnString}
+		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}}
 		if settings.CosmosDeletesEmuRequestedFlag {
 			cosmosSettings.EmulateDeletes = true
 			// the destination is a MongoDB database otherwise the Options check would have failed
@@ -155,7 +155,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.dst = connectorNull.NewNullConnector(destinationName)
 		r.runnerProgress.DestinationDescription = "/dev/null"
 	} else if settings.DstType == "CosmosDB" {
-		connSettings := connectorCosmos.ConnectorSettings{ConnectionString: settings.DstConnString}
+		connSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
 			if settings.CosmosNumParallelWriters != 0 {

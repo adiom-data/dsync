@@ -59,7 +59,7 @@ func (cc *Connector) printProgress(readerProgress *ReaderProgress) {
 	operations := uint64(0)
 	for {
 		select {
-		case <-cc.flowCtx.Done():
+		case <-cc.FlowCtx.Done():
 			return
 		case <-ticker.C:
 			elapsedTime := time.Since(startTime).Seconds()
@@ -92,7 +92,7 @@ func (cc *Connector) getLatestResumeToken(ctx context.Context, location iface.Lo
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
 	var id interface{}
-	col := cc.client.Database(location.Database).Collection(location.Collection)
+	col := cc.Client.Database(location.Database).Collection(location.Collection)
 
 	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {
@@ -142,7 +142,7 @@ func (cc *Connector) updateChangeStreamProgressTracking(reader *ReaderProgress) 
 	cc.muProgressMetrics.Lock()
 	defer cc.muProgressMetrics.Unlock()
 	reader.changeStreamEvents++
-	cc.status.ProgressMetrics.ChangeStreamEvents++
+	cc.Status.ProgressMetrics.ChangeStreamEvents++
 	return
 }
 
@@ -191,9 +191,9 @@ func nsToString(ns iface.Namespace) string {
 
 // update estimated namespace doc counts from the actual database
 func (cc *Connector) resetNsProgressEstimatedDocCounts() error {
-	for ns, nsStatus := range cc.status.ProgressMetrics.NamespaceProgress {
-		collection := cc.client.Database(ns.Db).Collection(ns.Col)
-		count, err := collection.EstimatedDocumentCount(cc.ctx)
+	for ns, nsStatus := range cc.Status.ProgressMetrics.NamespaceProgress {
+		collection := cc.Client.Database(ns.Db).Collection(ns.Col)
+		count, err := collection.EstimatedDocumentCount(cc.Ctx)
 		if err != nil {
 			return fmt.Errorf("failed to count documents: %v", err)
 		}
@@ -205,10 +205,10 @@ func (cc *Connector) resetNsProgressEstimatedDocCounts() error {
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
 func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
 	slog.Debug("Restoring progress metrics from tasks")
-	cc.status.ProgressMetrics.TasksTotal = int64(len(tasks))
+	cc.Status.ProgressMetrics.TasksTotal = int64(len(tasks))
 	for _, task := range tasks {
 		ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
-		nsStatus := cc.status.ProgressMetrics.NamespaceProgress[ns]
+		nsStatus := cc.Status.ProgressMetrics.NamespaceProgress[ns]
 		//check if the namespace status exists, if not create it
 		if nsStatus == nil {
 			nsStatus = &iface.NamespaceStatus{
@@ -221,14 +221,14 @@ func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX:
 				EstimatedDocsCopied: 0,
 				ActiveTasksList:     make(map[iface.ReadPlanTaskID]bool),
 			}
-			cc.status.ProgressMetrics.NamespaceProgress[ns] = nsStatus
+			cc.Status.ProgressMetrics.NamespaceProgress[ns] = nsStatus
 		}
 		nsStatus.Tasks = append(nsStatus.Tasks, task)
 		nsStatus.EstimatedDocCount += task.EstimatedDocCount
 		//if the task is completed, update the document counters
 		if task.Status == iface.ReadPlanTaskStatus_Completed {
-			cc.status.ProgressMetrics.TasksCompleted++
-			cc.status.ProgressMetrics.NumDocsSynced += task.DocsCopied
+			cc.Status.ProgressMetrics.TasksCompleted++
+			cc.Status.ProgressMetrics.NumDocsSynced += task.DocsCopied
 
 			nsStatus.TasksCompleted++
 			nsStatus.DocsCopied += task.DocsCopied
@@ -236,16 +236,16 @@ func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX:
 			nsStatus.EstimatedDocsCopied += task.EstimatedDocCount
 		}
 	}
-	cc.status.ProgressMetrics.NumNamespaces = int64(len(cc.status.ProgressMetrics.NamespaceProgress))
+	cc.Status.ProgressMetrics.NumNamespaces = int64(len(cc.Status.ProgressMetrics.NamespaceProgress))
 
-	for ns, nsStatus := range cc.status.ProgressMetrics.NamespaceProgress {
+	for ns, nsStatus := range cc.Status.ProgressMetrics.NamespaceProgress {
 		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-			cc.status.ProgressMetrics.NumNamespacesCompleted++
+			cc.Status.ProgressMetrics.NumNamespacesCompleted++
 		}
-		cc.status.ProgressMetrics.Namespaces = append(cc.status.ProgressMetrics.Namespaces, ns)
+		cc.Status.ProgressMetrics.Namespaces = append(cc.Status.ProgressMetrics.Namespaces, ns)
 	}
 
-	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.status.ProgressMetrics))
+	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.Status.ProgressMetrics))
 
 }
 
@@ -253,7 +253,7 @@ func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX:
 func (cc *Connector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
 	cc.muProgressMetrics.Lock()
 	nsStatus.ActiveTasksList[taskId] = true
-	cc.status.ProgressMetrics.TasksStarted++
+	cc.Status.ProgressMetrics.TasksStarted++
 	nsStatus.TasksStarted++
 	cc.muProgressMetrics.Unlock()
 }
@@ -262,7 +262,7 @@ func (cc *Connector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus, 
 func (cc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
 	cc.muProgressMetrics.Lock()
 	//update progress counters: num tasks completed
-	cc.status.ProgressMetrics.TasksCompleted++
+	cc.Status.ProgressMetrics.TasksCompleted++
 	nsStatus.TasksCompleted++
 
 	//go through all the tasks
@@ -281,10 +281,10 @@ func (cc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, tas
 	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(approxDocsCopied)))
 	//check if namespace has been completed
 	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-		cc.status.ProgressMetrics.NumNamespacesCompleted++
+		cc.Status.ProgressMetrics.NumNamespacesCompleted++
 	}
 	//decrement the tasks started counter
-	cc.status.ProgressMetrics.TasksStarted--
+	cc.Status.ProgressMetrics.TasksStarted--
 	nsStatus.TasksStarted--
 	//remove the task from the active tasks list
 	delete(nsStatus.ActiveTasksList, taskId)
@@ -296,7 +296,7 @@ func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
 	cc.muProgressMetrics.Lock()
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++
-	cc.status.ProgressMetrics.NumDocsSynced++
+	cc.Status.ProgressMetrics.NumDocsSynced++
 	cc.muProgressMetrics.Unlock()
 }
 

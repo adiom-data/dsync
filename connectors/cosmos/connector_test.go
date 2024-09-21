@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	mongoconn "github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/adiom-data/dsync/protocol/test"
@@ -30,10 +31,10 @@ const (
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 
 var connectorFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
 }
 var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
-	return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
+	return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -47,7 +48,7 @@ func TestCosmosConnectorSuite(t *testing.T) {
 	}
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return NewCosmosConnector("test", ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+			return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
 		},
 		func() test.TestDataStore {
 			return NewCosmosTestDataStore(TestCosmosConnectionString)
