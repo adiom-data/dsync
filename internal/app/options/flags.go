@@ -196,7 +196,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-max-namespaces",
+			Name:     "cosmos-source-max-namespaces",
 			Usage:    "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
 			Value:    cosmosDefaultMaxNumNamespaces,
 			Required: false,
@@ -213,12 +213,12 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-resume-token-interval",
+			Name:     "resume-token-interval",
 			Required: false,
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-writer-batch-size",
+			Name:     "writer-batch-size",
 			Required: false,
 			Hidden:   true,
 		}),
@@ -233,17 +233,17 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-parallel-copiers",
+			Name:     "parallel-copiers",
 			Required: false,
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-parallel-writers",
+			Name:     "parallel-writers",
 			Required: false,
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-parallel-integrity-check",
+			Name:     "parallel-integrity-check",
 			Required: false,
 			Hidden:   true,
 		}),

@@ -18,7 +18,6 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -63,20 +62,21 @@ type Connector struct {
 	BaseMongoConnector
 }
 
+func setDefault[T comparable](field *T, defaultValue T) {
+	if *field == *new(T) {
+		*field = defaultValue
+	}
+}
+
 func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	settings.ServerConnectTimeout = 10 * time.Second
-	settings.PingTimeout = 2 * time.Second
-	settings.InitialSyncNumParallelCopiers = 4
-	settings.WriterMaxBatchSize = 0
-	if settings.NumParallelWriters == 0 {
-		settings.NumParallelWriters = 4
-	}
-	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
-		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
-	}
-	settings.NumParallelIntegrityCheckTasks = 4
-
+	setDefault(&settings.ServerConnectTimeout, 10*time.Second)
+	setDefault(&settings.PingTimeout, 2*time.Second)
+	setDefault(&settings.InitialSyncNumParallelCopiers, 4)
+	setDefault(&settings.NumParallelWriters, 4)
+	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
+	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
+	setDefault(&settings.WriterMaxBatchSize, 0)
 	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings}}
 }
 
@@ -87,7 +87,7 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Connect to the MongoDB instance
 	ctxConnect, cancel := context.WithTimeout(mc.Ctx, mc.Settings.ServerConnectTimeout)
 	defer cancel()
-	clientOptions := options.Client().ApplyURI(mc.Settings.ConnectionString).SetConnectTimeout(mc.Settings.ServerConnectTimeout)
+	clientOptions := moptions.Client().ApplyURI(mc.Settings.ConnectionString).SetConnectTimeout(mc.Settings.ServerConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return err
