@@ -81,3 +81,13 @@ func updateFlowTaskData(flowDetails *FlowDetails, taskId iface.ReadPlanTaskID, t
 	}
 	return fmt.Errorf("task with ID %d not found", taskId)
 }
+
+// checks if all read plan tasks are completed
+func isFlowReadPlanDone(flowDetails *FlowDetails) bool {
+	for _, task := range flowDetails.ReadPlan.Tasks {
+		if task.Status != iface.ReadPlanTaskStatus_Completed {
+			return false
+		}
+	}
+	return true
+}

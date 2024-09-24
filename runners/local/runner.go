@@ -172,6 +172,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 
 		// set all other settings to default
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
+		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {

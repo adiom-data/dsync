@@ -28,4 +28,7 @@ type FlowDataIntegrityCheckResult struct {
 type FlowStatus struct {
 	//For uni-directional flows
 	SrcStatus, DstStatus ConnectorStatus
+
+	//Indicates if all tasks were completed (specific to the initial sync)
+	AllTasksCompleted bool
 }
