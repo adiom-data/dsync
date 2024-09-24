@@ -20,7 +20,7 @@ import (
 
 type ParallelWriterConnector interface {
 	HandleBarrierMessage(iface.DataMessage) error
-	ProcessDataMessage(iface.DataMessage) error
+	ProcessDataMessages([]iface.DataMessage) error
 }
 
 // A parallelized writes processor
@@ -35,7 +35,8 @@ type ParallelWriter struct {
 	connector ParallelWriterConnector
 
 	// Number of parallel workers
-	numWorkers int
+	numWorkers   int
+	maxBatchSize int
 
 	// Array of workers
 	workers []writerWorker
@@ -55,11 +56,12 @@ type ParallelWriter struct {
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int) *ParallelWriter {
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,
 		numWorkers:     numWorkers,
+		maxBatchSize:   maxBatchSize,
 		taskBarrierMap: make(map[uint]uint),
 		done:           make(chan struct{}),
 	}
@@ -169,6 +171,7 @@ func newWriterWorker(parallelWriter *ParallelWriter, id int, queueSize int) writ
 
 // Worker's main loop - processes messages from the queue
 func (ww *writerWorker) run() {
+	var batch []iface.DataMessage
 	for {
 		select {
 		case <-ww.parallelWriter.ctx.Done():
@@ -180,6 +183,15 @@ func (ww *writerWorker) run() {
 			// if it's a barrier message, check that we're the last worker to see it before handling
 			if msg.MutationType == iface.MutationType_Barrier {
 				isLastWorker := false
+
+				// process existing batch prior to barrier
+				if len(batch) > 0 {
+					err := ww.parallelWriter.connector.ProcessDataMessages(batch)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+					}
+					batch = nil
+				}
 
 				// if it's a task barrier, decrement the countdown for the task
 				if msg.BarrierType == iface.BarrierType_TaskComplete {
@@ -210,10 +222,23 @@ func (ww *writerWorker) run() {
 				continue
 			}
 
-			// process the data message
-			err := ww.parallelWriter.connector.ProcessDataMessage(msg)
-			if err != nil {
-				slog.Error(fmt.Sprintf("Worker %v failed to process data message: %v", ww.id, err))
+			// Check to see if we should process a batch now
+			if len(batch) > 0 && (msg.Loc.Database != batch[0].Loc.Database || msg.Loc.Collection != batch[0].Loc.Collection) {
+				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+				}
+				batch = nil
+			}
+
+			batch = append(batch, msg)
+			// Process right away if we've reached the size or have to process an embedded batch or the queue is currently empty
+			if (ww.parallelWriter.maxBatchSize > 0 && len(batch) >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
+				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+				}
+				batch = nil
 			}
 		}
 	}

@@ -465,7 +465,7 @@ func (cc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly for initializing/starting parallel writers
-	flowParallelWriter := mongoconn.NewParallelWriter(cc.FlowCtx, cc, cc.settings.NumParallelWriters)
+	flowParallelWriter := mongoconn.NewParallelWriter(cc.FlowCtx, cc, cc.settings.NumParallelWriters, cc.settings.WriterMaxBatchSize)
 	flowParallelWriter.Start()
 
 	// start printing progress
