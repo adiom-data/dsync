@@ -56,15 +56,18 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 		return
 	}
 	srcStatus := flowStatus.SrcStatus
-
-	if r.runnerProgress.SyncState != iface.VerifySyncState && r.runnerProgress.SyncState != iface.CleanupSyncState { //XXX: if we're cleaning up or verifying, we don't want to overwrite the state
-		r.runnerProgress.SyncState = srcStatus.SyncState
-	}
 	stateInfo := ""
-	// if we're in change stream mode, but not all tasks have been fully completed, we need to keep the state as Initial Sync
-	if r.runnerProgress.SyncState == iface.ChangeStreamSyncState && !flowStatus.AllTasksCompleted {
+
+	switch {
+	case r.runnerProgress.SyncState == iface.VerifySyncState || r.runnerProgress.SyncState == iface.CleanupSyncState:
+		// Do nothing, keep the current state
+	case srcStatus.SyncState == iface.ChangeStreamSyncState && !flowStatus.AllTasksCompleted:
+		// Source is already in the change stream mode but not all tasks were fully completed
 		r.runnerProgress.SyncState = iface.InitialSyncSyncState
 		stateInfo += "Finalizing initial sync... "
+	default:
+		// Just use the source state
+		r.runnerProgress.SyncState = srcStatus.SyncState
 	}
 
 	stateInfo += srcStatus.AdditionalInfo
