@@ -197,7 +197,7 @@ func runDsync(c *cli.Context) error {
 			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
 				r.UpdateRunnerProgress()
-				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
+				generateNewHTML(r.GetRunnerProgress(), wsErrorLog, w)
 			})
 			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
 			http.ListenAndServe(host, nil)

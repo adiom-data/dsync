@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"io"
 	"math"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -421,4 +422,40 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 	}
 
 	return htmlOutput
+}
+
+// generate HTML page with the new design
+func generateNewHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.ReverseBuffer, w http.ResponseWriter) {
+	funcMap := template.FuncMap{
+		"calcPercentNS": func(ns *iface.NamespaceStatus) int64 {
+			pct, _, _ := percentCompleteNamespace(ns)
+			return int64(pct)
+		},
+		"round": func(f float64) int {
+			return int(math.Round(f))
+		},
+	}
+
+	t := template.Must(template.New("index.html").Funcs(funcMap).ParseFiles("./internal/app/Designs/SP_all-states-in-one/index.html"))
+
+	elapsed := time.Since(progress.StartTime).Round(time.Second)
+
+	data := struct {
+		runnerLocal.RunnerSyncProgress
+		Elapsed         string
+		TotalProgress   int64
+		TotalThroughput float64
+		ErrorLogString  string
+	}{
+		RunnerSyncProgress: progress,
+		Elapsed:            elapsed.String(),
+		TotalProgress:      int64(percentCompleteTotal(progress)),
+		TotalThroughput:    progress.Throughput,
+		ErrorLogString:     errorLog.String(),
+	}
+
+    err := t.Execute(w, data)
+    if err != nil {
+        fmt.Println("Error executing template:", err)
+    }
 }

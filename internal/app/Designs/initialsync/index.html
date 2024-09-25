@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sync Progress</title>
+    <link rel="icon" href="/web_static/favicon.ico" type="image/x-icon" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --accent: #2353ff;
+        --background: 253, 254, 254;
+        --foreground: 32, 32, 32; /* #202020 */
+        --background-block: 247, 248, 251; /*#f7f8fb*/
+        --border: 234, 240, 245; /* #eaf0f5 */
+        --border-block: 208, 208, 208; /* #D0D0D0 */
+        --separator: 226, 227, 240; /* e2e3f0 */
+        --progress-bar: 224, 231, 250; /* e0e7fa */
+        --bg-displays-percent: 115, 130, 182;
+      }
+
+      .dark {
+        --background: 32, 32, 32;
+        --foreground: 253, 254, 254;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Urbanist', sans-serif;
+        font-optical-sizing: auto;
+        font-weight: 400;
+        font-style: normal;
+        color: rgb(var(--foreground));
+        margin: 0;
+        background-color: rgb(var(--background));
+
+        display: flex;
+        flex-direction: column;
+        min-height: 100dvh;
+
+        transition: color, background-color 150ms linear;
+        position: relative;
+        overflow-x: hidden;
+
+        background-image: url('./adiom-back-png.png');
+        background-repeat: no-repeat;
+        background-position: top 0 right 0;
+        background-size: cover;
+      }
+
+      main {
+        flex: 1 1 auto;
+        padding-top: 3.25rem;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .gap-24 {
+        gap: 24px;
+      }
+
+      .gap-14 {
+        gap: 14px;
+      }
+
+      .gap-9 {
+        gap: 9px;
+      }
+
+      .mb-24 {
+        margin-bottom: 1.5rem;
+      }
+
+      .mb-48 {
+        margin-bottom: 3rem;
+      }
+
+      .row,
+      .row-column {
+        display: flex;
+      }
+
+      .row-column {
+        flex-direction: column;
+      }
+
+      @media screen and (min-width: 768px) {
+        .md-row {
+          flex-direction: row;
+        }
+      }
+
+      .items-center {
+        align-items: center;
+      }
+
+      .justify-center {
+        justify-content: center;
+      }
+
+      .justify-between {
+        justify-content: space-between;
+      }
+
+      .flex-wrap {
+        flex-wrap: wrap;
+      }
+
+      .col {
+        border-radius: 12px;
+        padding: 0.75rem 1.5rem;
+      }
+
+      @media screen and (min-width: 768px) {
+        .col {
+          border-radius: 18px;
+          padding: 1.5rem 3rem;
+        }
+      }
+
+      .col-4,
+      .col-6,
+      .col-8,
+      .col-12 {
+        background-color: rgba(var(--background-block), 0.4);
+        border: 1px solid rgba(var(--border-block), 0.12);
+      }
+
+      .col-max-content {
+        width: 100%;
+        max-width: max-content;
+      }
+
+      .col-6 {
+        flex: 1 1 50%;
+      }
+
+      .col-8 {
+        flex: 1 1 70%;
+      }
+
+      .col-12 {
+        flex: 1 1 100%;
+      }
+
+      .bg-block {
+        background-color: rgba(var(--background-block), 0.4);
+        border: 1px solid rgba(var(--border-block), 0.12);
+      }
+
+      .bg-transparent {
+        background-color: transparent;
+        border: none;
+      }
+
+      .container {
+        max-width: 100%;
+        margin: 0 auto;
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+
+      @media screen and (min-width: 768px) {
+        .container {
+          max-width: 1280px;
+        }
+      }
+
+      .background-svg {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: -1;
+      }
+
+      .header {
+        border-bottom: 1px solid rgb(var(--border));
+        transition: border-bottom 150ms linear;
+      }
+
+      .header > .container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
+        font-weight: 900;
+        font-size: 2rem;
+        line-height: 1.2;
+        text-transform: capitalize;
+        color: var(--accent);
+        display: block;
+        padding: 1.75rem 0 1.75rem 0;
+      }
+
+      .theme-toggler {
+        position: relative;
+        width: 65px;
+        height: 40px;
+        border-radius: 125px;
+        background-color: rgba(var(--background-block), 0.7);
+        border: none;
+      }
+      .theme-toggler:hover {
+        cursor: pointer;
+      }
+      .theme-toggler::before {
+        content: '';
+        width: 20px;
+        height: 20px;
+        background-color: var(--accent);
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        border-radius: 50%;
+        transition: all 100ms linear;
+
+        transform: translateY(-50%);
+      }
+
+      .section-hero {
+        margin-bottom: 2.8rem;
+      }
+
+      .title {
+        max-width: 338px;
+        font-size: 2.5rem;
+        font-weight: 800;
+        position: relative;
+        line-height: 1.2;
+        text-transform: capitalize;
+      }
+
+      .title-thin {
+        font-weight: 500;
+      }
+
+      .title:before {
+        content: '';
+        width: 200px;
+        height: 6px;
+        background-color: var(--accent);
+        position: absolute;
+        bottom: -10px;
+        left: 94px;
+      }
+
+      @media screen and (min-width: 768px) {
+        .title {
+          font-size: 3.375rem;
+        }
+
+        .title::before {
+          width: 280px;
+        }
+      }
+
+      .col-title {
+        font-weight: 700;
+        font-size: 1.5rem;
+        line-height: 1.4;
+        text-transform: capitalize;
+      }
+
+      .col-value {
+        font-weight: 500;
+        font-size: 1rem;
+        line-height: 1.2;
+        text-transform: capitalize;
+      }
+
+      .col-title-icon {
+        width: 32px;
+        height: 24px;
+        border-radius: 6px;
+        background-color: var(--accent);
+      }
+
+      .separator {
+        width: 100%;
+        min-height: 1px;
+        background-color: rgba(var(--separator));
+      }
+
+      @media screen and (min-width: 768px) {
+        .separator {
+          width: 1px;
+          min-height: 100%;
+        }
+      }
+
+      .progress-bar,
+      .indeterminate-bar {
+        min-width: 100%;
+        height: 22px;
+        border-radius: 12px;
+        background-color: rgb(var(--progress-bar));
+        margin-bottom: 14px;
+        position: relative;
+      }
+
+      .indeterminate-bar {
+        overflow: hidden;
+      }
+
+      .progress,
+      .indeterminate {
+        height: 100%;
+        border-radius: 12px;
+        background-color: var(--accent);
+        position: relative;
+        transition: width 150ms linear;
+      }
+
+      .indeterminate {
+        width: 30%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        animation: indeterminate 2s infinite ease-in-out;
+      }
+
+      @keyframes indeterminate {
+        0% {
+          left: -30%;
+          width: 30%;
+        }
+        50% {
+          left: 35%;
+          width: 50%;
+        }
+        100% {
+          left: 100%;
+          width: 30%;
+        }
+      }
+
+      .progress-label-percent {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        width: 67px;
+        height: 44px;
+        border-radius: 16px;
+        border: 1px solid rgba(var(--border-block), 0.12);
+        backdrop-filter: blur(5.1px);
+        background: rgba(var(--bg-displays-percent), 0.1);
+        font-weight: 900;
+        font-size: 20px;
+        line-height: 1.2;
+        text-transform: capitalize;
+        color: var(--accent);
+
+        position: absolute;
+        bottom: 12px;
+        right: -10px;
+      }
+
+      .progress-value {
+        min-width: 9rem;
+      }
+
+      .per-namespace-progress {
+        display: grid;
+        grid-auto-rows: auto 1fr;
+      }
+
+      .overflow-auto {
+        overflow: auto;
+      }
+
+      .table-title {
+        font-weight: 700;
+        line-height: 1.5;
+        text-transform: capitalize;
+        font-size: 1.5rem;
+      }
+
+      .table-header .table-cell {
+        font-weight: 700;
+        font-size: 1rem;
+        line-height: 1.2;
+        text-transform: capitalize;
+      }
+
+      .table-row,
+      .table-row-3 {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(6rem, 1fr));
+        justify-content: space-between;
+        border-top: 1px solid rgb(var(--separator));
+      }
+
+      .table-row-3 {
+        grid-template-columns: repeat(3, minmax(9rem, 1fr));
+      }
+
+      .table-row.table-header,
+      .table-row-3.table-header {
+        border: none;
+      }
+
+      .table-cell {
+        width: 100%;
+        text-align: center;
+        padding: 1.5rem 0 1.5rem 0;
+        font-weight: 400;
+        font-size: 0.875rem;
+        line-height: 1.2;
+      }
+
+      .cell-to-center {
+        width: 100%;
+        text-align: center;
+      }
+
+      .pie-wrapper {
+        max-width: 18.75rem;
+      }
+
+      @media screen and (min-width: 768px) {
+      }
+
+      .footer {
+        margin-bottom: 5.25rem;
+      }
+
+      .errors-title {
+        font-weight: 700;
+        font-size: 1.5rem;
+        line-height: 1.2;
+        text-transform: capitalize;
+      }
+
+      @media screen and (min-width: 768px) {
+        .erros-title {
+          font-size: 2.25rem;
+        }
+      }
+
+      .test-color {
+        background-color: #2353ff;
+        width: 100%;
+        height: 50px;
+      }
+
+      .errors {
+        height: 350px;
+        overflow: auto;
+      }
+
+      .errors {
+        font-family: monospace;
+        margin: 0;
+      }
+
+      .errors::-webkit-scrollbar {
+        width: 9px;
+        height: 80px;
+      }
+      .errors::-webkit-scrollbar-track {
+        background-color: transparent;
+        border-radius: 10px;
+      }
+      .errors::-webkit-scrollbar-thumb {
+        background-color: var(--accent);
+        border-radius: 10px;
+      }
+      .errors::-webkit-scrollbar-thumb:hover {
+        cursor: pointer;
+        background-color: var(--accent);
+      }
+      .errors::-webkit-scrollbar-button {
+        background-color: transparent;
+        height: 0px;
+        width: 0px;
+      }
+
+      .spinner {
+        margin: 0 auto 3rem auto;
+        stroke: var(--accent);
+        width: 150px;
+        height: 150px;
+      }
+
+      @media screen and (min-width: 768px) {
+        .spinner {
+          width: 200px;
+          height: 200px;
+        }
+      }
+
+      /* DARK THEME */
+      .dark .header {
+        border-bottom: 1px solid rgba(var(--border), 0.1);
+      }
+
+      .dark .theme-toggler::before {
+        width: 30px;
+        height: 30px;
+        left: 30px;
+      }
+
+      .dark .theme-toggler {
+        background-color: rgb(var(--background-block));
+      }
+
+      .dark .bg-block,
+      .dark .col-4,
+      .dark .col-6,
+      .dark .col-8,
+      .dark .col-12 {
+        background-color: rgba(var(--background-block), 0.04);
+      }
+
+      .dark .bg-transparent {
+        background-color: transparent;
+      }
+
+      .dark .progress-label-percent {
+        color: rgb(var(--foreground));
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="container">
+        <a href="/" class="logo">adiom</a>
+        <button type="button" class="theme-toggler" aria-label="Switch theme to light or dark one"></button>
+      </div>
+    </header>
+
+    <main>
+      <section class="section-hero container">
+        <h1 class="title"><span class="title-thin">sync</span> progress</h1>
+      </section>
+
+      <section class="section-path mb-24">
+        <div class="container">
+          <div class="row-column md-row gap-24">
+            <div class="col col-6 row-column gap-14">
+              <h2 class="col-title">source:</h2>
+              <span class="col-value">[Cosmos DB] cosmosdbtest-3.mongo.cosmos.azure.com:10255</span>
+            </div>
+            <div class="col col-6 row-column gap-14">
+              <h2 class="col-title">destination:</h2>
+              <span class="col-value">[MongoDB] localhost:27027</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-info mb-48">
+        <div class="container">
+          <div class="row-column md-row col gap-24 bg-block justify-between">
+            <div class="col-max-content row-column gap-14 justify-between">
+              <div class="row items-center gap-9">
+                <span class="col-title-icon row justify-center items-center">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M4.7025 12.7875C4.98459 13.113 5.16703 13.5128 5.22802 13.9391C5.28901 14.3655 5.22598 14.8004 5.04644 15.1919C4.86691 15.5834 4.57847 15.9149 4.21558 16.1469C3.85269 16.3788 3.43069 16.5014 3 16.5C1.755 16.5 0.75 15.495 0.75 14.25C0.75 13.005 1.755 12 3 12C3.135 12 3.27 12 3.3975 12.0375L5.7 8.01751L4.395 7.27501L7.4625 6.43501L8.3025 9.50251L6.9975 8.76001L4.7025 12.7875ZM15 12C14.025 12 13.2 12.63 12.885 13.5H8.25V12L6 14.25L8.25 16.5V15H12.885C13.2 15.87 14.025 16.5 15 16.5C16.245 16.5 17.25 15.495 17.25 14.25C17.25 13.005 16.245 12 15 12ZM9 6.00001C9.135 6.00001 9.27 6.00001 9.3975 5.96251L11.7 9.98251L10.395 10.725L13.4625 11.565L14.3025 8.49751L12.9975 9.24001L10.7025 5.21251C10.9846 4.88705 11.167 4.48727 11.228 4.06091C11.289 3.63456 11.226 3.19966 11.0464 2.80816C10.8669 2.41667 10.5785 2.08514 10.2156 1.85317C9.85269 1.6212 9.43069 1.4986 9 1.50001C7.755 1.50001 6.75 2.50501 6.75 3.75001C6.75 4.99501 7.755 6.00001 9 6.00001Z"
+                      fill="#FDFDFE"
+                    />
+                  </svg>
+                </span>
+                <h2 class="col-title">state:</h2>
+              </div>
+              <span class="col-value">InitialSync</span>
+            </div>
+            <span class="separator"></span>
+            <div class="col-max-content row-column gap-14 justify-between">
+              <h2 class="col-title">time elapsed:</h2>
+              <span class="col-value">3m3s</span>
+            </div>
+            <span class="separator"></span>
+            <div class="col-max-content row-column gap-14 justify-between">
+              <h2 class="col-title">Namespaces Synced:</h2>
+              <span class="col-value">0 / 3</span>
+            </div>
+            <span class="separator"></span>
+            <div class="col-max-content row-column gap-14 justify-between">
+              <h2 class="col-title">Documents Synced:</h2>
+              <span class="col-value">1214503</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-progress mb-48" data-progress="0" data-throughput="0">
+        <!--- Please, insert your variables for progress and throughput/sec to data-progress and data-throughput attributes accordingly.
+        Then JS code will handle changes in data-attributes and update html markup with values.-->
+        <div class="container">
+          <div class="progress-bar">
+            <div class="progress">
+              <span class="progress-label-percent">0%</span>
+            </div>
+          </div>
+
+          <div class="progress-info row justify-between flex-wrap gap-9">
+            <div class="row items-center gap-9">
+              <h3 class="progress-title">Total % Complete:</h3>
+              <span class="progress-value progress-percent">0%</span>
+            </div>
+            <div class="row items-center gap-9">
+              <h3 class="progress-title">Total Throughput:</h3>
+              <span class="progress-value progress-ops">0 ops/sec</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-namespace mb-24">
+        <div class="container">
+          <div class="row-column md-row gap-24">
+            <div class="col col-8 row-column overflow-auto">
+              <h2 class="table-title">per-namespace progress</h2>
+              <div class="per-namespace-progress overflow-auto" role="table">
+                <div class="table-row table-header" role="row">
+                  <div class="table-cell" role="columnheader">Namespace</div>
+                  <div class="table-cell" role="columnheader">Complete</div>
+                  <div class="table-cell" role="columnheader">Tasks</div>
+                  <div class="table-cell" role="columnheader">Active</div>
+                  <div class="table-cell" role="columnheader">Docs</div>
+                  <div class="table-cell" role="columnheader">Throughput</div>
+                </div>
+
+                <div class="table-row row-data" role="row" data-name="{odc col1}" data-docs="265000">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 3</div>
+                  <div class="table-cell" role="cell">6 </div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1561</div>
+                </div>
+
+                <div class="table-row row-data" role="row" data-name="{odc col2}" data-docs="1500000">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 6</div>
+                  <div class="table-cell" role="cell">8</div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1978</div>
+                </div>
+
+                <div class="table-row row-data" role="row" data-name="{odc col3}" data-docs="3000000">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 6</div>
+                  <div class="table-cell" role="cell">8</div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1978</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-4 bg-transparent row justify-center items-center">
+              <div class="pie-wrapper" data-docs>
+                <canvas id="myPieChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="row">
+          <div class="col col-12">
+            <h2 class="errors-title">Errors</h2>
+            <div class="errors">
+              <p>
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ex rem adipisci provident qui veniam tenetur a
+                amet inventore dolore.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      const chartData = [];
+      const colors = ['#2353FF', '#4069FF', '#5989FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
+
+      const dataRows = document.querySelectorAll('.row-data');
+      dataRows.forEach(row => {
+        row.querySelector('.name').textContent = row.getAttribute('data-name');
+        row.querySelector('.docs').textContent = row.getAttribute('data-docs');
+      });
+
+      const ctx = document.getElementById('myPieChart');
+      const myPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: chartData.map(item => item.name),
+          datasets: [
+            {
+              label: ' Docs',
+              data: chartData.map(item => item.docs),
+              backgroundColor: chartData.map((item, index) => colors[index]),
+              hoverBackgroundColor: colors.map(color => lightenColor(color, 10)),
+              borderWidth: 0,
+              borderColor: 'rgba(0,0,0,0)',
+              offset: 30,
+              hoverOffset: 40,
+              borderRadius: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                font: {
+                  size: 15,
+                },
+                usePointStyle: true,
+                pointStyle: 'rectRounded',
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: function (tooltipItem) {
+                  const data = tooltipItem.chart.data.datasets[0].data;
+                  const total = data.reduce((acc, value) => acc + value, 0);
+                  const value = data[tooltipItem.dataIndex];
+                  const percentage = ((value / total) * 100).toFixed(1);
+                  const formattedValue = value.toLocaleString();
+                  return `Docs: ${formattedValue} (${percentage}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+
+      function lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16),
+          amt = Math.round(2.55 * percent),
+          R = (num >> 16) + amt,
+          G = ((num >> 8) & 0x00ff) + amt,
+          B = (num & 0x0000ff) + amt;
+
+        return `#${(
+          0x1000000 +
+          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+          (B < 255 ? (B < 1 ? 0 : B) : 255)
+        )
+          .toString(16)
+          .slice(1)}`;
+      }
+
+      pieChartInit();
+      function pieChartInit() {
+        const observerForPieChart = new MutationObserver(mutationsList => {
+          for (const mutation of mutationsList) {
+            if (mutation.type === 'attributes') {
+              handleChange(mutation);
+            }
+          }
+        });
+
+        const config = {
+          attributes: true,
+          attributeFilter: ['data-name', 'data-docs'],
+          subtree: true,
+        };
+
+        const namespacesTable = document.querySelector('.per-namespace-progress');
+        observerForPieChart.observe(namespacesTable, config);
+      }
+
+      function handleChange(mutation) {
+        if (mutation.type === 'attributes') {
+          const currentChange = {
+            name: mutation.target.getAttribute('data-name'),
+            docs: parseInt(mutation.target.getAttribute(mutation.attributeName)),
+          };
+
+          const index = chartData.findIndex(item => item.name === currentChange.name);
+
+          if (index !== -1) {
+            chartData[index] = currentChange;
+          } else {
+            chartData.push(currentChange);
+          }
+
+          myPieChart.data.labels = chartData.map(item => item.name);
+          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
+          myPieChart.data.datasets[0].backgroundColor = colors;
+          myPieChart.update();
+
+          mutation.target.querySelector('.docs').textContent = mutation.target.getAttribute('data-docs');
+        }
+      }
+
+      themeInit();
+      function themeInit() {
+        const getThemeFromLocalStorage = JSON.parse(window.localStorage.getItem('theme'));
+
+        if (getThemeFromLocalStorage && getThemeFromLocalStorage === 'dark') {
+          document.body.classList.add('dark');
+          myPieChart.options.plugins.legend.labels.color = 'white';
+        } else {
+          window.localStorage.setItem('theme', JSON.stringify('light'));
+          myPieChart.options.plugins.legend.labels.color = 'black';
+        }
+
+        document.querySelector('.theme-toggler').addEventListener('click', themeToggler);
+        myPieChart.update();
+      }
+
+      function themeToggler() {
+        if (document.body.classList.contains('dark')) {
+          document.body.classList.remove('dark');
+          window.localStorage.setItem('theme', JSON.stringify('light'));
+          myPieChart.options.plugins.legend.labels.color = 'black';
+        } else {
+          document.body.classList.add('dark');
+          window.localStorage.setItem('theme', JSON.stringify('dark'));
+          myPieChart.options.plugins.legend.labels.color = 'white';
+        }
+        myPieChart.update();
+      }
+
+      initProgressBar();
+      function initProgressBar() {
+        const sectionProgress = document.querySelector('.section-progress');
+        const progress = document.querySelector('.progress');
+        const progressLabel = progress.firstElementChild;
+
+        progress.style.width = '0%';
+        progressLabel.style.opacity = '0';
+        progressLabel.style.visibility = 'hidden';
+
+        const observer = new MutationObserver(mutationList => {
+          mutationList.forEach(mutation => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-progress') {
+              const newProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+              updateProgress(newProgress);
+            } else if (mutation.type === 'attributes' && mutation.attributeName === 'data-throughput') {
+              const newThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
+              updateThroughput(newThroughput);
+            }
+          });
+        });
+
+        observer.observe(sectionProgress, { attributes: true, attributeFilter: ['data-progress', 'data-throughput'] });
+      }
+
+      function updateProgress(newProgress) {
+        const progress = document.querySelector('.progress');
+        const progressLabel = progress.firstElementChild;
+        const progressPercent = document.querySelector('.progress-percent');
+
+        if (newProgress <= 0) {
+          progress.style.width = '0%';
+          progressLabel.style.opacity = '0';
+          progressLabel.style.visibility = 'hidden';
+        } else {
+          progressLabel.style.opacity = '1';
+          progressLabel.style.visibility = 'visible';
+        }
+
+        if (newProgress > 100) return;
+
+        progress.style.width = `${newProgress}%`;
+        progressLabel.textContent = `${newProgress}%`;
+        progressPercent.textContent = `${newProgress}%`;
+      }
+
+      function updateThroughput(newThroughput) {
+        const sectionProgress = document.querySelector('.section-progress');
+        const progressOps = document.querySelector('.progress-ops');
+
+        const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+
+        if (currentProgress !== 0 && currentProgress !== 100) {
+          progressOps.textContent = `${newThroughput} Ops/Sec`;
+        } else {
+          progressOps.textContent = `0 Ops/Sec`;
+        }
+      }
+
+      // WARNING!
+      // Code below is not for production! There is simulation of data changing
+      // Just to see how should works pie chart, table "Per-Namespace Progress" and progress bar for development mode
+
+      //-----------Uncomment code below to see how should works pie chart and table-------------------------
+      // function getRandomNumber() {
+      //   return Math.floor(Math.random() * (2500 - 100 + 1)) + 100;
+      // }
+
+      // setInterval(() => {
+      //   const namespacesDocs = document.querySelectorAll('.row-data');
+
+      //   namespacesDocs.forEach(item => {
+      //     const currentDocs = parseInt(item.getAttribute('data-docs'));
+      //     item.setAttribute('data-docs', currentDocs + getRandomNumber());
+      //   });
+      // }, 1000);
+
+      // ===================================================================================
+
+      // -------Uncomment code below to see how should works progress-bar----------------------
+      // setInterval(() => {
+      //   const sectionProgress = document.querySelector('.section-progress');
+      //   const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+      //   if (currentProgress > 99) return;
+
+      //   sectionProgress.setAttribute('data-progress', currentProgress + 1);
+      // }, 100);
+
+      // setInterval(() => {
+      //   const sectionProgress = document.querySelector('.section-progress');
+      //   sectionProgress.setAttribute('data-throughput', Math.floor(1000 + Math.random() * 9000));
+      // }, 2000);
+      // ===================================================================================
+    </script>
+  </body>
+</html>
