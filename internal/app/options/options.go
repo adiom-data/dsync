@@ -39,15 +39,15 @@ type Options struct {
 	WebPort   uint
 
 	LoadLevel                            string
-	CosmosInitialSyncNumParallelCopiers  int
-	CosmosNumParallelWriters             int
-	CosmosNumParallelIntegrityCheckTasks int
+	InitialSyncNumParallelCopiers  		 int
+	NumParallelWriters             		 int
+	NumParallelIntegrityCheckTasks 		 int
 	CosmosNumParallelPartitionWorkers    int
-	CosmosMaxNumNamespaces               int
-	CosmosServerConnectTimeout           time.Duration
-	CosmosPingTimeout                    time.Duration
-	CosmosCdcResumeTokenUpdateInterval   time.Duration
-	CosmosWriterMaxBatchSize             int
+	CosmosReaderMaxNumNamespaces         int
+	ServerConnectTimeout           		 time.Duration
+	PingTimeout                    		 time.Duration
+	CdcResumeTokenUpdateInterval         time.Duration
+	WriterMaxBatchSize             	     int
 	CosmosTargetDocCountPerPartition     int64
 	CosmosDeletesCheckInterval           time.Duration
 	Mode                                 string
@@ -72,15 +72,15 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.PprofPort = c.Uint("pprof-port")
 	o.WebPort = c.Uint("web-port")
 
-	o.CosmosInitialSyncNumParallelCopiers = c.Int("cosmos-parallel-copiers")
-	o.CosmosNumParallelWriters = c.Int("cosmos-parallel-writers")
-	o.CosmosNumParallelIntegrityCheckTasks = c.Int("cosmos-parallel-integrity-check")
+	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
+	o.NumParallelWriters = c.Int("parallel-writers")
+	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
 	o.CosmosNumParallelPartitionWorkers = c.Int("cosmos-parallel-partition-workers")
-	o.CosmosMaxNumNamespaces = c.Int("cosmos-max-namespaces")
-	o.CosmosServerConnectTimeout = time.Duration(c.Int("cosmos-server-timeout")) * time.Second
-	o.CosmosPingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
-	o.CosmosCdcResumeTokenUpdateInterval = time.Duration(c.Int("cosmos-resume-token-interval")) * time.Second
-	o.CosmosWriterMaxBatchSize = c.Int("cosmos-writer-batch-size")
+	o.CosmosReaderMaxNumNamespaces = c.Int("cosmos-reader-max-namespaces")
+	o.ServerConnectTimeout = time.Duration(c.Int("server-timeout")) * time.Second
+	o.PingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
+	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("cdc-resume-token-interval")) * time.Second
+	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.CosmosTargetDocCountPerPartition = c.Int64("cosmos-doc-partition")
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
 	o.Mode = c.String("mode")

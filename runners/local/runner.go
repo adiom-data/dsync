@@ -63,15 +63,15 @@ type RunnerLocalSettings struct {
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
 	LoadLevel                            string
-	CosmosInitialSyncNumParallelCopiers  int
-	CosmosNumParallelWriters             int
-	CosmosNumParallelIntegrityCheckTasks int
+	InitialSyncNumParallelCopiers  		 int
+	NumParallelWriters             		 int
+	NumParallelIntegrityCheckTasks 		 int
 	CosmosNumParallelPartitionWorkers    int
-	CosmosMaxNumNamespaces               int
-	CosmosServerConnectTimeout           time.Duration
-	CosmosPingTimeout                    time.Duration
-	CosmosCdcResumeTokenUpdateInterval   time.Duration
-	CosmosWriterMaxBatchSize             int
+	CosmosReaderMaxNumNamespaces         int
+	ServerConnectTimeout           		 time.Duration
+	PingTimeout                    		 time.Duration
+	CdcResumeTokenUpdateInterval   		 time.Duration
+	WriterMaxBatchSize             		 int
 	CosmosTargetDocCountPerPartition     int64
 	CosmosDeletesCheckInterval           time.Duration
 	SyncMode                             string
@@ -108,18 +108,18 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.CosmosInitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
-				cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
+			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
 			} else {
 				cosmosSettings.InitialSyncNumParallelCopiers = btc
 			}
-			if settings.CosmosNumParallelWriters != 0 {
-				cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			if settings.NumParallelWriters != 0 {
+				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
 			} else { // default for writer, integrity check, and partition workers are the same
 				cosmosSettings.NumParallelWriters = btc / 2
 			}
-			if settings.CosmosNumParallelIntegrityCheckTasks != 0 {
-				cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
+			if settings.NumParallelIntegrityCheckTasks != 0 {
+				cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 			} else {
 				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
 			}
@@ -129,16 +129,16 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 				cosmosSettings.NumParallelPartitionWorkers = btc / 2
 			}
 		} else {
-			cosmosSettings.InitialSyncNumParallelCopiers = settings.CosmosInitialSyncNumParallelCopiers
-			cosmosSettings.NumParallelWriters = settings.CosmosNumParallelWriters
-			cosmosSettings.NumParallelIntegrityCheckTasks = settings.CosmosNumParallelIntegrityCheckTasks
+			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
+			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
-		cosmosSettings.MaxNumNamespaces = settings.CosmosMaxNumNamespaces
-		cosmosSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
-		cosmosSettings.PingTimeout = settings.CosmosPingTimeout
-		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CosmosCdcResumeTokenUpdateInterval
-		cosmosSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
+		cosmosSettings.MaxNumNamespaces = settings.CosmosReaderMaxNumNamespaces
+		cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		cosmosSettings.PingTimeout = settings.PingTimeout
+		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
+		cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
 		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
 
@@ -146,7 +146,36 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
 		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
-		r.src = connectorMongo.NewMongoConnector(sourceName, connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString})
+		mongoSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}
+		if settings.LoadLevel != "" {
+			btc := getBaseThreadCount(settings.LoadLevel)
+			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
+				mongoSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			} else {
+				mongoSettings.InitialSyncNumParallelCopiers = btc
+			}
+			if settings.NumParallelWriters != 0 {
+				mongoSettings.NumParallelWriters = settings.NumParallelWriters
+			} else { // default for writer, integrity check, and partition workers are the same
+				mongoSettings.NumParallelWriters = btc / 2
+			}
+			if settings.NumParallelIntegrityCheckTasks != 0 {
+				mongoSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+			} else {
+				mongoSettings.NumParallelIntegrityCheckTasks = btc / 2
+			}
+		} else {
+			mongoSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
+			mongoSettings.NumParallelWriters = settings.NumParallelWriters
+			mongoSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+		}
+		mongoSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
+		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		mongoSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		mongoSettings.PingTimeout = settings.PingTimeout
+		
+		// set all other settings to default
+		r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	}
 	//null write?
@@ -158,17 +187,17 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		connSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.CosmosNumParallelWriters != 0 {
-				connSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			if settings.NumParallelWriters != 0 {
+				connSettings.NumParallelWriters = settings.NumParallelWriters
 			} else {
 				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
 			}
 		} else {
-			connSettings.NumParallelWriters = settings.CosmosNumParallelWriters
+			connSettings.NumParallelWriters = settings.NumParallelWriters
 		}
-		connSettings.WriterMaxBatchSize = settings.CosmosWriterMaxBatchSize
-		connSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
-		connSettings.PingTimeout = settings.CosmosPingTimeout
+		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		connSettings.PingTimeout = settings.PingTimeout
 
 		// set all other settings to default
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
