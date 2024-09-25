@@ -7,10 +7,13 @@
 package dsync
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"math"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -421,4 +424,70 @@ func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.Reve
 	}
 
 	return htmlOutput
+}
+
+// Convert the iface.Namespace key to a string ("db.col") to support JSON marshal
+func convertNamespaceMapToStringKeys(originalMap map[iface.Namespace]*iface.NamespaceStatus) map[string]*iface.NamespaceStatus {
+    newMap := make(map[string]*iface.NamespaceStatus)
+
+    for key, value := range originalMap {
+        newKey := fmt.Sprintf("%s.%s", key.Db, key.Col)
+        newMap[newKey] = value
+    }
+    return newMap
+}
+
+// Push updates using SSE server
+func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal, errorLog *logger.ReverseBuffer, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	defer func() {
+        fmt.Fprintf(w, "data: complete\n\n")
+        w.(http.Flusher).Flush()
+    }()
+	ticker := time.NewTicker(1 * time.Second)
+    defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Context cancelled, stopping progress updates.")
+			return
+		case <-ticker.C:
+			runner.UpdateRunnerProgress()
+			progress := runner.GetRunnerProgress()
+			elapsed := time.Since(progress.StartTime).Round(time.Second)
+			convertedNamespaceMap := convertNamespaceMapToStringKeys(progress.NsProgressMap)
+
+			// Construct data struct
+			data := struct {
+				RunnerSyncProgress runnerLocal.RunnerSyncProgress
+				Elapsed         string
+				TotalProgress   int64
+				TotalThroughput float64
+				ErrorLogString  string
+				NsProgressMap   map[string]*iface.NamespaceStatus
+			}{
+				RunnerSyncProgress: progress,
+				Elapsed:            elapsed.String(),
+				TotalProgress:      int64(percentCompleteTotal(progress)),
+				TotalThroughput:    progress.Throughput,
+				ErrorLogString:     errorLog.String(),
+				NsProgressMap:      convertedNamespaceMap,
+			}
+
+			// Convert data to JSON and send as event to client
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				fmt.Println("Error marshaling JSON:", err)
+				break
+			}
+			fmt.Fprintf(w, "data: %s\n\n", jsonData)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}	
 }

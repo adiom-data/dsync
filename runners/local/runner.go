@@ -306,6 +306,7 @@ func (r *RunnerLocal) Run() error {
 				slog.Error("Data integrity check: FAIL")
 			}
 		}
+		time.Sleep(2 * time.Second)
 		return err
 	}
 
