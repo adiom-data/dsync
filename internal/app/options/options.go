@@ -39,15 +39,15 @@ type Options struct {
 	WebPort   uint
 
 	LoadLevel                            string
-	InitialSyncNumParallelCopiers  int
-	NumParallelWriters             int
-	NumParallelIntegrityCheckTasks int
+	InitialSyncNumParallelCopiers  		 int
+	NumParallelWriters             		 int
+	NumParallelIntegrityCheckTasks 		 int
 	CosmosNumParallelPartitionWorkers    int
-	CosmosReaderMaxNumNamespaces               int
-	ServerConnectTimeout           time.Duration
-	PingTimeout                    time.Duration
-	CdcResumeTokenUpdateInterval   time.Duration
-	WriterMaxBatchSize             int
+	CosmosReaderMaxNumNamespaces         int
+	ServerConnectTimeout           		 time.Duration
+	PingTimeout                    		 time.Duration
+	CdcResumeTokenUpdateInterval         time.Duration
+	WriterMaxBatchSize             	     int
 	CosmosTargetDocCountPerPartition     int64
 	CosmosDeletesCheckInterval           time.Duration
 	Mode                                 string
