@@ -43,9 +43,9 @@ type Options struct {
 	NumParallelWriters             int
 	NumParallelIntegrityCheckTasks int
 	CosmosNumParallelPartitionWorkers    int
-	CosmosSourceMaxNumNamespaces               int
-	CosmosServerConnectTimeout           time.Duration
-	CosmosPingTimeout                    time.Duration
+	CosmosReaderMaxNumNamespaces               int
+	ServerConnectTimeout           time.Duration
+	PingTimeout                    time.Duration
 	CdcResumeTokenUpdateInterval   time.Duration
 	WriterMaxBatchSize             int
 	CosmosTargetDocCountPerPartition     int64
@@ -72,15 +72,15 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.PprofPort = c.Uint("pprof-port")
 	o.WebPort = c.Uint("web-port")
 
-	o.InitialSyncNumParallelCopiers = c.Int("cosmos-parallel-copiers")
-	o.NumParallelWriters = c.Int("cosmos-parallel-writers")
-	o.NumParallelIntegrityCheckTasks = c.Int("cosmos-parallel-integrity-check")
+	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
+	o.NumParallelWriters = c.Int("parallel-writers")
+	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check")
 	o.CosmosNumParallelPartitionWorkers = c.Int("cosmos-parallel-partition-workers")
-	o.CosmosSourceMaxNumNamespaces = c.Int("cosmos-max-namespaces")
-	o.CosmosServerConnectTimeout = time.Duration(c.Int("cosmos-server-timeout")) * time.Second
-	o.CosmosPingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
-	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("cosmos-resume-token-interval")) * time.Second
-	o.WriterMaxBatchSize = c.Int("cosmos-writer-batch-size")
+	o.CosmosReaderMaxNumNamespaces = c.Int("cosmos-reader-max-namespaces")
+	o.ServerConnectTimeout = time.Duration(c.Int("server-timeout")) * time.Second
+	o.PingTimeout = time.Duration(c.Int("ping-timeout")) * time.Second
+	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("cdc-resume-token-interval")) * time.Second
+	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.CosmosTargetDocCountPerPartition = c.Int64("cosmos-doc-partition")
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
 	o.Mode = c.String("mode")

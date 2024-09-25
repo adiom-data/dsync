@@ -196,24 +196,24 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-source-max-namespaces",
+			Name:     "cosmos-reader-max-namespaces",
 			Usage:    "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
 			Value:    cosmosDefaultMaxNumNamespaces,
 			Required: false,
 			Category: "Cosmos DB-specific Options",
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-server-timeout",
+			Name:     "server-timeout",
 			Required: false,
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-ping-timeout",
+			Name:     "ping-timeout",
 			Required: false,
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "resume-token-interval",
+			Name:     "cdc-resume-token-interval",
 			Required: false,
 			Hidden:   true,
 		}),

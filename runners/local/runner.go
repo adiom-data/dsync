@@ -67,9 +67,9 @@ type RunnerLocalSettings struct {
 	NumParallelWriters             		 int
 	NumParallelIntegrityCheckTasks 		 int
 	CosmosNumParallelPartitionWorkers    int
-	CosmosSourceMaxNumNamespaces         int
-	CosmosServerConnectTimeout           time.Duration
-	CosmosPingTimeout                    time.Duration
+	CosmosReaderMaxNumNamespaces         int
+	ServerConnectTimeout           		 time.Duration
+	PingTimeout                    		 time.Duration
 	CdcResumeTokenUpdateInterval   		 time.Duration
 	WriterMaxBatchSize             		 int
 	CosmosTargetDocCountPerPartition     int64
@@ -134,9 +134,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
-		cosmosSettings.MaxNumNamespaces = settings.CosmosSourceMaxNumNamespaces
-		cosmosSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
-		cosmosSettings.PingTimeout = settings.CosmosPingTimeout
+		cosmosSettings.MaxNumNamespaces = settings.CosmosReaderMaxNumNamespaces
+		cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		cosmosSettings.PingTimeout = settings.PingTimeout
 		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
@@ -171,6 +171,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		}
 		mongoSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		mongoSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		mongoSettings.PingTimeout = settings.PingTimeout
 		
 		// set all other settings to default
 		r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
@@ -194,8 +196,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			connSettings.NumParallelWriters = settings.NumParallelWriters
 		}
 		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		connSettings.ServerConnectTimeout = settings.CosmosServerConnectTimeout
-		connSettings.PingTimeout = settings.CosmosPingTimeout
+		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		connSettings.PingTimeout = settings.PingTimeout
 
 		// set all other settings to default
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
