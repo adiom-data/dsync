@@ -436,7 +436,7 @@ func generateNewHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.R
 		},
 	}
 
-	t := template.Must(template.New("index.html").Funcs(funcMap).ParseFiles("./internal/app/Designs/SP_all-states-in-one/index.html"))
+	t := template.Must(template.New("index.html").Funcs(funcMap).ParseFiles("./templates/index.html"))
 
 	elapsed := time.Since(progress.StartTime).Round(time.Second)
 
@@ -454,8 +454,8 @@ func generateNewHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.R
 		ErrorLogString:     errorLog.String(),
 	}
 
-    err := t.Execute(w, data)
-    if err != nil {
-        fmt.Println("Error executing template:", err)
-    }
+	err := t.Execute(w, data)
+	if err != nil {
+		fmt.Println("Error executing template:", err)
+	}
 }

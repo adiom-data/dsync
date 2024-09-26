@@ -567,7 +567,7 @@
                 </span>
                 <h2 class="col-title">state:</h2>
               </div>
-              <span class="col-value">AllInOne</span>
+              <span class="col-value">{{ .SyncState }}</span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
@@ -648,6 +648,8 @@
 
       <section class="section-namespace mb-24">
         <div class="container">
+
+          {{ if eq .SyncState "InitialSync" }}
           <div class="row-column md-row gap-24">
             <div class="col col-8 row-column overflow-auto">
               <h2 class="table-title">per-namespace progress</h2>
@@ -665,32 +667,17 @@
                 in each row.
                     Then JS code will handle changes in data-attributes and update html markup with values.
                 -->
-                <div class="table-row row-data" role="row" data-name="{odc col1}" data-docs="200">
-                  <div class="table-cell name" role="cell"></div>
-                  <div class="table-cell" role="cell">0%</div>
-                  <div class="table-cell" role="cell">0 / 3</div>
-                  <div class="table-cell" role="cell">6 </div>
-                  <div class="table-cell docs" role="cell"></div>
-                  <div class="table-cell" role="cell">1561</div>
-                </div>
-
-                <div class="table-row row-data" role="row" data-name="{odc col2}" data-docs="150">
-                  <div class="table-cell name" role="cell"></div>
-                  <div class="table-cell" role="cell">0%</div>
-                  <div class="table-cell" role="cell">0 / 6</div>
-                  <div class="table-cell" role="cell">8</div>
-                  <div class="table-cell docs" role="cell"></div>
-                  <div class="table-cell" role="cell">1978</div>
-                </div>
-
-                <div class="table-row row-data" role="row" data-name="{odc col3}" data-docs="50">
-                  <div class="table-cell name" role="cell"></div>
-                  <div class="table-cell" role="cell">0%</div>
-                  <div class="table-cell" role="cell">0 / 6</div>
-                  <div class="table-cell" role="cell">8</div>
-                  <div class="table-cell docs" role="cell"></div>
-                  <div class="table-cell" role="cell">1978</div>
-                </div>
+                  {{ range $ns, $status := .NsProgressMap }}
+                  {{ $tasksTotalNS := len $status.Tasks }}
+                  <div class="table-row row-data" role="row" data-name="{{ $ns }}" data-docs="{{ $status.DocsCopied }}">
+                    <div class="table-cell name" role="cell"></div>
+                    <div class="table-cell" role="cell">{{ calcPercentNS $status }}%</div>
+                    <div class="table-cell" role="cell">{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</div>
+                    <div class="table-cell" role="cell">{{ $status.TasksStarted }}</div>
+                    <div class="table-cell docs" role="cell"></div>
+                    <div class="table-cell" role="cell">{{ round $status.Throughput }}</div>
+                  </div>
+                  {{ end }}
               </div>
             </div>
             <div class="col-4 bg-transparent row justify-center items-center">
@@ -699,7 +686,31 @@
               </div>
             </div>
           </div>
-        </div>
+
+          {{ else if eq .SyncState "ChangeStream" }}
+          <div class="row-column col bg-block"></div>
+            <h2 class="table-title">progress</h2>
+            <div class="per-namespace-progress" role="table">
+              <div class="table-row-3 table-header" role="row">
+                <div class="table-cell" role="columnheader">Change Stream Events</div>
+                <div class="table-cell" role="columnheader">Deletes Caught</div>
+                <div class="table-cell" role="columnheader">Events To Catch Up</div>
+              </div>
+              <!--  -->
+
+              <div class="table-row-3" role="row">
+                <div class="table-cell" role="cell">{{ .ChangeStreamEvents }}</div>
+                <div class="table-cell" role="cell">{{ .DeletesCaught }}</div>
+                <div class="table-cell" role="cell">{{ .Lag }}</div>
+              </div>
+            </div>
+          
+          {{ else if eq .SyncState "Verify" }}
+          <h2>Verification Result</h2>
+          <p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
+
+          </div>
+          {{ end }}
       </section>
     </main>
 
@@ -710,8 +721,7 @@
             <h2 class="errors-title">Errors</h2>
             <div class="errors">
               <p>
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ex rem adipisci provident qui veniam tenetur a
-                amet inventore dolore.
+                {{ .ErrorLogString }}
               </p>
             </div>
           </div>
@@ -927,6 +937,11 @@
         }
       }
 
+      setInterval(function() {
+        console.log('Attempting to reload the page...');
+        window.location.reload();
+      }, 1000);
+		  
       // WARNING!
       // Code below is not for production! There is simulation of data changing
       // Just to see how should works pie chart, table "Per-Namespace Progress" and progress bar for development mode
