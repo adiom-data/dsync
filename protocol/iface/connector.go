@@ -59,6 +59,7 @@ type ConnectorStatus struct {
 const (
 	SetupSyncState        = "Setup"
 	VerifySyncState       = "Verify"
+	VerifyFullySyncState  = "VerifyFully"
 	CleanupSyncState      = "Cleanup"
 	ReadPlanningSyncState = "ReadPlanning"
 

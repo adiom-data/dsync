@@ -59,7 +59,7 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	stateInfo := ""
 
 	switch {
-	case r.runnerProgress.SyncState == iface.VerifySyncState || r.runnerProgress.SyncState == iface.CleanupSyncState:
+	case r.runnerProgress.SyncState == iface.VerifySyncState || r.runnerProgress.SyncState == iface.VerifyFullySyncState && r.runnerProgress.SyncState != iface.CleanupSyncState:
 		// Do nothing, keep the current state
 	case srcStatus.SyncState == iface.ChangeStreamSyncState && !flowStatus.AllTasksCompleted:
 		// Source is already in the change stream mode but not all tasks were fully completed

@@ -26,10 +26,11 @@ type Options struct {
 
 	NamespaceFrom []string
 
-	Verify   bool
-	Cleanup  bool
-	Progress bool
-	Reverse  bool
+	Verify      bool
+	VerifyFully bool
+	Cleanup     bool
+	Progress    bool
+	Reverse     bool
 
 	CosmosDeletesEmu bool
 
@@ -38,19 +39,19 @@ type Options struct {
 	PprofPort uint
 	WebPort   uint
 
-	LoadLevel                            string
-	InitialSyncNumParallelCopiers  		 int
-	NumParallelWriters             		 int
-	NumParallelIntegrityCheckTasks 		 int
-	CosmosNumParallelPartitionWorkers    int
-	CosmosReaderMaxNumNamespaces         int
-	ServerConnectTimeout           		 time.Duration
-	PingTimeout                    		 time.Duration
-	CdcResumeTokenUpdateInterval         time.Duration
-	WriterMaxBatchSize             	     int
-	CosmosTargetDocCountPerPartition     int64
-	CosmosDeletesCheckInterval           time.Duration
-	Mode                                 string
+	LoadLevel                         string
+	InitialSyncNumParallelCopiers     int
+	NumParallelWriters                int
+	NumParallelIntegrityCheckTasks    int
+	CosmosNumParallelPartitionWorkers int
+	CosmosReaderMaxNumNamespaces      int
+	ServerConnectTimeout              time.Duration
+	PingTimeout                       time.Duration
+	CdcResumeTokenUpdateInterval      time.Duration
+	WriterMaxBatchSize                int
+	CosmosTargetDocCountPerPartition  int64
+	CosmosDeletesCheckInterval        time.Duration
+	Mode                              string
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {
@@ -65,6 +66,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Logfile = c.String("logfile")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
+	o.VerifyFully = c.Bool("verify-fully")
 	o.Cleanup = c.Bool("cleanup")
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")

@@ -106,6 +106,7 @@ func runDsync(c *cli.Context) error {
 		StateStoreConnString:              o.StateStoreConnString,
 		NsFromString:                      o.NamespaceFrom,
 		VerifyRequestedFlag:               o.Verify,
+		FullVerifyRequestedFlag:           o.VerifyFully,
 		CleanupRequestedFlag:              o.Cleanup,
 		FlowStatusReportingInterval:       10,
 		CosmosDeletesEmuRequestedFlag:     o.CosmosDeletesEmu,
@@ -236,7 +237,7 @@ func runDsync(c *cli.Context) error {
 		err := r.Setup(runnerCtx)
 		if err == nil {
 			err = r.Run()
-			if !o.Verify { //if verification was requested, the user should be able to see the results
+			if !o.Verify && !o.VerifyFully { //if verification was requested, the user should be able to see the results
 				runnerCancelFunc()
 			}
 		} else {

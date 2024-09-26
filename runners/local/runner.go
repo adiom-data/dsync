@@ -53,9 +53,10 @@ type RunnerLocalSettings struct {
 
 	NsFromString []string
 
-	VerifyRequestedFlag  bool
-	CleanupRequestedFlag bool
-	ReverseRequestedFlag bool
+	VerifyRequestedFlag     bool
+	FullVerifyRequestedFlag bool
+	CleanupRequestedFlag    bool
+	ReverseRequestedFlag    bool
 
 	FlowStatusReportingInterval time.Duration
 
@@ -316,9 +317,27 @@ func (r *RunnerLocal) Run() error {
 	}
 	r.activeFlowID = flowID
 
+	//don't start the flow if the verify-fully flag is set
+	if r.settings.FullVerifyRequestedFlag {
+		r.runnerProgress.SyncState = iface.VerifyFullySyncState
+		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
+		if err != nil {
+			slog.Error("Failed to perform flow full integrity check", err)
+		} else {
+			if integrityCheckRes.Passed {
+				r.runnerProgress.VerificationResult = "OK"
+				slog.Info("Full data integrity check: OK")
+			} else {
+				r.runnerProgress.VerificationResult = "FAIL"
+				slog.Error("Full data integrity check: FAIL")
+			}
+		}
+		return err
+	}
+
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
-		r.runnerProgress.SyncState = "Verify"
+		r.runnerProgress.SyncState = iface.VerifySyncState
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
 		if err != nil {
 			slog.Error("Failed to perform flow integrity check", err)
