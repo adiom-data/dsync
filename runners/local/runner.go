@@ -16,6 +16,7 @@ import (
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	connectorNull "github.com/adiom-data/dsync/connectors/null"
 	connectorRandom "github.com/adiom-data/dsync/connectors/random"
+	"github.com/adiom-data/dsync/connectors/testconn"
 	coordinatorSimple "github.com/adiom-data/dsync/coordinators/simple"
 	"github.com/adiom-data/dsync/protocol/iface"
 	statestoreMongo "github.com/adiom-data/dsync/statestores/mongo"
@@ -62,19 +63,19 @@ type RunnerLocalSettings struct {
 
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
-	LoadLevel                            string
-	InitialSyncNumParallelCopiers  		 int
-	NumParallelWriters             		 int
-	NumParallelIntegrityCheckTasks 		 int
-	CosmosNumParallelPartitionWorkers    int
-	CosmosReaderMaxNumNamespaces         int
-	ServerConnectTimeout           		 time.Duration
-	PingTimeout                    		 time.Duration
-	CdcResumeTokenUpdateInterval   		 time.Duration
-	WriterMaxBatchSize             		 int
-	CosmosTargetDocCountPerPartition     int64
-	CosmosDeletesCheckInterval           time.Duration
-	SyncMode                             string
+	LoadLevel                         string
+	InitialSyncNumParallelCopiers     int
+	NumParallelWriters                int
+	NumParallelIntegrityCheckTasks    int
+	CosmosNumParallelPartitionWorkers int
+	CosmosReaderMaxNumNamespaces      int
+	ServerConnectTimeout              time.Duration
+	PingTimeout                       time.Duration
+	CdcResumeTokenUpdateInterval      time.Duration
+	WriterMaxBatchSize                int
+	CosmosTargetDocCountPerPartition  int64
+	CosmosDeletesCheckInterval        time.Duration
+	SyncMode                          string
 }
 
 const (
@@ -173,10 +174,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		mongoSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		mongoSettings.PingTimeout = settings.PingTimeout
-		
+
 		// set all other settings to default
 		r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
+	} else if settings.SrcType == "testconn" {
+		r.src = testconn.NewConnector(sourceName, settings.SrcConnString)
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
@@ -202,12 +205,24 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		// set all other settings to default
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
 		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
+	} else if settings.DstType == "testconn" {
+		r.dst = testconn.NewConnector(destinationName, settings.DstConnString)
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
+			if settings.NumParallelWriters != 0 {
+				connSettings.NumParallelWriters = settings.NumParallelWriters
+			} else {
+				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
+			}
+		} else {
+			connSettings.NumParallelWriters = settings.NumParallelWriters
 		}
+		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
+		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
+		connSettings.PingTimeout = settings.PingTimeout
+
 		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
