@@ -95,7 +95,7 @@ func (s *StateStore) Setup(ctx context.Context) error {
 func (s *StateStore) Teardown() {
 	if s.client != nil {
 		if err := s.client.Disconnect(s.ctx); err != nil {
-			panic(err)
+			slog.Warn(fmt.Sprintf("Failed to disconnect from MongoDb: %v", err))
 		}
 	}
 }

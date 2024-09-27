@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"net/http"
@@ -97,35 +99,57 @@ func runDsync(c *cli.Context) error {
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
-		SrcConnString:                        o.SrcConnString,
-		DstConnString:                        o.DstConnString,
-		SrcType:                              o.Sourcetype,
-		DstType:                              o.Destinationtype,
-		StateStoreConnString:                 o.StateStoreConnString,
-		NsFromString:                         o.NamespaceFrom,
-		VerifyRequestedFlag:                  o.Verify,
-		CleanupRequestedFlag:                 o.Cleanup,
-		FlowStatusReportingInterval:          10,
-		CosmosDeletesEmuRequestedFlag:        o.CosmosDeletesEmu,
-		AdvancedProgressRecalcInterval:       throughputUpdateInterval,
-		LoadLevel:                            o.LoadLevel,
-		InitialSyncNumParallelCopiers:  	  o.InitialSyncNumParallelCopiers,
-		NumParallelWriters:             	  o.NumParallelWriters,
-		NumParallelIntegrityCheckTasks: 	  o.NumParallelIntegrityCheckTasks,
-		CosmosNumParallelPartitionWorkers:    o.CosmosNumParallelPartitionWorkers,
-		CosmosReaderMaxNumNamespaces:         o.CosmosReaderMaxNumNamespaces,
-		ServerConnectTimeout:           	  o.ServerConnectTimeout,
-		PingTimeout:                    	  o.PingTimeout,
-		CdcResumeTokenUpdateInterval:   	  o.CdcResumeTokenUpdateInterval,
-		WriterMaxBatchSize:             	  o.WriterMaxBatchSize,
-		CosmosTargetDocCountPerPartition:     o.CosmosTargetDocCountPerPartition,
-		CosmosDeletesCheckInterval:           o.CosmosDeletesCheckInterval,
-		SyncMode:                             o.Mode,
-		ReverseRequestedFlag:                 o.Reverse,
+		SrcConnString:                     o.SrcConnString,
+		DstConnString:                     o.DstConnString,
+		SrcType:                           o.Sourcetype,
+		DstType:                           o.Destinationtype,
+		StateStoreConnString:              o.StateStoreConnString,
+		NsFromString:                      o.NamespaceFrom,
+		VerifyRequestedFlag:               o.Verify,
+		CleanupRequestedFlag:              o.Cleanup,
+		FlowStatusReportingInterval:       10,
+		CosmosDeletesEmuRequestedFlag:     o.CosmosDeletesEmu,
+		AdvancedProgressRecalcInterval:    throughputUpdateInterval,
+		LoadLevel:                         o.LoadLevel,
+		InitialSyncNumParallelCopiers:     o.InitialSyncNumParallelCopiers,
+		NumParallelWriters:                o.NumParallelWriters,
+		NumParallelIntegrityCheckTasks:    o.NumParallelIntegrityCheckTasks,
+		CosmosNumParallelPartitionWorkers: o.CosmosNumParallelPartitionWorkers,
+		CosmosReaderMaxNumNamespaces:      o.CosmosReaderMaxNumNamespaces,
+		ServerConnectTimeout:              o.ServerConnectTimeout,
+		PingTimeout:                       o.PingTimeout,
+		CdcResumeTokenUpdateInterval:      o.CdcResumeTokenUpdateInterval,
+		WriterMaxBatchSize:                o.WriterMaxBatchSize,
+		CosmosTargetDocCountPerPartition:  o.CosmosTargetDocCountPerPartition,
+		CosmosDeletesCheckInterval:        o.CosmosDeletesCheckInterval,
+		SyncMode:                          o.Mode,
+		ReverseRequestedFlag:              o.Reverse,
 	})
 
 	var wg sync.WaitGroup
 	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGPIPE)
+
+	// handle interrupt shutdown
+	go func() {
+		for s := range sigChan {
+			if s != syscall.SIGPIPE {
+				go func() {
+					time.Sleep(time.Second * 10)
+					go func() {
+						time.Sleep(time.Second * 10)
+						slog.Error("Waited too long, force exit.")
+						os.Exit(-1)
+					}()
+					slog.Error("Waited too long, trying to cancel context.")
+					runnerCancelFunc()
+				}()
+				slog.Info("Attempting graceful shutdown.")
+				r.GracefulShutdown()
+			}
+		}
+	}()
 
 	//start a goroutine to print memory usage
 	go func() {
