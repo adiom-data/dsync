@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
@@ -39,7 +40,111 @@ func (mc *BaseMongoConnector) HandleBarrierMessage(barrierMsg iface.DataMessage)
 	return nil
 }
 
-func (mc *BaseMongoConnector) ProcessDataMessage(dataMsg iface.DataMessage) error {
+type dataMsgIdIndex struct {
+	dataMsgId []byte
+	index     int
+}
+
+// returns the new item or existing item, and whether or not a new item was added
+func addToIdIndexMap(m map[int][]*dataMsgIdIndex, dataMsg iface.DataMessage) (*dataMsgIdIndex, bool) {
+	h := hashDataMsgId(dataMsg)
+	items, found := m[h]
+	if found {
+		for _, item := range items {
+			if slices.Equal(item.dataMsgId, *dataMsg.Id) {
+				return item, false
+			}
+		}
+	}
+	item := &dataMsgIdIndex{*dataMsg.Id, -1}
+	m[h] = append(items, item)
+	return item, true
+}
+
+// ProcesDataMessages assumes all have the same Database and Collection
+func (mc *BaseMongoConnector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
+	if len(dataMsgs) == 0 {
+		return nil
+	}
+	dataMsg := dataMsgs[0]
+	dbName := dataMsg.Loc.Database
+	colName := dataMsg.Loc.Collection
+	maxSeqNum := max(dataMsg.SeqNum, mc.Status.WriteLSN)
+
+	collection := mc.Client.Database(dbName).Collection(colName)
+
+	var models []mongo.WriteModel
+	// keeps track of the index in models for a particular document because last write wins
+	hashToDataMsgIdIndex := map[int][]*dataMsgIdIndex{}
+
+	for _, dataMsg := range dataMsgs {
+		idType := bsontype.Type(dataMsg.IdType)
+		maxSeqNum = max(maxSeqNum, dataMsg.SeqNum)
+
+		switch dataMsg.MutationType {
+		case iface.MutationType_Insert, iface.MutationType_Update:
+			dmii, isNew := addToIdIndexMap(hashToDataMsgIdIndex, dataMsg)
+			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}
+			data := *dataMsg.Data
+			model := mongo.NewReplaceOneModel().SetFilter(idFilter).SetReplacement(bson.Raw(data)).SetUpsert(true)
+			if isNew {
+				dmii.index = len(models)
+				models = append(models, model)
+			} else {
+				models[dmii.index] = model
+			}
+		case iface.MutationType_Delete:
+			dmii, isNew := addToIdIndexMap(hashToDataMsgIdIndex, dataMsg)
+			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: *dataMsg.Id}}}
+			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
+			if isNew {
+				dmii.index = len(models)
+				models = append(models, model)
+			} else {
+				models[dmii.index] = model
+			}
+		case iface.MutationType_InsertBatch:
+			// Do nothing because we will handle this with a legacy method
+		default:
+			slog.Error(fmt.Sprintf("unsupported operation type during batch: %v", dataMsg.MutationType))
+		}
+
+		if (mc.Settings.WriterMaxBatchSize > 0 && len(models) >= mc.Settings.WriterMaxBatchSize) || (dataMsg.MutationType == iface.MutationType_InsertBatch && len(models) > 0) {
+			_, err := collection.BulkWrite(mc.Ctx, models, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed batch of %v documents into collection %v.%v", len(models[:mc.Settings.WriterMaxBatchSize]), dbName, colName))
+				return err
+			}
+			mc.Status.WriteLSN = maxSeqNum //XXX (AK, 6/2024): this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
+
+			models = nil
+			hashToDataMsgIdIndex = map[int][]*dataMsgIdIndex{}
+		}
+
+		// Specially process an insert batch due to some optimizations
+		if dataMsg.MutationType == iface.MutationType_InsertBatch {
+			err := mc.legacyProcessDataMessage(dataMsg)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to process embedded batch: %v", err))
+				return err
+			}
+		}
+	}
+
+	if len(models) > 0 {
+		_, err := collection.BulkWrite(mc.Ctx, models, options.BulkWrite().SetOrdered(false))
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed batch of %v documents into collection %v.%v", len(models), dbName, colName))
+			return err
+		}
+		mc.Status.WriteLSN = maxSeqNum //XXX (AK, 6/2024): this is just a placeholder for now that won't work well if things are processed out of order or if they are parallelized
+	}
+
+	return nil
+}
+
+// legacyProcessDataMessage has an optimization for batched inserts
+func (mc *BaseMongoConnector) legacyProcessDataMessage(dataMsg iface.DataMessage) error {
 	dbName := dataMsg.Loc.Database
 	colName := dataMsg.Loc.Collection
 

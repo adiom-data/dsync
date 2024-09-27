@@ -482,7 +482,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowParallelWriter := NewParallelWriter(mc.FlowCtx, mc, mc.Settings.NumParallelWriters)
+	flowParallelWriter := NewParallelWriter(mc.FlowCtx, mc, mc.Settings.NumParallelWriters, mc.Settings.WriterMaxBatchSize)
 	flowParallelWriter.Start()
 
 	// start printing progress
