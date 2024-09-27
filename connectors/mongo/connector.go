@@ -529,6 +529,7 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 			}
 		}
 
+		flowParallelWriter.StopAndWait()
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", mc.ID, flowId))
 		err := mc.Coord.NotifyDone(flowId, mc.ID)
 		if err != nil {

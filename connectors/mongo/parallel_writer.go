@@ -50,6 +50,8 @@ type ParallelWriter struct {
 	// CDC resume token barrier countdown
 	// We don't admit new CDC barriers until the countdown reaches 0
 	resumeTokenBarrierWorkersCountdown atomic.Int32
+
+	done chan struct{}
 }
 
 // NewParallelWriter creates a new ParallelWriter
@@ -59,6 +61,7 @@ func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, n
 		connector:      connector,
 		numWorkers:     numWorkers,
 		taskBarrierMap: make(map[uint]uint),
+		done:           make(chan struct{}),
 	}
 }
 
@@ -67,7 +70,19 @@ func (bwa *ParallelWriter) Start() {
 	bwa.workers = make([]writerWorker, bwa.numWorkers)
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i] = newWriterWorker(bwa, i, 10) //XXX: should we make the queue size configurable? WARNING: these could be batches and they could be big
-		go bwa.workers[i].run()
+		go func() {
+			bwa.workers[i].run()
+			bwa.done <- struct{}{}
+		}()
+	}
+}
+
+func (bwa *ParallelWriter) StopAndWait() {
+	for _, worker := range bwa.workers {
+		close(worker.queue)
+	}
+	for i := 0; i < bwa.numWorkers; i++ {
+		<-bwa.done
 	}
 }
 
@@ -158,7 +173,10 @@ func (ww *writerWorker) run() {
 		select {
 		case <-ww.parallelWriter.ctx.Done():
 			return
-		case msg := <-ww.queue:
+		case msg, ok := <-ww.queue:
+			if !ok {
+				return
+			}
 			// if it's a barrier message, check that we're the last worker to see it before handling
 			if msg.MutationType == iface.MutationType_Barrier {
 				isLastWorker := false
