@@ -424,6 +424,11 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 		//wait for all copiers to finish
 		wg.Wait()
+
+		dataChannel <- iface.DataMessage{
+			MutationType: iface.MutationType_Barrier,
+			BarrierType:  iface.BarrierType_Block,
+		}
 	}()
 
 	// wait for both the change stream reader and the initial sync to finish

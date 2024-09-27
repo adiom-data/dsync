@@ -46,6 +46,7 @@ const (
 	BarrierType_Reserved = iota
 	BarrierType_TaskComplete
 	BarrierType_CdcResumeTokenUpdate
+	BarrierType_Block
 )
 
 // Special barrier message used for task completion signals over the data channel

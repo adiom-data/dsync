@@ -231,6 +231,11 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					Collection: col,
 				},
 			}
+
+			channel <- iface.DataMessage{
+				MutationType: iface.MutationType_Barrier,
+				BarrierType:  iface.BarrierType_Block,
+			}
 		Loop:
 			for {
 				for _, splitted := range allSplitted {
