@@ -420,8 +420,12 @@ func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, tas
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *Simple) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
-	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
+func (c *Simple) PerformFlowIntegrityCheck(fid iface.FlowID, full bool) (iface.FlowDataIntegrityCheckResult, error) {
+	checkTypeStr := "basic"
+	if full {
+		checkTypeStr = "full"
+	}
+	slog.Info(fmt.Sprintf("Initiating flow %s integrity check for flow with ID: %v", checkTypeStr, fid))
 
 	res := iface.FlowDataIntegrityCheckResult{}
 
@@ -441,8 +445,13 @@ func (c *Simple) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataInte
 		return res, fmt.Errorf("destination connector %v not found", flowDet.Options.DstId)
 	}
 
-	if !src.Details.Cap.IntegrityCheck || !dst.Details.Cap.IntegrityCheck {
-		return res, fmt.Errorf("one or both connectors don't support integrity checks")
+	checkTypeSupported := src.Details.Cap.IntegrityCheck && dst.Details.Cap.IntegrityCheck
+	if full {
+		checkTypeSupported = src.Details.Cap.FullIntegrityCheck && dst.Details.Cap.FullIntegrityCheck
+	}
+
+	if !checkTypeSupported {
+		return res, fmt.Errorf(fmt.Sprintf("one or both connectors don't support %s integrity checks", checkTypeStr))
 	}
 
 	// Wait for integrity check results asynchronously
@@ -450,11 +459,11 @@ func (c *Simple) PerformFlowIntegrityCheck(fid iface.FlowID) (iface.FlowDataInte
 	var resSource, resDestination iface.ConnectorDataIntegrityCheckResult
 
 	// Request integrity check results from connectors
-	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil {
+	if err := src.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions, full); err != nil {
 		slog.Error("Failed to request integrity check from source", err)
 		return res, err
 	}
-	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
+	if err := dst.Endpoint.RequestDataIntegrityCheck(fid, flowDet.Options.SrcConnectorOptions, full); err != nil { //TODO (AK, 6/2024): should we have proper options here? (maybe even data validation-specific?)
 		slog.Error("Failed to request integrity check from destination", err)
 		return res, err
 	}

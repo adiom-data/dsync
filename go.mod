@@ -4,6 +4,7 @@ go 1.22.0
 
 require (
 	github.com/gdamore/tcell/v2 v2.7.4
+	github.com/holiman/uint256 v1.3.1
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b

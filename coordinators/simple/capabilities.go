@@ -17,7 +17,7 @@ func calcSharedCapabilities(c1Caps iface.ConnectorCapabilities, c2Caps iface.Con
 	// effectively a bitmask that will be later applied to individual connectors' capabilities
 
 	// XXX: is there a better way to do this? Maybe a real bitmask?
-	caps := iface.ConnectorCapabilities{true, true, true, true}
+	caps := iface.ConnectorCapabilities{true, true, true, true, true}
 
 	// Source and Sink are always true as they don't need to be shared
 	// we only care about resumability right now
