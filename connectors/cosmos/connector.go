@@ -7,6 +7,7 @@
 package cosmos
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -359,15 +360,15 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						continue
 					}
 					loc := iface.Location{Database: db, Collection: col}
-					var dataBatch [][]byte
-					var batch_idx int
+					// var dataBatch [][]byte
+					// var batch_idx int
 					var docs int64
 					for cursor.Next(cc.FlowCtx) {
-						if dataBatch == nil {
-							dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
-							batch_idx = 0
-						}
-						rawData := cursor.Current
+						// if dataBatch == nil {
+						// 	dataBatch = make([][]byte, cursor.RemainingBatchLength()+1) //preallocate the batch
+						// 	batch_idx = 0
+						// }
+						rawData := bson.Raw(bytes.Clone(cursor.Current))
 						data := []byte(rawData)
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
@@ -375,14 +376,19 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						cc.taskInProgressUpdate(nsStatus)
 						docs++
 
-						dataBatch[batch_idx] = data
-						batch_idx++
+						id := rawData.Lookup("_id")
 
-						if cursor.RemainingBatchLength() == 0 { //no more left in the batch
-							dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc}
-							//TODO (AK, 6/2024): is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
-							dataBatch = nil
-						}
+						dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc, Id: &id.Value,
+							IdType: byte(id.Type)}
+
+						// dataBatch[batch_idx] = data
+						// batch_idx++
+
+						// if cursor.RemainingBatchLength() == 0 { //no more left in the batch
+						// 	dataChannel <- iface.DataMessage{DataBatch: dataBatch, MutationType: iface.MutationType_InsertBatch, Loc: loc}
+						// 	//TODO (AK, 6/2024): is it ok that this blocks until the app is terminated if no one reads? (e.g. reader crashes)
+						// 	dataBatch = nil
+						// }
 					}
 					if err := cursor.Err(); err != nil {
 						if cc.FlowCtx.Err() == context.Canceled {
