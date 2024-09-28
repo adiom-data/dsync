@@ -110,6 +110,7 @@ func (mc *BaseMongoConnector) ProcessDataMessages(dataMsgs []iface.DataMessage) 
 		}
 
 		if (mc.Settings.WriterMaxBatchSize > 0 && len(models) >= mc.Settings.WriterMaxBatchSize) || (dataMsg.MutationType == iface.MutationType_InsertBatch && len(models) > 0) {
+			slog.Debug(fmt.Sprintf("Inserting batch of %v documents into collection %v.%v", len(models), dbName, colName))
 			_, err := collection.BulkWrite(mc.Ctx, models, options.BulkWrite().SetOrdered(false))
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed batch of %v documents into collection %v.%v", len(models[:mc.Settings.WriterMaxBatchSize]), dbName, colName))
@@ -132,6 +133,7 @@ func (mc *BaseMongoConnector) ProcessDataMessages(dataMsgs []iface.DataMessage) 
 	}
 
 	if len(models) > 0 {
+		slog.Debug(fmt.Sprintf("Inserting batch of %v documents into collection %v.%v", len(models), dbName, colName))
 		_, err := collection.BulkWrite(mc.Ctx, models, options.BulkWrite().SetOrdered(false))
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed batch of %v documents into collection %v.%v", len(models), dbName, colName))

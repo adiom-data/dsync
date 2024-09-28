@@ -243,6 +243,8 @@ func (ww *writerWorker) run() {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+				} else {
+					slog.Debug(fmt.Sprintf("Worker %v processed a batch of %v messages", ww.id, len(batch)))
 				}
 				batch = nil
 			}
@@ -253,6 +255,8 @@ func (ww *writerWorker) run() {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+				} else {
+					slog.Debug(fmt.Sprintf("Worker %v processed a batch of %v messages", ww.id, len(batch)))
 				}
 				batch = nil
 			}

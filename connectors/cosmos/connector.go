@@ -377,6 +377,9 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						docs++
 
 						id := rawData.Lookup("_id")
+						if id.Value == nil {
+							slog.Error(fmt.Sprintf("Document with missing _id found in collection %s.%s", db, col))
+						}
 
 						dataChannel <- iface.DataMessage{Data: &data, MutationType: iface.MutationType_Insert, Loc: loc, Id: &id.Value,
 							IdType: byte(id.Type)}
