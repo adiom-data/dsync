@@ -193,6 +193,9 @@ func (mc *BaseMongoConnector) doFullIntegrityCheck_sync(flowId iface.FlowID, opt
 	var wg sync.WaitGroup
 	wg.Add(mc.Settings.NumParallelIntegrityCheckTasks)
 
+	mask := uint256.NewInt(0)
+	mask.SetAllOne()
+
 	// start hashers
 	for i := 0; i < mc.Settings.NumParallelIntegrityCheckTasks; i++ {
 		go func() {
@@ -216,14 +219,15 @@ func (mc *BaseMongoConnector) doFullIntegrityCheck_sync(flowId iface.FlowID, opt
 					data := []byte(rawData)
 
 					hash := sha256.Sum256(data)
-
-					// TODO: Conversation here is slow and ugly. Find more fitting package for this.
-					hashStr := strings.TrimLeft(hex.EncodeToString(hash[:]), "0")
-					hashInt := uint256.MustFromHex("0x" + hashStr)
+					hashInt := uint256.NewInt(1)
+					hashInt.SetBytes(hash[:])
+					if hashInt.IsZero() {
+						hashInt.SetOne()
+					}
 
 					// Multiplication is order independent, so it does not matter the order we are going to get the
 					// values in, we will still get the same hash as the result, if all the hashes were the same.
-					completeHash.Mul(completeHash, hashInt)
+					completeHash.MulMod(completeHash, hashInt, mask)
 
 					if cursor.RemainingBatchLength() == 0 { //no more left in the batch
 						resultChannel <- nsHashResult{ns: ns, hash: completeHash, err: err}
