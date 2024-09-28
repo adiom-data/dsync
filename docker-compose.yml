@@ -11,6 +11,7 @@ services:
       - ./scripts/start-mongo.sh:/start-mongo.sh
     environment:
       - REPL_SET_NAME=data1
+      - PORT=27017
     command: ["/start-mongo.sh"]
     healthcheck:
       test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
@@ -20,23 +21,43 @@ services:
 
   mongo2:
     hostname: mongo2
-    restart: on-failure
     image: mongo:latest
     ports:
-      - "27018:27017"
+      - "27018:27018"
     volumes:
       - data2:/data/db
       - ./scripts/start-mongo.sh:/start-mongo.sh
     environment:
       - REPL_SET_NAME=data2
+      - PORT=27018
     command: ["/start-mongo.sh"]
     healthcheck:
-      test: "timeout 5 mongosh --eval 'db.adminCommand(\"ping\")'"
+      test: "timeout 5 mongosh --port 27018 --eval 'db.adminCommand(\"ping\")'"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  mongotest:
+    hostname: mongotest
+    image: mongo:latest
+    ports:
+      - "27019:27019"
+    volumes:
+      - datatest:/data/db
+      - ./scripts/start-mongo.sh:/start-mongo.sh
+    environment:
+      - REPL_SET_NAME=datatest
+      - PORT=27019
+    command: ["/start-mongo.sh"]
+    healthcheck:
+      test: "timeout 5 mongosh --port 27019 --eval 'db.adminCommand(\"ping\")'"
       interval: 10s
       timeout: 10s
       retries: 5
 
   dsync:
+    deploy:
+      replicas: 0
     build: .
     depends_on:
       mongo1:
@@ -45,8 +66,9 @@ services:
         condition: service_healthy
     volumes:
       - ./scripts/wait-for-mongo.sh:/wait-for-mongo.sh
-    command: ["/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27017/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO"]
+    command: ["/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27018/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO"]
 
 volumes:
   data1:
   data2:
+  datatest:
