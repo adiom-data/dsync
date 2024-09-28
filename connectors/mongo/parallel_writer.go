@@ -52,6 +52,8 @@ type ParallelWriter struct {
 	// We don't admit new CDC barriers until the countdown reaches 0
 	resumeTokenBarrierWorkersCountdown atomic.Int32
 
+	blockBarrier chan struct{}
+
 	done chan struct{}
 }
 
@@ -63,6 +65,7 @@ func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, n
 		numWorkers:     numWorkers,
 		maxBatchSize:   maxBatchSize,
 		taskBarrierMap: make(map[uint]uint),
+		blockBarrier:   make(chan struct{}),
 		done:           make(chan struct{}),
 	}
 }
@@ -140,6 +143,15 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 	}
 
 	bwa.BroadcastMessage(barrierMsg)
+
+	if barrierMsg.BarrierType == iface.BarrierType_Block {
+		slog.Debug("Blocking barrier encountered.")
+		for i := 0; i < bwa.numWorkers; i++ {
+			<-bwa.blockBarrier
+		}
+		slog.Debug("Blocking barrier unblocked.")
+	}
+
 	return nil
 }
 
@@ -191,6 +203,10 @@ func (ww *writerWorker) run() {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 					}
 					batch = nil
+				}
+
+				if msg.BarrierType == iface.BarrierType_Block {
+					ww.parallelWriter.blockBarrier <- struct{}{}
 				}
 
 				// if it's a task barrier, decrement the countdown for the task
