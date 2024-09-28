@@ -387,6 +387,11 @@ func (r *RunnerLocal) Run() error {
 	return nil
 }
 
+func (r *RunnerLocal) GracefulShutdown() {
+	slog.Debug("RunnerLocal GracefulShutdown")
+	r.src.Teardown()
+}
+
 func (r *RunnerLocal) Teardown() {
 	slog.Debug("RunnerLocal Teardown")
 
