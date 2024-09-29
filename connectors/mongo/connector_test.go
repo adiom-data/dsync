@@ -1,3 +1,6 @@
+//go:build external
+// +build external
+
 /*
  * Copyright (C) 2024 Adiom, Inc.
  *

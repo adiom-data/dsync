@@ -74,6 +74,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 	if len(namespaces) < 1 {
 		namespaces = []string{"testconn.testconncol"}
 	}
+	var tasks []iface.ReadPlanTask
 	for _, namespace := range namespaces {
 		splitted := strings.SplitN(namespace, ".", 2)
 		if len(splitted) != 2 {
@@ -81,35 +82,36 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 		}
 		db := splitted[0]
 		col := splitted[1]
-		err := c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{
-			ReadPlan: iface.ConnectorReadPlan{
-				Tasks: []iface.ReadPlanTask{
-					{
-						Id:     1,
-						Status: iface.ReadPlanTaskStatus_New,
-						Def: struct {
-							Db           string
-							Col          string
-							PartitionKey string
-							Low          interface{}
-							High         interface{}
-						}{
-							Db:  db,
-							Col: col,
-						},
-						EstimatedDocCount: 0,
-						DocsCopied:        0,
-					},
-				},
-				CdcResumeToken: []byte{1},
-				CreatedAtEpoch: 0,
+		tasks = append(tasks, iface.ReadPlanTask{
+			Id:     1,
+			Status: iface.ReadPlanTaskStatus_New,
+			Def: struct {
+				Db           string
+				Col          string
+				PartitionKey string
+				Low          interface{}
+				High         interface{}
+			}{
+				Db:  db,
+				Col: col,
 			},
-			Success: true,
+			EstimatedDocCount: 0,
+			DocsCopied:        0,
 		})
-		if err != nil {
-			return err
-		}
 	}
+
+	err := c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{
+		ReadPlan: iface.ConnectorReadPlan{
+			Tasks:          tasks,
+			CdcResumeToken: []byte{1},
+			CreatedAtEpoch: 0,
+		},
+		Success: true,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

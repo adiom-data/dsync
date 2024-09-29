@@ -389,7 +389,7 @@ func (r *RunnerLocal) Run() error {
 
 func (r *RunnerLocal) GracefulShutdown() {
 	slog.Debug("RunnerLocal GracefulShutdown")
-	r.src.Teardown()
+	r.src.Interrupt(r.activeFlowID)
 }
 
 func (r *RunnerLocal) Teardown() {

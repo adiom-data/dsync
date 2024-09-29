@@ -56,6 +56,46 @@ mongosh $MDB_DEST
 ```
 Congratulations! You should be able to access the 'odc' database and see the collections in it that were migrated from the Cosmos DB.
 
+# Development Tips
+
+Use `docker-compose up` to start up the docker containers which run multiple mongo instances:
+* mongo1 - used as a metadata store and as a potential source/sink
+* mongo2 - used as a potential source/sink
+* mongotest - used by the mongo tests
+
+If you are developing on a mac, you likely need to edit your /etc/hosts file so that the docker hostnames work. Add this line:
+
+```
+127.0.0.1       mongo1 mongo2 mongotest
+```
+
+You need to export COSMOS_TEST to be able to run the cosmos test.
+
+```
+make clean-testdb # cleans and populates mongotest for the mongo connector test
+make test # just tests without external dependencies
+make test-all # if you have everything set up properly, you can run this
+# test specific connectors
+make test-mongo
+make test-cosmos
+```
+
+## General testing with the docker instances
+
+```
+make clean-dbs
+make verify # should succeed
+make boostrap1
+make verify # verify should fail
+make boostrap2
+make verify # verify should succeed
+make clean-dbs
+make bootstrap1
+make sync12 # syncs mongo1 to mongo2, have to ctrl-C after a few seconds to stop
+make verify # verify should suceed
+```
+
+
 # Questions and reporting issues
 
 Please report any bugs here in the GitHub project.
