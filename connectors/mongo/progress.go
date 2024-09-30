@@ -8,7 +8,7 @@ import (
 )
 
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
-func RestoreProgressDetails(tasks []iface.ReadPlanTask, status *iface.ConnectorStatus) { 
+func RestoreProgressDetails(status *iface.ConnectorStatus, tasks []iface.ReadPlanTask) { 
 	slog.Debug("Restoring progress metrics from tasks")
 	status.ProgressMetrics.TasksTotal = int64(len(tasks))
 	for _, task := range tasks {
@@ -54,10 +54,10 @@ func RestoreProgressDetails(tasks []iface.ReadPlanTask, status *iface.ConnectorS
 }
 
 // update estimated namespace doc counts from the actual database
-func ResetNsProgressEstimatedDocCounts(mc *Connector) error {
-	for ns, nsStatus := range mc.status.ProgressMetrics.NamespaceProgress {
-		collection := mc.client.Database(ns.Db).Collection(ns.Col)
-		count, err := collection.EstimatedDocumentCount(mc.ctx)
+func ResetNsProgressEstimatedDocCounts(mc *BaseMongoConnector) error {
+	for ns, nsStatus := range mc.Status.ProgressMetrics.NamespaceProgress {
+		collection := mc.Client.Database(ns.Db).Collection(ns.Col)
+		count, err := collection.EstimatedDocumentCount(mc.Ctx)
 		if err != nil {
 			return fmt.Errorf("failed to count documents: %v", err)
 		}
@@ -67,28 +67,28 @@ func ResetNsProgressEstimatedDocCounts(mc *Connector) error {
 }
 
 // Updates the progress metrics once a task has been started
-func (mc *Connector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
+func TaskStartedProgressUpdate(mc *BaseMongoConnector, nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
 	mc.muProgressMetrics.Lock()
 	nsStatus.ActiveTasksList[taskId] = true
-	mc.status.ProgressMetrics.TasksStarted++
+	mc.Status.ProgressMetrics.TasksStarted++
 	nsStatus.TasksStarted++
 	mc.muProgressMetrics.Unlock()
 }
 
 // Updates the progress metrics once a task has been started
-func (mc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
+func TaskInProgressUpdate(mc *BaseMongoConnector, nsStatus *iface.NamespaceStatus) {
 	mc.muProgressMetrics.Lock()
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++
-	mc.status.ProgressMetrics.NumDocsSynced++
+	mc.Status.ProgressMetrics.NumDocsSynced++
 	mc.muProgressMetrics.Unlock()
 }
 
 // Updates the progress metrics once a task has been completed
-func (mc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
+func TaskDoneProgressUpdate(mc *BaseMongoConnector, nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
 	mc.muProgressMetrics.Lock()
 	// update progress counters: num tasks completed
-	mc.status.ProgressMetrics.TasksCompleted++
+	mc.Status.ProgressMetrics.TasksCompleted++
 	nsStatus.TasksCompleted++
 
 	// go through all the tasks
@@ -107,10 +107,10 @@ func (mc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, tas
 	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(approxDocsCopied)))
 	// check if namespace has been completed
 	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-		mc.status.ProgressMetrics.NumNamespacesCompleted++
+		mc.Status.ProgressMetrics.NumNamespacesCompleted++
 	}
 	// decrement the tasks started counter
-	mc.status.ProgressMetrics.TasksStarted--
+	mc.Status.ProgressMetrics.TasksStarted--
 	nsStatus.TasksStarted--
 	// remove the task from the active tasks list
 	delete(nsStatus.ActiveTasksList, taskId)

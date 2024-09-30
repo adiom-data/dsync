@@ -181,8 +181,8 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
-	RestoreProgressDetails(tasks, &mc.Status)
-	go ResetNsProgressEstimatedDocCounts(mc)
+	RestoreProgressDetails(&mc.Status, tasks)
+	go ResetNsProgressEstimatedDocCounts(&mc.BaseMongoConnector)
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
@@ -408,7 +408,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 					nsStatus := mc.Status.ProgressMetrics.NamespaceProgress[ns]
-					mc.taskStartedProgressUpdate(nsStatus, task.Id)
+					TaskStartedProgressUpdate(&mc.BaseMongoConnector, nsStatus, task.Id)
 
 					if err != nil {
 						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
@@ -431,7 +431,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						data := []byte(rawData)
 						readerProgress.initialSyncDocs.Add(1)
 
-						mc.taskInProgressUpdate(nsStatus)
+						TaskInProgressUpdate(&mc.BaseMongoConnector, nsStatus)
 						docs++
 
 						dataBatch[batch_idx] = data
@@ -453,7 +453,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						cursor.Close(mc.FlowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 						// update progress after completing the task and create task metadata to pass to coordinator to persist
-						mc.taskDoneProgressUpdate(nsStatus, task.Id)
+						TaskDoneProgressUpdate(&mc.BaseMongoConnector, nsStatus, task.Id)
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
 						taskData := iface.TaskDoneMeta{DocsCopied: docs}
