@@ -116,7 +116,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 }
 
 // RequestDataIntegrityCheck implements iface.Connector.
-func (c *connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (c *connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, full bool) error {
 	// TODO: implement
 	panic("unimplemented")
 }

@@ -113,7 +113,7 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	mc.ConnectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
-	mc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
+	mc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, FullIntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	mc.Status = iface.ConnectorStatus{WriteLSN: 0}
 
@@ -545,9 +545,13 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	return nil
 }
 
-func (mc *BaseMongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (mc *BaseMongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions, full bool) error {
 	// need to make this async to honor the spec
-	go mc.doIntegrityCheck_sync(flowId, options)
+	if full {
+		go mc.doFullIntegrityCheck_sync(flowId, options)
+	} else {
+		go mc.doIntegrityCheck_sync(flowId, options)
+	}
 
 	return nil
 }

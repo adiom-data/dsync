@@ -124,7 +124,7 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	// Instantiate ConnectorType
 	cc.ConnectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities, current capabilities are source only
-	cc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
+	cc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, FullIntegrityCheck: true, Resumability: true}
 	// Instantiate ConnectorStatus
 	progressMetrics := iface.ProgressMetrics{
 		NumDocsSynced:          0,

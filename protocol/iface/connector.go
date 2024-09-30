@@ -19,10 +19,11 @@ type ConnectorType struct {
 // If something is announced as true, it can be later turned off through the setParameters call
 // But if something is announced as not supported (false), it can't be turned on
 type ConnectorCapabilities struct {
-	Source         bool
-	Sink           bool
-	IntegrityCheck bool
-	Resumability   bool
+	Source             bool
+	Sink               bool
+	IntegrityCheck     bool
+	FullIntegrityCheck bool
+	Resumability       bool
 }
 
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
@@ -127,7 +128,7 @@ type ConnectorICoordinatorSignal interface {
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                                                    // Write data from the provided channel (async)
 	Interrupt(flowId FlowID) error                                                                                           // Interrupt the flow (async)
 
-	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions) error // Request a data integrity check based on a read plan (async)
+	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions, full bool) error // Request a data integrity check based on a read plan (async)
 
 	GetConnectorStatus(flowId FlowID) ConnectorStatus // Immediate and non-blocking
 }

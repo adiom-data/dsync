@@ -128,6 +128,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Category: "Special Commands",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:     "verify-fully",
+			Usage:    "perform a full data integrity check for an existing flow",
+			Category: "Special Commands",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "cleanup",
 			Usage:    "cleanup metadata for an existing flow",
 			Category: "Special Commands",
