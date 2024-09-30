@@ -38,19 +38,27 @@ type Options struct {
 	PprofPort uint
 	WebPort   uint
 
-	LoadLevel                            string
-	InitialSyncNumParallelCopiers  		 int
-	NumParallelWriters             		 int
-	NumParallelIntegrityCheckTasks 		 int
-	CosmosNumParallelPartitionWorkers    int
-	CosmosReaderMaxNumNamespaces         int
-	ServerConnectTimeout           		 time.Duration
-	PingTimeout                    		 time.Duration
-	CdcResumeTokenUpdateInterval         time.Duration
-	WriterMaxBatchSize             	     int
-	CosmosTargetDocCountPerPartition     int64
-	CosmosDeletesCheckInterval           time.Duration
-	Mode                                 string
+	LoadLevel                         string
+	InitialSyncNumParallelCopiers     int
+	NumParallelWriters                int
+	NumParallelIntegrityCheckTasks    int
+	CosmosNumParallelPartitionWorkers int
+	CosmosReaderMaxNumNamespaces      int
+	ServerConnectTimeout              time.Duration
+	PingTimeout                       time.Duration
+	CdcResumeTokenUpdateInterval      time.Duration
+	WriterMaxBatchSize                int
+	CosmosTargetDocCountPerPartition  int64
+	CosmosDeletesCheckInterval        time.Duration
+	Mode                              string
+}
+
+// works with a copy of the struct to avoid modifying the original
+func RedactSensitiveInfo(o Options) Options {
+	o.SrcConnString = "REDACTED"
+	o.DstConnString = "REDACTED"
+	o.StateStoreConnString = "REDACTED"
+	return o
 }
 
 func NewFromCLIContext(c *cli.Context) (Options, error) {

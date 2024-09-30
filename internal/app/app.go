@@ -96,7 +96,7 @@ func runDsync(c *cli.Context) error {
 
 	slog.Info(fmt.Sprintf("Starting dsync %v", build.VersionInfo()))
 
-	slog.Debug(fmt.Sprintf("Parsed options: %+v", o))
+	slog.Debug(fmt.Sprintf("Parsed options: %+v", options.RedactSensitiveInfo(o)))
 
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
 		SrcConnString:                     o.SrcConnString,
