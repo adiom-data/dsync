@@ -137,15 +137,6 @@ func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
 	return fmt.Sprintf("%v", keyJsonMap["Rid"]), nil
 }
 
-// update changeStreamEvents progress counters atomically
-func (cc *Connector) updateChangeStreamProgressTracking(reader *ReaderProgress) {
-	cc.muProgressMetrics.Lock()
-	defer cc.muProgressMetrics.Unlock()
-	reader.changeStreamEvents++
-	cc.Status.ProgressMetrics.ChangeStreamEvents++
-	return
-}
-
 // create a find query for a task
 func createFindQuery(ctx context.Context, collection *mongo.Collection, task iface.ReadPlanTask) (cur *mongo.Cursor, err error) {
 	if task.Def.Low == nil && task.Def.High == nil { //no boundaries
@@ -187,117 +178,6 @@ func createFindQuery(ctx context.Context, collection *mongo.Collection, task ifa
 
 func nsToString(ns iface.Namespace) string {
 	return fmt.Sprintf("%s.%s", ns.Db, ns.Col)
-}
-
-// update estimated namespace doc counts from the actual database
-func (cc *Connector) resetNsProgressEstimatedDocCounts() error {
-	for ns, nsStatus := range cc.Status.ProgressMetrics.NamespaceProgress {
-		collection := cc.Client.Database(ns.Db).Collection(ns.Col)
-		count, err := collection.EstimatedDocumentCount(cc.Ctx)
-		if err != nil {
-			return fmt.Errorf("failed to count documents: %v", err)
-		}
-		nsStatus.EstimatedDocCount = int64(count)
-	}
-	return nil
-}
-
-// restoreProgressDetails restores the progress metrics from the persisted tasks and progress
-func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { //XXX: can parallelize this
-	slog.Debug("Restoring progress metrics from tasks")
-	cc.Status.ProgressMetrics.TasksTotal = int64(len(tasks))
-	for _, task := range tasks {
-		ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
-		nsStatus := cc.Status.ProgressMetrics.NamespaceProgress[ns]
-		//check if the namespace status exists, if not create it
-		if nsStatus == nil {
-			nsStatus = &iface.NamespaceStatus{
-				EstimatedDocCount:   0,
-				Throughput:          0,
-				Tasks:               []iface.ReadPlanTask{},
-				TasksCompleted:      0,
-				TasksStarted:        0,
-				DocsCopied:          0,
-				EstimatedDocsCopied: 0,
-				ActiveTasksList:     make(map[iface.ReadPlanTaskID]bool),
-			}
-			cc.Status.ProgressMetrics.NamespaceProgress[ns] = nsStatus
-		}
-		nsStatus.Tasks = append(nsStatus.Tasks, task)
-		nsStatus.EstimatedDocCount += task.EstimatedDocCount
-		//if the task is completed, update the document counters
-		if task.Status == iface.ReadPlanTaskStatus_Completed {
-			cc.Status.ProgressMetrics.TasksCompleted++
-			cc.Status.ProgressMetrics.NumDocsSynced += task.DocsCopied
-
-			nsStatus.TasksCompleted++
-			nsStatus.DocsCopied += task.DocsCopied
-
-			nsStatus.EstimatedDocsCopied += task.EstimatedDocCount
-		}
-	}
-	cc.Status.ProgressMetrics.NumNamespaces = int64(len(cc.Status.ProgressMetrics.NamespaceProgress))
-
-	for ns, nsStatus := range cc.Status.ProgressMetrics.NamespaceProgress {
-		if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-			cc.Status.ProgressMetrics.NumNamespacesCompleted++
-		}
-		cc.Status.ProgressMetrics.Namespaces = append(cc.Status.ProgressMetrics.Namespaces, ns)
-	}
-
-	slog.Debug(fmt.Sprintf("Restored progress metrics: %+v", cc.Status.ProgressMetrics))
-
-}
-
-// Updates the progress metrics once a task has been started
-func (cc *Connector) taskStartedProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
-	cc.muProgressMetrics.Lock()
-	nsStatus.ActiveTasksList[taskId] = true
-	cc.Status.ProgressMetrics.TasksStarted++
-	nsStatus.TasksStarted++
-	cc.muProgressMetrics.Unlock()
-}
-
-// Updates the progress metrics once a task has been completed
-func (cc *Connector) taskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
-	cc.muProgressMetrics.Lock()
-	//update progress counters: num tasks completed
-	cc.Status.ProgressMetrics.TasksCompleted++
-	nsStatus.TasksCompleted++
-
-	//go through all the tasks
-	// - mark ours as completed
-	// - calculate the approximate number of docs copied based on per-task estimates
-	approxDocsCopied := int64(0)
-	for i, task := range nsStatus.Tasks {
-		if task.Id == taskId {
-			nsStatus.Tasks[i].Status = iface.ReadPlanTaskStatus_Completed
-		}
-		if task.Status == iface.ReadPlanTaskStatus_Completed {
-			approxDocsCopied += task.EstimatedDocCount
-		}
-	}
-	//update the estimated docs copied count for the namespace to keep percentage proportional
-	nsStatus.EstimatedDocsCopied = int64(math.Max(float64(nsStatus.EstimatedDocsCopied), float64(approxDocsCopied)))
-	//check if namespace has been completed
-	if nsStatus.TasksCompleted == int64(len(nsStatus.Tasks)) {
-		cc.Status.ProgressMetrics.NumNamespacesCompleted++
-	}
-	//decrement the tasks started counter
-	cc.Status.ProgressMetrics.TasksStarted--
-	nsStatus.TasksStarted--
-	//remove the task from the active tasks list
-	delete(nsStatus.ActiveTasksList, taskId)
-	cc.muProgressMetrics.Unlock()
-}
-
-// Updates the progress metrics once a task has been started
-func (cc *Connector) taskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
-	cc.muProgressMetrics.Lock()
-	nsStatus.DocsCopied++
-	nsStatus.EstimatedDocsCopied++
-	cc.Status.ProgressMetrics.NumDocsSynced++
-	cc.muProgressMetrics.Unlock()
 }
 
 // Get the continuation value from a change stream resume token

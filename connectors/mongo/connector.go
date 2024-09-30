@@ -71,7 +71,6 @@ func setDefault[T comparable](field *T, defaultValue T) {
 
 func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-<<<<<<< HEAD
 	setDefault(&settings.ServerConnectTimeout, 10*time.Second)
 	setDefault(&settings.PingTimeout, 2*time.Second)
 	setDefault(&settings.InitialSyncNumParallelCopiers, 4)
@@ -80,21 +79,6 @@ func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.WriterMaxBatchSize, 0)
 	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings}}
-=======
-	settings.serverConnectTimeout = 10 * time.Second
-	settings.pingTimeout = 2 * time.Second
-	settings.initialSyncNumParallelCopiers = 4
-	settings.writerMaxBatchSize = 0
-	if settings.NumParallelWriters == 0 {
-		settings.NumParallelWriters = 4
-	}
-	if settings.CdcResumeTokenUpdateInterval == 0 { //if not set, default to 60 seconds
-		settings.CdcResumeTokenUpdateInterval = 60 * time.Second
-	}
-	settings.numParallelIntegrityCheckTasks = 4
-
-	return &Connector{desc: desc, settings: settings}
->>>>>>> f93bb3f (Finished with mongo progress)
 }
 
 func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
@@ -197,8 +181,8 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
-	mc.restoreProgressDetails(tasks)
-	go mc.resetNsProgressEstimatedDocCounts()
+	RestoreProgressDetails(tasks, &mc.Status)
+	go ResetNsProgressEstimatedDocCounts(mc)
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
