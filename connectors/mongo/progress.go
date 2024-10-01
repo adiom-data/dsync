@@ -16,7 +16,7 @@ type ProgressTracker struct {
 	muProgressMetrics sync.Mutex
 	Status            *iface.ConnectorStatus
 	Client            *mongo.Client
-	Ctx			   	  context.Context	
+	Ctx               context.Context
 }
 
 // Initializes and returns a new ProgressTracker
@@ -33,16 +33,16 @@ func NewProgressTracker(status *iface.ConnectorStatus, client *mongo.Client, ctx
 		NamespaceProgress: make(map[iface.Namespace]*iface.NamespaceStatus),
 		Namespaces:        make([]iface.Namespace, 0),
 	}
-	
+
 	return &ProgressTracker{
 		Status: status,
 		Client: client,
-		Ctx: ctx,
+		Ctx:    ctx,
 	}
 }
 
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
-func (pt *ProgressTracker) RestoreProgressDetails(tasks []iface.ReadPlanTask) { 
+func (pt *ProgressTracker) RestoreProgressDetails(tasks []iface.ReadPlanTask) {
 	slog.Debug("Restoring progress metrics from tasks")
 	pt.Status.ProgressMetrics.TasksTotal = int64(len(tasks))
 	for _, task := range tasks {
@@ -101,7 +101,8 @@ func (pt *ProgressTracker) ResetNsProgressEstimatedDocCounts() error {
 }
 
 // Updates the progress metrics once a task has been started
-func (pt *ProgressTracker) TaskStartedProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
+func (pt *ProgressTracker) TaskStartedProgressUpdate(ns iface.Namespace, taskId iface.ReadPlanTaskID) {
+	nsStatus := pt.Status.ProgressMetrics.NamespaceProgress[ns]
 	pt.muProgressMetrics.Lock()
 	nsStatus.ActiveTasksList[taskId] = true
 	pt.Status.ProgressMetrics.TasksStarted++
@@ -110,7 +111,8 @@ func (pt *ProgressTracker) TaskStartedProgressUpdate(nsStatus *iface.NamespaceSt
 }
 
 // Updates the progress metrics once a task has been started
-func (pt *ProgressTracker) TaskInProgressUpdate(nsStatus *iface.NamespaceStatus) {
+func (pt *ProgressTracker) TaskInProgressUpdate(ns iface.Namespace) {
+	nsStatus := pt.Status.ProgressMetrics.NamespaceProgress[ns]
 	pt.muProgressMetrics.Lock()
 	nsStatus.DocsCopied++
 	nsStatus.EstimatedDocsCopied++
@@ -119,7 +121,8 @@ func (pt *ProgressTracker) TaskInProgressUpdate(nsStatus *iface.NamespaceStatus)
 }
 
 // Updates the progress metrics once a task has been completed
-func (pt *ProgressTracker) TaskDoneProgressUpdate(nsStatus *iface.NamespaceStatus, taskId iface.ReadPlanTaskID) {
+func (pt *ProgressTracker) TaskDoneProgressUpdate(ns iface.Namespace, taskId iface.ReadPlanTaskID) {
+	nsStatus := pt.Status.ProgressMetrics.NamespaceProgress[ns]
 	pt.muProgressMetrics.Lock()
 	// update progress counters: num tasks completed
 	pt.Status.ProgressMetrics.TasksCompleted++
