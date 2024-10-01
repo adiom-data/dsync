@@ -35,7 +35,6 @@ type BaseMongoConnector struct {
 	ConnectorCapabilities iface.ConnectorCapabilities
 
 	Coord             iface.CoordinatorIConnectorSignal
-	muProgressMetrics sync.Mutex
 
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
@@ -45,6 +44,8 @@ type BaseMongoConnector struct {
 	FlowId               iface.FlowID
 	FlowConnCapabilities iface.ConnectorCapabilities
 	FlowCDCResumeToken   bson.Raw
+
+	ProgressTracker 	 *ProgressTracker
 }
 
 type ConnectorSettings struct {
@@ -71,6 +72,7 @@ func setDefault[T comparable](field *T, defaultValue T) {
 
 func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
+	progressTracker := NewProgressTracker()
 	setDefault(&settings.ServerConnectTimeout, 10*time.Second)
 	setDefault(&settings.PingTimeout, 2*time.Second)
 	setDefault(&settings.InitialSyncNumParallelCopiers, 4)
@@ -78,7 +80,7 @@ func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
 	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.WriterMaxBatchSize, 0)
-	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings}}
+	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings,ProgressTracker: progressTracker,}}
 }
 
 func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
@@ -181,8 +183,8 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
-	RestoreProgressDetails(&mc.Status, tasks)
-	go ResetNsProgressEstimatedDocCounts(&mc.BaseMongoConnector)
+	mc.ProgressTracker.RestoreProgressDetails(tasks)
+	go mc.ProgressTracker.ResetNsProgressEstimatedDocCounts(&mc.BaseMongoConnector)
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
@@ -408,7 +410,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 					nsStatus := mc.Status.ProgressMetrics.NamespaceProgress[ns]
-					TaskStartedProgressUpdate(&mc.BaseMongoConnector, nsStatus, task.Id)
+					mc.ProgressTracker.TaskStartedProgressUpdate(nsStatus, task.Id)
 
 					if err != nil {
 						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
@@ -431,7 +433,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						data := []byte(rawData)
 						readerProgress.initialSyncDocs.Add(1)
 
-						TaskInProgressUpdate(&mc.BaseMongoConnector, nsStatus)
+						mc.ProgressTracker.TaskInProgressUpdate(nsStatus)
 						docs++
 
 						dataBatch[batch_idx] = data
@@ -453,7 +455,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						cursor.Close(mc.FlowCtx)
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 						// update progress after completing the task and create task metadata to pass to coordinator to persist
-						TaskDoneProgressUpdate(&mc.BaseMongoConnector, nsStatus, task.Id)
+						mc.ProgressTracker.TaskDoneProgressUpdate(nsStatus, task.Id)
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
 						taskData := iface.TaskDoneMeta{DocsCopied: docs}

@@ -8,7 +8,7 @@ import (
 
 // restoreProgressDetails restores the progress metrics from the persisted tasks and progress
 func (cc *Connector) restoreProgressDetails(tasks []iface.ReadPlanTask) { 
-	mongo.RestoreProgressDetails(&cc.Status, tasks)
+	mongo.RestoreProgressDetails(tasks)
 }
 
 // update estimated namespace doc counts from the actual database
