@@ -72,7 +72,6 @@ func setDefault[T comparable](field *T, defaultValue T) {
 
 func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	// Set default values
-	progressTracker := NewProgressTracker()
 	setDefault(&settings.ServerConnectTimeout, 10*time.Second)
 	setDefault(&settings.PingTimeout, 2*time.Second)
 	setDefault(&settings.InitialSyncNumParallelCopiers, 4)
@@ -80,7 +79,7 @@ func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
 	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.WriterMaxBatchSize, 0)
-	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings,ProgressTracker: progressTracker,}}
+	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings,}}
 }
 
 func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
@@ -117,24 +116,11 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	mc.ConnectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities
 	mc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
-	// Instantiate ConnectorStatus
-	progressMetrics := iface.ProgressMetrics{
-		NumDocsSynced:          0,
-		TasksTotal:             0,
-		TasksStarted:           0,
-		TasksCompleted:         0,
-		NumNamespaces:          0,
-		NumNamespacesCompleted: 0,
-		ChangeStreamEvents:     0,
-
-		NamespaceProgress: make(map[iface.Namespace]*iface.NamespaceStatus),
-		Namespaces:        make([]iface.Namespace, 0),
-	}
-
+	// Instantiate ConnectorStatus and ProgressTracker
 	mc.Status = iface.ConnectorStatus{
-		WriteLSN:        0,
-		ProgressMetrics: progressMetrics,
-	}
+        WriteLSN: 0,
+    }
+	mc.ProgressTracker = NewProgressTracker(&mc.Status, mc.Client, mc.Ctx)
 
 	// Get the coordinator endpoint
 	coord, err := mc.T.GetCoordinatorEndpoint("local")
@@ -184,7 +170,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
 	mc.ProgressTracker.RestoreProgressDetails(tasks)
-	go mc.ProgressTracker.ResetNsProgressEstimatedDocCounts(&mc.BaseMongoConnector)
+	go mc.ProgressTracker.ResetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")

@@ -1,23 +1,27 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math"
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Tracks progress of the tasks
 type ProgressTracker struct {
 	muProgressMetrics sync.Mutex
-	Status            iface.ConnectorStatus
+	Status            *iface.ConnectorStatus
+	Client            *mongo.Client
+	Ctx			   	  context.Context	
 }
 
 // Initializes and returns a new ProgressTracker
-func NewProgressTracker() *ProgressTracker {
-	progressMetrics := iface.ProgressMetrics{
+func NewProgressTracker(status *iface.ConnectorStatus, client *mongo.Client, ctx context.Context) *ProgressTracker {
+	status.ProgressMetrics = iface.ProgressMetrics{
 		NumDocsSynced:          0,
 		TasksTotal:             0,
 		TasksStarted:           0,
@@ -31,10 +35,9 @@ func NewProgressTracker() *ProgressTracker {
 	}
 	
 	return &ProgressTracker{
-		Status: iface.ConnectorStatus{
-			WriteLSN: 0,
-			ProgressMetrics: progressMetrics,
-		},
+		Status: status,
+		Client: client,
+		Ctx: ctx,
 	}
 }
 
@@ -85,10 +88,10 @@ func (pt *ProgressTracker) RestoreProgressDetails(tasks []iface.ReadPlanTask) {
 }
 
 // update estimated namespace doc counts from the actual database
-func (pt *ProgressTracker) ResetNsProgressEstimatedDocCounts(mc *BaseMongoConnector) error {
+func (pt *ProgressTracker) ResetNsProgressEstimatedDocCounts() error {
 	for ns, nsStatus := range pt.Status.ProgressMetrics.NamespaceProgress {
-		collection := mc.Client.Database(ns.Db).Collection(ns.Col)
-		count, err := collection.EstimatedDocumentCount(mc.Ctx)
+		collection := pt.Client.Database(ns.Db).Collection(ns.Col)
+		count, err := collection.EstimatedDocumentCount(pt.Ctx)
 		if err != nil {
 			return fmt.Errorf("failed to count documents: %v", err)
 		}
@@ -146,4 +149,12 @@ func (pt *ProgressTracker) TaskDoneProgressUpdate(nsStatus *iface.NamespaceStatu
 	// remove the task from the active tasks list
 	delete(nsStatus.ActiveTasksList, taskId)
 	pt.muProgressMetrics.Unlock()
+}
+
+// update changeStreamEvents progress counters atomically - only used by Cosmos connector
+func (pt *ProgressTracker) UpdateChangeStreamProgressTracking() {
+	pt.muProgressMetrics.Lock()
+	defer pt.muProgressMetrics.Unlock()
+	pt.Status.ProgressMetrics.ChangeStreamEvents++
+	return
 }
