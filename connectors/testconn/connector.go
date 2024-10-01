@@ -64,7 +64,9 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 
 // Interrupt implements iface.Connector.
 func (c *connector) Interrupt(flowId iface.FlowID) error {
-	c.flowCancelFunc()
+	if c.flowCancelFunc != nil {
+		c.flowCancelFunc()
+	}
 	return nil
 }
 
@@ -116,9 +118,8 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 }
 
 // RequestDataIntegrityCheck implements iface.Connector.
-func (c *connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	// TODO: implement
-	panic("unimplemented")
+func (c *connector) IntegrityCheck(ctx context.Context, flowId iface.FlowID, task iface.ReadPlanTask) (iface.ConnectorDataIntegrityCheckResult, error) {
+	return iface.ConnectorDataIntegrityCheckResult{}, errors.New("Not implemented")
 }
 
 // SetParameters implements iface.Connector.
@@ -386,5 +387,7 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannel iface
 
 // Teardown implements iface.Connector.
 func (c *connector) Teardown() {
-	c.flowCancelFunc()
+	if c.flowCancelFunc != nil {
+		c.flowCancelFunc()
+	}
 }

@@ -37,8 +37,7 @@ type FlowDetails struct {
 
 	dataChannels []iface.DataChannelID
 
-	doneNotificationChannels   []chan struct{}                                //for connectors to let us know they're done with the flow
-	integrityCheckDoneChannels []chan iface.ConnectorDataIntegrityCheckResult //for connectors to post the results of the integrity check (this can be a continious stream in the future, hence a channel)
+	doneNotificationChannels []chan struct{} //for connectors to let us know they're done with the flow
 
 	flowDone chan struct{} //for everyone else to know the flow is done
 

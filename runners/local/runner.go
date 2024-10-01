@@ -7,6 +7,7 @@ package runnerLocal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -40,6 +41,10 @@ type RunnerLocal struct {
 	runnerProgress RunnerSyncProgress //internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
 
 	ctx context.Context
+
+	// Separate context for integrity as this is for gracefully interrupting it
+	integrityCtx       context.Context
+	cancelIntegrityCtx context.CancelFunc
 
 	activeFlowID iface.FlowID
 }
@@ -116,13 +121,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			}
 			if settings.NumParallelWriters != 0 {
 				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
-			} else { // default for writer, integrity check, and partition workers are the same
+			} else { // default for writer and partition workers are the same
 				cosmosSettings.NumParallelWriters = btc / 2
-			}
-			if settings.NumParallelIntegrityCheckTasks != 0 {
-				cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
-			} else {
-				cosmosSettings.NumParallelIntegrityCheckTasks = btc / 2
 			}
 			if settings.CosmosNumParallelPartitionWorkers != 0 {
 				cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
@@ -132,7 +132,6 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		} else {
 			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
 			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
-			cosmosSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
 		cosmosSettings.MaxNumNamespaces = settings.CosmosReaderMaxNumNamespaces
@@ -157,18 +156,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			}
 			if settings.NumParallelWriters != 0 {
 				mongoSettings.NumParallelWriters = settings.NumParallelWriters
-			} else { // default for writer, integrity check, and partition workers are the same
+			} else { // default for writer and partition workers are the same
 				mongoSettings.NumParallelWriters = btc / 2
-			}
-			if settings.NumParallelIntegrityCheckTasks != 0 {
-				mongoSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
-			} else {
-				mongoSettings.NumParallelIntegrityCheckTasks = btc / 2
 			}
 		} else {
 			mongoSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
 			mongoSettings.NumParallelWriters = settings.NumParallelWriters
-			mongoSettings.NumParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 		}
 		mongoSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
@@ -239,7 +232,14 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.statestore = statestoreTemp.NewTempStateStore()
 	}
 
-	r.coord = coordinatorSimple.NewSimpleCoordinator()
+	numParallelIntegrityCheckTasks := 4 // default
+	if settings.NumParallelIntegrityCheckTasks != 0 {
+		numParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
+	} else if settings.LoadLevel != "" {
+		btc := getBaseThreadCount(settings.LoadLevel)
+		numParallelIntegrityCheckTasks = btc / 2
+	}
+	r.coord = coordinatorSimple.NewSimpleCoordinator(numParallelIntegrityCheckTasks)
 	r.trans = transportLocal.NewTransportLocal(r.coord)
 	r.settings = settings
 
@@ -250,6 +250,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 	slog.Debug("RunnerLocal Setup")
 
 	r.ctx = ctx
+	r.integrityCtx, r.cancelIntegrityCtx = context.WithCancel(ctx)
 
 	//Initialize in sequence
 	err := r.statestore.Setup(r.ctx)
@@ -319,13 +320,17 @@ func (r *RunnerLocal) Run() error {
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
-		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(flowID)
+		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID)
 		if err != nil {
 			slog.Error("Failed to perform flow integrity check", err)
 		} else {
 			if integrityCheckRes.Passed {
 				r.runnerProgress.VerificationResult = "OK"
-				slog.Info("Data integrity check: OK")
+				if r.integrityCtx.Err() != nil && errors.Is(r.integrityCtx.Err(), context.Canceled) {
+					slog.Info("Data integrity check canceled, but so far: OK")
+				} else {
+					slog.Info("Data integrity check: OK")
+				}
 			} else {
 				r.runnerProgress.VerificationResult = "FAIL"
 				slog.Error("Data integrity check: FAIL")
@@ -390,6 +395,9 @@ func (r *RunnerLocal) Run() error {
 func (r *RunnerLocal) GracefulShutdown() {
 	slog.Debug("RunnerLocal GracefulShutdown")
 	r.src.Interrupt(r.activeFlowID)
+	if r.cancelIntegrityCtx != nil {
+		r.cancelIntegrityCtx()
+	}
 }
 
 func (r *RunnerLocal) Teardown() {

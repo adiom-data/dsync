@@ -66,7 +66,6 @@ func NewCosmosConnector(desc string, settings ConnectorSettings) *Connector {
 	setDefault(&settings.InitialSyncNumParallelCopiers, 8)
 	setDefault(&settings.WriterMaxBatchSize, 0)
 	setDefault(&settings.NumParallelWriters, 4)
-	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
 	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.MaxNumNamespaces, 8)
 	setDefault(&settings.TargetDocCountPerPartition, 512*1000)

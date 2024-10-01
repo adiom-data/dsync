@@ -1,4 +1,4 @@
-.PHONY: dsync clean clean-dbs verify bootstrap1 bootstrap2 sync12 test-all test clean-testdb test-mongo test-cosmos
+.PHONY: dsync clean clean-dbs verify bootstrap1 bootstrap2 sync12 test-all test clean-testdb test-mongo test-cosmos mocks
 
 RUN_CMD=go run main.go
 
@@ -25,7 +25,7 @@ sync12:
 	$(RUN_CMD) -s "mongodb://mongo1:27017/?replicaSet=data1" -d "mongodb://mongo2:27018/?replicaSet=data2" -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO
 
 test-all:
-	go test -count=1 -v --tags=external ./...
+	go test -count=1 -v -p 1 --tags=external ./...
 
 test:
 	go test ./...
@@ -39,4 +39,13 @@ clean-testdb:
 	$(RUN_CMD) -d "mongodb://mongotest:27019/?replicaSet=datatest" -sourcetype testconn -s ./fixture -m "mongodb://mongotest:27019/?replicaSet=datatest" --verbosity INFO --namespace testconn.test1,testconn.test2,testconn.test3,testconn.test4
 
 test-mongo:
-	MONGO_TEST=mongodb://mongotest:27019/?replicaSet=datatest go test -count=1 -v --tags=integration github.com/adiom-data/dsync/connectors/mongo
+	MONGO_TEST=mongodb://mongotest:27019/?replicaSet=datatest go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo
+
+mocks:
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Connector
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Coordinator
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Runner
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Transport
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name ConnectorICoordinatorSignal
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name CoordinatorIConnectorSignal
+	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Statestore

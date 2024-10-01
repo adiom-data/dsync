@@ -27,10 +27,8 @@ type ConnectorCapabilities struct {
 
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
 type ConnectorDataIntegrityCheckResult struct {
-	Digest string
+	Digest []byte
 	Count  int64
-
-	Success bool
 }
 
 type ConnectorReadPlanResult struct {
@@ -127,7 +125,7 @@ type ConnectorICoordinatorSignal interface {
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                                                    // Write data from the provided channel (async)
 	Interrupt(flowId FlowID) error                                                                                           // Interrupt the flow (async)
 
-	RequestDataIntegrityCheck(flowId FlowID, options ConnectorOptions) error // Request a data integrity check based on a read plan (async)
+	IntegrityCheck(ctx context.Context, flowId FlowID, task ReadPlanTask) (ConnectorDataIntegrityCheckResult, error) // Request a data integrity check based on a read plan task
 
 	GetConnectorStatus(flowId FlowID) ConnectorStatus // Immediate and non-blocking
 }

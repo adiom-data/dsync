@@ -49,13 +49,12 @@ type BaseMongoConnector struct {
 type ConnectorSettings struct {
 	ConnectionString string
 
-	ServerConnectTimeout           time.Duration
-	PingTimeout                    time.Duration
-	InitialSyncNumParallelCopiers  int
-	WriterMaxBatchSize             int // applies to batch inserts only; 0 means no limit
-	NumParallelWriters             int
-	CdcResumeTokenUpdateInterval   time.Duration
-	NumParallelIntegrityCheckTasks int
+	ServerConnectTimeout          time.Duration
+	PingTimeout                   time.Duration
+	InitialSyncNumParallelCopiers int
+	WriterMaxBatchSize            int // applies to batch inserts only; 0 means no limit
+	NumParallelWriters            int
+	CdcResumeTokenUpdateInterval  time.Duration
 }
 
 type Connector struct {
@@ -74,7 +73,6 @@ func NewMongoConnector(desc string, settings ConnectorSettings) *Connector {
 	setDefault(&settings.PingTimeout, 2*time.Second)
 	setDefault(&settings.InitialSyncNumParallelCopiers, 4)
 	setDefault(&settings.NumParallelWriters, 4)
-	setDefault(&settings.NumParallelIntegrityCheckTasks, 4)
 	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.WriterMaxBatchSize, 0)
 	return &Connector{BaseMongoConnector: BaseMongoConnector{Desc: desc, Settings: settings}}
@@ -545,19 +543,14 @@ func (mc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	return nil
 }
 
-func (mc *BaseMongoConnector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	// need to make this async to honor the spec
-	go mc.doIntegrityCheck_sync(flowId, options)
-
-	return nil
-}
-
 func (mc *BaseMongoConnector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return mc.Status
 }
 
 func (mc *BaseMongoConnector) Interrupt(flowId iface.FlowID) error {
-	mc.FlowCancelFunc()
+	if mc.FlowCancelFunc != nil {
+		mc.FlowCancelFunc()
+	}
 	return nil
 }
 
