@@ -265,7 +265,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
+			if errors.Is(mc.FlowCtx.Err(), context.Canceled) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -354,7 +354,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 		}
 
 		if err := changeStream.Err(); err != nil {
-			if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
+			if errors.Is(mc.FlowCtx.Err(), context.Canceled) {
 				slog.Debug(fmt.Sprintf("Change stream error: %v, but the context was cancelled", err))
 			} else {
 				slog.Error(fmt.Sprintf("Change stream error: %v", err))
@@ -396,7 +396,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					mc.ProgressTracker.TaskStartedProgressUpdate(ns, task.Id)
 
 					if err != nil {
-						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
+						if errors.Is(mc.FlowCtx.Err(), context.Canceled) {
 							slog.Debug(fmt.Sprintf("Find error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Failed to find documents in collection: %v", err))
@@ -429,7 +429,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						}
 					}
 					if err := cursor.Err(); err != nil {
-						if errors.Is(context.Canceled, mc.FlowCtx.Err()) {
+						if errors.Is(mc.FlowCtx.Err(), context.Canceled) {
 							slog.Debug(fmt.Sprintf("Cursor error: %v, but the context was cancelled", err))
 						} else {
 							slog.Error(fmt.Sprintf("Cursor error: %v", err))
