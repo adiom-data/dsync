@@ -48,7 +48,7 @@ func (cc *Connector) startGlobalLsnWorkers(ctx context.Context, namespaces []ifa
 			}
 			changeStream, err := cc.createChangeStream(ctx, loc, opts)
 			if err != nil {
-				if errors.Is(context.Canceled, ctx.Err()) {
+				if errors.Is(ctx.Err(), context.Canceled) {
 					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))
 				} else {
 					slog.Error(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v", loc.Database, loc.Collection, err))

@@ -492,7 +492,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 						slog.Info(fmt.Sprintf("Source integrity task canceled %v", task))
 						return nil
 					}
-					slog.Error(fmt.Sprintf("Source integrity check failed: %v", err))
+					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", task, err))
 					return err
 				}
 				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, fid, task)
@@ -501,7 +501,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 						slog.Info(fmt.Sprintf("Destination integrity task canceled %v", task))
 						return nil
 					}
-					slog.Error(fmt.Sprintf("Destination integrity check failed: %v", err))
+					slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", task, err))
 					return err
 				}
 				matches := bytes.Equal(srcRes.Digest, dstRes.Digest) && srcRes.Count == dstRes.Count
