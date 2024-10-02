@@ -115,7 +115,8 @@ func (cc *Connector) processChangeStreamEvents(ctx context.Context, readerProgre
 			continue
 		}
 		//send the data message
-		cc.updateChangeStreamProgressTracking(readerProgress)
+		cc.ProgressTracker.UpdateChangeStreamProgressTracking()
+		readerProgress.changeStreamEvents++
 
 		// extract the continuation value from the change stream event
 		// if we fail to extract the continuation value, we will stop using the Cosmos continuation token for this change stream

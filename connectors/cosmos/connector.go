@@ -31,8 +31,6 @@ type Connector struct {
 	mongoconn.BaseMongoConnector
 	settings ConnectorSettings
 
-	muProgressMetrics sync.Mutex
-
 	//TODO (AK, 6/2024): these should be per-flow (as well as the other bunch of things)
 	// ducktaping for now
 	flowCDCResumeTokenMap     *TokenMap     //stores the resume token for each namespace
@@ -124,25 +122,11 @@ func (cc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	cc.ConnectorType = iface.ConnectorType{DbType: connectorDBType, Version: version.(string), Spec: connectorSpec}
 	// Instantiate ConnectorCapabilities, current capabilities are source only
 	cc.ConnectorCapabilities = iface.ConnectorCapabilities{Source: true, Sink: true, IntegrityCheck: true, Resumability: true}
-	// Instantiate ConnectorStatus
-	progressMetrics := iface.ProgressMetrics{
-		NumDocsSynced:          0,
-		TasksTotal:             0,
-		TasksStarted:           0,
-		TasksCompleted:         0,
-		NumNamespaces:          0,
-		NumNamespacesCompleted: 0,
-		DeletesCaught:          0,
-		ChangeStreamEvents:     0,
-
-		NamespaceProgress: make(map[iface.Namespace]*iface.NamespaceStatus),
-		Namespaces:        make([]iface.Namespace, 0),
-	}
-
+	// Instantiate ConnectorStatus and ProgressTracker
 	cc.Status = iface.ConnectorStatus{
-		WriteLSN:        0,
-		ProgressMetrics: progressMetrics,
+		WriteLSN: 0,
 	}
+	cc.ProgressTracker = mongoconn.NewProgressTracker(&cc.Status, cc.Client, cc.Ctx)
 
 	// Get the coordinator endpoint
 	coord, err := cc.T.GetCoordinatorEndpoint("local")
@@ -194,10 +178,10 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 	namespaces := make([]iface.Namespace, 0)
 
-	cc.restoreProgressDetails(tasks)
+	cc.ProgressTracker.RestoreProgressDetails(tasks)
 	// reset doc counts for all namespaces to actual for more accurate progress reporting
 	//XXX: is it safe to just do it async? we don't want to block the command from returning
-	go cc.resetNsProgressEstimatedDocCounts()
+	go cc.ProgressTracker.ResetNsProgressEstimatedDocCounts()
 
 	if len(tasks) == 0 && options.Mode != iface.SyncModeCDC {
 		return errors.New("no tasks to copy")
@@ -344,8 +328,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 					//retrieve namespace status struct for this namespace to update accordingly
 					ns := iface.Namespace{Db: db, Col: col}
 
-					nsStatus := cc.Status.ProgressMetrics.NamespaceProgress[ns]
-					cc.taskStartedProgressUpdate(nsStatus, task.Id)
+					cc.ProgressTracker.TaskStartedProgressUpdate(ns, task.Id)
 
 					collection := cc.Client.Database(db).Collection(col)
 					cursor, err := createFindQuery(cc.FlowCtx, collection, task)
@@ -371,7 +354,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						//update the docs counters
 						readerProgress.initialSyncDocs.Add(1)
 
-						cc.taskInProgressUpdate(nsStatus)
+						cc.ProgressTracker.TaskInProgressUpdate(ns)
 						docs++
 
 						dataBatch[batch_idx] = data
@@ -394,7 +377,7 @@ func (cc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 						readerProgress.tasksCompleted++ //XXX Should we do atomic add here as well, shared variable multiple threads
 
 						//update the progress after completing the task and create task metadata to pass to coordinator to persist
-						cc.taskDoneProgressUpdate(nsStatus, task.Id)
+						cc.ProgressTracker.TaskDoneProgressUpdate(ns, task.Id)
 
 						slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 						//notify the coordinator that the task is done from our side
