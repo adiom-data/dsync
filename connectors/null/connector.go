@@ -143,10 +143,11 @@ func (nc *Connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelId if
 	return nil
 }
 
-func (nc *Connector) RequestDataIntegrityCheck(flowId iface.FlowID, options iface.ConnectorOptions) error {
+func (nc *Connector) IntegrityCheck(ctx context.Context, flowId iface.FlowID, task iface.ReadPlanTask) (iface.ConnectorDataIntegrityCheckResult, error) {
 	//does nothing, no data to check
-	return fmt.Errorf("null write connector does not support data integrity check")
+	return iface.ConnectorDataIntegrityCheckResult{}, fmt.Errorf("null write connector does not support data integrity check")
 }
+
 func (nc *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return nc.status
 }

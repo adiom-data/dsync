@@ -80,6 +80,12 @@ make test-mongo
 make test-cosmos
 ```
 
+## Mocks
+
+First time install mockery: `brew install mockery`
+
+After just run `make mocks`
+
 ## General testing with the docker instances
 
 ```

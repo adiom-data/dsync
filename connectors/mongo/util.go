@@ -154,3 +154,32 @@ func GetMongoFlavor(connectionString string) MongoFlavor {
 	}
 	return FlavorMongoDB
 }
+
+// create a find query for a task
+func createFindFilter(task iface.ReadPlanTask) bson.D {
+	if task.Def.PartitionKey == "" {
+		return bson.D{}
+	}
+	if task.Def.Low == nil && task.Def.High == nil { //no boundaries
+		return bson.D{}
+	} else if task.Def.Low == nil && task.Def.High != nil { //only upper boundary
+		return bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$lt", task.Def.High},
+			}},
+		}
+	} else if task.Def.Low != nil && task.Def.High == nil { //only lower boundary
+		return bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$gte", task.Def.Low},
+			}},
+		}
+	} else { //both boundaries
+		return bson.D{
+			{task.Def.PartitionKey, bson.D{
+				{"$gte", task.Def.Low},
+				{"$lt", task.Def.High},
+			}},
+		}
+	}
+}
