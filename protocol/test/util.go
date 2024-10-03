@@ -16,7 +16,7 @@ const (
 	// Read planning timeout
 	ReadPlanningTimeout = 5 * time.Second
 	// Flow completion timeout
-	FlowCompletionTimeout = 10 * time.Second
+	FlowCompletionTimeout = 20 * time.Second
 	// Event reaction timeout
 	EventReactionTimeout = 5 * time.Second
 	// Data integrity check timeout

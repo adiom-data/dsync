@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/adiom-data/dsync/connectors/common"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/test"
 	"github.com/stretchr/testify/suite"
@@ -31,7 +32,8 @@ var TestMongoConnectionString = os.Getenv(MongoEnvironmentVariable)
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return NewMongoConnector("test", ConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
+			return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
+			// return NewMongoConnector("test", ConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewMongoTestDataStore(TestMongoConnectionString)

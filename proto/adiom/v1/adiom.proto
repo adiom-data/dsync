@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package adiom.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/v1;adiomv1";
+
+import "adiom/v1/messages.proto";
+
+service ConnectorService {
+    rpc GetInfo(GetInfoRequest) returns (GetInfoResponse);
+    rpc GetNamespaceMetadata(GetNamespaceMetadataRequest) returns (GetNamespaceMetadataResponse);
+    rpc ListData(ListDataRequest) returns (ListDataResponse);
+
+    // Sink
+    rpc WriteData(WriteDataRequest) returns (WriteDataResponse);
+    rpc WriteUpdates(WriteUpdatesRequest) returns (WriteUpdatesResponse);
+
+    // Source
+    rpc GeneratePlan(GeneratePlanRequest) returns (GeneratePlanResponse);
+    rpc StreamUpdates(StreamUpdatesRequest) returns (stream StreamUpdatesResponse);
+    rpc StreamLSN(StreamLSNRequest) returns (stream StreamLSNResponse);
+}

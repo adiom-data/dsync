@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adiom-data/dsync/connectors/common"
 	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	connectorNull "github.com/adiom-data/dsync/connectors/null"
@@ -144,7 +145,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
 
 		// set all other settings to default
-		r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
+		connectorSettings := common.ConnectorSettings{
+			NumParallelCopiers:        cosmosSettings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        cosmosSettings.NumParallelWriters,
+			MaxWriterBatchSize:        cosmosSettings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: cosmosSettings.CdcResumeTokenUpdateInterval,
+		}
+		r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
 		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
 		mongoSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}
@@ -170,10 +177,22 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		mongoSettings.PingTimeout = settings.PingTimeout
 
 		// set all other settings to default
-		r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
+		connectorSettings := common.ConnectorSettings{
+			NumParallelCopiers:        mongoSettings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        mongoSettings.NumParallelWriters,
+			MaxWriterBatchSize:        mongoSettings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: mongoSettings.CdcResumeTokenUpdateInterval,
+		}
+		r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "testconn" {
-		r.src = testconn.NewConnector(sourceName, settings.SrcConnString)
+		// TODO configure params properly
+		r.src = common.NewLocalConnector(sourceName, testconn.NewConn(settings.SrcConnString), common.ConnectorSettings{
+			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        settings.NumParallelWriters,
+			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+		})
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
@@ -197,10 +216,22 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		connSettings.PingTimeout = settings.PingTimeout
 
 		// set all other settings to default
-		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
+		connectorSettings := common.ConnectorSettings{
+			NumParallelCopiers:        connSettings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        connSettings.NumParallelWriters,
+			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
+		}
+		r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
 		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
 	} else if settings.DstType == "testconn" {
-		r.dst = testconn.NewConnector(destinationName, settings.DstConnString)
+		// TODO configure params properly
+		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), common.ConnectorSettings{
+			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        settings.NumParallelWriters,
+			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+		})
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
@@ -217,7 +248,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		connSettings.PingTimeout = settings.PingTimeout
 
-		r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
+		connectorSettings := common.ConnectorSettings{
+			NumParallelCopiers:        connSettings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        connSettings.NumParallelWriters,
+			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
+		}
+		r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
 
