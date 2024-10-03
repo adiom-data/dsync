@@ -7,6 +7,7 @@
 package dsync
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -458,4 +459,73 @@ func generateNewHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.R
 	if err != nil {
 		fmt.Println("Error executing template:", err)
 	}
+}
+
+func convertNamespaceMapToStringKeys(
+    originalMap map[iface.Namespace]*iface.NamespaceStatus) map[string]*iface.NamespaceStatus {
+    
+    newMap := make(map[string]*iface.NamespaceStatus)
+
+    for key, value := range originalMap {
+        // Convert the iface.Namespace key to a string, e.g., "db.col"
+        newKey := fmt.Sprintf("%s.%s", key.Db, key.Col)
+        newMap[newKey] = value
+    }
+
+    return newMap
+}
+
+// push updates using SSE server
+func progressUpdatesHandler(progress runnerLocal.RunnerSyncProgress, errorLog *logger.ReverseBuffer, w http.ResponseWriter, r *http.Request) {
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	for {
+		// Calculate elapsed time
+		elapsed := time.Since(progress.StartTime).Round(time.Second)
+
+		convertedNamespaceMap := convertNamespaceMapToStringKeys(progress.NsProgressMap)
+		// Construct the data struct
+		data := struct {
+			runnerLocal.RunnerSyncProgress
+			Elapsed         string
+			TotalProgress   int64
+			TotalThroughput float64
+			ErrorLogString  string
+			NsProgressMap   map[string]*iface.NamespaceStatus
+		}{
+			RunnerSyncProgress: progress,
+			Elapsed:            elapsed.String(),
+			TotalProgress:      int64(percentCompleteTotal(progress)),
+			TotalThroughput:    progress.Throughput,
+			ErrorLogString:     errorLog.String(),
+			NsProgressMap:      convertedNamespaceMap,
+		}
+
+		// Convert the struct to JSON
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			fmt.Println("Error marshaling JSON:", err)
+			break
+		}
+
+		// Send the JSON data as an event to the client
+		fmt.Fprintf(w, "data: %s\n\n", jsonData)
+		w.(http.Flusher).Flush() // Ensure the event is sent immediately
+
+		// Stop when the progress reaches 100%
+		if data.TotalProgress >= 100 {
+			break
+		}
+
+		// Sleep for a second before sending the next update (simulating real-time updates)
+		time.Sleep(1 * time.Second)
+	}
+
+	// Send a final "complete" signal when progress is done
+	fmt.Fprintf(w, "data: complete\n\n")
+	w.(http.Flusher).Flush()
+	
+
 }

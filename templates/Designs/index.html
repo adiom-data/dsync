@@ -51,7 +51,7 @@
         position: relative;
         overflow-x: hidden;
 
-        background-image: url('/web_static/adiom-back-png.png');
+        background-image: url('./adiom-back-png.png');
         background-repeat: no-repeat;
         background-position: top 0 right 0;
         background-size: cover;
@@ -137,8 +137,7 @@
 
       .col-4,
       .col-6,
-      .col-8, 
-      .col-12 {
+      .col-8 .col-12 {
         background-color: rgba(var(--background-block), 0.4);
         border: 1px solid rgba(var(--border-block), 0.12);
       }
@@ -543,11 +542,11 @@
           <div class="row-column md-row gap-24">
             <div class="col col-6 row-column gap-14">
               <h2 class="col-title">source:</h2>
-              <span class="col-value">{{ .SourceDescription }}</span>
+              <span class="col-value">[Cosmos DB] cosmosdbtest-3.mongo.cosmos.azure.com:10255</span>
             </div>
             <div class="col col-6 row-column gap-14">
               <h2 class="col-title">destination:</h2>
-              <span class="col-value">{{ .DestinationDescription }}</span>
+              <span class="col-value">[MongoDB] localhost:27027</span>
             </div>
           </div>
         </div>
@@ -568,22 +567,22 @@
                 </span>
                 <h2 class="col-title">state:</h2>
               </div>
-              <span class="col-value">{{ .SyncState }}</span>
+              <span class="col-value">AllInOne</span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">time elapsed:</h2>
-              <span class="col-value" id="elapsed-time">{{ .Elapsed }}</span>
+              <span class="col-value">3m3s</span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">Namespaces Synced:</h2>
-              <span class="col-value">{{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</span>
+              <span class="col-value">0 / 3</span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">Documents Synced:</h2>
-              <span class="col-value">{{ .NumDocsSynced }}</span>
+              <span class="col-value">1214503</span>
             </div>
           </div>
         </div>
@@ -620,13 +619,13 @@
         </g>
       </svg>
 
-      <section class="section-progress mb-48" data-progress="{{ .TotalProgress }}" data-throughput="{{ round .TotalThroughput }}">
+      <section class="section-progress mb-48" data-progress="0" data-throughput="0">
         <!--- Please, insert your variables for progress and throughput/sec to data-progress and data-throughput attributes accordingly.
         Then JS code will handle changes in data-attributes and update html markup with values.-->
         <div class="container">
           <div class="progress-bar">
             <div class="progress">
-              <span class="progress-label-percent">{{ .TotalProgress }}%</span>
+              <span class="progress-label-percent">0%</span>
             </div>
           </div>
 
@@ -637,11 +636,11 @@
           <div class="progress-info row justify-between flex-wrap gap-9">
             <div class="row items-center gap-9">
               <h3 class="progress-title">Total % Complete:</h3>
-              <span class="progress-value progress-percent">{{ .TotalProgress }}%</span>
+              <span class="progress-value progress-percent">0%</span>
             </div>
             <div class="row items-center gap-9">
               <h3 class="progress-title">Total Throughput:</h3>
-              <span class="progress-value progress-ops">{{ round .TotalThroughput }} ops/sec</span>
+              <span class="progress-value progress-ops">0 ops/sec</span>
             </div>
           </div>
         </div>
@@ -649,8 +648,6 @@
 
       <section class="section-namespace mb-24">
         <div class="container">
-
-          {{ if eq .SyncState "InitialSync" }}
           <div class="row-column md-row gap-24">
             <div class="col col-8 row-column overflow-auto">
               <h2 class="table-title">per-namespace progress</h2>
@@ -668,17 +665,32 @@
                 in each row.
                     Then JS code will handle changes in data-attributes and update html markup with values.
                 -->
-                  {{ range $ns, $status := .NsProgressMap }}
-                  {{ $tasksTotalNS := len $status.Tasks }}
-                  <div class="table-row row-data" role="row" data-name="{{ $ns }}" data-docs="{{ $status.DocsCopied }}">
-                    <div class="table-cell name" role="cell"></div>
-                    <div class="table-cell" role="cell">{{ calcPercentNS $status }}%</div>
-                    <div class="table-cell" role="cell">{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</div>
-                    <div class="table-cell" role="cell">{{ $status.TasksStarted }}</div>
-                    <div class="table-cell docs" role="cell"></div>
-                    <div class="table-cell" role="cell">{{ round $status.Throughput }}</div>
-                  </div>
-                  {{ end }}
+                <div class="table-row row-data" role="row" data-name="{odc col1}" data-docs="200">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 3</div>
+                  <div class="table-cell" role="cell">6 </div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1561</div>
+                </div>
+
+                <div class="table-row row-data" role="row" data-name="{odc col2}" data-docs="150">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 6</div>
+                  <div class="table-cell" role="cell">8</div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1978</div>
+                </div>
+
+                <div class="table-row row-data" role="row" data-name="{odc col3}" data-docs="50">
+                  <div class="table-cell name" role="cell"></div>
+                  <div class="table-cell" role="cell">0%</div>
+                  <div class="table-cell" role="cell">0 / 6</div>
+                  <div class="table-cell" role="cell">8</div>
+                  <div class="table-cell docs" role="cell"></div>
+                  <div class="table-cell" role="cell">1978</div>
+                </div>
               </div>
             </div>
             <div class="col-4 bg-transparent row justify-center items-center">
@@ -687,31 +699,7 @@
               </div>
             </div>
           </div>
-
-          {{ else if eq .SyncState "ChangeStream" }}
-          <div class="row-column col bg-block">
-            <h2 class="table-title">progress</h2>
-            <div class="per-namespace-progress" role="table">
-              <div class="table-row-3 table-header" role="row">
-                <div class="table-cell" role="columnheader">Change Stream Events</div>
-                <div class="table-cell" role="columnheader">Deletes Caught</div>
-                <div class="table-cell" role="columnheader">Events To Catch Up</div>
-              </div>
-
-              <div class="table-row-3" role="row">
-                <div class="table-cell" role="cell">{{ .ChangeStreamEvents }}</div>
-                <div class="table-cell" role="cell">{{ .DeletesCaught }}</div>
-                <div class="table-cell" role="cell">{{ .Lag }}</div>
-              </div>
-            </div>
-          </div>
-
-          {{ else if eq .SyncState "Verify" }}
-          <h2>Verification Result</h2>
-          <p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
-
-          </div>
-          {{ end }}
+        </div>
       </section>
     </main>
 
@@ -722,7 +710,8 @@
             <h2 class="errors-title">Errors</h2>
             <div class="errors">
               <p>
-                {{ .ErrorLogString }}
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ex rem adipisci provident qui veniam tenetur a
+                amet inventore dolore.
               </p>
             </div>
           </div>
@@ -731,48 +720,15 @@
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-      const eventSource = new EventSource("/progress");
+      const chartData = [];
+      const colors = ['#2353FF', '#4069FF', '#5989FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
 
-      eventSource.onmessage = function(event) {
-        // Parse the received JSON data
-        const data = JSON.parse(event.data);
-        document.getElementById("elapsed-time").textContent = data.Elapsed;
-        if (data.TotalProgress >= 100) {
-          eventSource.close();
-        }
-      }
-
-      // set interval for page to update changes every second
-      setInterval(() => {
-        const namespacesDocs = document.querySelectorAll('.row-data');
-
-        namespacesDocs.forEach(item => {
-          const name =  item.getAttribute('data-name');
-          const currentDocs = parseInt(item.getAttribute('data-docs'));
-          item.setAttribute('data-docs', currentDocs);
-          const existing = chartData.find(data => data.name === name);
-
-          if (!existing) {
-            chartData.push({
-              name: name,
-              docs: currentDocs
-            });
-          } 
-          
-        });
-      }, 1000);
-
-      // table
       const dataRows = document.querySelectorAll('.row-data');
       dataRows.forEach(row => {
         row.querySelector('.name').textContent = row.getAttribute('data-name');
         row.querySelector('.docs').textContent = row.getAttribute('data-docs');
       });
 
-      // pie chart
-      const chartData = [];
-      const colors = ['#2353FF', '#5989FF', '#4069FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
-      
       const ctx = document.getElementById('myPieChart');
       const myPieChart = new Chart(ctx, {
         type: 'pie',
@@ -822,6 +778,23 @@
         },
       });
 
+      function lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16),
+          amt = Math.round(2.55 * percent),
+          R = (num >> 16) + amt,
+          G = ((num >> 8) & 0x00ff) + amt,
+          B = (num & 0x0000ff) + amt;
+
+        return `#${(
+          0x1000000 +
+          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+          (B < 255 ? (B < 1 ? 0 : B) : 255)
+        )
+          .toString(16)
+          .slice(1)}`;
+      }
+
       pieChartInit();
       function pieChartInit() {
         const observerForPieChart = new MutationObserver(mutationsList => {
@@ -842,79 +815,29 @@
         observerForPieChart.observe(namespacesTable, config);
       }
 
-      // progress bar
-      initProgressBar();
-      function initProgressBar() {
-        const sectionProgress = document.querySelector('.section-progress');
-        const progress = document.querySelector('.progress');
-        const progressLabel = progress.firstElementChild;
+      const handleChange = mutation => {
+        if (mutation.type === 'attributes') {
+          const currentChange = {
+            name: mutation.target.getAttribute('data-name'),
+            docs: parseInt(mutation.target.getAttribute(mutation.attributeName)),
+          };
 
-        progress.style.width = '0%';
-        progressLabel.style.opacity = '0';
-        progressLabel.style.visibility = 'hidden';
+          const index = chartData.findIndex(item => item.name === currentChange.name);
 
-        const observer = new MutationObserver(mutationList => {
-          mutationList.forEach(mutation => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'data-progress') {
-              const newProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
-              updateProgress(newProgress);
-            } else if (mutation.type === 'attributes' && mutation.attributeName === 'data-throughput') {
-              const newThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
-              updateThroughput(newThroughput);
-            }
-          });
-        });
-        observer.observe(sectionProgress, { attributes: true, attributeFilter: ['data-progress', 'data-throughput'] });
-      }
+          if (index !== -1) {
+            chartData[index] = currentChange;
+          } else {
+            chartData.push(currentChange);
+          }
 
-      function updateProgress(newProgress) {
-        const progress = document.querySelector('.progress');
-        const progressLabel = progress.firstElementChild;
-        const progressPercent = document.querySelector('.progress-percent');
-        const sectionProgress = document.querySelector('.section-progress');
+          myPieChart.data.labels = chartData.map(item => item.name);
+          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
+          myPieChart.data.datasets[0].backgroundColor = colors;
+          myPieChart.update();
 
-        if (newProgress <= 0) {
-          progress.style.width = '0%';
-          progressLabel.style.opacity = '0';
-          progressLabel.style.visibility = 'hidden';
-        } else {
-          progressLabel.style.opacity = '1';
-          progressLabel.style.visibility = 'visible';
+          mutation.target.querySelector('.docs').textContent = mutation.target.getAttribute('data-docs');
         }
-
-        if (newProgress > 100) return;
-
-        progress.style.width = `${newProgress}%`;
-        progressLabel.textContent = `${newProgress}%`;
-        progressPercent.textContent = `${newProgress}%`;
-        sectionProgress.setAttribute('data-progress', currentProgress);
-      }
-
-      setInterval(() => {
-        const sectionProgress = document.querySelector('.section-progress');
-        const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
-        if (currentProgress > 99) return;
-
-        sectionProgress.setAttribute('data-progress', currentProgress);
-      }, 100);
-
-      // theme and colors
-      function lightenColor(color, percent) {
-        const num = parseInt(color.replace('#', ''), 16),
-          amt = Math.round(2.55 * percent),
-          R = (num >> 16) + amt,
-          G = ((num >> 8) & 0x00ff) + amt,
-          B = (num & 0x0000ff) + amt;
-
-        return `#${(
-          0x1000000 +
-          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-          (B < 255 ? (B < 1 ? 0 : B) : 255)
-        )
-          .toString(16)
-          .slice(1)}`;
-      }
+      };
 
       themeInit();
       function themeInit() {
@@ -945,29 +868,51 @@
         myPieChart.update();
       }
 
-      const handleChange = mutation => {
-        if (mutation.type === 'attributes') {
-          const currentChange = {
-            name: mutation.target.getAttribute('data-name'),
-            docs: parseInt(mutation.target.getAttribute(mutation.attributeName)),
-          };
+      initProgressBar();
+      function initProgressBar() {
+        const sectionProgress = document.querySelector('.section-progress');
+        const progress = document.querySelector('.progress');
+        const progressLabel = progress.firstElementChild;
 
-          const index = chartData.findIndex(item => item.name === currentChange.name);
+        progress.style.width = '0%';
+        progressLabel.style.opacity = '0';
+        progressLabel.style.visibility = 'hidden';
 
-          if (index !== -1) {
-            chartData[index] = currentChange;
-          } else {
-            chartData.push(currentChange);
-          }
+        const observer = new MutationObserver(mutationList => {
+          mutationList.forEach(mutation => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-progress') {
+              const newProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+              updateProgress(newProgress);
+            } else if (mutation.type === 'attributes' && mutation.attributeName === 'data-throughput') {
+              const newThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
+              updateThroughput(newThroughput);
+            }
+          });
+        });
 
-          myPieChart.data.labels = chartData.map(item => item.name);
-          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
-          myPieChart.data.datasets[0].backgroundColor = colors;
-          myPieChart.update();
+        observer.observe(sectionProgress, { attributes: true, attributeFilter: ['data-progress', 'data-throughput'] });
+      }
 
-          mutation.target.querySelector('.docs').textContent = mutation.target.getAttribute('data-docs');
+      function updateProgress(newProgress) {
+        const progress = document.querySelector('.progress');
+        const progressLabel = progress.firstElementChild;
+        const progressPercent = document.querySelector('.progress-percent');
+
+        if (newProgress <= 0) {
+          progress.style.width = '0%';
+          progressLabel.style.opacity = '0';
+          progressLabel.style.visibility = 'hidden';
+        } else {
+          progressLabel.style.opacity = '1';
+          progressLabel.style.visibility = 'visible';
         }
-      };
+
+        if (newProgress > 100) return;
+
+        progress.style.width = `${newProgress}%`;
+        progressLabel.textContent = `${newProgress}%`;
+        progressPercent.textContent = `${newProgress}%`;
+      }
 
       function updateThroughput(newThroughput) {
         const sectionProgress = document.querySelector('.section-progress');
@@ -982,11 +927,6 @@
         }
       }
 
-      // setInterval(function() {
-      //   console.log('Attempting to reload the page...');
-      //   window.location.reload();
-      // }, 1000);
-		  
       // WARNING!
       // Code below is not for production! There is simulation of data changing
       // Just to see how should works pie chart, table "Per-Namespace Progress" and progress bar for development mode
@@ -1005,25 +945,21 @@
       //   });
       // }, 1000);
 
-
       // ===================================================================================
 
       // -------Uncomment code below to see how should works progress-bar----------------------
-
       // setInterval(() => {
       //   const sectionProgress = document.querySelector('.section-progress');
       //   const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
       //   if (currentProgress > 99) return;
 
-      //   sectionProgress.setAttribute('data-progress', currentProgress);
+      //   sectionProgress.setAttribute('data-progress', currentProgress + 1);
       // }, 100);
-      
+
       // setInterval(() => {
       //   const sectionProgress = document.querySelector('.section-progress');
-      //   const currentThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
-      //   sectionProgress.setAttribute('data-throughput', currentThroughput);
+      //   sectionProgress.setAttribute('data-throughput', Math.floor(1000 + Math.random() * 9000));
       // }, 2000);
-
       // ===================================================================================
     </script>
   </body>

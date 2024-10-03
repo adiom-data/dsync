@@ -193,12 +193,22 @@ func runDsync(c *cli.Context) error {
 			host := fmt.Sprintf("localhost:%d", o.WebPort)
 			slog.Info("Starting web server to serve progress report on " + host + "/progress")
 			fs := http.FileServer(http.Dir("./web_static"))
+			progress := r.GetRunnerProgress()
 
+			// generate initial static page
 			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				r.UpdateRunnerProgress()
-				generateNewHTML(r.GetRunnerProgress(), wsErrorLog, w)
+				if req.Header.Get("Accept") == "text/event-stream" {
+					// Serve the SSE updates with progress
+					progressUpdatesHandler(progress, wsErrorLog, w, req)
+				} else {
+					// Otherwise, serve the initial HTML
+					w.Header().Set("Content-Type", "text/html")
+					r.UpdateRunnerProgress()
+					generateNewHTML(progress, wsErrorLog, w)
+				}
 			})
+
+			// server real-time updates
 			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
 			http.ListenAndServe(host, nil)
 		}()
