@@ -533,7 +533,7 @@ func (cc *Connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Co
 			go func(ns iface.Namespace) {
 				defer wg.Done()
 				loc := iface.Location{Database: ns.Db, Collection: ns.Col}
-				resumeToken, err := cc.getLatestResumeToken(cc.Ctx, loc)
+				resumeToken, err := getLatestResumeToken(cc.Ctx, cc.Client, loc)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
 					return

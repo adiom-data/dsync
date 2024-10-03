@@ -258,7 +258,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 				continue
 			}
 
-			if mc.shouldIgnoreChangeStreamEvent(change) {
+			if shouldIgnoreChangeStreamEvent(change) {
 				continue
 			}
 
@@ -330,7 +330,7 @@ func (mc *Connector) StartReadToChannel(flowId iface.FlowID, options iface.Conne
 				continue
 			}
 
-			if mc.shouldIgnoreChangeStreamEvent(change) {
+			if shouldIgnoreChangeStreamEvent(change) {
 				continue
 			}
 

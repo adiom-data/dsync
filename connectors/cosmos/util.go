@@ -81,10 +81,10 @@ func (cc *Connector) printProgress(readerProgress *ReaderProgress) {
 	}
 }
 
-func (cc *Connector) getLatestResumeToken(ctx context.Context, location iface.Location) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
-	changeStream, err := cc.createChangeStream(ctx, location, opts)
+	changeStream, err := createChangeStream(ctx, client, location, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
@@ -92,7 +92,7 @@ func (cc *Connector) getLatestResumeToken(ctx context.Context, location iface.Lo
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
 	var id interface{}
-	col := cc.Client.Database(location.Database).Collection(location.Collection)
+	col := client.Database(location.Database).Collection(location.Collection)
 
 	result, err := col.InsertOne(ctx, bson.M{})
 	if err != nil {

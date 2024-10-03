@@ -67,11 +67,11 @@ func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.Con
 		return 0
 	}
 	// 2. Compare the doc count on both sides (asynchoronously so that we can proceed with the next steps here)
-	go cc.compareDocCountWithWitness(cc.witnessMongoClient, namespaces, mismatchedNamespaces)
+	go compareDocCountWithWitness(cc.FlowCtx, cc.Client, cc.witnessMongoClient, namespaces, mismatchedNamespaces)
 
 	// 3. For mismatches, use Witness index to find out what has been deleted (async so that we can proceed with the next steps here)
-	go cc.parallelScanWitnessNamespaces(cc.witnessMongoClient, mismatchedNamespaces, idsToCheck)
-	go cc.checkSourceIdsAndGenerateDeletes(idsToCheck, idsToDelete)
+	go parallelScanWitnessNamespaces(cc.FlowCtx, cc.witnessMongoClient, mismatchedNamespaces, idsToCheck)
+	go checkSourceIdsAndGenerateDeletes(cc.FlowCtx, cc.Client, idsToCheck, idsToDelete)
 
 	// 4. Generate delete events
 	numDeletes := cc.generateDeleteMessages(idsToDelete, flowDataChannel)
@@ -81,17 +81,17 @@ func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.Con
 
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
 // The channel is closed at the end to signal that all comparisons are done
-func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, namespaces []iface.Namespace, mismatchedNamespaces chan<- iface.Namespace) {
+func compareDocCountWithWitness(ctx context.Context, client *mongo.Client, witnessClient *mongo.Client, namespaces []iface.Namespace, mismatchedNamespaces chan<- iface.Namespace) {
 	for _, ns := range namespaces {
 		// get the count from the source
-		sourceCount, err := cc.Client.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(cc.FlowCtx)
+		sourceCount, err := client.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(ctx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from source for %v: %v", ns, err))
 			continue
 		}
 
 		// get the count from the witness
-		witnessCount, err := witnessClient.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(cc.FlowCtx)
+		witnessCount, err := witnessClient.Database(ns.Db).Collection(ns.Col).EstimatedDocumentCount(ctx)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to get count from witness for %v: %v", ns, err))
 			continue
@@ -109,7 +109,7 @@ func (cc *Connector) compareDocCountWithWitness(witnessClient *mongo.Client, nam
 // Reads namespaces from the channel with 4 workers and scans the Witness index in parallel
 // Sends the ids to the channel for checking against the source
 // Exits when the channel is closed
-func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, mismatchedNamespaces <-chan iface.Namespace, idsToCheck chan<- idsWithLocation) {
+func parallelScanWitnessNamespaces(ctx context.Context, witnessClient *mongo.Client, mismatchedNamespaces <-chan iface.Namespace, idsToCheck chan<- idsWithLocation) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(numParallelWitnessScanTasks)
@@ -117,7 +117,7 @@ func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, 
 	for i := 0; i < numParallelWitnessScanTasks; i++ {
 		go func() {
 			for ns := range mismatchedNamespaces {
-				cc.scanWitnessNamespace(witnessClient, ns, idsToCheck)
+				scanWitnessNamespace(ctx, witnessClient, ns, idsToCheck)
 			}
 			wg.Done()
 		}()
@@ -129,20 +129,20 @@ func (cc *Connector) parallelScanWitnessNamespaces(witnessClient *mongo.Client, 
 }
 
 // Scans the Witness index for the given namespace and sends the ids to the channel (in batches for efficiency)
-func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns iface.Namespace, idsToCheck chan<- idsWithLocation) {
+func scanWitnessNamespace(ctx context.Context, witnessClient *mongo.Client, ns iface.Namespace, idsToCheck chan<- idsWithLocation) {
 	slog.Debug(fmt.Sprintf("Scanning witness index namespace %v", ns))
 	// get all ids from the source
 	opts := options.Find().SetProjection(bson.M{"_id": 1})
-	cur, err := witnessClient.Database(ns.Db).Collection(ns.Col).Find(cc.FlowCtx, bson.M{}, opts)
+	cur, err := witnessClient.Database(ns.Db).Collection(ns.Col).Find(ctx, bson.M{}, opts)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to get all ids from source for %v: %v", ns, err))
 		return
 	}
-	defer cur.Close(cc.FlowCtx)
+	defer cur.Close(ctx)
 
 	var ids []interface{}
 	count := 0
-	for cur.Next(cc.FlowCtx) {
+	for cur.Next(ctx) {
 		var idDoc bson.M
 		err := cur.Decode(&idDoc)
 		if err != nil {
@@ -171,7 +171,7 @@ func (cc *Connector) scanWitnessNamespace(witnessClient *mongo.Client, ns iface.
 // Reads ids to check from the channel, checks if they exist in the source, and sends those don't to the delete channel
 // Uses 4 workers to parallelize the checks
 // Exits when the channel is closed
-func (cc *Connector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan idsWithLocation, idsToDelete chan<- idsWithLocation) {
+func checkSourceIdsAndGenerateDeletes(ctx context.Context, client *mongo.Client, idsToCheck <-chan idsWithLocation, idsToDelete chan<- idsWithLocation) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(numParallelSourceScanTasks)
@@ -179,7 +179,7 @@ func (cc *Connector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan idsWithL
 	for i := 0; i < numParallelSourceScanTasks; i++ {
 		go func() {
 			for idsWithLoc := range idsToCheck {
-				cc.checkSourceIdsAndGenerateDeletesWorker(idsWithLoc, idsToDelete)
+				checkSourceIdsAndGenerateDeletesWorker(ctx, client, idsWithLoc, idsToDelete)
 			}
 			wg.Done()
 		}()
@@ -189,7 +189,7 @@ func (cc *Connector) checkSourceIdsAndGenerateDeletes(idsToCheck <-chan idsWithL
 }
 
 // Checks if the ids exist in the source and sends those that don't to the delete channel
-func (cc *Connector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLocation, idsToDelete chan<- idsWithLocation) {
+func checkSourceIdsAndGenerateDeletesWorker(ctx context.Context, client *mongo.Client, idsWithLoc idsWithLocation, idsToDelete chan<- idsWithLocation) {
 	slog.Debug(fmt.Sprintf("Checking source for ids: %+v (first: %v, last: %v, n: %v)", idsWithLoc.loc, idsWithLoc.ids[0], idsWithLoc.ids[len(idsWithLoc.ids)-1], len(idsWithLoc.ids)))
 	// we will take advatage of the $setDifference MongoDB aggregation operator to find the ids that are not in the source
 	// it does work in Cosmos, which is great!
@@ -205,16 +205,16 @@ func (cc *Connector) checkSourceIdsAndGenerateDeletesWorker(idsWithLoc idsWithLo
 		}}},
 	}
 
-	cur, err := cc.Client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(cc.FlowCtx, pipeline)
+	cur, err := client.Database(idsWithLoc.loc.Database).Collection(idsWithLoc.loc.Collection).Aggregate(ctx, pipeline)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to aggregate: %v", err))
 		return
 	}
-	defer cur.Close(cc.FlowCtx)
+	defer cur.Close(ctx)
 	// extract the missing ids
 	var missingIds []interface{}
 	var res bson.M
-	if cur.Next(cc.FlowCtx) {
+	if cur.Next(ctx) {
 		err := cur.Decode(&res)
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to decode missing ids: %v", err))

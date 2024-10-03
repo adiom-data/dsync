@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (mc *Connector) shouldIgnoreChangeStreamEvent(change bson.M) bool {
+func shouldIgnoreChangeStreamEvent(change bson.M) bool {
 	db := change["ns"].(bson.M)["db"].(string)
 	col := change["ns"].(bson.M)["coll"].(string)
 
