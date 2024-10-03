@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adiom-data/dsync/connectors/common"
 	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	connectorNull "github.com/adiom-data/dsync/connectors/null"
@@ -173,7 +174,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "testconn" {
-		r.src = testconn.NewConnector(sourceName, settings.SrcConnString)
+		// TODO configure params properly
+		r.src = common.NewLocalConnector(sourceName, testconn.NewConn(settings.SrcConnString), 2, 2, 2)
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
@@ -200,7 +202,8 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
 		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
 	} else if settings.DstType == "testconn" {
-		r.dst = testconn.NewConnector(destinationName, settings.DstConnString)
+		// TODO configure params properly
+		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), 2, 2, 2)
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
 		if settings.LoadLevel != "" {
