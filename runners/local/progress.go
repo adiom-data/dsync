@@ -52,7 +52,7 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 
 	flowStatus, err := r.coord.GetFlowStatus(r.activeFlowID)
 	if err != nil {
-		slog.Error("Failed to get flow status", err)
+		slog.Error("Failed to get flow status", "err", err)
 		return
 	}
 	srcStatus := flowStatus.SrcStatus

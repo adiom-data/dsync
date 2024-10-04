@@ -32,9 +32,9 @@ func (_m *Connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStat
 	return r0
 }
 
-// IntegrityCheck provides a mock function with given fields: ctx, flowId, task
-func (_m *Connector) IntegrityCheck(ctx context.Context, flowId iface.FlowID, task iface.ReadPlanTask) (iface.ConnectorDataIntegrityCheckResult, error) {
-	ret := _m.Called(ctx, flowId, task)
+// IntegrityCheck provides a mock function with given fields: ctx, task
+func (_m *Connector) IntegrityCheck(ctx context.Context, task iface.IntegrityCheckQuery) (iface.ConnectorDataIntegrityCheckResult, error) {
+	ret := _m.Called(ctx, task)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IntegrityCheck")
@@ -42,17 +42,17 @@ func (_m *Connector) IntegrityCheck(ctx context.Context, flowId iface.FlowID, ta
 
 	var r0 iface.ConnectorDataIntegrityCheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, iface.FlowID, iface.ReadPlanTask) (iface.ConnectorDataIntegrityCheckResult, error)); ok {
-		return rf(ctx, flowId, task)
+	if rf, ok := ret.Get(0).(func(context.Context, iface.IntegrityCheckQuery) (iface.ConnectorDataIntegrityCheckResult, error)); ok {
+		return rf(ctx, task)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, iface.FlowID, iface.ReadPlanTask) iface.ConnectorDataIntegrityCheckResult); ok {
-		r0 = rf(ctx, flowId, task)
+	if rf, ok := ret.Get(0).(func(context.Context, iface.IntegrityCheckQuery) iface.ConnectorDataIntegrityCheckResult); ok {
+		r0 = rf(ctx, task)
 	} else {
 		r0 = ret.Get(0).(iface.ConnectorDataIntegrityCheckResult)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, iface.FlowID, iface.ReadPlanTask) error); ok {
-		r1 = rf(ctx, flowId, task)
+	if rf, ok := ret.Get(1).(func(context.Context, iface.IntegrityCheckQuery) error); ok {
+		r1 = rf(ctx, task)
 	} else {
 		r1 = ret.Error(1)
 	}

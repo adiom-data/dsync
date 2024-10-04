@@ -128,6 +128,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Category: "Special Commands",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:     "verify-quick-count",
+			Usage:    "perform a data integrity check for an existing flow by doing a quick count by namespace",
+			Category: "Special Commands",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "cleanup",
 			Usage:    "cleanup metadata for an existing flow",
 			Category: "Special Commands",

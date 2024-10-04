@@ -25,9 +25,19 @@ type ConnectorCapabilities struct {
 	Resumability   bool
 }
 
+type IntegrityCheckQuery struct {
+	Db        string
+	Col       string
+	CountOnly bool
+
+	PartitionKey string
+	Low          interface{}
+	High         interface{}
+}
+
 // XXX (AK, 6/2024): not sure if it logically belongs here or to another iface file
 type ConnectorDataIntegrityCheckResult struct {
-	Digest []byte
+	XXHash uint64
 	Count  int64
 }
 
@@ -125,7 +135,7 @@ type ConnectorICoordinatorSignal interface {
 	StartWriteFromChannel(flowId FlowID, dataChannel DataChannelID) error                                                    // Write data from the provided channel (async)
 	Interrupt(flowId FlowID) error                                                                                           // Interrupt the flow (async)
 
-	IntegrityCheck(ctx context.Context, flowId FlowID, task ReadPlanTask) (ConnectorDataIntegrityCheckResult, error) // Request a data integrity check based on a read plan task
+	IntegrityCheck(ctx context.Context, task IntegrityCheckQuery) (ConnectorDataIntegrityCheckResult, error) // Request a data integrity check based on a read plan task
 
 	GetConnectorStatus(flowId FlowID) ConnectorStatus // Immediate and non-blocking
 }
