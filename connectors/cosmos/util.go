@@ -244,3 +244,11 @@ func gzipDecompress(compressedData []byte) ([]byte, error) {
 
 	return decompressedData.Bytes(), nil
 }
+
+func redactedSettings(s ConnectorSettings) ConnectorSettings {
+	copy := s
+	copy.ConnectionString = "REDACTED"
+	copy.WitnessMongoConnString = "REDACTED"
+
+	return copy
+}

@@ -183,3 +183,10 @@ func createFindFilter(task iface.ReadPlanTask) bson.D {
 		}
 	}
 }
+
+func redactedSettings(s ConnectorSettings) ConnectorSettings {
+	copy := s
+	copy.ConnectionString = "REDACTED"
+
+	return copy
+}
