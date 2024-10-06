@@ -139,6 +139,7 @@ func (mc *Connector) Setup(ctx context.Context, t iface.Transport) error {
 	}
 
 	slog.Info("MongoConnector has been configured with ID " + (string)(mc.ID))
+	slog.Debug(fmt.Sprintf("Connector config: %+v", redactedSettings(mc.Settings)))
 
 	return nil
 }
