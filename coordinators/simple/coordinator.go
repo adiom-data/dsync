@@ -6,7 +6,6 @@
 package simple
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -223,7 +222,7 @@ func (c *Simple) maybeCreateReadPlan(srcEndpoint iface.ConnectorICoordinatorSign
 	} else {
 		// Request the source connector to create a plan for reading
 		if err := srcEndpoint.RequestCreateReadPlan(fid, flowDet.Options.SrcConnectorOptions); err != nil {
-			slog.Error("Failed to request read planning from source", err)
+			slog.Error("Failed to request read planning from source", "err", err)
 			return err
 		}
 
@@ -236,7 +235,7 @@ func (c *Simple) maybeCreateReadPlan(srcEndpoint iface.ConnectorICoordinatorSign
 				slog.Debug(fmt.Sprintf("Persisting the flow plan for flow %v", flowDet))
 				err := c.s.PersistObject(flowStateMetadataStore, fid, flowDet)
 				if err != nil {
-					slog.Error("Failed to persist the flow plan", err)
+					slog.Error("Failed to persist the flow plan", "err", err)
 					return err
 				}
 			}
@@ -288,12 +287,12 @@ func (c *Simple) FlowStart(fid iface.FlowID) error {
 
 	// Tell source connector to start reading into the data channel
 	if err := src.Endpoint.StartReadToChannel(fid, flowDet.Options.SrcConnectorOptions, flowDet.ReadPlan, flowDet.dataChannels[0]); err != nil {
-		slog.Error("Failed to start reading from source", err)
+		slog.Error("Failed to start reading from source", "err", err)
 		return err
 	}
 	// Tell destination connector to start writing from the channel
 	if err := dst.Endpoint.StartWriteFromChannel(fid, flowDet.dataChannels[1]); err != nil {
-		slog.Error("Failed to start writing to the destination", err)
+		slog.Error("Failed to start writing to the destination", "err", err)
 		return err
 	}
 
@@ -365,7 +364,7 @@ func (c *Simple) FlowDestroy(fid iface.FlowID) {
 	// remove the flow state from the statestore
 	err := c.s.DeleteObject(flowStateMetadataStore, fid)
 	if err != nil {
-		slog.Error("Failed to delete flow state", err)
+		slog.Error("Failed to delete flow state", "err", err)
 	}
 }
 
@@ -423,7 +422,7 @@ func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, tas
 		if flowDet.Resumable {
 			err = c.s.PersistObject(flowStateMetadataStore, flowId, flowDet)
 			if err != nil {
-				slog.Error("Failed to persist the flow plan", err)
+				slog.Error("Failed to persist the flow plan", "err", err)
 				return err
 			}
 		}
@@ -434,7 +433,7 @@ func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, tas
 	return fmt.Errorf("connector not part of the flow")
 }
 
-func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID) (iface.FlowDataIntegrityCheckResult, error) {
+func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID, options iface.IntegrityCheckOptions) (iface.FlowDataIntegrityCheckResult, error) {
 	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
 
 	res := iface.FlowDataIntegrityCheckResult{}
@@ -463,20 +462,49 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 		return res, err
 	}
 
+	var queries []iface.IntegrityCheckQuery
+
+	if options.QuickCount {
+		dedup := map[string]iface.IntegrityCheckQuery{}
+		for _, task := range flowDet.ReadPlan.Tasks {
+			k := task.Def.Db + "." + task.Def.Col
+			if _, ok := dedup[k]; !ok {
+				dedup[k] = iface.IntegrityCheckQuery{
+					Db:        task.Def.Db,
+					Col:       task.Def.Col,
+					CountOnly: true,
+				}
+			}
+		}
+		for _, q := range dedup {
+			queries = append(queries, q)
+		}
+	} else {
+		for _, task := range flowDet.ReadPlan.Tasks {
+			queries = append(queries, iface.IntegrityCheckQuery{
+				Db:           task.Def.Db,
+				Col:          task.Def.Col,
+				PartitionKey: task.Def.PartitionKey,
+				Low:          task.Def.Low,
+				High:         task.Def.High,
+			})
+		}
+	}
+
 	numWorkers := c.numParallelIntegrityCheckTasks
 	if numWorkers < 1 {
-		numWorkers = len(flowDet.ReadPlan.Tasks)
+		numWorkers = len(queries)
 	}
-	taskCh := make(chan iface.ReadPlanTask)
+	queryCh := make(chan iface.IntegrityCheckQuery)
 	mismatchErr := errors.New("match failed")
 
 	go func() {
-		defer close(taskCh)
-		for _, task := range flowDet.ReadPlan.Tasks {
+		defer close(queryCh)
+		for _, query := range queries {
 			select {
-			case taskCh <- task:
+			case queryCh <- query:
 			case <-ctx.Done():
-				slog.Info(fmt.Sprintf("Integrity task canceled %v", task))
+				slog.Info(fmt.Sprintf("Integrity query canceled %v", query))
 				return
 			}
 		}
@@ -485,31 +513,31 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	var eg errgroup.Group
 	for i := 0; i < numWorkers; i++ {
 		eg.Go(func() error {
-			for task := range taskCh {
-				srcRes, err := src.Endpoint.IntegrityCheck(ctx, fid, task)
+			for query := range queryCh {
+				srcRes, err := src.Endpoint.IntegrityCheck(ctx, query)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Source integrity task canceled %v", task))
+						slog.Info(fmt.Sprintf("Source integrity query canceled %v", query))
 						return nil
 					}
-					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", task, err))
+					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
 					return err
 				}
-				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, fid, task)
+				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, query)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Destination integrity task canceled %v", task))
+						slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
 						return nil
 					}
-					slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", task, err))
+					slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", query, err))
 					return err
 				}
-				matches := bytes.Equal(srcRes.Digest, dstRes.Digest) && srcRes.Count == dstRes.Count
+				matches := srcRes == dstRes
 				if !matches {
-					slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", task, srcRes, dstRes))
+					slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", query, srcRes, dstRes))
 					return mismatchErr
 				}
-				slog.Info(fmt.Sprintf("Matched %v", task))
+				slog.Info(fmt.Sprintf("Matched %v, res: %v", query, srcRes))
 			}
 			return nil
 		})
@@ -625,7 +653,7 @@ func (c *Simple) UpdateCDCResumeToken(flowId iface.FlowID, conn iface.ConnectorI
 		if flowDet.Resumable {
 			err := c.s.PersistObject(flowStateMetadataStore, flowId, flowDet)
 			if err != nil {
-				slog.Error("Failed to persist the flow plan", err)
+				slog.Error("Failed to persist the flow plan", "err", err)
 				return err
 			}
 		}

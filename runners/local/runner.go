@@ -59,6 +59,7 @@ type RunnerLocalSettings struct {
 	NsFromString []string
 
 	VerifyRequestedFlag  bool
+	VerifyQuickCountFlag bool
 	CleanupRequestedFlag bool
 	ReverseRequestedFlag bool
 
@@ -255,7 +256,7 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 	//Initialize in sequence
 	err := r.statestore.Setup(r.ctx)
 	if err != nil {
-		slog.Error("RunnerLocal Setup statestore", err)
+		slog.Error("RunnerLocal Setup statestore", "err", err)
 		return err
 	}
 
@@ -263,13 +264,13 @@ func (r *RunnerLocal) Setup(ctx context.Context) error {
 
 	err = r.src.Setup(r.ctx, r.trans)
 	if err != nil {
-		slog.Error("RunnerLocal Setup src", err)
+		slog.Error("RunnerLocal Setup src", "err", err)
 		return err
 	}
 
 	err = r.dst.Setup(r.ctx, r.trans)
 	if err != nil {
-		slog.Error("RunnerLocal Setup dst", err)
+		slog.Error("RunnerLocal Setup dst", "err", err)
 		return err
 	}
 
@@ -312,7 +313,7 @@ func (r *RunnerLocal) Run() error {
 	}
 	flowID, err := r.coord.FlowGetOrCreate(flowOptions)
 	if err != nil {
-		slog.Error("Failed to create flow", err)
+		slog.Error("Failed to create flow", "err", err)
 		return err
 	}
 	r.activeFlowID = flowID
@@ -320,9 +321,9 @@ func (r *RunnerLocal) Run() error {
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
-		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID)
+		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag})
 		if err != nil {
-			slog.Error("Failed to perform flow integrity check", err)
+			slog.Error("Failed to perform flow integrity check", "err", err)
 		} else {
 			if integrityCheckRes.Passed {
 				r.runnerProgress.VerificationResult = "OK"
@@ -350,7 +351,7 @@ func (r *RunnerLocal) Run() error {
 	// start the flow
 	err = r.coord.FlowStart(flowID)
 	if err != nil {
-		slog.Error("Failed to start flow", err)
+		slog.Error("Failed to start flow", "err", err)
 		return err
 	}
 
@@ -369,7 +370,7 @@ func (r *RunnerLocal) Run() error {
 			default:
 				flowStatus, err := r.coord.GetFlowStatus(flowID)
 				if err != nil {
-					slog.Error("Failed to get flow status", err)
+					slog.Error("Failed to get flow status", "err", err)
 					break
 				}
 				slog.Debug(fmt.Sprintf("Flow status: %v", flowStatus))

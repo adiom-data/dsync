@@ -118,7 +118,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 }
 
 // RequestDataIntegrityCheck implements iface.Connector.
-func (c *connector) IntegrityCheck(ctx context.Context, flowId iface.FlowID, task iface.ReadPlanTask) (iface.ConnectorDataIntegrityCheckResult, error) {
+func (c *connector) IntegrityCheck(ctx context.Context, query iface.IntegrityCheckQuery) (iface.ConnectorDataIntegrityCheckResult, error) {
 	return iface.ConnectorDataIntegrityCheckResult{}, errors.New("Not implemented")
 }
 

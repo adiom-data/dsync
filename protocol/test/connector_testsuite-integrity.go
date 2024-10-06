@@ -46,16 +46,15 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	t.AssertExpectations(suite.T())
 	c.AssertExpectations(suite.T())
 
-	rpt := iface.ReadPlanTask{Id: 1}
-	rpt.Def.Db = "db"
-	rpt.Def.Col = "col"
-
-	fid := iface.FlowID("3234")
+	q := iface.IntegrityCheckQuery{
+		Db:  "db",
+		Col: "col",
+	}
 
 	// Check if the connector supports integrity check capabilities
 	if !caps.IntegrityCheck {
 		// Check that the method fails first
-		_, err := connector.IntegrityCheck(ctx, fid, rpt)
+		_, err := connector.IntegrityCheck(ctx, q)
 		assert.Error(suite.T(), err, "Should fail to perform a data integrity check if the connector does not support integrity check capabilities")
 		suite.T().Skip("Skipping test because this connector does not support integrity check capabilities")
 	}
@@ -70,17 +69,17 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 		"a": "1234",
 	}
 
-	res, err := connector.IntegrityCheck(ctx, fid, rpt)
+	res, err := connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count1 := res.Count
 
-	dataStore.InsertDummy(rpt.Def.Db, rpt.Def.Col+"Other", testRecord)
-	res, err = connector.IntegrityCheck(ctx, fid, rpt)
+	dataStore.InsertDummy(q.Db, q.Col+"Other", testRecord)
+	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count2 := res.Count
 
-	dataStore.InsertDummy(rpt.Def.Db, rpt.Def.Col, testRecord)
-	res, err = connector.IntegrityCheck(ctx, fid, rpt)
+	dataStore.InsertDummy(q.Db, q.Col, testRecord)
+	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count3 := res.Count
 

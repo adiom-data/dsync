@@ -156,29 +156,29 @@ func GetMongoFlavor(connectionString string) MongoFlavor {
 }
 
 // create a find query for a task
-func createFindFilter(task iface.ReadPlanTask) bson.D {
-	if task.Def.PartitionKey == "" {
+func createFindFilter(q iface.IntegrityCheckQuery) bson.D {
+	if q.PartitionKey == "" {
 		return bson.D{}
 	}
-	if task.Def.Low == nil && task.Def.High == nil { //no boundaries
+	if q.Low == nil && q.High == nil { //no boundaries
 		return bson.D{}
-	} else if task.Def.Low == nil && task.Def.High != nil { //only upper boundary
+	} else if q.Low == nil && q.High != nil { //only upper boundary
 		return bson.D{
-			{task.Def.PartitionKey, bson.D{
-				{"$lt", task.Def.High},
+			{q.PartitionKey, bson.D{
+				{"$lt", q.High},
 			}},
 		}
-	} else if task.Def.Low != nil && task.Def.High == nil { //only lower boundary
+	} else if q.Low != nil && q.High == nil { //only lower boundary
 		return bson.D{
-			{task.Def.PartitionKey, bson.D{
-				{"$gte", task.Def.Low},
+			{q.PartitionKey, bson.D{
+				{"$gte", q.Low},
 			}},
 		}
 	} else { //both boundaries
 		return bson.D{
-			{task.Def.PartitionKey, bson.D{
-				{"$gte", task.Def.Low},
-				{"$lt", task.Def.High},
+			{q.PartitionKey, bson.D{
+				{"$gte", q.Low},
+				{"$lt", q.High},
 			}},
 		}
 	}

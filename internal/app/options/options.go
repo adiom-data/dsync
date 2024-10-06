@@ -26,10 +26,11 @@ type Options struct {
 
 	NamespaceFrom []string
 
-	Verify   bool
-	Cleanup  bool
-	Progress bool
-	Reverse  bool
+	Verify           bool
+	VerifyQuickCount bool
+	Cleanup          bool
+	Progress         bool
+	Reverse          bool
 
 	CosmosDeletesEmu bool
 
@@ -73,6 +74,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Logfile = c.String("logfile")
 	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
 	o.Verify = c.Bool("verify")
+	o.VerifyQuickCount = c.Bool("verify-quick-count")
 	o.Cleanup = c.Bool("cleanup")
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")
