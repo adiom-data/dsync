@@ -543,11 +543,11 @@
           <div class="row-column md-row gap-24">
             <div class="col col-6 row-column gap-14">
               <h2 class="col-title">source:</h2>
-              <span class="col-value">{{ .SourceDescription }}</span>
+              <span class="col-value" id="source"></span>
             </div>
             <div class="col col-6 row-column gap-14">
               <h2 class="col-title">destination:</h2>
-              <span class="col-value">{{ .DestinationDescription }}</span>
+              <span class="col-value" id="destination"></span>
             </div>
           </div>
         </div>
@@ -568,22 +568,22 @@
                 </span>
                 <h2 class="col-title">state:</h2>
               </div>
-              <span class="col-value">{{ .SyncState }}</span>
+              <span class="col-value" id="sync-state"></span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">time elapsed:</h2>
-              <span class="col-value" id="elapsed-time">{{ .Elapsed }}</span>
+              <span class="col-value" id="elapsed-time"></span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">Namespaces Synced:</h2>
-              <span class="col-value">{{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</span>
+              <span class="col-value" id="namespaces-synced"></span>
             </div>
             <span class="separator"></span>
             <div class="col-max-content row-column gap-14 justify-between">
               <h2 class="col-title">Documents Synced:</h2>
-              <span class="col-value">{{ .NumDocsSynced }}</span>
+              <span class="col-value" id="docs-synced"></span>
             </div>
           </div>
         </div>
@@ -626,7 +626,7 @@
         <div class="container">
           <div class="progress-bar">
             <div class="progress">
-              <span class="progress-label-percent">{{ .TotalProgress }}%</span>
+              <span class="progress-label-percent" id="total-progress-percent">0%</span>
             </div>
           </div>
 
@@ -637,21 +637,19 @@
           <div class="progress-info row justify-between flex-wrap gap-9">
             <div class="row items-center gap-9">
               <h3 class="progress-title">Total % Complete:</h3>
-              <span class="progress-value progress-percent">{{ .TotalProgress }}%</span>
+              <span class="progress-value progress-percent" id="total-progress">0%</span>
             </div>
             <div class="row items-center gap-9">
               <h3 class="progress-title">Total Throughput:</h3>
-              <span class="progress-value progress-ops">{{ round .TotalThroughput }} ops/sec</span>
+              <span class="progress-value progress-ops" id="total-throughput">0 ops/sec</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="section-namespace mb-24">
+      <section class="section-namespace mb-24" id="namespace-table">
         <div class="container">
-
-          {{ if eq .SyncState "InitialSync" }}
-          <div class="row-column md-row gap-24">
+          <div class="row-column md-row gap-24" id="initial-sync">
             <div class="col col-8 row-column overflow-auto">
               <h2 class="table-title">per-namespace progress</h2>
               <div class="per-namespace-progress overflow-auto" role="table">
@@ -663,12 +661,13 @@
                   <div class="table-cell" role="columnheader">Docs</div>
                   <div class="table-cell" role="columnheader">Throughput</div>
                 </div>
+                <div id="namespace-rows"></div>
 
                 <!--- Please, insert your variables for namespace name and number of docs to data-name and data-docs attributes accordingly
                 in each row.
                     Then JS code will handle changes in data-attributes and update html markup with values.
                 -->
-                  {{ range $ns, $status := .NsProgressMap }}
+                  <!-- {{ range $ns, $status := .NsProgressMap }}
                   {{ $tasksTotalNS := len $status.Tasks }}
                   <div class="table-row row-data" role="row" data-name="{{ $ns }}" data-docs="{{ $status.DocsCopied }}">
                     <div class="table-cell name" role="cell"></div>
@@ -678,7 +677,8 @@
                     <div class="table-cell docs" role="cell"></div>
                     <div class="table-cell" role="cell">{{ round $status.Throughput }}</div>
                   </div>
-                  {{ end }}
+                  {{ end }} -->
+                  
               </div>
             </div>
             <div class="col-4 bg-transparent row justify-center items-center">
@@ -688,8 +688,7 @@
             </div>
           </div>
 
-          {{ else if eq .SyncState "ChangeStream" }}
-          <div class="row-column col bg-block">
+          <div class="row-column col bg-block" id="change-stream" style="display: none;">
             <h2 class="table-title">progress</h2>
             <div class="per-namespace-progress" role="table">
               <div class="table-row-3 table-header" role="row">
@@ -699,19 +698,20 @@
               </div>
 
               <div class="table-row-3" role="row">
-                <div class="table-cell" role="cell">{{ .ChangeStreamEvents }}</div>
-                <div class="table-cell" role="cell">{{ .DeletesCaught }}</div>
-                <div class="table-cell" role="cell">{{ .Lag }}</div>
+                <div class="table-cell" role="cell" id="change-stream-events">0</div>
+                <div class="table-cell" role="cell" id="deletes-caught">0</div>
+                <div class="table-cell" role="cell" id="events-to-catch-up">0</div>
               </div>
             </div>
           </div>
 
-          {{ else if eq .SyncState "Verify" }}
-          <h2>Verification Result</h2>
-          <p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
+          <div id = "verification" style="display: none;">
+            <h2>Verification Result</h2>
+            <p><strong>Verification Result:</strong> <span id="verification-result">N/A</span></p>
+          </div>
 
           </div>
-          {{ end }}
+          
       </section>
     </main>
 
@@ -731,256 +731,324 @@
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-      const eventSource = new EventSource("/progress");
-
-      eventSource.onmessage = function(event) {
-        // Parse the received JSON data
-        const data = JSON.parse(event.data);
-        document.getElementById("elapsed-time").textContent = data.Elapsed;
-        if (data.TotalProgress >= 100) {
-          eventSource.close();
-        }
-      }
-
-      // set interval for page to update changes every second
-      setInterval(() => {
-        const namespacesDocs = document.querySelectorAll('.row-data');
-
-        namespacesDocs.forEach(item => {
-          const name =  item.getAttribute('data-name');
-          const currentDocs = parseInt(item.getAttribute('data-docs'));
-          item.setAttribute('data-docs', currentDocs);
-          const existing = chartData.find(data => data.name === name);
-
-          if (!existing) {
-            chartData.push({
-              name: name,
-              docs: currentDocs
-            });
-          } 
+      document.addEventListener("DOMContentLoaded", function() {
+        const eventSource = new EventSource("/progress");
+        eventSource.onmessage = function(event) {
+          const data = JSON.parse(event.data);
+          document.getElementById("source").textContent = data.RunnerSyncProgress.SourceDescription;
+          document.getElementById("destination").textContent = data.RunnerSyncProgress.DestinationDescription;
+          document.getElementById("sync-state").textContent = data.RunnerSyncProgress.SyncState;
+          document.getElementById("elapsed-time").textContent = data.Elapsed;
+          document.getElementById("namespaces-synced").textContent = data.RunnerSyncProgress.NumNamespacesCompleted / data.RunnerSyncProgress.TotalNamespaces;
+          document.getElementById("docs-synced").textContent = data.RunnerSyncProgress.NumDocsSynced;
           
-        });
-      }, 1000);
+          // Update sync state sections
+          document.getElementById("initial-sync").style.display = data.SyncState === "InitialSync" ? "block" : "none";
+          document.getElementById("change-stream").style.display = data.SyncState === "ChangeStream" ? "block" : "none";
+          document.getElementById("verification").style.display = data.SyncState === "Verification" ? "block" : "none";
 
-      // table
-      const dataRows = document.querySelectorAll('.row-data');
-      dataRows.forEach(row => {
-        row.querySelector('.name').textContent = row.getAttribute('data-name');
-        row.querySelector('.docs').textContent = row.getAttribute('data-docs');
-      });
+          // Update progress bar and throughput
+          document.querySelector(".section-progress").setAttribute("data-progress", data.TotalProgress);
+          document.querySelector(".section-progress").setAttribute("data-throughput", Math.round(data.TotalThroughput));
+          document.getElementById("total-progress-percent").textContent = `${data.TotalProgress}%`;
+          document.getElementById("total-progress").textContent = `${data.TotalProgress}%`;
+          document.getElementById("total-throughput").textContent = `${Math.round(data.TotalThroughput)} ops/sec`;
+          
+          // Render the namespace progress table
+          if (data.RunnerSyncProgress.SyncState == "InitialSync") {
+            const namespaceRows = document.getElementById("namespace-rows");
+            namespaceRows.innerHTML = '';
+            for (const [namespace, status] of Object.entries(data.NsProgressMap)) {
+              const tasksTotalNS = status.Tasks.length;
+              const row = document.createElement("div");
+              row.className = "table-row row-data";
+              row.setAttribute("role", "row");
+              row.setAttribute("data-name", namespace);
+              row.setAttribute("data-docs", status.DocsCopied);
 
-      // pie chart
-      const chartData = [];
-      const colors = ['#2353FF', '#5989FF', '#4069FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
-      
-      const ctx = document.getElementById('myPieChart');
-      const myPieChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: chartData.map(item => item.name),
-          datasets: [
-            {
-              label: ' Docs',
-              data: chartData.map(item => item.docs),
-              backgroundColor: chartData.map((item, index) => colors[index]),
-              hoverBackgroundColor: colors.map(color => lightenColor(color, 10)),
-              borderWidth: 0,
-              borderColor: 'rgba(0,0,0,0)',
-              offset: 30,
-              hoverOffset: 40,
-              borderRadius: 2,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'bottom',
-              labels: {
-                font: {
-                  size: 15,
-                },
-                usePointStyle: true,
-                pointStyle: 'rectRounded',
-              },
-            },
-            tooltip: {
-              callbacks: {
-                label: function (tooltipItem) {
-                  const data = tooltipItem.chart.data.datasets[0].data;
-                  const total = data.reduce((acc, value) => acc + value, 0);
-                  const value = data[tooltipItem.dataIndex];
-                  const percentage = ((value / total) * 100).toFixed(1);
-                  const formattedValue = value.toLocaleString();
-                  return `Docs: ${formattedValue} (${percentage}%)`;
-                },
-              },
-            },
-          },
-        },
-      });
-
-      pieChartInit();
-      function pieChartInit() {
-        const observerForPieChart = new MutationObserver(mutationsList => {
-          for (const mutation of mutationsList) {
-            if (mutation.type === 'attributes') {
-              handleChange(mutation);
+              row.innerHTML = `
+                <div class="table-cell name" role="cell">${namespace}</div>
+                <div class="table-cell" role="cell">${calcPercentNS(status)}%</div>
+                <div class="table-cell" role="cell">${status.TasksCompleted} / ${tasksTotalNS}</div>
+                <div class="table-cell" role="cell">${status.TasksStarted}</div>
+                <div class="table-cell docs" role="cell">${status.DocsCopied}</div>
+                <div class="table-cell" role="cell">${Math.round(status.Throughput)}</div>
+              `;
+              namespaceRows.appendChild(row);
             }
           }
-        });
+        }
+      });
+      
 
-        const config = {
-          attributes: true,
-          attributeFilter: ['data-name', 'data-docs'],
-          subtree: true,
-        };
+      // eventSource.onmessage = function(event) {
+        // // Parse the received JSON data
+        // const data = JSON.parse(event.data);
+        // document.getElementById("sync-state").textContent = data.SyncState;
+        // 
+        // System.out.println(data.SyncState);
+        // if (data.SyncState === "ReadPlanning" || data.SyncState == "Setup") {
+        //   document.getElementById("namespaces-synced").textContent = 0 / 0;
+        //   document.getElementById("docs-synced").textContent = 0;
+        // } else {
+        //   document.getElementById("namespaces-synced").textContent = data.NumNamespacesCompleted / data.TotalNamespaces;
+        //   document.getElementById("docs-synced").textContent = data.NumDocsSynced;
+        // }
 
-        const namespacesTable = document.querySelector('.per-namespace-progress');
-        observerForPieChart.observe(namespacesTable, config);
-      }
+
+
+        // // Update change stream progress if in ChangeStream state
+        // if (data.SyncState === "ChangeStream") {
+        //   document.getElementById("change-stream-events").textContent = data.ChangeStreamEvents;
+        //   document.getElementById("deletes-caught").textContent = data.DeletesCaught;
+        //   document.getElementById("events-to-catch-up").textContent = data.Lag;
+        // }
+
+        // // Update verification result if in Verification state
+        // if (data.SyncState === "Verification") {
+        //   document.getElementById("verification-result").textContent = data.VerificationResult;
+        // }
+      // }
+
+      // Set interval for page to update changes every second
+      // setInterval(() => {
+      //   const namespacesDocs = document.querySelectorAll('.row-data');
+
+      //   namespacesDocs.forEach(item => {
+      //     const name =  item.getAttribute('data-name');
+      //     const currentDocs = parseInt(item.getAttribute('data-docs'));
+      //     item.setAttribute('data-docs', currentDocs);
+      //     const existing = chartData.find(data => data.name === name);
+
+      //     if (!existing) {
+      //       chartData.push({
+      //         name: name,
+      //         docs: currentDocs
+      //       });
+      //     } 
+          
+      //   });
+      // }, 1000);
+
+      // // table
+      // const dataRows = document.querySelectorAll('.row-data');
+      // dataRows.forEach(row => {
+      //   row.querySelector('.name').textContent = row.getAttribute('data-name');
+      //   row.querySelector('.docs').textContent = row.getAttribute('data-docs');
+      // });
+
+      // // pie chart
+      // const chartData = [];
+      // const colors = ['#2353FF', '#5989FF', '#4069FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
+      
+      // const ctx = document.getElementById('myPieChart');
+      // const myPieChart = new Chart(ctx, {
+      //   type: 'pie',
+      //   data: {
+      //     labels: chartData.map(item => item.name),
+      //     datasets: [
+      //       {
+      //         label: ' Docs',
+      //         data: chartData.map(item => item.docs),
+      //         backgroundColor: chartData.map((item, index) => colors[index]),
+      //         hoverBackgroundColor: colors.map(color => lightenColor(color, 10)),
+      //         borderWidth: 0,
+      //         borderColor: 'rgba(0,0,0,0)',
+      //         offset: 30,
+      //         hoverOffset: 40,
+      //         borderRadius: 2,
+      //       },
+      //     ],
+      //   },
+      //   options: {
+      //     responsive: true,
+      //     plugins: {
+      //       legend: {
+      //         display: true,
+      //         position: 'bottom',
+      //         labels: {
+      //           font: {
+      //             size: 15,
+      //           },
+      //           usePointStyle: true,
+      //           pointStyle: 'rectRounded',
+      //         },
+      //       },
+      //       tooltip: {
+      //         callbacks: {
+      //           label: function (tooltipItem) {
+      //             const data = tooltipItem.chart.data.datasets[0].data;
+      //             const total = data.reduce((acc, value) => acc + value, 0);
+      //             const value = data[tooltipItem.dataIndex];
+      //             const percentage = ((value / total) * 100).toFixed(1);
+      //             const formattedValue = value.toLocaleString();
+      //             return `Docs: ${formattedValue} (${percentage}%)`;
+      //           },
+      //         },
+      //       },
+      //     },
+      //   },
+      // });
+
+      // pieChartInit();
+      // function pieChartInit() {
+      //   const observerForPieChart = new MutationObserver(mutationsList => {
+      //     for (const mutation of mutationsList) {
+      //       if (mutation.type === 'attributes') {
+      //         handleChange(mutation);
+      //       }
+      //     }
+      //   });
+
+      //   const config = {
+      //     attributes: true,
+      //     attributeFilter: ['data-name', 'data-docs'],
+      //     subtree: true,
+      //   };
+
+      //   const namespacesTable = document.querySelector('.per-namespace-progress');
+      //   observerForPieChart.observe(namespacesTable, config);
+      // }
 
       // progress bar
-      initProgressBar();
-      function initProgressBar() {
-        const sectionProgress = document.querySelector('.section-progress');
-        const progress = document.querySelector('.progress');
-        const progressLabel = progress.firstElementChild;
+      // initProgressBar();
+      // function initProgressBar() {
+      //   const sectionProgress = document.querySelector('.section-progress');
+      //   const progress = document.querySelector('.progress');
+      //   const progressLabel = progress.firstElementChild;
 
-        progress.style.width = '0%';
-        progressLabel.style.opacity = '0';
-        progressLabel.style.visibility = 'hidden';
+      //   progress.style.width = '0%';
+      //   progressLabel.style.opacity = '0';
+      //   progressLabel.style.visibility = 'hidden';
 
-        const observer = new MutationObserver(mutationList => {
-          mutationList.forEach(mutation => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'data-progress') {
-              const newProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
-              updateProgress(newProgress);
-            } else if (mutation.type === 'attributes' && mutation.attributeName === 'data-throughput') {
-              const newThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
-              updateThroughput(newThroughput);
-            }
-          });
-        });
-        observer.observe(sectionProgress, { attributes: true, attributeFilter: ['data-progress', 'data-throughput'] });
-      }
+      //   const observer = new MutationObserver(mutationList => {
+      //     mutationList.forEach(mutation => {
+      //       if (mutation.type === 'attributes' && mutation.attributeName === 'data-progress') {
+      //         const newProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+      //         updateProgress(newProgress);
+      //       } else if (mutation.type === 'attributes' && mutation.attributeName === 'data-throughput') {
+      //         const newThroughput = parseInt(sectionProgress.getAttribute('data-throughput').replace(/\D/g, ''));
+      //         updateThroughput(newThroughput);
+      //       }
+      //     });
+      //   });
+      //   observer.observe(sectionProgress, { attributes: true, attributeFilter: ['data-progress', 'data-throughput'] });
+      // }
 
-      function updateProgress(newProgress) {
-        const progress = document.querySelector('.progress');
-        const progressLabel = progress.firstElementChild;
-        const progressPercent = document.querySelector('.progress-percent');
-        const sectionProgress = document.querySelector('.section-progress');
+      // function updateProgress(newProgress) {
+      //   const progress = document.querySelector('.progress');
+      //   const progressLabel = progress.firstElementChild;
+      //   const progressPercent = document.querySelector('.progress-percent');
+      //   const sectionProgress = document.querySelector('.section-progress');
 
-        if (newProgress <= 0) {
-          progress.style.width = '0%';
-          progressLabel.style.opacity = '0';
-          progressLabel.style.visibility = 'hidden';
-        } else {
-          progressLabel.style.opacity = '1';
-          progressLabel.style.visibility = 'visible';
-        }
+      //   if (newProgress <= 0) {
+      //     progress.style.width = '0%';
+      //     progressLabel.style.opacity = '0';
+      //     progressLabel.style.visibility = 'hidden';
+      //   } else {
+      //     progressLabel.style.opacity = '1';
+      //     progressLabel.style.visibility = 'visible';
+      //   }
 
-        if (newProgress > 100) return;
+      //   if (newProgress > 100) return;
 
-        progress.style.width = `${newProgress}%`;
-        progressLabel.textContent = `${newProgress}%`;
-        progressPercent.textContent = `${newProgress}%`;
-        sectionProgress.setAttribute('data-progress', currentProgress);
-      }
+      //   progress.style.width = `${newProgress}%`;
+      //   progressLabel.textContent = `${newProgress}%`;
+      //   progressPercent.textContent = `${newProgress}%`;
+      //   sectionProgress.setAttribute('data-progress', newProgress);
+      // }
 
-      setInterval(() => {
-        const sectionProgress = document.querySelector('.section-progress');
-        const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
-        if (currentProgress > 99) return;
+      // setInterval(() => {
+      //   const sectionProgress = document.querySelector('.section-progress');
+      //   const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+      //   if (currentProgress > 99) return;
 
-        sectionProgress.setAttribute('data-progress', currentProgress);
-      }, 100);
+      //   sectionProgress.setAttribute('data-progress', currentProgress);
+      // }, 100);
 
-      // theme and colors
-      function lightenColor(color, percent) {
-        const num = parseInt(color.replace('#', ''), 16),
-          amt = Math.round(2.55 * percent),
-          R = (num >> 16) + amt,
-          G = ((num >> 8) & 0x00ff) + amt,
-          B = (num & 0x0000ff) + amt;
+      // // theme and colors
+      // function lightenColor(color, percent) {
+      //   const num = parseInt(color.replace('#', ''), 16),
+      //     amt = Math.round(2.55 * percent),
+      //     R = (num >> 16) + amt,
+      //     G = ((num >> 8) & 0x00ff) + amt,
+      //     B = (num & 0x0000ff) + amt;
 
-        return `#${(
-          0x1000000 +
-          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-          (B < 255 ? (B < 1 ? 0 : B) : 255)
-        )
-          .toString(16)
-          .slice(1)}`;
-      }
+      //   return `#${(
+      //     0x1000000 +
+      //     (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+      //     (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+      //     (B < 255 ? (B < 1 ? 0 : B) : 255)
+      //   )
+      //     .toString(16)
+      //     .slice(1)}`;
+      // }
 
-      themeInit();
-      function themeInit() {
-        const getThemeFromLocalStorage = JSON.parse(window.localStorage.getItem('theme'));
+      // themeInit();
+      // function themeInit() {
+      //   const getThemeFromLocalStorage = JSON.parse(window.localStorage.getItem('theme'));
 
-        if (getThemeFromLocalStorage && getThemeFromLocalStorage === 'dark') {
-          document.body.classList.add('dark');
-          myPieChart.options.plugins.legend.labels.color = 'white';
-        } else {
-          window.localStorage.setItem('theme', JSON.stringify('light'));
-          myPieChart.options.plugins.legend.labels.color = 'black';
-        }
+      //   if (getThemeFromLocalStorage && getThemeFromLocalStorage === 'dark') {
+      //     document.body.classList.add('dark');
+      //     myPieChart.options.plugins.legend.labels.color = 'white';
+      //   } else {
+      //     window.localStorage.setItem('theme', JSON.stringify('light'));
+      //     myPieChart.options.plugins.legend.labels.color = 'black';
+      //   }
 
-        document.querySelector('.theme-toggler').addEventListener('click', themeToggler);
-        myPieChart.update();
-      }
+      //   document.querySelector('.theme-toggler').addEventListener('click', themeToggler);
+      //   myPieChart.update();
+      // }
 
-      function themeToggler() {
-        if (document.body.classList.contains('dark')) {
-          document.body.classList.remove('dark');
-          window.localStorage.setItem('theme', JSON.stringify('light'));
-          myPieChart.options.plugins.legend.labels.color = 'black';
-        } else {
-          document.body.classList.add('dark');
-          window.localStorage.setItem('theme', JSON.stringify('dark'));
-          myPieChart.options.plugins.legend.labels.color = 'white';
-        }
-        myPieChart.update();
-      }
+      // function themeToggler() {
+      //   if (document.body.classList.contains('dark')) {
+      //     document.body.classList.remove('dark');
+      //     window.localStorage.setItem('theme', JSON.stringify('light'));
+      //     myPieChart.options.plugins.legend.labels.color = 'black';
+      //   } else {
+      //     document.body.classList.add('dark');
+      //     window.localStorage.setItem('theme', JSON.stringify('dark'));
+      //     myPieChart.options.plugins.legend.labels.color = 'white';
+      //   }
+      //   myPieChart.update();
+      // }
 
-      const handleChange = mutation => {
-        if (mutation.type === 'attributes') {
-          const currentChange = {
-            name: mutation.target.getAttribute('data-name'),
-            docs: parseInt(mutation.target.getAttribute(mutation.attributeName)),
-          };
+      // const handleChange = mutation => {
+      //   if (mutation.type === 'attributes') {
+      //     const currentChange = {
+      //       name: mutation.target.getAttribute('data-name'),
+      //       docs: parseInt(mutation.target.getAttribute(mutation.attributeName)),
+      //     };
 
-          const index = chartData.findIndex(item => item.name === currentChange.name);
+      //     const index = chartData.findIndex(item => item.name === currentChange.name);
 
-          if (index !== -1) {
-            chartData[index] = currentChange;
-          } else {
-            chartData.push(currentChange);
-          }
+      //     if (index !== -1) {
+      //       chartData[index] = currentChange;
+      //     } else {
+      //       chartData.push(currentChange);
+      //     }
 
-          myPieChart.data.labels = chartData.map(item => item.name);
-          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
-          myPieChart.data.datasets[0].backgroundColor = colors;
-          myPieChart.update();
+      //     myPieChart.data.labels = chartData.map(item => item.name);
+      //     myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
+      //     myPieChart.data.datasets[0].backgroundColor = colors;
+      //     myPieChart.update();
 
-          mutation.target.querySelector('.docs').textContent = mutation.target.getAttribute('data-docs');
-        }
-      };
+      //     mutation.target.querySelector('.docs').textContent = mutation.target.getAttribute('data-docs');
+      //   }
+      // };
 
-      function updateThroughput(newThroughput) {
-        const sectionProgress = document.querySelector('.section-progress');
-        const progressOps = document.querySelector('.progress-ops');
+      // function updateThroughput(newThroughput) {
+      //   const sectionProgress = document.querySelector('.section-progress');
+      //   const progressOps = document.querySelector('.progress-ops');
 
-        const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
+      //   const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
 
-        if (currentProgress !== 0 && currentProgress !== 100) {
-          progressOps.textContent = `${newThroughput} Ops/Sec`;
-        } else {
-          progressOps.textContent = `0 Ops/Sec`;
-        }
-      }
+      //   if (currentProgress !== 0 && currentProgress !== 100) {
+      //     progressOps.textContent = `${newThroughput} Ops/Sec`;
+      //   } else {
+      //     progressOps.textContent = `0 Ops/Sec`;
+      //   }
+      // }
 
       // setInterval(function() {
       //   console.log('Attempting to reload the page...');
