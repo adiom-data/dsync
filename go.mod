@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tryvium-travels/memongo v0.12.0
 	github.com/urfave/cli/v2 v2.27.4
-	go.mongodb.org/mongo-driver v1.17.0
+	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 )
 
