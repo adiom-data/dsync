@@ -148,6 +148,10 @@
         max-width: max-content;
       }
 
+      .col-4 {
+        flex: 1 1 30%;
+      }
+
       .col-6 {
         flex: 1 1 50%;
       }
@@ -434,6 +438,12 @@
         margin-bottom: 5.25rem;
       }
 
+      .pie-wrapper {
+        width: 100%;
+        max-width: 18.75rem;
+        height: 18.75rem;
+      }
+
       .errors-title {
         font-weight: 700;
         font-size: 1.5rem;
@@ -442,7 +452,7 @@
       }
 
       @media screen and (min-width: 768px) {
-        .erros-title {
+        .errors-title {
           font-size: 2.25rem;
         }
       }
@@ -661,24 +671,7 @@
                   <div class="table-cell" role="columnheader">Docs</div>
                   <div class="table-cell" role="columnheader">Throughput</div>
                 </div>
-                <div id="namespace-rows"></div>
-
-                <!--- Please, insert your variables for namespace name and number of docs to data-name and data-docs attributes accordingly
-                in each row.
-                    Then JS code will handle changes in data-attributes and update html markup with values.
-                -->
-                  <!-- {{ range $ns, $status := .NsProgressMap }}
-                  {{ $tasksTotalNS := len $status.Tasks }}
-                  <div class="table-row row-data" role="row" data-name="{{ $ns }}" data-docs="{{ $status.DocsCopied }}">
-                    <div class="table-cell name" role="cell"></div>
-                    <div class="table-cell" role="cell">{{ calcPercentNS $status }}%</div>
-                    <div class="table-cell" role="cell">{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</div>
-                    <div class="table-cell" role="cell">{{ $status.TasksStarted }}</div>
-                    <div class="table-cell docs" role="cell"></div>
-                    <div class="table-cell" role="cell">{{ round $status.Throughput }}</div>
-                  </div>
-                  {{ end }} -->
-                  
+                <div id="namespace-rows"></div>        
               </div>
             </div>
             <div class="col-4 bg-transparent row justify-center items-center">
@@ -783,9 +776,12 @@
         });
 
         function pieChartUpdate(chartData) {
-          myPieChart.data.labels = chartData.map(item => item.name);
-          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
-          myPieChart.update();
+          setInterval(() => {
+            myPieChart.data.labels = chartData.map(item => item.name);
+            myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
+            myPieChart.data.datasets[0].backgroundColor = colors;
+            myPieChart.update();
+          }, 3000);
         }
         
         const eventSource = new EventSource("/progress");
@@ -809,7 +805,7 @@
           
           // Render the namespace progress table
           if (data.RunnerSyncProgress.SyncState == "InitialSync") {
-            document.getElementById("initial-sync").style.display = "block";
+            document.getElementById("initial-sync").style.display = "flex";
             const namespaceRows = document.getElementById("namespace-rows");
             namespaceRows.innerHTML = '';
 
@@ -953,26 +949,7 @@
       //   }
       //   myPieChart.update();
       // }
-      
 
-
-      // function updateThroughput(newThroughput) {
-      //   const sectionProgress = document.querySelector('.section-progress');
-      //   const progressOps = document.querySelector('.progress-ops');
-
-      //   const currentProgress = parseInt(sectionProgress.getAttribute('data-progress').replace(/\D/g, ''));
-
-      //   if (currentProgress !== 0 && currentProgress !== 100) {
-      //     progressOps.textContent = `${newThroughput} Ops/Sec`;
-      //   } else {
-      //     progressOps.textContent = `0 Ops/Sec`;
-      //   }
-      // }
-
-      // setInterval(function() {
-      //   console.log('Attempting to reload the page...');
-      //   window.location.reload();
-      // }, 1000);
 		  
       // WARNING!
       // Code below is not for production! There is simulation of data changing
