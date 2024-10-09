@@ -451,12 +451,6 @@
         text-transform: capitalize;
       }
 
-      @media screen and (min-width: 768px) {
-        .errors-title {
-          font-size: 2.25rem;
-        }
-      }
-
       .errors {
         height: 350px;
         overflow: auto;
@@ -630,7 +624,7 @@
         </g>
       </svg>
 
-      <section class="section-progress mb-48" data-progress="{{ .TotalProgress }}" data-throughput="{{ round .TotalThroughput }}">
+      <section class="section-progress mb-48" data-progress="0" data-throughput="0">
         <!--- Please, insert your variables for progress and throughput/sec to data-progress and data-throughput attributes accordingly.
         Then JS code will handle changes in data-attributes and update html markup with values.-->
         <div class="container">
@@ -659,7 +653,7 @@
 
       <section class="section-namespace mb-24">
         <div class="container">
-          <div class="row-column md-row gap-24" id="initial-sync" style="display: none;">
+          <div class="initial-sync row-column md-row gap-24">
             <div class="col col-8 row-column overflow-auto">
               <h2 class="table-title">per-namespace progress</h2>
               <div class="per-namespace-progress overflow-auto" role="table">
@@ -681,7 +675,7 @@
             </div>
           </div>
 
-          <div class="row-column col bg-block" id="change-stream" style="display: none;">
+          <div class="change-stream row-column col bg-block">
             <h2 class="table-title">progress</h2>
             <div class="per-namespace-progress" role="table">
               <div class="table-row-3 table-header" role="row">
@@ -698,7 +692,7 @@
             </div>
           </div>
 
-          <div id = "verification" style="display: none;">
+          <div class="verification">
             <h2>Verification Result</h2>
             <p><strong>Verification Result:</strong> <span id="verification-result"></span></p>
           </div>
@@ -723,7 +717,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", function() {
-        
         const chartData = [];
         const colors = ['#2353FF', '#5989FF', '#4069FF', '#7099FF', '#8EB3FF', '#BCD0FF', '#D9E4FF'];
         const ctx = document.getElementById('myPieChart');
@@ -783,29 +776,113 @@
             myPieChart.update();
           }, 3000);
         }
+
+        // theme and colors
+        function lightenColor(color, percent) {
+          const num = parseInt(color.replace('#', ''), 16),
+            amt = Math.round(2.55 * percent),
+            R = (num >> 16) + amt,
+            G = ((num >> 8) & 0x00ff) + amt,
+            B = (num & 0x0000ff) + amt;
+
+          return `#${(
+            0x1000000 +
+            (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+            (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+            (B < 255 ? (B < 1 ? 0 : B) : 255)
+          )
+            .toString(16)
+            .slice(1)}`;
+        }
+
+        themeInit();
+        function themeInit() {
+          const getThemeFromLocalStorage = JSON.parse(window.localStorage.getItem('theme'));
+          if (getThemeFromLocalStorage && getThemeFromLocalStorage === 'dark') {
+            document.body.classList.add('dark');
+            myPieChart.options.plugins.legend.labels.color = 'white';
+          } else {
+            window.localStorage.setItem('theme', JSON.stringify('light'));
+            myPieChart.options.plugins.legend.labels.color = 'black';
+          }
+          document.querySelector('.theme-toggler').addEventListener('click', themeToggler);
+          myPieChart.update();
+        }
+
+        function themeToggler() {
+          if (document.body.classList.contains('dark')) {
+            document.body.classList.remove('dark');
+            window.localStorage.setItem('theme', JSON.stringify('light'));
+            myPieChart.options.plugins.legend.labels.color = 'black';
+          } else {
+            document.body.classList.add('dark');
+            window.localStorage.setItem('theme', JSON.stringify('dark'));
+            myPieChart.options.plugins.legend.labels.color = 'white';
+          }
+          myPieChart.update();
+        }
+
+        function updateComponents(status) {
+          const initialSync = document.querySelector(".initial-sync");
+          const changeStream = document.querySelector(".change-stream");
+          const verification = document.querySelector(".verification");
+          const sectionProgress = document.querySelector(".section-progress");
+          const spinner = document.querySelector(".spinner");
+          const progressBar = document.querySelector(".progress-bar");
+          const indeterminateBar = document.querySelector(".indeterminate-bar");
+          
+          initialSync.style.display = "none";
+          changeStream.style.display = "none";
+          verification.style.display = "none";
+          sectionProgress.style.display = "none";
+          spinner.style.display = "none";
+          progressBar.style.display = "none";
+          indeterminateBar.style.display = "none";
+
+          switch (status) {
+            case "InitialSync":
+              initialSync.style.display = "flex";
+              sectionProgress.style = "flex";
+              progressBar.style.display = "block";
+              break;
+            case "ChangeStream":
+              changeStream.style.display = "block";
+              sectionProgress.style = "flex";
+              indeterminateBar.style.display = "block";
+              break;
+            case "Verify":
+              verification.style.display = "block";
+              spinner.style.display = "block";
+            case "ReadPlanning" || "Setup":
+              spinner.style.display = "block";
+              break;
+          }
+        }
         
         const eventSource = new EventSource("/progress");
         eventSource.onmessage = function(event) {
           const data = JSON.parse(event.data);
+          const SyncState = data.RunnerSyncProgress.SyncState;
+          updateComponents(SyncState);
           document.getElementById("source").textContent = data.RunnerSyncProgress.SourceDescription;
           document.getElementById("destination").textContent = data.RunnerSyncProgress.DestinationDescription;
-          document.getElementById("sync-state").textContent = data.RunnerSyncProgress.SyncState;
+          document.getElementById("sync-state").textContent = SyncState;
           document.getElementById("elapsed-time").textContent = data.Elapsed;
           document.getElementById("namespaces-synced").textContent = `${data.RunnerSyncProgress.NumNamespacesCompleted} / ${data.RunnerSyncProgress.TotalNamespaces}`;
           document.getElementById("docs-synced").textContent = data.RunnerSyncProgress.NumDocsSynced;
-
-          document.getElementById("error-log").textContent = data.ErrorLogString;
+          const errorString = data.ErrorLogString.replace(/\n/g, '<br>');
+          document.getElementById("error-log").textContent = errorString;
 
           // Update progress bar and throughput
           document.querySelector(".section-progress").setAttribute("data-progress", data.TotalProgress);
           document.querySelector(".section-progress").setAttribute("data-throughput", Math.round(data.TotalThroughput));
           document.getElementById("total-progress-percent").textContent = `${data.TotalProgress}%`;
           document.getElementById("total-progress").textContent = `${data.TotalProgress}%`;
+          document.querySelector('.progress').style.width = `${data.TotalProgress}%`;
           document.getElementById("total-throughput").textContent = `${Math.round(data.TotalThroughput)} ops/sec`;
-          
+
           // Render the namespace progress table
-          if (data.RunnerSyncProgress.SyncState == "InitialSync") {
-            document.getElementById("initial-sync").style.display = "flex";
+          if (SyncState == "InitialSync") {
             const namespaceRows = document.getElementById("namespace-rows");
             namespaceRows.innerHTML = '';
 
@@ -838,16 +915,14 @@
           }
 
           // Render the change stream progress table
-          if (data.SyncState === "ChangeStream") {
-            document.getElementById("change-stream").style.display = "block"; 
-            document.getElementById("change-stream-events").textContent = data.ChangeStreamEvents;
-            document.getElementById("deletes-caught").textContent = data.DeletesCaught;
-            document.getElementById("events-to-catch-up").textContent = data.EventsToCatchUp;
+          if (SyncState === "ChangeStream") {
+            document.getElementById("change-stream-events").textContent = data.RunnerSyncProgress.ChangeStreamEvents;
+            document.getElementById("deletes-caught").textContent = data.RunnerSyncProgress.DeletesCaught;
+            document.getElementById("events-to-catch-up").textContent = data.RunnerSyncProgress.Lag;
           }
 
           // Render verification result
-          if (data.SyncState === "Verify") {
-            document.getElementById("verification").style.display = "block";
+          if (SyncState === "Verify") {
             document.getElementById("verification-result").textContent = data.VerificationResult;
           }
         }
@@ -903,54 +978,6 @@
           return Math.min(100, percentComplete);
       }
 
-      // theme and colors
-      function lightenColor(color, percent) {
-        const num = parseInt(color.replace('#', ''), 16),
-          amt = Math.round(2.55 * percent),
-          R = (num >> 16) + amt,
-          G = ((num >> 8) & 0x00ff) + amt,
-          B = (num & 0x0000ff) + amt;
-
-        return `#${(
-          0x1000000 +
-          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-          (B < 255 ? (B < 1 ? 0 : B) : 255)
-        )
-          .toString(16)
-          .slice(1)}`;
-      }
-
-      // themeInit();
-      // function themeInit() {
-      //   const getThemeFromLocalStorage = JSON.parse(window.localStorage.getItem('theme'));
-
-      //   if (getThemeFromLocalStorage && getThemeFromLocalStorage === 'dark') {
-      //     document.body.classList.add('dark');
-      //     myPieChart.options.plugins.legend.labels.color = 'white';
-      //   } else {
-      //     window.localStorage.setItem('theme', JSON.stringify('light'));
-      //     myPieChart.options.plugins.legend.labels.color = 'black';
-      //   }
-
-      //   document.querySelector('.theme-toggler').addEventListener('click', themeToggler);
-      //   myPieChart.update();
-      // }
-
-      // function themeToggler() {
-      //   if (document.body.classList.contains('dark')) {
-      //     document.body.classList.remove('dark');
-      //     window.localStorage.setItem('theme', JSON.stringify('light'));
-      //     myPieChart.options.plugins.legend.labels.color = 'black';
-      //   } else {
-      //     document.body.classList.add('dark');
-      //     window.localStorage.setItem('theme', JSON.stringify('dark'));
-      //     myPieChart.options.plugins.legend.labels.color = 'white';
-      //   }
-      //   myPieChart.update();
-      // }
-
-		  
       // WARNING!
       // Code below is not for production! There is simulation of data changing
       // Just to see how should works pie chart, table "Per-Namespace Progress" and progress bar for development mode
