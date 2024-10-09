@@ -238,7 +238,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		numParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 	} else if settings.LoadLevel != "" {
 		btc := getBaseThreadCount(settings.LoadLevel)
-		numParallelIntegrityCheckTasks = btc / 2
+		numParallelIntegrityCheckTasks = btc // default to the base thread count to be consistent with the number of parallel copiers
 	}
 	r.coord = coordinatorSimple.NewSimpleCoordinator(numParallelIntegrityCheckTasks)
 	r.trans = transportLocal.NewTransportLocal(r.coord)

@@ -248,7 +248,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Hidden:   true,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "parallel-integrity-check",
+			Name:     "parallel-integrity-check-workers",
 			Required: false,
 			Hidden:   true,
 		}),
