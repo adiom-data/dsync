@@ -399,6 +399,12 @@
         font-size: 1.5rem;
       }
 
+      @media screen and (min-width: 768px) {
+        .table-title {
+          font-size: 2.25rem;
+        }
+      }
+
       .table-header .table-cell {
         font-weight: 700;
         font-size: 1rem;
@@ -449,6 +455,12 @@
         font-size: 1.5rem;
         line-height: 1.2;
         text-transform: capitalize;
+      }
+
+      @media screen and (min-width: 768px) {
+        .errors-title {
+          font-size: 2.25rem;
+        }
       }
 
       .errors {
@@ -692,12 +704,11 @@
             </div>
           </div>
 
-          <div class="verification">
-            <h2>Verification Result</h2>
-            <p><strong>Verification Result:</strong> <span id="verification-result"></span></p>
+          <div class="verification row-column col bg-block" role="table">
+            <h2 class="table-title">Verification Result</h2>
+            <span id="verification-result" role="row"></span>
           </div>
-
-          </div>
+        </div>
           
       </section>
     </main>
@@ -769,12 +780,10 @@
         });
 
         function pieChartUpdate(chartData) {
-          setInterval(() => {
-            myPieChart.data.labels = chartData.map(item => item.name);
-            myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
-            myPieChart.data.datasets[0].backgroundColor = colors;
-            myPieChart.update();
-          }, 3000);
+          myPieChart.data.labels = chartData.map(item => item.name);
+          myPieChart.data.datasets[0].data = chartData.map(item => item.docs);
+          myPieChart.data.datasets[0].backgroundColor = colors;
+          myPieChart.update();
         }
 
         // theme and colors
@@ -858,7 +867,14 @@
               break;
           }
         }
+
+        setInterval(() => {
+          if (latestChartData.length != 0) {
+            pieChartUpdate(latestChartData);
+          }
+        }, 3000);
         
+        let latestChartData = [];
         const eventSource = new EventSource("/progress");
         eventSource.onmessage = function(event) {
           const data = JSON.parse(event.data);
@@ -871,7 +887,7 @@
           document.getElementById("namespaces-synced").textContent = `${data.RunnerSyncProgress.NumNamespacesCompleted} / ${data.RunnerSyncProgress.TotalNamespaces}`;
           document.getElementById("docs-synced").textContent = data.RunnerSyncProgress.NumDocsSynced;
           const errorString = data.ErrorLogString.replace(/\n/g, '<br>');
-          document.getElementById("error-log").textContent = errorString;
+          document.getElementById("error-log").innerHTML = errorString;
 
           // Update progress bar and throughput
           document.querySelector(".section-progress").setAttribute("data-progress", data.TotalProgress);
@@ -910,8 +926,8 @@
                 name: namespace,
                 docs: status.DocsCopied
               });
+              latestChartData = chartData;
             }
-            pieChartUpdate(chartData);
           }
 
           // Render the change stream progress table
@@ -923,7 +939,7 @@
 
           // Render verification result
           if (SyncState === "Verify") {
-            document.getElementById("verification-result").textContent = data.VerificationResult;
+            document.getElementById("verification-result").textContent = data.RunnerSyncProgress.VerificationResult;
           }
         }
       });
@@ -931,23 +947,17 @@
       // Calculates the percent complete for the given namespace, returns (percentComplete, numerator, denominator)
       function calcPercentNS(nsStatus) {
         let percentComplete;
-        let numerator, denominator;
         if (nsStatus.Tasks.length == 1) {
           //no partitioning
           const docCount = nsStatus.EstimatedDocCount
           if (docCount == 0) {
             percentComplete = 100
-            numerator = 1
-            denominator = 1
           } else {
             percentComplete = (nsStatus.DocsCopied / docCount) * 100
-            numerator = nsStatus.DocsCopied
-            denominator = docCount
           }
         } else {
           //partitioning
           const numDocsCopied = nsStatus.EstimatedDocsCopied;
-
           // iterate over the tasks and calculate the necessary totals
           let numCompletedDocs = 0;
           let numInProgressDocsMax = 0;
@@ -961,7 +971,6 @@
               numInProgressDocsMax += task.EstimatedDocCount;
             }
           }
-
           let numDocsInProgress = numDocsCopied - numCompletedDocs;
           const numDocsLeft = numDocsTotal - numCompletedDocs;
 
@@ -972,8 +981,9 @@
             numDocsInProgress = numInProgressDocsMax;
           }
             percentComplete = ((numCompletedDocs + numDocsInProgress) / (numCompletedDocs + numDocsLeft)) * 100;
-            numerator = numCompletedDocs + numDocsInProgress;
-            denominator = numCompletedDocs + numDocsLeft;
+          }
+          if (nsStatus.DocsCopied === nsStatus.EstimatedDocCount) {
+            percentComplete = 100;
           }
           return Math.min(100, percentComplete);
       }
