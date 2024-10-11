@@ -125,6 +125,8 @@ func runDsync(c *cli.Context) error {
 		CosmosDeletesCheckInterval:        o.CosmosDeletesCheckInterval,
 		SyncMode:                          o.Mode,
 		ReverseRequestedFlag:              o.Reverse,
+		XSource:                           o.XSource,
+		XDestination:                      o.XDestination,
 	})
 
 	var wg sync.WaitGroup

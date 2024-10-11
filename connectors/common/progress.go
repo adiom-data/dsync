@@ -107,12 +107,12 @@ func (pt *ProgressTracker) TaskStartedProgressUpdate(ns iface.Namespace, taskId 
 }
 
 // Updates the progress metrics once a task has been started
-func (pt *ProgressTracker) TaskInProgressUpdate(ns iface.Namespace) {
+func (pt *ProgressTracker) TaskInProgressUpdate(ns iface.Namespace, inc int64) {
 	nsStatus := pt.Status.ProgressMetrics.NamespaceProgress[ns]
 	pt.muProgressMetrics.Lock()
-	nsStatus.DocsCopied++
-	nsStatus.EstimatedDocsCopied++
-	pt.Status.ProgressMetrics.NumDocsSynced++
+	nsStatus.DocsCopied += inc
+	nsStatus.EstimatedDocsCopied += inc
+	pt.Status.ProgressMetrics.NumDocsSynced += inc
 	pt.muProgressMetrics.Unlock()
 }
 
@@ -155,5 +155,4 @@ func (pt *ProgressTracker) UpdateChangeStreamProgressTracking() {
 	pt.muProgressMetrics.Lock()
 	defer pt.muProgressMetrics.Unlock()
 	pt.Status.ProgressMetrics.ChangeStreamEvents++
-	return
 }

@@ -92,7 +92,8 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 					Db:  task.Def.Db,
 					Col: task.Def.Col,
 				},
-				Cursor: mongoconn.EncodeCursor(low, high),
+				Cursor:         mongoconn.EncodeCursor(low, high),
+				EstimatedCount: uint64(task.EstimatedDocCount),
 			})
 		}
 	} else {

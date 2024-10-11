@@ -52,6 +52,8 @@ type Options struct {
 	CosmosTargetDocCountPerPartition  int64
 	CosmosDeletesCheckInterval        time.Duration
 	Mode                              string
+	XSource                           bool
+	XDestination                      bool
 }
 
 // works with a copy of the struct to avoid modifying the original
@@ -95,6 +97,8 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.CosmosDeletesCheckInterval = time.Duration(c.Int("cosmos-delete-interval")) * time.Second
 	o.Mode = c.String("mode")
 	o.Reverse = c.Bool("reverse")
+	o.XSource = c.Bool("xs")
+	o.XDestination = c.Bool("xd")
 
 	// Infer source type if not provided
 	if o.Sourcetype == "" && o.SrcConnString != "/dev/random" {

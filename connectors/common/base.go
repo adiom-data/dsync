@@ -24,6 +24,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.akshayshah.org/memhttp"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const progressReportingIntervalSec = 10
@@ -39,8 +40,15 @@ type ConnectorSettings struct {
 	ResumeTokenUpdateInterval time.Duration
 }
 
+type maybeOptimizedConnectorService interface {
+	ListData(context.Context, *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error)
+	WriteData(context.Context, *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error)
+	WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error)
+}
+
 type connector struct {
-	impl adiomv1connect.ConnectorServiceClient
+	impl               adiomv1connect.ConnectorServiceClient
+	maybeOptimizedImpl maybeOptimizedConnectorService
 
 	desc string
 
@@ -85,10 +93,10 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 	var pCursor []byte
 	if task.Low != nil {
-		pCursor = task.Low.([]byte)
+		pCursor = task.Low.(primitive.Binary).Data
 	}
 	for {
-		res, err := c.impl.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+		res, err := c.maybeOptimizedImpl.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 			Partition: &adiomv1.Partition{
 				Namespace: &adiomv1.Namespace{
 					Db:  task.Db,
@@ -170,7 +178,8 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 				}
 				task.Def.Db = partition.GetNamespace().GetDb()
 				task.Def.Col = partition.GetNamespace().GetCol()
-				task.Def.Low = partition.GetCursor()
+				task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
+				task.EstimatedDocCount = int64(partition.GetEstimatedCount())
 				tasks = append(tasks, task)
 			}
 		}
@@ -401,6 +410,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		for i := 0; i < c.settings.NumParallelCopiers; i++ {
 			go func() {
 				defer wg.Done()
+			Loop:
 				for task := range taskChannel {
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
 					var docs int64
@@ -408,17 +418,19 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					c.progressTracker.TaskStartedProgressUpdate(ns, task.Id)
 
 					var cursor []byte
-					if task.Def.Low != nil {
-						cursor = task.Def.Low.([]byte)
-					}
 
+					var pCursor []byte
+					if task.Def.Low != nil {
+						pCursor = task.Def.Low.(primitive.Binary).Data
+					}
 					for {
-						res, err := c.impl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
+						res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
 							Partition: &adiomv1.Partition{
 								Namespace: &adiomv1.Namespace{
 									Db:  task.Def.Db,
 									Col: task.Def.Col,
 								},
+								Cursor: pCursor,
 							},
 							Cursor: cursor,
 						}))
@@ -426,11 +438,11 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							if !errors.Is(err, context.Canceled) {
 								slog.Error(fmt.Sprintf("Error listing data: %v", err))
 							}
-							break
+							continue Loop
 						}
 
 						readerProgress.initialSyncDocs.Add(uint64(len(res.Msg.Data)))
-						c.progressTracker.TaskInProgressUpdate(ns)
+						c.progressTracker.TaskInProgressUpdate(ns, int64(len(res.Msg.Data)))
 						docs += int64(len(res.Msg.Data))
 
 						dataMessage := iface.DataMessage{
@@ -448,7 +460,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						}
 						if bytes.Equal(cursor, nextCursor) {
 							slog.Error("Cursor and next cursor are non empty and the same")
-							break
+							continue Loop
 						}
 						cursor = nextCursor
 					}
@@ -717,7 +729,7 @@ func NewLocalConnector(desc string, impl adiomv1connect.ConnectorServiceHandler,
 	}
 	client := adiomv1connect.NewConnectorServiceClient(srv.Client(), srv.URL())
 	return &localConnector{
-		NewConnector(desc, client, settings),
+		NewConnector(desc, client, impl, settings),
 		impl,
 		srv,
 	}
@@ -729,26 +741,32 @@ func setDefault[T comparable](field *T, defaultValue T) {
 	}
 }
 
-func NewConnector(desc string, impl adiomv1connect.ConnectorServiceClient, settings ConnectorSettings) *connector {
+func NewConnector(desc string, impl adiomv1connect.ConnectorServiceClient, underlying maybeOptimizedConnectorService, settings ConnectorSettings) *connector {
 	setDefault(&settings.NumParallelCopiers, 4)
 	setDefault(&settings.NumParallelWriters, 4)
 	setDefault(&settings.ResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.MaxWriterBatchSize, 0)
+
+	maybeOptimizedConnectorService := underlying
+	if maybeOptimizedConnectorService == nil {
+		underlying = impl
+	}
 	return &connector{
-		desc:     desc,
-		impl:     impl,
-		settings: settings,
+		desc:               desc,
+		impl:               impl,
+		maybeOptimizedImpl: maybeOptimizedConnectorService,
+		settings:           settings,
 	}
 }
 
 // ProcesDataMessages assumes all have the same namespace
 func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 	var msgs []*adiomv1.Update
-	for _, dataMsg := range dataMsgs {
+	for i, dataMsg := range dataMsgs {
 		switch dataMsg.MutationType {
 		case iface.MutationType_InsertBatch:
 			if len(msgs) > 0 {
-				_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 					Namespace: &adiomv1.Namespace{Db: dataMsg.Loc.Database, Col: dataMsg.Loc.Collection},
 					Updates:   msgs,
 					Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
@@ -756,10 +774,10 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				if err != nil {
 					return err
 				}
-				// TODO: add a WriteLSN here also, but the one before current dataMsg
+				c.status.WriteLSN = max(c.status.WriteLSN, dataMsgs[i-1].SeqNum)
 				msgs = nil
 			}
-			_, err := c.impl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
+			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
 				Namespace: &adiomv1.Namespace{Db: dataMsg.Loc.Database, Col: dataMsg.Loc.Collection},
 				Data:      dataMsg.DataBatch,
 				Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO

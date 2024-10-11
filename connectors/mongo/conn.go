@@ -1,12 +1,16 @@
 package mongo
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -24,7 +28,14 @@ import (
 type conn struct {
 	client *mongo.Client
 
-	maxBatchSize int
+	writerMaxBatchSize int
+	readerMaxBatchSize int
+
+	nextCursorID atomic.Int64
+	ctx          context.Context
+	cancel       context.CancelFunc
+	buffersMutex sync.RWMutex
+	buffers      map[int64]<-chan []byte
 }
 
 // get all database names except system databases
@@ -184,12 +195,7 @@ func DecodeCursor(cursor []byte) (bson.RawValue, bson.RawValue) {
 	return low, high
 }
 
-func createFindFilterFromListDataRequest(r *adiomv1.ListDataRequest) bson.D {
-	cursor := r.GetCursor()
-	if cursor == nil {
-		cursor = r.GetPartition().GetCursor()
-	}
-
+func createFindFilterFromCursor(cursor []byte) bson.D {
 	low, high := DecodeCursor(cursor)
 
 	if low.IsZero() && high.IsZero() { //no boundaries
@@ -220,44 +226,89 @@ func createFindFilterFromListDataRequest(r *adiomv1.ListDataRequest) bson.D {
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	partition := r.Msg.GetPartition()
 	collection := c.client.Database(partition.GetNamespace().GetDb()).Collection(partition.GetNamespace().GetCol())
-	filter := createFindFilterFromListDataRequest(r.Msg)
-	cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
-	if err != nil {
-		if !errors.Is(err, context.Canceled) {
-			slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+
+	var cursorID, ctr int64
+
+	pageCursor := r.Msg.GetCursor()
+	if pageCursor == nil {
+		cursorID = c.nextCursorID.Add(1)
+		ch := make(chan []byte, 1000)
+		c.buffersMutex.Lock()
+		c.buffers[cursorID] = ch
+		c.buffersMutex.Unlock()
+
+		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
+		cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+			}
+			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+
+		go func(ctx context.Context) {
+			defer cursor.Close(ctx)
+			defer close(ch)
+			for cursor.Next(ctx) {
+				select {
+				case ch <- cursor.Current:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if cursor.Err() != nil {
+				if !errors.Is(cursor.Err(), context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+				}
+			}
+		}(c.ctx) // This context may outlive the current request
+	} else {
+		var err error
+		br := bytes.NewReader(r.Msg.GetCursor())
+		cursorID, err = binary.ReadVarint(br)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor: %w", err))
+		}
+		ctr, err = binary.ReadVarint(br)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor: %w", err))
+		}
 	}
-	defer cursor.Close(ctx)
+	c.buffersMutex.RLock()
+	ch, ok := c.buffers[cursorID]
+	c.buffersMutex.RUnlock()
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
+	}
+
 	var dataBatch [][]byte
-	low := bson.RawValue{}
+	for {
+		select {
+		case data, ok := <-ch:
+			if !ok {
+				c.buffersMutex.Lock()
+				delete(c.buffers, cursorID)
+				c.buffersMutex.Unlock()
 
-	for cursor.Next(ctx) {
-		rawData := cursor.Current
-		dataBatch = append(dataBatch, []byte(rawData))
-
-		if cursor.RemainingBatchLength() == 0 {
-			low = rawData.Lookup("_id")
-			break
+				return connect.NewResponse(&adiomv1.ListDataResponse{
+					Data: dataBatch,
+					Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+				}), nil
+			}
+			dataBatch = append(dataBatch, data)
+			if len(dataBatch) >= c.readerMaxBatchSize {
+				nextCursor := binary.AppendVarint(nil, cursorID)
+				nextCursor = binary.AppendVarint(nextCursor, ctr+1)
+				return connect.NewResponse(&adiomv1.ListDataResponse{
+					Data:       dataBatch,
+					Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+					NextCursor: nextCursor,
+				}), nil
+			}
+		case <-ctx.Done():
+			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
 	}
-	if cursor.Err() != nil {
-		if !errors.Is(cursor.Err(), context.Canceled) {
-			slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
-		}
-	}
-
-	var nextCursor []byte
-	if !low.IsZero() {
-		_, high := DecodeCursor(r.Msg.GetCursor())
-		nextCursor = EncodeCursor(low, high)
-	}
-
-	return connect.NewResponse(&adiomv1.ListDataResponse{
-		Data:       dataBatch,
-		Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
-		NextCursor: nextCursor,
-	}), nil
 }
 
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
@@ -511,7 +562,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	var batch []interface{}
 	for _, data := range r.Msg.GetData() {
 		batch = append(batch, bson.Raw(data))
-		if c.maxBatchSize > 0 && len(batch) >= c.maxBatchSize {
+		if c.writerMaxBatchSize > 0 && len(batch) >= c.writerMaxBatchSize {
 			err := insertBatchOverwrite(ctx, col, batch)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
@@ -626,6 +677,7 @@ func MongoClient(ctx context.Context, settings ConnectorSettings) (*mongo.Client
 }
 
 func (c *conn) Teardown() {
+	c.cancel()
 	_ = c.client.Disconnect(context.Background())
 }
 
@@ -638,6 +690,14 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 	return NewConnWithClient(client, connSettings.WriterMaxBatchSize)
 }
 
-func NewConnWithClient(client *mongo.Client, maxBatchSize int) adiomv1connect.ConnectorServiceHandler {
-	return &conn{client: client, maxBatchSize: maxBatchSize}
+func NewConnWithClient(client *mongo.Client, writerMaxBatchSize int) adiomv1connect.ConnectorServiceHandler {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &conn{
+		client:             client,
+		writerMaxBatchSize: writerMaxBatchSize,
+		readerMaxBatchSize: 100, // TODO: make configurable
+		ctx:                ctx,
+		cancel:             cancel,
+		buffers:            map[int64]<-chan []byte{},
+	}
 }

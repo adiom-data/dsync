@@ -83,6 +83,8 @@ type RunnerLocalSettings struct {
 	CosmosTargetDocCountPerPartition  int64
 	CosmosDeletesCheckInterval        time.Duration
 	SyncMode                          string
+	XSource                           bool
+	XDestination                      bool
 }
 
 const (
@@ -151,7 +153,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			MaxWriterBatchSize:        cosmosSettings.WriterMaxBatchSize,
 			ResumeTokenUpdateInterval: cosmosSettings.CdcResumeTokenUpdateInterval,
 		}
-		r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
+		if settings.XSource {
+			slog.Info("Experimental Cosmos Source")
+			r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
+		} else {
+			r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
+		}
 		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
 		mongoSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}
@@ -183,7 +190,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			MaxWriterBatchSize:        mongoSettings.WriterMaxBatchSize,
 			ResumeTokenUpdateInterval: mongoSettings.CdcResumeTokenUpdateInterval,
 		}
-		r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
+		if settings.XSource {
+			slog.Info("Experimental Mongo Source")
+			r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
+		} else {
+			r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
+		}
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "testconn" {
 		// TODO configure params properly
@@ -222,7 +234,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
 			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
 		}
-		r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
+		if settings.XDestination {
+			slog.Info("Experimental Cosmos Destination")
+			r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
+		} else {
+			r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
+		}
 		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
 	} else if settings.DstType == "testconn" {
 		// TODO configure params properly
@@ -254,7 +271,12 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
 			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
 		}
-		r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
+		if settings.XDestination {
+			slog.Info("Experimental Mongo Destination")
+			r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
+		} else {
+			r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
+		}
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
 
