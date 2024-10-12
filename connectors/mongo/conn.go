@@ -29,13 +29,12 @@ type conn struct {
 	client *mongo.Client
 
 	writerMaxBatchSize int
-	readerMaxBatchSize int
 
 	nextCursorID atomic.Int64
 	ctx          context.Context
 	cancel       context.CancelFunc
 	buffersMutex sync.RWMutex
-	buffers      map[int64]<-chan []byte
+	buffers      map[int64]<-chan [][]byte
 }
 
 // get all database names except system databases
@@ -232,7 +231,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	pageCursor := r.Msg.GetCursor()
 	if pageCursor == nil {
 		cursorID = c.nextCursorID.Add(1)
-		ch := make(chan []byte, 1000)
+		ch := make(chan [][]byte, 10)
 		c.buffersMutex.Lock()
 		c.buffers[cursorID] = ch
 		c.buffersMutex.Unlock()
@@ -249,11 +248,16 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		go func(ctx context.Context) {
 			defer cursor.Close(ctx)
 			defer close(ch)
+			var dataBatch [][]byte
 			for cursor.Next(ctx) {
-				select {
-				case ch <- cursor.Current:
-				case <-ctx.Done():
-					return
+				dataBatch = append(dataBatch, cursor.Current)
+				if cursor.RemainingBatchLength() == 0 {
+					select {
+					case ch <- dataBatch:
+						dataBatch = nil
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 			if cursor.Err() != nil {
@@ -281,10 +285,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
 
-	var dataBatch [][]byte
 	for {
 		select {
-		case data, ok := <-ch:
+		case dataBatch, ok := <-ch:
 			if !ok {
 				c.buffersMutex.Lock()
 				delete(c.buffers, cursorID)
@@ -295,16 +298,13 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 					Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				}), nil
 			}
-			dataBatch = append(dataBatch, data)
-			if len(dataBatch) >= c.readerMaxBatchSize {
-				nextCursor := binary.AppendVarint(nil, cursorID)
-				nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-				return connect.NewResponse(&adiomv1.ListDataResponse{
-					Data:       dataBatch,
-					Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
-					NextCursor: nextCursor,
-				}), nil
-			}
+			nextCursor := binary.AppendVarint(nil, cursorID)
+			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
+			return connect.NewResponse(&adiomv1.ListDataResponse{
+				Data:       dataBatch,
+				Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+				NextCursor: nextCursor,
+			}), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -695,9 +695,8 @@ func NewConnWithClient(client *mongo.Client, writerMaxBatchSize int) adiomv1conn
 	return &conn{
 		client:             client,
 		writerMaxBatchSize: writerMaxBatchSize,
-		readerMaxBatchSize: 100, // TODO: make configurable
 		ctx:                ctx,
 		cancel:             cancel,
-		buffers:            map[int64]<-chan []byte{},
+		buffers:            map[int64]<-chan [][]byte{},
 	}
 }
