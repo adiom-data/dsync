@@ -15,6 +15,7 @@ import (
 
 	"github.com/adiom-data/dsync/connectors/common"
 	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
+	"github.com/adiom-data/dsync/connectors/dynamodb"
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
 	connectorNull "github.com/adiom-data/dsync/connectors/null"
 	connectorRandom "github.com/adiom-data/dsync/connectors/random"
@@ -205,6 +206,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
 			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
 		})
+	} else if settings.SrcType == "dynamodb" {
+		r.src = common.NewLocalConnector(sourceName, dynamodb.NewConn(settings.SrcConnString), common.ConnectorSettings{
+			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        settings.NumParallelWriters,
+			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+		})
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
@@ -244,6 +252,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	} else if settings.DstType == "testconn" {
 		// TODO configure params properly
 		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), common.ConnectorSettings{
+			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
+			NumParallelWriters:        settings.NumParallelWriters,
+			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+		})
+	} else if settings.DstType == "dynamodb" {
+		r.dst = common.NewLocalConnector(destinationName, dynamodb.NewConn(settings.DstConnString), common.ConnectorSettings{
 			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
 			NumParallelWriters:        settings.NumParallelWriters,
 			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
