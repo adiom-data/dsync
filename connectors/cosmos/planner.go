@@ -17,6 +17,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/rand"
 )
 
@@ -72,7 +73,12 @@ func (cc *Connector) createInitialCopyTasks(namespaces []string, mode string) ([
 	}
 
 	if mode != iface.SyncModeCDC {
-		partitionedTasks, err := cc.partitionTasksIfNecessary(nsTasks)
+		p := planner{
+			Ctx:      cc.Ctx,
+			Client:   cc.Client,
+			settings: cc.settings,
+		}
+		partitionedTasks, err := p.partitionTasksIfNecessary(nsTasks)
 		//shuffle the tasks to ensure we balance the workload across different namespaces
 		if len(nsTasks) > 1 {
 			shuffleTasks(partitionedTasks)
@@ -91,9 +97,15 @@ func shuffleTasks(tasks []iface.ReadPlanTask) {
 	}
 }
 
+type planner struct {
+	Ctx      context.Context
+	Client   *mongo.Client
+	settings ConnectorSettings
+}
+
 // partitionTasksIfNecessary checks all the namespace tasks and partitions them if necessary
 // returns the final list of tasks to be executed with unique task ids
-func (cc *Connector) partitionTasksIfNecessary(namespaceTasks []iface.Namespace) ([]iface.ReadPlanTask, error) {
+func (cc *planner) partitionTasksIfNecessary(namespaceTasks []iface.Namespace) ([]iface.ReadPlanTask, error) {
 	countCheckChannel := make(chan iface.Namespace, len(namespaceTasks))
 	approxTasksChannel := make(chan iface.ReadPlanTask, len(namespaceTasks))
 
@@ -127,7 +139,7 @@ func (cc *Connector) partitionTasksIfNecessary(namespaceTasks []iface.Namespace)
 // Replaces the approximate bound with the closest lower or equal value found
 // Disconiues the task if the bounds are the same
 // Outputs finalized tasks into the finalTasksChannel
-func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
+func (cc *planner) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.ReadPlanTask, finalTasksChannel chan<- iface.ReadPlanTask) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(cc.settings.NumParallelPartitionWorkers)
@@ -168,7 +180,7 @@ func (cc *Connector) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface
 	close(finalTasksChannel)
 }
 
-func (cc *Connector) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanTask {
+func (cc *planner) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanTask {
 	task := iface.ReadPlanTask{}
 	task.Def.Db = ns.Db
 	task.Def.Col = ns.Col
@@ -179,7 +191,7 @@ func (cc *Connector) createReadPlanTaskForNs(ns iface.Namespace) iface.ReadPlanT
 
 // In parallel checks the count of the namespace and segregates them into two channels
 // One for finalized tasks, and another for partitioned tasks with approximate bounds that need to be clarified
-func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.Namespace, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
+func (cc *planner) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.Namespace, finalTasksChannel chan<- iface.ReadPlanTask, approxTasksChannel chan<- iface.ReadPlanTask) {
 	//define workgroup
 	wg := sync.WaitGroup{}
 	wg.Add(cc.settings.NumParallelPartitionWorkers)
@@ -210,7 +222,7 @@ func (cc *Connector) parallelNamespaceTaskPreparer(countCheckChannel <-chan ifac
 				} else { //we need to split it
 					slog.Debug(fmt.Sprintf("Need to split task %v with count %v", nsTask, count))
 					//get min and max bounds
-					min, max, err := cc.getMinAndMax(cc.Ctx, nsTask, cc.settings.partitionKey)
+					min, max, err := getMinAndMax(cc.Ctx, cc.Client, nsTask, cc.settings.partitionKey)
 					if err != nil {
 						slog.Warn(fmt.Sprintf("Failed to get min and max boundaries for a task %v so not splitting: %v", nsTask, err))
 						task := cc.createReadPlanTaskForNs(nsTask)

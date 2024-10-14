@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/adiom-data/dsync/connectors/common"
 	mongoconn "github.com/adiom-data/dsync/connectors/mongo"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/adiom-data/dsync/protocol/test"
@@ -33,11 +35,17 @@ const (
 
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
 
+type LocalConnector interface {
+	Impl() adiomv1connect.ConnectorServiceHandler
+}
+
 var connectorFactoryFunc = func() iface.Connector {
-	return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
+	return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
+	// return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
 }
 var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
-	return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
+	return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
+	//return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)
@@ -50,24 +58,21 @@ func TestCosmosConnectorSuite(t *testing.T) {
 		t.Fatal("COSMOS environment variable not set")
 	}
 	tSuite := test.NewConnectorTestSuite(
-		func() iface.Connector {
-			return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
-		},
-		func() test.TestDataStore {
-			return NewCosmosTestDataStore(TestCosmosConnectionString)
-		})
+		connectorFactoryFunc,
+		datastoreFactoryFunc,
+	)
 	suite.Run(t, tSuite)
 }
 
 /*
 * Cosmos-specific test for deletes emulation DISABLED (default)
-* Confirms that no deletes are emitted when the CheckForDeletes() is triggered
+* Confirms that no deletes are emitted when the ForceDeletes() is triggered
 *
 * Scenario:
 * 1) Start reading without any special configuration
 * 2) Wait a bit to make sure that we entered the CDC phase
 * 3) Do a delete
-* 4) Call CheckForDeletesSync()
+* 4) Call ForceDelete()
 * 5) Wait a bit more to make sure that the deletes are processed
 * 6) Check that no deletes were emitted
  */
@@ -85,10 +90,10 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorFactoryFunc().(*Connector)
+	connector := connectorFactoryFunc()
 
 	// setup the connector and make sure it returns no errors
-	err := connector.Setup(ctx, t)
+	err := connector.(iface.Connector).Setup(ctx, t)
 	assert.NoError(testState, err)
 
 	// check that the mocked methods were called
@@ -105,6 +110,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	flowComplete := make(chan struct{})
 	dummyTestDBName := "db1"
 	dummyTestColName := "col1"
+	dataStore.InsertDummy(dummyTestDBName, dummyTestColName, bson.M{"_id": -1})
 
 	// Do some prep
 	flowID := iface.FlowID("1234")
@@ -177,7 +183,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	}
 
 	// Call the check for deletes function
-	connector.CheckForDeletesTrigger(flowID)
+	go connector.(LocalConnector).Impl().(*conn).ForceDelete()
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")
@@ -214,7 +220,7 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 * 1) Start reading with a connector configuration that enables deletes
 * 2) Wait a bit to make sure that we entered the CDC phase
 * 3) Inject two entries into the witness that don't exist on the source
-* 4) Call CheckForDeletesSync()
+* 4) Call ForceDelete()
 * 5) Wait a bit more to make sure that the deletes are processed
 * 6) Check that the 2 deletes were emitted
  */
@@ -245,10 +251,10 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	c.On("RegisterConnector", mock.Anything, mock.Anything).Return(testConnectorID, nil)
 
 	// create a new connector object
-	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI()).(*Connector)
+	connector := connectorDeletesEmuFactoryFunc(witnessMongoServer.URI())
 
 	// setup the connector and make sure it returns no errors
-	err = connector.Setup(ctx, t)
+	err = connector.(iface.Connector).Setup(ctx, t)
 	assert.NoError(testState, err)
 
 	// check that the mocked methods were called
@@ -265,6 +271,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	flowComplete := make(chan struct{})
 	dummyTestDBName := "db1"
 	dummyTestColName := "col1"
+	dataStore.InsertDummy(dummyTestDBName, dummyTestColName, bson.M{"_id": -1})
 
 	// Do some prep
 	flowID := iface.FlowID("1234")
@@ -337,7 +344,7 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	}
 
 	// Call the check for deletes function
-	connector.CheckForDeletesTrigger(flowID)
+	go connector.(LocalConnector).Impl().(*conn).ForceDelete()
 
 	// Sleep for a bit
 	testState.Log("Sleeping for 5 seconds to allow the connector to process any deletes")

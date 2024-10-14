@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package adiom.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/v1;adiomv1";
+
+message BsonValue {
+    bytes data = 1;
+    uint32 type = 2;
+}
+
+enum DataType {
+    DATA_TYPE_UNKNOWN = 0;
+    DATA_TYPE_MONGO_BSON = 1; // BSON that must have an _id field
+}
+
+message Namespace {
+    string db = 1;
+    string col = 2;
+}
+
+message Partition {
+    Namespace namespace = 1;
+    string description = 2;
+    bytes cursor = 3;
+    uint64 estimated_count = 4;
+}
+
+message Capabilities {
+    bool source = 1;
+    bool sink = 2;
+    bool resumable = 3;
+    bool lsn_stream = 4;
+}
+
+message GetInfoRequest {}
+
+message GetInfoResponse {
+    string db_type = 1;
+    string version = 2;
+    string spec = 3;
+    repeated DataType supported_data_types = 4;
+    Capabilities capabilities = 5;
+}
+
+message GetNamespaceMetadataRequest {
+    Namespace namespace = 1;
+}
+
+message GetNamespaceMetadataResponse {
+    uint64 count = 1;
+}
+
+message GeneratePlanRequest {
+    repeated Namespace namespaces = 1;
+    bool parallelize = 2;
+}
+
+message GeneratePlanResponse {
+    repeated Partition partitions = 1;
+    bytes start_cursor = 2;
+}
+
+enum UpdateType {
+    UPDATE_TYPE_UNKNOWN = 0;
+    UPDATE_TYPE_INSERT = 1;
+    UPDATE_TYPE_UPDATE = 2;
+    UPDATE_TYPE_DELETE = 3;
+}
+
+message Update {
+    BsonValue id = 1;
+    UpdateType type = 2;
+    bytes data = 3;
+}
+
+message ListDataRequest {
+    Partition partition = 1;
+    repeated BsonValue ids = 2;
+    bytes cursor = 3;
+    // uint64 limit = 4;
+}
+
+message ListDataResponse {
+    repeated bytes data = 1;
+    DataType type = 2;
+    bytes next_cursor = 3;
+}
+
+message WriteDataRequest {
+    Namespace namespace = 1;
+    repeated bytes data = 2;
+    DataType type = 3;
+}
+
+message WriteDataResponse {}
+
+message WriteUpdatesRequest {
+    Namespace namespace = 1;
+    repeated Update updates = 2;
+    DataType type = 3;
+}
+
+message WriteUpdatesResponse {}
+
+message StreamUpdatesRequest {
+    repeated Namespace namespaces = 1;
+    bytes cursor = 3;
+}
+
+message StreamUpdatesResponse {
+    repeated Update updates = 1;
+    Namespace namespace = 2;
+    DataType type = 3;
+    bytes next_cursor = 4;
+}
+
+message StreamLSNRequest {
+    repeated Namespace namespaces = 1;
+    bytes cursor = 3;
+}
+
+message StreamLSNResponse {
+    uint64 lsn = 1;
+    bytes next_cursor = 2;
+}

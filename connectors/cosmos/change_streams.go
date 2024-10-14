@@ -20,10 +20,10 @@ import (
 )
 
 // Creates a single changestream compatible with CosmosDB with the provided options
-func (cc *Connector) createChangeStream(ctx context.Context, namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
+func createChangeStream(ctx context.Context, client *mongo.Client, namespace iface.Location, opts *moptions.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
-	collection := cc.Client.Database(db).Collection(col)
+	collection := client.Database(db).Collection(col)
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{
 			{Key: "operationType", Value: bson.D{{Key: "$in", Value: bson.A{"insert", "update", "replace"}}}}}}},
@@ -65,7 +65,7 @@ func (cc *Connector) StartConcurrentChangeStreams(ctx context.Context, namespace
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
-			changeStream, err := cc.createChangeStream(ctx, loc, opts)
+			changeStream, err := createChangeStream(ctx, cc.Client, loc, opts)
 			if err != nil {
 				if errors.Is(ctx.Err(), context.Canceled) {
 					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))

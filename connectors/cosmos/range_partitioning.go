@@ -70,7 +70,6 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 			Type:  bson.TypeObjectID,
 			Value: val[:],
 		}
-
 	}
 
 	// add the mina nd max boundaries to be precise
@@ -81,8 +80,8 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 }
 
 // get min and max boundaries for a namespace task
-func (cc *Connector) getMinAndMax(ctx context.Context, ns iface.Namespace, partitionKey string) (bson.RawValue, bson.RawValue, error) {
-	collection := cc.Client.Database(ns.Db).Collection(ns.Col)
+func getMinAndMax(ctx context.Context, client *mongo.Client, ns iface.Namespace, partitionKey string) (bson.RawValue, bson.RawValue, error) {
+	collection := client.Database(ns.Db).Collection(ns.Col)
 	optsMax := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, -1}})
 	optsMin := options.Find().SetProjection(bson.D{{partitionKey, 1}}).SetLimit(1).SetSort(bson.D{{partitionKey, 1}})
 
