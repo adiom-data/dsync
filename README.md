@@ -1,16 +1,15 @@
-**Welcome to Adiom Documentation!**
+**Welcome to Adiom's Dsync GitHub Repository!**
 
 _Complete documentation can be found [here](https://docs.adiom.io)_
 
-We solve data migration and replication between NoSQL databases. We focus on challenges specific to large datasets and mission-critical applications. Our approach involves creating an open data object exchange protocol, a lightweight platform, and open-source tools to streamline data replication and movement.
+We solve data migration and replication between NoSQL databases. We focus on challenges specific to large datasets and mission-critical applications. Our mission is to make database migration and replication easy for engineers and DevOps, reducing the need for custom solutions.
 
 # Introduction to Dsync
 > **_NOTE: Dsync is currently in beta and is undergoing active development and testing._**
 
+Dsync is an open-source tool developed by [Adiom](https://adiom.io). Dsync is designed for fast, secure data migration and synchronization between NoSQL databases, ensuring resiliency, ease of use, and production-grade performance. Currenly its primary use case is live database migration from Cosmos DB to MongoDB Atlas. Over time we will extend it to other NoSQL databases (e.g. DynamoDB, BigQuery) and add advanced features such as bidirectional communication and many-to-many flows. 
 
-Dsync is a data migration tool between NoSQL databases. Over time it will extend to many different databases including Azure Cosmos, MongoDB, and advanced features such as bidirectional communication and many-to-many flows. 
-
-Given source and destination databases, the tool completes an initial sync transferring all data from the source database to the destination database. After the initial sync, it continuously monitors the source database for any changes and updates the destination database accordingly.
+Given source and destination databases, dsync completes an initial sync transferring all data from the source database to the destination database. After the initial sync, it continuously monitors the source database for any changes and updates the destination database accordingly.
 
 ![Dsync progress reporting sample](/img/screenshot.png?width=20&raw=true)
 
