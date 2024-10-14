@@ -22,9 +22,9 @@ const DefaultVerbosity = "INFO"
 // XXX: should these definitions be moved to the RunnerLocal?
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
-var validSources = []string{"MongoDB", "CosmosDB", "testconn"}
+var validSources = []string{"MongoDB", "CosmosDB", "testconn", "dynamodb"}
 
-var validDestinations = []string{"MongoDB", "CosmosDB", "testconn"}
+var validDestinations = []string{"MongoDB", "CosmosDB", "testconn", "dynamodb"}
 
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
 
