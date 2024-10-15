@@ -30,16 +30,16 @@ jobs:
           env GOOS=$GOOS GOARCH=$GOARCH go build -o $output_name
         done
     - name: Create a README with instructions
-      run: echo "# dsync Binary" > README.md
+      run: echo "# Dsync Binary\nChoose and run the dsync binary based on your architecture.\nRefer to the docs for more info at docs.adiom.io" > README.md
     - name: Archive binaries and README
       run: |
-        zip dsync.zip dsync-* README.md
+        zip dsync-${{ github.ref_name }}.zip dsync-* README.md
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dsync.zip
-        asset_name: dsync.zip
+        asset_path: ./dsync-${{ github.ref_name }}.zip
+        asset_name: dsync-${{ github.ref_name }}.zip
         asset_content_type: application/zip
