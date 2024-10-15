@@ -3,6 +3,7 @@ module github.com/adiom-data/dsync
 go 1.22.0
 
 require (
+	connectrpc.com/connect v1.17.0
 	github.com/cespare/xxhash v1.1.0
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/lmittmann/tint v1.0.5
@@ -11,13 +12,14 @@ require (
 	github.com/samber/slog-multi v1.2.3
 	github.com/stretchr/testify v1.9.0
 	github.com/tryvium-travels/memongo v0.12.0
-	github.com/urfave/cli/v2 v2.27.4
+	github.com/urfave/cli/v2 v2.27.5
+	go.akshayshah.org/memhttp v0.1.0
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	google.golang.org/protobuf v1.34.2
 )
 
 require (
-	connectrpc.com/connect v1.17.0 // indirect
 	github.com/acobaugh/osrelease v0.0.0-20181218015638-a93a0a55a249 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
@@ -28,17 +30,15 @@ require (
 	github.com/samber/lo v1.47.0 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	go.akshayshah.org/memhttp v0.1.0 // indirect
+	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/term v0.23.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
 )
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/brianvoe/gofakeit/v7 v7.0.4
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.13.6 // indirect
@@ -52,6 +52,5 @@ require (
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.18.0 // indirect
-	google.golang.org/grpc v1.67.1
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
