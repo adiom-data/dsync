@@ -291,7 +291,9 @@ func (r *RunnerLocal) Run() error {
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag})
-		if err != nil {
+		if err != nil { 
+			r.runnerProgress.VerificationResult = "ERROR"
+			slog.Error("Data integrity check: ERROR")
 			slog.Error("Failed to perform flow integrity check", "err", err)
 		} else {
 			if integrityCheckRes.Passed {
@@ -306,7 +308,6 @@ func (r *RunnerLocal) Run() error {
 				slog.Error("Data integrity check: FAIL")
 			}
 		}
-		time.Sleep(2 * time.Second)
 		return err
 	}
 

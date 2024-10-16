@@ -655,8 +655,6 @@
       </svg>
 
       <section class="section-progress mb-48" data-progress="0" data-throughput="0">
-        <!--- Please, insert your variables for progress and throughput/sec to data-progress and data-throughput attributes accordingly.
-        Then JS code will handle changes in data-attributes and update html markup with values.-->
         <div class="container">
           <div class="progress-bar">
             <div class="progress">
@@ -724,7 +722,7 @@
 
           <div class="verification row-column col bg-block" role="table">
             <h2 class="table-title">Verification Result</h2>
-            <span id="verification-result" role="row">Data Integrity Check: </span>
+            <span id="verification-result" role="row"></span>
           </div>
         </div>
           
@@ -1020,7 +1018,7 @@
 
           // Render verification result
           if (SyncState === "Verify") {
-            document.getElementById("verification-result").textContent += data.RunnerSyncProgress.VerificationResult;
+            document.getElementById("verification-result").textContent = "Data Integrity Check: " + data.RunnerSyncProgress.VerificationResult;
           }
         }
 
@@ -1047,7 +1045,6 @@
       //     item.setAttribute('data-docs', currentDocs + getRandomNumber());
       //   });
       // }, 1000);
-
 
       // ===================================================================================
 
