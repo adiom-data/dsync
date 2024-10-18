@@ -15,10 +15,10 @@ import (
 )
 
 type StreamOptions struct {
-	GetRecordsLimiter      Limiter
-	Logger                 Logger
-	NoChildShardRetryDelay time.Duration
-	NoChildShardAttempts   int
+	GetPerShardRecordsLimiter func() Limiter
+	Logger                    Logger
+	NoChildShardRetryDelay    time.Duration
+	NoChildShardAttempts      int
 }
 
 type stream struct {
@@ -45,10 +45,10 @@ type StreamRecords struct {
 
 func NewStream(streamClient *dynamodbstreams.Client, dynamoHelper *dynamodbStreamHelper, streamARN string, shardIteratorInputs []*dynamodbstreams.GetShardIteratorInput, ch chan<- StreamRecords, optsFn ...func(*StreamOptions)) *stream {
 	opts := StreamOptions{
-		GetRecordsLimiter:      rate.NewLimiter(rate.Limit(5), 5),
-		Logger:                 slog.Default(),
-		NoChildShardRetryDelay: time.Second * 5,
-		NoChildShardAttempts:   5,
+		GetPerShardRecordsLimiter: func() Limiter { return rate.NewLimiter(rate.Limit(5), 5) },
+		Logger:                    slog.Default(),
+		NoChildShardRetryDelay:    time.Second * 5,
+		NoChildShardAttempts:      5,
 	}
 	for _, fn := range optsFn {
 		fn(&opts)
@@ -187,6 +187,7 @@ func (s *stream) startProcessShards(ctx context.Context, shards []*dynamodbstrea
 }
 
 func (s *stream) processShard(ctx context.Context, shardInput *dynamodbstreams.GetShardIteratorInput, ch chan<- StreamRecords) error {
+	limiter := s.options.GetPerShardRecordsLimiter()
 	shardIteratorRes, err := s.streamClient.GetShardIterator(ctx, shardInput)
 	if err != nil {
 		return err
@@ -194,8 +195,8 @@ func (s *stream) processShard(ctx context.Context, shardInput *dynamodbstreams.G
 	shardIterator := shardIteratorRes.ShardIterator
 
 	for {
-		if s.options.GetRecordsLimiter != nil {
-			if err := s.options.GetRecordsLimiter.Wait(ctx); err != nil {
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
 				return err
 			}
 		}
