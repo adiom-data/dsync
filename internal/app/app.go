@@ -24,6 +24,7 @@ import (
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/logger"
 	runner "github.com/adiom-data/dsync/runners/local"
+	"github.com/adiom-data/dsync/static"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/urfave/cli/v2"
@@ -71,6 +72,7 @@ func runDsync(c *cli.Context) error {
 	if !o.Progress { // if no CLI progress requested, we need to start a web server
 		needWebServer = true
 	}
+	var server *http.Server
 
 	// set up logging
 	lo := logger.Options{Verbosity: o.Verbosity}
@@ -91,6 +93,11 @@ func runDsync(c *cli.Context) error {
 	if needWebServer {
 		wsErrorLog = new(logger.ReverseBuffer)
 		lo.ErrorView = wsErrorLog
+		host := fmt.Sprintf("localhost:%d", o.WebPort)
+		slog.Info("Starting web server to serve progress report on " + host)
+		server = &http.Server{
+			Addr: host,
+		}
 	}
 	logger.Setup(lo)
 
@@ -148,6 +155,15 @@ func runDsync(c *cli.Context) error {
 				}()
 				slog.Info("Attempting graceful shutdown.")
 				r.GracefulShutdown()
+				shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+				defer shutdownCancel()
+				if err := server.Shutdown(shutdownCtx); err != nil {
+					slog.Debug("Server Shutdown Failed", "error", err)
+				} else {
+					slog.Info("Server gracefully stopped")
+				}
+				break
+
 			}
 		}
 	}()
@@ -212,20 +228,19 @@ func runDsync(c *cli.Context) error {
 		}()
 	}
 
+	// Start a web server to serve real-time progress updates
 	if needWebServer {
-		//start a web server to serve progress report
+		http.Handle("/", http.StripPrefix("/", http.FileServer(http.FS(static.WebStatic))))
+		http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
+			progressUpdatesHandler(runnerCtx, r, wsErrorLog, w, req)
+		})
+		wg.Add(1)
 		go func() {
-			host := fmt.Sprintf("localhost:%d", o.WebPort)
-			slog.Info("Starting web server to serve progress report on " + host + "/progress")
-			fs := http.FileServer(http.Dir("./web_static"))
-
-			http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				r.UpdateRunnerProgress()
-				generateHTML(r.GetRunnerProgress(), wsErrorLog, w)
-			})
-			http.Handle("/web_static/", http.StripPrefix("/web_static/", fs))
-			http.ListenAndServe(host, nil)
+			defer wg.Done()
+			err := server.ListenAndServe()
+			if err == http.ErrServerClosed {
+				return
+			}
 		}()
 	}
 
@@ -246,10 +261,18 @@ func runDsync(c *cli.Context) error {
 		}
 		r.Teardown()
 		runnerErr = err
+		shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+		defer shutdownCancel()
+		if needWebServer {
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				slog.Debug("Server Shutdown Failed", "error", err)
+			} else {
+				slog.Info("Server gracefully stopped")
+			}
+		}
 	}()
 
 	wg.Wait()
-
 	if userInterrupted {
 		fmt.Println("user interrupted the process")
 	}
