@@ -10,13 +10,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
-	"slices"
-	"strings"
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/rand"
 )
@@ -27,67 +23,6 @@ var (
 	// System collections that we don't want to copy (regex pattern)
 	ExcludedSystemCollPattern = "^system[.]"
 )
-
-// returns the list of namespaces and the tasks to be executed (partitioned if necessary)
-func (cc *Connector) createInitialCopyTasks(namespaces []string, mode string) ([]iface.Namespace, []iface.ReadPlanTask, error) {
-	var dbsToResolve []string //database names that we need to resolve
-
-	var nsTasks []iface.Namespace
-
-	if namespaces == nil {
-		var err error
-		dbsToResolve, err = cc.getAllDatabases()
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		// iterate over provided namespaces
-		// if it has a dot, then it is a fully qualified namespace
-		// otherwise, it is a database name to resolve
-		for _, ns := range namespaces {
-			db, col, isFQN := strings.Cut(ns, ".")
-			if isFQN {
-				nsTasks = append(nsTasks, iface.Namespace{db, col})
-			} else {
-				dbsToResolve = append(dbsToResolve, ns)
-			}
-		}
-	}
-
-	slog.Debug(fmt.Sprintf("Databases to resolve: %v", dbsToResolve))
-
-	//iterate over unresolved databases and get all collections
-	for _, db := range dbsToResolve {
-		colls, err := cc.getAllCollections(db)
-		if err != nil {
-			return nil, nil, err
-		}
-		//create tasks for these
-		for _, coll := range colls {
-			nsTasks = append(nsTasks, iface.Namespace{db, coll})
-		}
-	}
-
-	if len(nsTasks) > cc.settings.MaxNumNamespaces {
-		return nil, nil, fmt.Errorf("too many namespaces to copy: %d, max %d", len(nsTasks), cc.settings.MaxNumNamespaces)
-	}
-
-	if mode != iface.SyncModeCDC {
-		p := planner{
-			Ctx:      cc.Ctx,
-			Client:   cc.Client,
-			settings: cc.settings,
-		}
-		partitionedTasks, err := p.partitionTasksIfNecessary(nsTasks)
-		//shuffle the tasks to ensure we balance the workload across different namespaces
-		if len(nsTasks) > 1 {
-			shuffleTasks(partitionedTasks)
-		}
-		return nsTasks, partitionedTasks, err
-	}
-
-	return nsTasks, nil, nil
-}
 
 // function to shuffle the tasks
 func shuffleTasks(tasks []iface.ReadPlanTask) {
@@ -276,34 +211,4 @@ func (cc *planner) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.
 	// wait for all workers to finish and close the approxTasksChannel channel
 	wg.Wait()
 	close(approxTasksChannel)
-}
-
-// get all database names except system databases
-func (cc *Connector) getAllDatabases() ([]string, error) {
-	dbNames, err := cc.Client.ListDatabaseNames(cc.Ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	dbs := slices.DeleteFunc(dbNames, func(d string) bool {
-		return slices.Contains(ExcludedDBListForIC, d)
-	})
-
-	return dbs, nil
-}
-
-// get all collections in a database except system collections
-func (cc *Connector) getAllCollections(dbName string) ([]string, error) {
-	collectionsAll, err := cc.Client.Database(dbName).ListCollectionNames(cc.Ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	//remove all system collections that match the pattern
-	r, _ := regexp.Compile(ExcludedSystemCollPattern)
-	collections := slices.DeleteFunc(collectionsAll, func(n string) bool {
-		return r.Match([]byte(n))
-	})
-
-	return collections, nil
 }

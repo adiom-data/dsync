@@ -31,54 +31,6 @@ const (
 	numParallelSourceScanTasks = 4
 )
 
-/**
-* Trigger a check for deletes in Cosmos
- */
-func (cc *Connector) CheckForDeletesTrigger(flowId iface.FlowID) {
-	if !cc.settings.EmulateDeletes {
-		slog.Debug("EmulateDeletes is disabled, skipping check for deletes")
-		return
-	}
-	cc.flowDeletesTriggerChannel <- struct{}{}
-}
-
-/**
- * Check for deletes in Cosmos
- *
- * This function is used to simulate deletes in Cosmos since Cosmos does not support deletes in changestream.
- * We use an external "Witness" index to track which documents we have already read from the source.
- * At any point in time, any document that is not present in the Witness index but is present in the source is considered deleted.
- *
- * For simplicity, we are using the destination's index directly right now because we can.
- *
- * Returns the number of deletes generated
- */
-//TODO: Could there be a race condition here when a doc with the same _id is recreated?
-func (cc *Connector) checkForDeletes_sync(flowId iface.FlowID, options iface.ConnectorOptions, flowDataChannel chan<- iface.DataMessage) uint64 {
-	// Preparations
-	mismatchedNamespaces := make(chan iface.Namespace)
-	idsToCheck := make(chan idsWithLocation)  //channel to post ids to check
-	idsToDelete := make(chan idsWithLocation) //channel to post ids to delete
-
-	// 1. Get namespaces list from the Witness
-	namespaces, err := getFQNamespaceListWitness(cc.FlowCtx, cc.witnessMongoClient, options.Namespace)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get fully qualified namespace list from the witness: %v", err))
-		return 0
-	}
-	// 2. Compare the doc count on both sides (asynchoronously so that we can proceed with the next steps here)
-	go compareDocCountWithWitness(cc.FlowCtx, cc.Client, cc.witnessMongoClient, namespaces, mismatchedNamespaces)
-
-	// 3. For mismatches, use Witness index to find out what has been deleted (async so that we can proceed with the next steps here)
-	go parallelScanWitnessNamespaces(cc.FlowCtx, cc.witnessMongoClient, mismatchedNamespaces, idsToCheck)
-	go checkSourceIdsAndGenerateDeletes(cc.FlowCtx, cc.Client, idsToCheck, idsToDelete)
-
-	// 4. Generate delete events
-	numDeletes := cc.generateDeleteMessages(idsToDelete, flowDataChannel)
-	slog.Debug(fmt.Sprintf("Generated %v delete messages", numDeletes))
-	return numDeletes
-}
-
 // Compares the document count between us and the Witness for given namespaces, and writes mismatches to the channel
 // The channel is closed at the end to signal that all comparisons are done
 func compareDocCountWithWitness(ctx context.Context, client *mongo.Client, witnessClient *mongo.Client, namespaces []iface.Namespace, mismatchedNamespaces chan<- iface.Namespace) {
@@ -238,25 +190,6 @@ func checkSourceIdsAndGenerateDeletesWorker(ctx context.Context, client *mongo.C
 		slog.Debug(fmt.Sprintf("Found %v missing ids for %v", len(missingIds), idsWithLoc.loc))
 		idsToDelete <- idsWithLocation{loc: idsWithLoc.loc, ids: missingIds}
 	}
-}
-
-// Reads ids from one channel and sends delete event messages to the other
-// Exits when the channel is closed
-// Returns the number of delete messages generated
-func (cc *Connector) generateDeleteMessages(idsToDelete <-chan idsWithLocation, dataChannel chan<- iface.DataMessage) uint64 {
-	var totalDeletes uint64
-	for idWithLoc := range idsToDelete {
-		for i := 0; i < len(idWithLoc.ids); i++ {
-			// convert id to raw bson
-			idType, idVal, err := bson.MarshalValue(idWithLoc.ids[i])
-			if err != nil {
-				slog.Error(fmt.Sprintf("failed to marshal _id: %v", err))
-			}
-			dataChannel <- iface.DataMessage{Loc: idWithLoc.loc, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Delete}
-			totalDeletes++
-		}
-	}
-	return totalDeletes
 }
 
 /****************************************************

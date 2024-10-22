@@ -35,11 +35,12 @@ message Capabilities {
 message GetInfoRequest {}
 
 message GetInfoResponse {
-    string db_type = 1;
-    string version = 2;
-    string spec = 3;
-    repeated DataType supported_data_types = 4;
-    Capabilities capabilities = 5;
+    string id = 1;
+    string db_type = 2;
+    string version = 3;
+    string spec = 4;
+    repeated DataType supported_data_types = 5;
+    Capabilities capabilities = 6;
 }
 
 message GetNamespaceMetadataRequest {

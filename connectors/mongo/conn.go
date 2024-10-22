@@ -25,10 +25,24 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type ConnectorSettings struct {
+	ConnectionString string
+
+	ServerConnectTimeout time.Duration
+	PingTimeout          time.Duration
+	WriterMaxBatchSize   int // applies to batch inserts only; 0 means no limit
+}
+
+func setDefault[T comparable](field *T, defaultValue T) {
+	if *field == *new(T) {
+		*field = defaultValue
+	}
+}
+
 type conn struct {
 	client *mongo.Client
 
-	writerMaxBatchSize int
+	settings ConnectorSettings
 
 	nextCursorID atomic.Int64
 	ctx          context.Context
@@ -140,6 +154,7 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 	version := commandResult["version"]
 
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
+		Id:                 string(generateConnectorID(c.settings.ConnectionString)),
 		DbType:             connectorDBType,
 		Version:            version.(string),
 		Spec:               connectorSpec,
@@ -556,13 +571,49 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	return nil
 }
 
+// inserts data and overwrites on conflict
+func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}) error {
+	// eagerly attempt an unordered insert
+	_, bwErr := collection.InsertMany(ctx, documents, options.InsertMany().SetOrdered(false))
+
+	// check the errors and collect those that errored out due to duplicate key errors
+	// we will skip all the other errors for now
+	if bwErr != nil {
+		var bulkOverwrite []mongo.WriteModel
+
+		// check if it's a bulk write exception
+		var bwErrWriteErrors mongo.BulkWriteException
+		if errors.As(bwErr, &bwErrWriteErrors) {
+			for _, we := range bwErrWriteErrors.WriteErrors {
+				if mongo.IsDuplicateKeyError(we.WriteError) {
+					doc := documents[we.Index]
+					id := doc.(bson.Raw).Lookup("_id") //we know it's there because there was a conflict on _id //XXX: should we check that it's the right type?
+					bulkOverwrite = append(bulkOverwrite, mongo.NewReplaceOneModel().SetFilter(bson.M{"_id": id}).SetReplacement(doc).SetUpsert(true))
+				} else {
+					slog.Error(fmt.Sprintf("Skipping failure to insert document into collection: %v", we.WriteError))
+				}
+			}
+		}
+
+		// redo them all as a bulk replace
+		if len(bulkOverwrite) > 0 {
+			_, err := collection.BulkWrite(ctx, bulkOverwrite, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to overwrite documents in collection: %v", err))
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
 	col := c.client.Database(r.Msg.GetNamespace().GetDb()).Collection(r.Msg.GetNamespace().GetCol())
 	var batch []interface{}
 	for _, data := range r.Msg.GetData() {
 		batch = append(batch, bson.Raw(data))
-		if c.writerMaxBatchSize > 0 && len(batch) >= c.writerMaxBatchSize {
+		if c.settings.WriterMaxBatchSize > 0 && len(batch) >= c.settings.WriterMaxBatchSize {
 			err := insertBatchOverwrite(ctx, col, batch)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
@@ -687,16 +738,16 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 		slog.Error(fmt.Sprintf("unable to connect to mongo client: %v", err))
 		panic(err)
 	}
-	return NewConnWithClient(client, connSettings.WriterMaxBatchSize)
+	return NewConnWithClient(client, connSettings)
 }
 
-func NewConnWithClient(client *mongo.Client, writerMaxBatchSize int) adiomv1connect.ConnectorServiceHandler {
+func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &conn{
-		client:             client,
-		writerMaxBatchSize: writerMaxBatchSize,
-		ctx:                ctx,
-		cancel:             cancel,
-		buffers:            map[int64]<-chan [][]byte{},
+		client:   client,
+		settings: settings,
+		ctx:      ctx,
+		cancel:   cancel,
+		buffers:  map[int64]<-chan [][]byte{},
 	}
 }

@@ -257,16 +257,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden:   true,
 		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:     "xs", // Experimental: source
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:     "xd", // Experimental: destination
-			Required: false,
-			Hidden:   true,
-		}),
 	}
 
 	before := func(c *cli.Context) error {

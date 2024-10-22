@@ -41,11 +41,9 @@ type LocalConnector interface {
 
 var connectorFactoryFunc = func() iface.Connector {
 	return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
-	// return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}})
 }
 var connectorDeletesEmuFactoryFunc = func(TestWitnessConnectionString string) iface.Connector {
 	return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
-	//return NewCosmosConnector("test", ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second}, EmulateDeletes: true, WitnessMongoConnString: TestWitnessConnectionString})
 }
 var datastoreFactoryFunc = func() test.TestDataStore {
 	return NewCosmosTestDataStore(TestCosmosConnectionString)

@@ -6,12 +6,6 @@
 package mongo
 
 import (
-	"fmt"
-	"log/slog"
-	"regexp"
-	"slices"
-	"strings"
-
 	"github.com/adiom-data/dsync/protocol/iface"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -28,89 +22,6 @@ var (
 	ExcludedDBPatternCS         = `^(?!local$|config$|admin$|adiom-internal$)`
 	ExcludedSystemCollPatternCS = `^(?!system.)`
 )
-
-func (mc *Connector) createInitialCopyTasks(namespaces []string) ([]iface.ReadPlanTask, error) {
-	var dbsToResolve []string //database names that we need to resolve
-
-	var tasks []iface.ReadPlanTask
-	taskId := iface.ReadPlanTaskID(1)
-
-	if namespaces == nil {
-		var err error
-		dbsToResolve, err = mc.getAllDatabases()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// iterate over provided namespaces
-		// if it has a dot, then it is a fully qualified namespace
-		// otherwise, it is a database name to resolve
-		for _, ns := range namespaces {
-			db, col, isFQN := strings.Cut(ns, ".")
-			if isFQN {
-				task := iface.ReadPlanTask{Id: taskId}
-				task.Def.Db = db
-				task.Def.Col = col
-
-				tasks = append(tasks, task)
-				taskId++
-			} else {
-				dbsToResolve = append(dbsToResolve, ns)
-			}
-		}
-	}
-
-	slog.Debug(fmt.Sprintf("Databases to resolve: %v", dbsToResolve))
-
-	//iterate over unresolved databases and get all collections
-	for _, db := range dbsToResolve {
-		colls, err := mc.getAllCollections(db)
-		if err != nil {
-			return nil, err
-		}
-		//create tasks for these
-		for _, coll := range colls {
-			task := iface.ReadPlanTask{Id: taskId}
-			task.Def.Db = db
-			task.Def.Col = coll
-
-			tasks = append(tasks, task)
-			taskId++
-		}
-	}
-
-	return tasks, nil
-}
-
-// get all database names except system databases
-func (mc *BaseMongoConnector) getAllDatabases() ([]string, error) {
-	dbNames, err := mc.Client.ListDatabaseNames(mc.Ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	dbs := slices.DeleteFunc(dbNames, func(d string) bool {
-		return slices.Contains(ExcludedDBListForIC, d)
-	})
-
-	return dbs, nil
-}
-
-// get all collections in a database except system collections
-func (mc *BaseMongoConnector) getAllCollections(dbName string) ([]string, error) {
-	collectionsAll, err := mc.Client.Database(dbName).ListCollectionNames(mc.Ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	//remove all system collections that match the pattern
-	r, _ := regexp.Compile(ExcludedSystemCollPattern)
-	collections := slices.DeleteFunc(collectionsAll, func(n string) bool {
-		return r.Match([]byte(n))
-	})
-
-	return collections, nil
-}
 
 // creates a filter for the change stream to include only the specified namespaces
 func createChangeStreamNamespaceFilterFromTasks(tasks []iface.ReadPlanTask) bson.D {
