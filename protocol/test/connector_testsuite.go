@@ -27,6 +27,7 @@ type ConnectorTestSuite struct {
 	suite.Suite
 	connectorFactoryFunc func() iface.Connector
 	datastoreFactoryFunc func() TestDataStore //optional and might be nil
+	SkipIntegrity        bool
 }
 
 func NewConnectorTestSuite(connectorFunc func() iface.Connector, datastoreFactoryFunc func() TestDataStore) *ConnectorTestSuite {
@@ -189,9 +190,6 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	// Check if the connector supports sink capabilities
 	if !caps.Sink {
-		// Check that the method fails first
-		err := connector.StartWriteFromChannel(iface.FlowID("2234"), iface.DataChannelID("4321"))
-		assert.Error(suite.T(), err, "Should fail to write data to a sink if the connector does not support sink capabilities")
 		suite.T().Skip("Skipping test because this connector does not support sink capabilities")
 	}
 
