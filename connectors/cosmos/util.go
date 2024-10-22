@@ -14,11 +14,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
@@ -50,35 +48,6 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 		panic(fmt.Sprintf("Failed to hash the flow options: %v", err))
 	}
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
-}
-
-func (cc *Connector) printProgress(readerProgress *ReaderProgress) {
-	ticker := time.NewTicker(progressReportingIntervalSec * time.Second)
-	defer ticker.Stop()
-	startTime := time.Now()
-	operations := uint64(0)
-	for {
-		select {
-		case <-cc.FlowCtx.Done():
-			return
-		case <-ticker.C:
-			elapsedTime := time.Since(startTime).Seconds()
-			operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents - operations
-			opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
-			// Print reader progress
-			if !cc.settings.EmulateDeletes {
-				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, opsPerSec))
-			} else {
-				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Deletes - %d, Operations per Second - %.2f",
-					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted, readerProgress.tasksTotal, readerProgress.changeStreamEvents, readerProgress.deletesCaught, opsPerSec))
-
-			}
-
-			startTime = time.Now()
-			operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents
-		}
-	}
 }
 
 func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location) (bson.Raw, error) {

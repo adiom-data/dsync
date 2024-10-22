@@ -237,8 +237,7 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 		Desc: c.desc,
 		Type: connectorType,
 		Cap:  connectorCapabilities,
-		// TODO: unsure how to properly set connector id
-		Id: iface.ConnectorID(fmt.Sprintf("%v.%v.%v", connectorType.DbType, connectorType.Version, connectorType.Spec)),
+		Id:   iface.ConnectorID(res.Msg.GetId()),
 	}
 	// Register the connector
 	c.id, err = coord.RegisterConnector(connectorDetails, c)

@@ -21,6 +21,29 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	connectorDBType string = "CosmosDB"               // We're a CosmosDB-compatible connector
+	connectorSpec   string = "MongoDB Provisioned RU" // Only compatible with MongoDB API and provisioned deployments
+)
+
+type ConnectorSettings struct {
+	mongoconn.ConnectorSettings
+	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
+	TargetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	NumParallelPartitionWorkers int    //number of workers used for partitioning
+	partitionKey                string //partition key to use for collections
+
+	EmulateDeletes         bool // if true, we will generate delete events
+	DeletesCheckInterval   time.Duration
+	WitnessMongoConnString string
+}
+
+func setDefault[T comparable](field *T, defaultValue T) {
+	if *field == *new(T) {
+		*field = defaultValue
+	}
+}
+
 type conn struct {
 	adiomv1connect.ConnectorServiceHandler
 
@@ -458,10 +481,7 @@ func (c *conn) Teardown() {
 func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	setDefault(&settings.ServerConnectTimeout, 15*time.Second)
 	setDefault(&settings.PingTimeout, 10*time.Second)
-	setDefault(&settings.InitialSyncNumParallelCopiers, 8)
 	setDefault(&settings.WriterMaxBatchSize, 0)
-	setDefault(&settings.NumParallelWriters, 4)
-	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.MaxNumNamespaces, 8)
 	setDefault(&settings.TargetDocCountPerPartition, 512*1000)
 	setDefault(&settings.NumParallelPartitionWorkers, 4)
@@ -487,7 +507,7 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 		panic(err)
 	}
 
-	mongoConn := mongoconn.NewConnWithClient(client, settings.WriterMaxBatchSize)
+	mongoConn := mongoconn.NewConnWithClient(client, settings.ConnectorSettings)
 	return &conn{
 		ConnectorServiceHandler: mongoConn,
 		connectorSettings:       settings,

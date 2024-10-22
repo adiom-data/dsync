@@ -33,7 +33,6 @@ func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
 			return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
-			// return NewMongoConnector("test", ConnectorSettings{ConnectionString: TestMongoConnectionString, CdcResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewMongoTestDataStore(TestMongoConnectionString)
