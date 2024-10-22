@@ -150,46 +150,45 @@ func (c *connector) Interrupt(flowId iface.FlowID) error {
 
 // RequestCreateReadPlan implements iface.Connector.
 func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	go func() {
-		// Retrieve the latest resume token before we start reading anything
-		// We will use the resume token to start the change stream
-		c.status.SyncState = iface.ReadPlanningSyncState
-		namespaces := adiomNamespaces(options.Namespace)
-		resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
-			Namespaces:  namespaces,
-			Parallelize: options.Mode != iface.SyncModeCDC,
-		}))
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
-			return
-		}
+	// Retrieve the latest resume token before we start reading anything
+	// We will use the resume token to start the change stream
+	c.status.SyncState = iface.ReadPlanningSyncState
+	namespaces := adiomNamespaces(options.Namespace)
+	resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
+		Namespaces:  namespaces,
+		Parallelize: options.Mode != iface.SyncModeCDC,
+	}))
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
+		return c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{})
+	}
 
-		c.resumeToken = resp.Msg.GetStartCursor()
+	c.resumeToken = resp.Msg.GetStartCursor()
 
-		curID := 0
-		var tasks []iface.ReadPlanTask
-		if options.Mode == iface.SyncModeCDC {
-			tasks = nil
-		} else {
-			for _, partition := range resp.Msg.GetPartitions() {
-				curID++
-				task := iface.ReadPlanTask{
-					Id: iface.ReadPlanTaskID(curID),
-				}
-				task.Def.Db = partition.GetNamespace().GetDb()
-				task.Def.Col = partition.GetNamespace().GetCol()
-				task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
-				task.EstimatedDocCount = int64(partition.GetEstimatedCount())
-				tasks = append(tasks, task)
+	curID := 0
+	var tasks []iface.ReadPlanTask
+	if options.Mode == iface.SyncModeCDC {
+		tasks = nil
+	} else {
+		for _, partition := range resp.Msg.GetPartitions() {
+			curID++
+			task := iface.ReadPlanTask{
+				Id: iface.ReadPlanTaskID(curID),
 			}
+			task.Def.Db = partition.GetNamespace().GetDb()
+			task.Def.Col = partition.GetNamespace().GetCol()
+			task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
+			task.EstimatedDocCount = int64(partition.GetEstimatedCount())
+			tasks = append(tasks, task)
 		}
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
+	}
+	plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
 
-		err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
-		}
-	}()
+	err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		return err
+	}
 	return nil
 }
 
