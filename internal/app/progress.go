@@ -477,7 +477,7 @@ func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal
 			// Convert data to JSON and send as event to client
 			jsonData, err := json.Marshal(data)
 			if err != nil {
-				slog.Error("Error marshaling JSON:", err)
+				slog.Error("Error marshaling JSON:", "err", err)
 				break
 			}
 			fmt.Fprintf(w, "data: %s\n\n", jsonData)

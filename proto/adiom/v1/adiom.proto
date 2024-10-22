@@ -8,7 +8,6 @@ import "adiom/v1/messages.proto";
 service ConnectorService {
     rpc GetInfo(GetInfoRequest) returns (GetInfoResponse);
     rpc GetNamespaceMetadata(GetNamespaceMetadataRequest) returns (GetNamespaceMetadataResponse);
-    rpc ListData(ListDataRequest) returns (ListDataResponse);
 
     // Sink
     rpc WriteData(WriteDataRequest) returns (WriteDataResponse);
@@ -16,6 +15,7 @@ service ConnectorService {
 
     // Source
     rpc GeneratePlan(GeneratePlanRequest) returns (GeneratePlanResponse);
+    rpc ListData(ListDataRequest) returns (ListDataResponse);
     rpc StreamUpdates(StreamUpdatesRequest) returns (stream StreamUpdatesResponse);
     rpc StreamLSN(StreamLSNRequest) returns (stream StreamLSNResponse);
 }

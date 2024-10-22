@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
@@ -81,7 +83,17 @@ func getAllCollections(ctx context.Context, client *mongo.Client, dbName string)
 	return collections, nil
 }
 
-func NamespacePartitions(ctx context.Context, namespaces []*adiomv1.Namespace, client *mongo.Client) ([]*adiomv1.Partition, error) {
+func GetCol(client *mongo.Client, ns string) (*mongo.Collection, iface.Namespace, bool) {
+	n, ok := ToNS(ns)
+	return client.Database(n.Db).Collection(n.Col), n, ok
+}
+
+func ToNS(ns string) (iface.Namespace, bool) {
+	db, col, ok := strings.Cut(ns, ".")
+	return iface.Namespace{Db: db, Col: col}, ok
+}
+
+func NamespacePartitions(ctx context.Context, namespaces []string, client *mongo.Client) ([]*adiomv1.Partition, error) {
 	var dbsToResolve []string //database names that we need to resolve
 	var partitions []*adiomv1.Partition
 
@@ -96,12 +108,13 @@ func NamespacePartitions(ctx context.Context, namespaces []*adiomv1.Namespace, c
 		// if it has a dot, then it is a fully qualified namespace
 		// otherwise, it is a database name to resolve
 		for _, ns := range namespaces {
-			if ns.Col != "" {
+			db, _, isFQN := strings.Cut(ns, ".")
+			if isFQN {
 				partitions = append(partitions, &adiomv1.Partition{
 					Namespace: ns,
 				})
 			} else {
-				dbsToResolve = append(dbsToResolve, ns.Db)
+				dbsToResolve = append(dbsToResolve, db)
 			}
 		}
 	}
@@ -116,7 +129,7 @@ func NamespacePartitions(ctx context.Context, namespaces []*adiomv1.Namespace, c
 		}
 		for _, col := range cols {
 			partitions = append(partitions, &adiomv1.Partition{
-				Namespace: &adiomv1.Namespace{Db: db, Col: col},
+				Namespace: fmt.Sprintf("%v.%v", db, col),
 			})
 		}
 	}
@@ -138,8 +151,8 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions:  partitions,
-		StartCursor: resumeToken,
+		Partitions:        partitions,
+		UpdatesPartitions: []*adiomv1.Partition{{Cursor: resumeToken}},
 	}), nil
 }
 
@@ -154,24 +167,30 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 	version := commandResult["version"]
 
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		Id:                 string(generateConnectorID(c.settings.ConnectionString)),
-		DbType:             connectorDBType,
-		Version:            version.(string),
-		Spec:               connectorSpec,
-		SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+		Id:      string(generateConnectorID(c.settings.ConnectionString)),
+		DbType:  connectorDBType,
+		Version: version.(string),
+		Spec:    connectorSpec,
 		Capabilities: &adiomv1.Capabilities{
-			Source:    true,
-			Sink:      true,
-			Resumable: true,
-			LsnStream: true,
+			Source: &adiomv1.Capabilities_Source{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				LsnStream:          true,
+				MultiNamespacePlan: true,
+				DefaultPlan:        true,
+			},
+			Sink: &adiomv1.Capabilities_Sink{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+			},
 		},
 	}), nil
 }
 
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetNamespaceMetadata(ctx context.Context, r *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
-	ns := r.Msg.GetNamespace()
-	collection := c.client.Database(ns.Db).Collection(ns.Col)
+	collection, _, ok := GetCol(c.client, r.Msg.GetNamespace())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+	}
 	count, err := collection.EstimatedDocumentCount(ctx)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
@@ -239,7 +258,10 @@ func createFindFilterFromCursor(cursor []byte) bson.D {
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	partition := r.Msg.GetPartition()
-	collection := c.client.Database(partition.GetNamespace().GetDb()).Collection(partition.GetNamespace().GetCol())
+	collection, _, ok := GetCol(c.client, partition.GetNamespace())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+	}
 
 	var cursorID, ctr int64
 
@@ -310,14 +332,12 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 				return connect.NewResponse(&adiomv1.ListDataResponse{
 					Data: dataBatch,
-					Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				}), nil
 			}
 			nextCursor := binary.AppendVarint(nil, cursorID)
 			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
 			return connect.NewResponse(&adiomv1.ListDataResponse{
 				Data:       dataBatch,
-				Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				NextCursor: nextCursor,
 			}), nil
 		case <-ctx.Done():
@@ -328,8 +348,16 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamLSNRequest], s *connect.ServerStream[adiomv1.StreamLSNResponse]) error {
+	var namespaces []iface.Namespace
+	for _, namespace := range r.Msg.GetNamespaces() {
+		ns, ok := ToNS(namespace)
+		if !ok {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+		}
+		namespaces = append(namespaces, ns)
+	}
 	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
-	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(r.Msg.GetNamespaces())
+	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
 
 	changeStream, err := c.client.Watch(ctx, mongo.Pipeline{
 		{{"$match", nsFilter}},
@@ -375,7 +403,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 }
 
 // creates a filter for the change stream to include only the specified namespaces
-func createChangeStreamNamespaceFilterFromNamespaces(namespaces []*adiomv1.Namespace) bson.D {
+func createChangeStreamNamespaceFilterFromNamespaces(namespaces []iface.Namespace) bson.D {
 	if len(namespaces) == 0 {
 		return createChangeStreamNamespaceFilter()
 	}
@@ -411,10 +439,10 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			return nil, fmt.Errorf("failed to marshal full document: %v", err)
 		}
 		update = &adiomv1.Update{
-			Id: &adiomv1.BsonValue{
+			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
 				Type: uint32(idType),
-			},
+			}},
 			Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 			Data: fullDocumentRaw,
 		}
@@ -438,10 +466,10 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			return nil, fmt.Errorf("failed to marshal full document: %v", err)
 		}
 		update = &adiomv1.Update{
-			Id: &adiomv1.BsonValue{
+			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
 				Type: uint32(idType),
-			},
+			}},
 			Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 			Data: fullDocumentRaw,
 		}
@@ -454,10 +482,10 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			return nil, fmt.Errorf("failed to marshal _id: %v", err)
 		}
 		update = &adiomv1.Update{
-			Id: &adiomv1.BsonValue{
+			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
 				Type: uint32(idType),
-			},
+			}},
 			Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 		}
 	default:
@@ -469,8 +497,16 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
+	var namespaces []iface.Namespace
+	for _, namespace := range r.Msg.GetNamespaces() {
+		ns, ok := ToNS(namespace)
+		if !ok {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+		}
+		namespaces = append(namespaces, ns)
+	}
 	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor())).SetFullDocument("updateLookup")
-	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(r.Msg.GetNamespaces())
+	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
 	slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 
 	changeStream, err := c.client.Watch(ctx, mongo.Pipeline{
@@ -483,7 +519,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	defer changeStream.Close(ctx)
 
 	var updates []*adiomv1.Update
-	var currentNamespace *adiomv1.Namespace
+	var currentNamespace string
 	var lastResumeToken bson.Raw
 
 	for changeStream.Next(ctx) {
@@ -508,13 +544,13 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 
 		db := change["ns"].(bson.M)["db"].(string)
 		col := change["ns"].(bson.M)["coll"].(string)
+		newNamespace := fmt.Sprintf("%v.%v", db, col)
 
-		if currentNamespace == nil || db != currentNamespace.Db || col != currentNamespace.Col {
+		if currentNamespace == "" || currentNamespace != newNamespace {
 			if len(updates) > 0 {
 				err := s.Send(&adiomv1.StreamUpdatesResponse{
 					Updates:    updates,
 					Namespace:  currentNamespace,
-					Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 					NextCursor: lastResumeToken,
 				})
 				if err != nil {
@@ -524,7 +560,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 					slog.Error(fmt.Sprintf("failed to send updates: %v", err))
 				}
 			}
-			currentNamespace = &adiomv1.Namespace{Db: db, Col: col}
+			currentNamespace = newNamespace
 			updates = nil
 		}
 
@@ -535,7 +571,6 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			err := s.Send(&adiomv1.StreamUpdatesResponse{
 				Updates:    updates,
 				Namespace:  currentNamespace,
-				Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				NextCursor: lastResumeToken,
 			})
 			if err != nil {
@@ -558,7 +593,6 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		err := s.Send(&adiomv1.StreamUpdatesResponse{
 			Updates:    updates,
 			Namespace:  currentNamespace,
-			Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 			NextCursor: lastResumeToken,
 		})
 		if err != nil {
@@ -609,7 +643,10 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
-	col := c.client.Database(r.Msg.GetNamespace().GetDb()).Collection(r.Msg.GetNamespace().GetCol())
+	col, _, ok := GetCol(c.client, r.Msg.GetNamespace())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+	}
 	var batch []interface{}
 	for _, data := range r.Msg.GetData() {
 		batch = append(batch, bson.Raw(data))
@@ -643,35 +680,38 @@ type dataIdIndex struct {
 // returns the new item or existing item, and whether or not a new item was added
 func addToIdIndexMap2(m map[int][]*dataIdIndex, update *adiomv1.Update) (*dataIdIndex, bool) {
 	hasher := xxhash.New()
-	hasher.Write(update.GetId().GetData())
+	hasher.Write(update.GetId()[0].GetData())
 	h := int(hasher.Sum64())
 	items, found := m[h]
 	if found {
 		for _, item := range items {
-			if slices.Equal(item.dataId, update.GetId().GetData()) {
+			if slices.Equal(item.dataId, update.GetId()[0].GetData()) {
 				return item, false
 			}
 		}
 	}
-	item := &dataIdIndex{update.GetId().GetData(), -1}
+	item := &dataIdIndex{update.GetId()[0].GetData(), -1}
 	m[h] = append(items, item)
 	return item, true
 }
 
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
-	col := c.client.Database(r.Msg.GetNamespace().GetDb()).Collection(r.Msg.GetNamespace().GetCol())
+	col, _, ok := GetCol(c.client, r.Msg.GetNamespace())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+	}
 	var models []mongo.WriteModel
 	// keeps track of the index in models for a particular document because we want all ids to be unique in the batch
 	hashToDataIdIndex := map[int][]*dataIdIndex{}
 
 	for _, update := range r.Msg.GetUpdates() {
-		idType := bsontype.Type(update.GetId().GetType())
+		idType := bsontype.Type(update.GetId()[0].GetType())
 
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
 			dii, isNew := addToIdIndexMap2(hashToDataIdIndex, update)
-			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId().GetData()}}}
+			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}}}
 			model := mongo.NewReplaceOneModel().SetFilter(idFilter).SetReplacement(bson.Raw(update.GetData())).SetUpsert(true)
 			if isNew {
 				dii.index = len(models)
@@ -681,7 +721,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 			dii, isNew := addToIdIndexMap2(hashToDataIdIndex, update)
-			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId().GetData()}}}
+			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}}}
 			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
 			if isNew {
 				dii.index = len(models)

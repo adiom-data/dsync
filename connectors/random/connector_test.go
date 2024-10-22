@@ -7,6 +7,7 @@ package random
 
 import (
 	"testing"
+	"time"
 
 	"github.com/adiom-data/dsync/connectors/common"
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -17,7 +18,7 @@ import (
 // Standard test suite for the connector interface
 func TestRandomConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
-		return common.NewLocalConnector("test", NewConn(ConnectorSettings{}), common.ConnectorSettings{})
+		return common.NewLocalConnector("test", NewConn(ConnectorSettings{}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
 	}, nil)
 	tSuite.SkipIntegrity = true
 	suite.Run(t, tSuite)

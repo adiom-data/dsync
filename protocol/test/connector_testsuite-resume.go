@@ -304,6 +304,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageCount := 0
 	secondBarrierReceived := false
+	writesInBetween := false
 
 	// Start a go routine to read from the data channel until it's closed
 	dataReader := func(channel chan iface.DataMessage) {
@@ -316,6 +317,10 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 			if msg.MutationType != iface.MutationType_Barrier {
 				// This is a data message
 				messageCount++
+				// we only care about detecting writes during the CDC phase
+				if phase == 1 && msg.MutationType != iface.MutationType_InsertBatch {
+					writesInBetween = true
+				}
 			} else {
 				// it's a barrier
 				if msg.BarrierType == iface.BarrierType_CdcResumeTokenUpdate {
@@ -327,7 +332,11 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 					if phase == 1 {
 						secondBarrierReceived = true
 						// Check that the CDC resume token is the same as it is in the plan
-						assert.Equal(suite.T(), msg.BarrierCdcResumeToken, readPlan.CdcResumeToken, "CDC resume token should be the same as in the plan")
+						if writesInBetween {
+							assert.NotEqual(suite.T(), msg.BarrierCdcResumeToken, readPlan.CdcResumeToken, "CDC resume token should be different since writes happened")
+						} else {
+							assert.Equal(suite.T(), msg.BarrierCdcResumeToken, readPlan.CdcResumeToken, "CDC resume token should be the same as in the plan")
+						}
 					}
 				}
 			}
