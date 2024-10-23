@@ -121,7 +121,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
-		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.ConnectorSettings{})
+		r.src = common.NewLocalConnector(sourceName, connectorRandom.NewConn(connectorRandom.ConnectorSettings{}), connectorSettings)
 		r.runnerProgress.SourceDescription = "/dev/null"
 	} else if settings.SrcType == "CosmosDB" {
 		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}}
@@ -166,7 +166,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
-		r.dst = connectorNull.NewNullConnector(destinationName)
+		r.dst = common.NewLocalConnector(destinationName, connectorNull.NewConn(), connectorSettings)
 		r.runnerProgress.DestinationDescription = "/dev/null"
 	} else if settings.DstType == "CosmosDB" {
 		connSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}}
