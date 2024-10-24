@@ -16,31 +16,41 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
-	"github.com/adiom-data/dsync/protocol/iface"
 )
 
 type conn struct {
 	settings ConnectorSettings
 
-	docMap      map[iface.Location]*IndexMap //map of locations to map of document IDs
+	docMap      map[string]*IndexMap //map of locations to map of document IDs
 	docMapMutex sync.RWMutex
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) GeneratePlan(context.Context, *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
+func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
+	if len(r.Msg.GetNamespaces()) == 1 {
+		return connect.NewResponse(&adiomv1.GeneratePlanResponse{
+			Partitions: []*adiomv1.Partition{{
+				Namespace:      r.Msg.GetNamespaces()[0],
+				EstimatedCount: uint64(c.settings.numCollectionsPerDatabase),
+			}},
+			UpdatesPartitions: []*adiomv1.Partition{{Cursor: []byte{1}}},
+		}), nil
+	}
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions:  c.CreateInitialGenerationTasks(),
-		StartCursor: []byte{1},
+		Partitions:        c.CreateInitialGenerationTasks(),
+		UpdatesPartitions: []*adiomv1.Partition{{Cursor: []byte{1}}},
 	}), nil
 }
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]) (*connect.Response[adiomv1.GetInfoResponse], error) {
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		DbType:             "/dev/random",
-		SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+		DbType: "/dev/random",
 		Capabilities: &adiomv1.Capabilities{
-			Source: true,
+			Source: &adiomv1.Capabilities_Source{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				DefaultPlan:        true,
+			},
 		},
 	}), nil
 }
@@ -124,7 +134,7 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 
 	settings.probabilities = []float64{0.34, 0.33, 0.33}
 
-	return &conn{settings: settings, docMap: map[iface.Location]*IndexMap{}}
+	return &conn{settings: settings, docMap: map[string]*IndexMap{}}
 }
 
 type ConnectorSettings struct {

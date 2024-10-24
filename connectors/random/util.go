@@ -11,7 +11,6 @@ import (
 	"math/rand"
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
-	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/brianvoe/gofakeit/v7"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -21,7 +20,7 @@ const (
 )
 
 // checks if the location key exists in the map, if not creates a new IndexMap for the given location to store ids
-func (rc *conn) getOrCreateLocIndexMap(loc iface.Location) *IndexMap {
+func (rc *conn) getOrCreateLocIndexMap(loc string) *IndexMap {
 	rc.docMapMutex.Lock()
 	defer rc.docMapMutex.Unlock()
 
@@ -38,7 +37,7 @@ func (rc *conn) getOrCreateLocIndexMap(loc iface.Location) *IndexMap {
 		It generates random documents for the specified collection in the task and sends them in a batch data messages to the channel
 */
 func (rc *conn) ProcessDataGenerationTaskBatch(partition *adiomv1.Partition) (*adiomv1.ListDataResponse, error) {
-	loc := iface.Location{Database: partition.GetNamespace().GetDb(), Collection: partition.GetNamespace().GetCol()}
+	loc := partition.GetNamespace()
 	var docs []map[string]interface{}
 	//create slice of random documents
 	for i := 0; i < rc.settings.numInitialDocumentsPerCollection; i++ { //Batch size is just number of docs per collection here
@@ -53,7 +52,6 @@ func (rc *conn) ProcessDataGenerationTaskBatch(partition *adiomv1.Partition) (*a
 	}
 	return &adiomv1.ListDataResponse{
 		Data: dataBatch,
-		Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 	}, nil
 }
 
@@ -68,10 +66,7 @@ func (rc *conn) CreateInitialGenerationTasks() []*adiomv1.Partition {
 	for i := 1; i <= rc.settings.numDatabases; i++ {
 		for j := 1; j <= rc.settings.numCollectionsPerDatabase; j++ {
 			task := &adiomv1.Partition{
-				Namespace: &adiomv1.Namespace{
-					Db:  fmt.Sprintf("db%d", i),
-					Col: fmt.Sprintf("col%d", j),
-				},
+				Namespace:      fmt.Sprintf("db%d.col%d", i, j),
 				EstimatedCount: uint64(rc.settings.maxDocsPerCollection),
 			}
 			tasks = append(tasks, task)
@@ -96,7 +91,7 @@ func (rc *conn) generateRandomDocument() map[string]interface{} {
 	 	function generates a single insert data message with a random document for the specified location
 		generates an id for the document and updates the given location's IndexMap with the id
 */
-func (rc *conn) SingleInsertDataMessage(loc iface.Location, doc map[string]interface{}) (*adiomv1.StreamUpdatesResponse, error) {
+func (rc *conn) SingleInsertDataMessage(loc string, doc map[string]interface{}) (*adiomv1.StreamUpdatesResponse, error) {
 	//checks if the location key exists in the map, if not creates a new IndexMap for the given location to store ids
 	docMap := rc.getOrCreateLocIndexMap(loc)
 	id := docMap.AddRandomID() //generate random id and add to IndexMap
@@ -108,16 +103,14 @@ func (rc *conn) SingleInsertDataMessage(loc iface.Location, doc map[string]inter
 	idType, idVal, _ := bson.MarshalValue(id)
 	return &adiomv1.StreamUpdatesResponse{
 		Updates: []*adiomv1.Update{{
-			Id: &adiomv1.BsonValue{
+			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
 				Type: uint32(idType),
-			},
+			}},
 			Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 			Data: data,
 		}},
-		Namespace:  &adiomv1.Namespace{Db: loc.Database, Col: loc.Collection},
-		Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
-		NextCursor: []byte{},
+		Namespace: loc,
 	}, nil
 }
 
@@ -126,7 +119,7 @@ function generates a batch insert data message with a slice of random documents 
 generates an id for each document and updates the given location's IndexMap with the ids
 sends all of the documents in a single batch insert data message to optimize performance
 */
-func (rc *conn) BatchInsertDataMessage(loc iface.Location, docs []map[string]interface{}) ([][]byte, error) {
+func (rc *conn) BatchInsertDataMessage(loc string, docs []map[string]interface{}) ([][]byte, error) {
 	var dataBatch [][]byte
 	var err error
 	dataBatch = make([][]byte, len(docs)) //create slice of byte slices to store marshaled documents for data message
@@ -151,7 +144,7 @@ func (rc *conn) generateChangeStreamEvent(operation adiomv1.UpdateType) (*adiomv
 	//generate random location
 	db := gofakeit.Number(1, rc.settings.numDatabases)
 	col := gofakeit.Number(1, rc.settings.numCollectionsPerDatabase)
-	loc := iface.Location{Database: fmt.Sprintf("db%d", db), Collection: fmt.Sprintf("col%d", col)}
+	loc := fmt.Sprintf("db%d.col%d", db, col)
 
 	docMap := rc.getOrCreateLocIndexMap(loc)
 	if docMap.GetNumDocs() == 0 && (operation == adiomv1.UpdateType_UPDATE_TYPE_DELETE || operation == adiomv1.UpdateType_UPDATE_TYPE_UPDATE) {
@@ -168,7 +161,7 @@ func (rc *conn) generateChangeStreamEvent(operation adiomv1.UpdateType) (*adiomv
 			return nil, nil
 		}
 		doc := rc.generateRandomDocument()
-		slog.Debug(fmt.Sprintf("Generated insert change stream event in collection %v.%v", loc.Database, loc.Collection))
+		slog.Debug(fmt.Sprintf("Generated insert change stream event in collection %v", loc))
 		return rc.SingleInsertDataMessage(loc, doc)
 
 	//update case generates an update data message with a random document by generating a random id from the IndexMap
@@ -178,41 +171,33 @@ func (rc *conn) generateChangeStreamEvent(operation adiomv1.UpdateType) (*adiomv
 		doc["_id"] = id //generate new document for the given id and return update data message
 		data, _ := bson.Marshal(doc)
 		idType, idVal, _ := bson.MarshalValue(id)
-		slog.Debug(fmt.Sprintf("Generated update change stream event with id %d in collection %v.%v", id, loc.Database, loc.Collection))
+		slog.Debug(fmt.Sprintf("Generated update change stream event with id %d in collection %v", id, loc))
 		return &adiomv1.StreamUpdatesResponse{
 			Updates: []*adiomv1.Update{{
-				Id: &adiomv1.BsonValue{
+				Id: []*adiomv1.BsonValue{{
 					Data: idVal,
 					Type: uint32(idType),
-				},
+				}},
 				Type: operation,
 				Data: data,
 			}},
-			Namespace: &adiomv1.Namespace{
-				Db:  loc.Database,
-				Col: loc.Collection,
-			},
-			Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+			Namespace: loc,
 		}, nil
 
 	//delete case generates a delete data message with a random id from the IndexMap
 	case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 		id := docMap.DeleteRandomKey()
 		idType, idVal, _ := bson.MarshalValue(id)
-		slog.Debug(fmt.Sprintf("Generated delete change stream event with id %d in collection %v.%v", id, loc.Database, loc.Collection))
+		slog.Debug(fmt.Sprintf("Generated delete change stream event with id %d in collection %v", id, loc))
 		return &adiomv1.StreamUpdatesResponse{
 			Updates: []*adiomv1.Update{{
-				Id: &adiomv1.BsonValue{
+				Id: []*adiomv1.BsonValue{{
 					Data: idVal,
 					Type: uint32(idType),
-				},
+				}},
 				Type: operation,
 			}},
-			Namespace: &adiomv1.Namespace{
-				Db:  loc.Database,
-				Col: loc.Collection,
-			},
-			Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+			Namespace: loc,
 		}, nil
 	}
 	return nil, fmt.Errorf("failed to generate change stream event")
