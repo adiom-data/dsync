@@ -239,7 +239,7 @@ func (ww *writerWorker) run() {
 			}
 
 			// Check to see if we should process a batch now
-			if len(batch) > 0 && (msg.Loc.Database != batch[0].Loc.Database || msg.Loc.Collection != batch[0].Loc.Collection) {
+			if len(batch) > 0 && msg.Loc != batch[0].Loc {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
