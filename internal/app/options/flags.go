@@ -117,7 +117,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewGenericFlag(&cli.GenericFlag{
 			Name:     "namespace",
-			Usage:    "list of namespaces 'db1,db2.collection' (comma-separated) to sync from on the source",
+			Usage:    "list of namespaces 'db1,db2.collection,db3.collection:otherdb.othercollection' (comma-separated) to sync from on the source and a colon to map names.",
 			Aliases:  []string{"ns", "nsFrom"},
 			Category: "Flow Options",
 			Value:    &ListFlag{},

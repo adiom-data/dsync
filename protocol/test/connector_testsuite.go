@@ -8,6 +8,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -216,7 +217,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 
 	// Start a go routine to write to the data channel
 	go func() {
-		loc := iface.Location{Database: dbName, Collection: colName}
+		loc := fmt.Sprintf("%v.%v", dbName, colName)
 		lsn := int64(0)
 		// write a number of messages to the channel
 		for i := 0; i < messageIterCount; i++ {
