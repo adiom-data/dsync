@@ -26,8 +26,7 @@ type ConnectorCapabilities struct {
 }
 
 type IntegrityCheckQuery struct {
-	Db        string
-	Col       string
+	Namespace string
 	CountOnly bool
 
 	PartitionKey string

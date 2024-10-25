@@ -46,9 +46,10 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	t.AssertExpectations(suite.T())
 	c.AssertExpectations(suite.T())
 
+	qdb := "db"
+	qcol := "col"
 	q := iface.IntegrityCheckQuery{
-		Db:  "db",
-		Col: "col",
+		Namespace: "db.col",
 	}
 
 	// Check if the connector supports integrity check capabilities
@@ -70,12 +71,12 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	assert.NoError(suite.T(), err)
 	count1 := res.Count
 
-	dataStore.InsertDummy(q.Db, q.Col+"Other", testRecord)
+	dataStore.InsertDummy(qdb, qcol+"Other", testRecord)
 	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count2 := res.Count
 
-	dataStore.InsertDummy(q.Db, q.Col, testRecord)
+	dataStore.InsertDummy(qdb, qcol, testRecord)
 	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count3 := res.Count

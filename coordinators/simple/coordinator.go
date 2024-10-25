@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -433,6 +434,28 @@ func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, tas
 	return fmt.Errorf("connector not part of the flow")
 }
 
+func mapNamespace(m map[string]string, namespace string) string {
+	if res, ok := m[namespace]; ok {
+		return res
+	}
+	if left, right, ok := strings.Cut(namespace, "."); ok {
+		if res, ok := m[left]; ok {
+			return res + "." + right
+		}
+	}
+	return namespace
+}
+
+func createNamespaceMap(namespaces []string) map[string]string {
+	m := map[string]string{}
+	for _, namespace := range namespaces {
+		if l, r, ok := strings.Cut(namespace, ":"); ok {
+			m[l] = r
+		}
+	}
+	return m
+}
+
 func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID, options iface.IntegrityCheckOptions) (iface.FlowDataIntegrityCheckResult, error) {
 	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
 
@@ -462,16 +485,19 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 		return res, err
 	}
 
+	namespaceMap := createNamespaceMap(flowDet.Options.SrcConnectorOptions.Namespace)
 	var queries []iface.IntegrityCheckQuery
 
 	if options.QuickCount {
 		dedup := map[string]iface.IntegrityCheckQuery{}
 		for _, task := range flowDet.ReadPlan.Tasks {
-			k := task.Def.Db + "." + task.Def.Col
+			k := task.Def.Col
+			if task.Def.Db != "" {
+				k = task.Def.Db + "." + task.Def.Col
+			}
 			if _, ok := dedup[k]; !ok {
 				dedup[k] = iface.IntegrityCheckQuery{
-					Db:        task.Def.Db,
-					Col:       task.Def.Col,
+					Namespace: k,
 					CountOnly: true,
 				}
 			}
@@ -481,9 +507,12 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 		}
 	} else {
 		for _, task := range flowDet.ReadPlan.Tasks {
+			k := task.Def.Col
+			if task.Def.Db != "" {
+				k = task.Def.Db + "." + task.Def.Col
+			}
 			queries = append(queries, iface.IntegrityCheckQuery{
-				Db:           task.Def.Db,
-				Col:          task.Def.Col,
+				Namespace:    k,
 				PartitionKey: task.Def.PartitionKey,
 				Low:          task.Def.Low,
 				High:         task.Def.High,
@@ -523,7 +552,11 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
 					return err
 				}
-				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, query)
+				dstNamespace := mapNamespace(namespaceMap, query.Namespace)
+				dstQuery := query
+				dstQuery.Namespace = dstNamespace
+
+				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, dstQuery)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
