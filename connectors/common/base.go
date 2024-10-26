@@ -737,6 +737,10 @@ func NewLocalConnector(desc string, impl adiomv1connect.ConnectorServiceHandler,
 	}
 }
 
+func NewRemoteConnector(desc string, impl adiomv1connect.ConnectorServiceClient, settings ConnectorSettings) *connector {
+	return NewConnector(desc, impl, impl, settings)
+}
+
 func setDefault[T comparable](field *T, defaultValue T) {
 	if *field == *new(T) {
 		*field = defaultValue

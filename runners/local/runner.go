@@ -10,22 +10,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/adiom-data/dsync/connectors/common"
-	connectorCosmos "github.com/adiom-data/dsync/connectors/cosmos"
-	"github.com/adiom-data/dsync/connectors/dynamodb"
-	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
-	connectorNull "github.com/adiom-data/dsync/connectors/null"
-	connectorRandom "github.com/adiom-data/dsync/connectors/random"
-	"github.com/adiom-data/dsync/connectors/testconn"
 	coordinatorSimple "github.com/adiom-data/dsync/coordinators/simple"
+	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/protocol/iface"
 	statestoreMongo "github.com/adiom-data/dsync/statestores/mongo"
 	statestoreTemp "github.com/adiom-data/dsync/statestores/temp"
 	transportLocal "github.com/adiom-data/dsync/transports/local"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 // Implements the protocol.iface.Runner interface
@@ -52,10 +45,8 @@ type RunnerLocal struct {
 }
 
 type RunnerLocalSettings struct {
-	SrcConnString        string
-	DstConnString        string
-	SrcType              string
-	DstType              string
+	Src                  options.ConfiguredConnector
+	Dst                  options.ConfiguredConnector
 	StateStoreConnString string
 
 	NsFromString []string
@@ -67,23 +58,15 @@ type RunnerLocalSettings struct {
 
 	FlowStatusReportingInterval time.Duration
 
-	CosmosDeletesEmuRequestedFlag bool
-
 	AdvancedProgressRecalcInterval time.Duration // 0 means disabled
 
-	LoadLevel                         string
-	InitialSyncNumParallelCopiers     int
-	NumParallelWriters                int
-	NumParallelIntegrityCheckTasks    int
-	CosmosNumParallelPartitionWorkers int
-	CosmosReaderMaxNumNamespaces      int
-	ServerConnectTimeout              time.Duration
-	PingTimeout                       time.Duration
-	CdcResumeTokenUpdateInterval      time.Duration
-	WriterMaxBatchSize                int
-	CosmosTargetDocCountPerPartition  int64
-	CosmosDeletesCheckInterval        time.Duration
-	SyncMode                          string
+	LoadLevel                      string
+	InitialSyncNumParallelCopiers  int
+	NumParallelWriters             int
+	NumParallelIntegrityCheckTasks int
+	CdcResumeTokenUpdateInterval   time.Duration
+	WriterMaxBatchSize             int
+	SyncMode                       string
 }
 
 const (
@@ -110,7 +93,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
 	}
 	if settings.LoadLevel != "" {
-		btc := getBaseThreadCount(settings.LoadLevel)
+		btc := GetBaseThreadCount(settings.LoadLevel)
 		if connectorSettings.NumParallelCopiers == 0 {
 			connectorSettings.NumParallelCopiers = btc
 		}
@@ -119,84 +102,20 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		}
 	}
 
-	nullRead := settings.SrcConnString == "/dev/random"
-	if nullRead {
-		r.src = common.NewLocalConnector(sourceName, connectorRandom.NewConn(connectorRandom.ConnectorSettings{}), connectorSettings)
-		r.runnerProgress.SourceDescription = "/dev/null"
-	} else if settings.SrcType == "CosmosDB" {
-		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}}
-		if settings.CosmosDeletesEmuRequestedFlag {
-			cosmosSettings.EmulateDeletes = true
-			// the destination is a MongoDB database otherwise the Options check would have failed
-			cosmosSettings.WitnessMongoConnString = settings.DstConnString
-		}
-		// check and adjust for configurated settings
-		if settings.LoadLevel != "" {
-			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.CosmosNumParallelPartitionWorkers != 0 {
-				cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
-			} else {
-				cosmosSettings.NumParallelPartitionWorkers = btc / 2
-			}
-		} else {
-			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
-		}
-		cosmosSettings.MaxNumNamespaces = settings.CosmosReaderMaxNumNamespaces
-		cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-		cosmosSettings.PingTimeout = settings.PingTimeout
-		cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
-		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
-
-		r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
-		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
-	} else if settings.SrcType == "MongoDB" {
-		mongoSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}
-		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		mongoSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-		mongoSettings.PingTimeout = settings.PingTimeout
-
-		r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
-		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
-	} else if settings.SrcType == "testconn" {
-		r.src = common.NewLocalConnector(sourceName, testconn.NewConn(settings.SrcConnString), connectorSettings)
-	} else if settings.SrcType == "dynamodb" {
-		r.src = common.NewLocalConnector(sourceName, dynamodb.NewConn(settings.SrcConnString), connectorSettings)
-	}
-	//null write?
-	nullWrite := settings.DstConnString == "/dev/null"
-	if nullWrite {
-		r.dst = common.NewLocalConnector(destinationName, connectorNull.NewConn(), connectorSettings)
-		r.runnerProgress.DestinationDescription = "/dev/null"
-	} else if settings.DstType == "CosmosDB" {
-		connSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}}
-		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-		connSettings.PingTimeout = settings.PingTimeout
-
-		r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
-		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
-	} else if settings.DstType == "testconn" {
-		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), connectorSettings)
-	} else if settings.DstType == "dynamodb" {
-		r.dst = common.NewLocalConnector(destinationName, dynamodb.NewConn(settings.DstConnString), connectorSettings)
+	if settings.Src.Local != nil {
+		r.src = common.NewLocalConnector(sourceName, settings.Src.Local, connectorSettings)
 	} else {
-		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
-		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
-		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
-		connSettings.PingTimeout = settings.PingTimeout
-
-		r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
-		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
+		r.src = common.NewRemoteConnector(sourceName, settings.Src.Remote, connectorSettings)
+	}
+	if settings.Dst.Local != nil {
+		r.dst = common.NewLocalConnector(destinationName, settings.Dst.Local, connectorSettings)
+	} else {
+		r.dst = common.NewRemoteConnector(destinationName, settings.Dst.Remote, connectorSettings)
 	}
 
 	//XXX: implement and use a function isStateful() from connectors to determine if a connector is stateful (although we may not care too much about it for SaaS deployments)
 	if settings.StateStoreConnString != "" { //if the statestore is explicitly set, use it
 		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.StateStoreConnString})
-	} else if !nullWrite && !settings.ReverseRequestedFlag { //if the destination is stateful, we can use it as statestore
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.DstConnString})
-	} else if settings.ReverseRequestedFlag { //if we're reversing the flow, use the source as statestore (we assume it was stateful)
-		r.statestore = statestoreMongo.NewMongoStateStore(statestoreMongo.StateStoreSettings{ConnectionString: settings.SrcConnString})
 	} else {
 		// otherwise, use a stub statestore because no statestore is needed
 		r.statestore = statestoreTemp.NewTempStateStore()
@@ -206,7 +125,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 	if settings.NumParallelIntegrityCheckTasks != 0 {
 		numParallelIntegrityCheckTasks = settings.NumParallelIntegrityCheckTasks
 	} else if settings.LoadLevel != "" {
-		btc := getBaseThreadCount(settings.LoadLevel)
+		btc := GetBaseThreadCount(settings.LoadLevel)
 		numParallelIntegrityCheckTasks = btc // default to the base thread count to be consistent with the number of parallel copiers
 	}
 	r.coord = coordinatorSimple.NewSimpleCoordinator(numParallelIntegrityCheckTasks)
@@ -291,7 +210,7 @@ func (r *RunnerLocal) Run() error {
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag})
-		if err != nil { 
+		if err != nil {
 			r.runnerProgress.VerificationResult = "ERROR"
 			slog.Error("Data integrity check: ERROR")
 			slog.Error("Failed to perform flow integrity check", "err", err)
@@ -382,7 +301,7 @@ func (r *RunnerLocal) Teardown() {
 }
 
 // Determines the base thread count for the connector based on the provided load level
-func getBaseThreadCount(loadLevel string) int {
+func GetBaseThreadCount(loadLevel string) int {
 	switch loadLevel {
 	case "Low":
 		return 4
@@ -397,27 +316,10 @@ func getBaseThreadCount(loadLevel string) int {
 	return 0
 }
 
-// redacts mongodb connection string and keeps only hostname:port
-// XXX: is this the right place for it or connectors should expose the redacted string themselves?
-func redactMongoConnString(url string) string {
-	var hosts string
-
-	connString, err := connstring.Parse(url)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to parse connection string: %v", err))
-		hosts = url //assume it's a hostname
-	} else {
-		hosts = strings.Join(connString.Hosts, ",")
-	}
-
-	return hosts
-}
-
 func applyReverseIfNeeded(settings *RunnerLocalSettings) {
 	if settings.ReverseRequestedFlag {
 		slog.Info("Reversing the flow")
-		settings.SrcConnString, settings.DstConnString = settings.DstConnString, settings.SrcConnString
-		settings.SrcType, settings.DstType = settings.DstType, settings.SrcType
+		settings.Src, settings.Dst = settings.Dst, settings.Src
 		settings.SyncMode = iface.SyncModeCDC
 	}
 }

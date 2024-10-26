@@ -8,6 +8,7 @@ package dsync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -43,7 +44,7 @@ func NewApp() *cli.App {
 		Flags:     flags,
 		Name:      "dsync",
 		Usage:     "Copies data from the source to the destination",
-		UsageText: "dsync [options]",
+		UsageText: "dsync [options] source [source-options] destination [destination-options]",
 		Version:   build.VersionInfo(),
 		Copyright: build.CopyrightStr,
 		Action:    runDsync,
@@ -105,33 +106,44 @@ func runDsync(c *cli.Context) error {
 
 	slog.Debug(fmt.Sprintf("Parsed options: %+v", options.RedactSensitiveInfo(o)))
 
+	var additionalSettings options.AdditionalSettings
+	if o.LoadLevel != "" {
+		additionalSettings.BaseThreadCount = runner.GetBaseThreadCount(o.LoadLevel)
+	}
+	src, dst, err := options.ConfigureConnectors(c.Args().Slice(), additionalSettings)
+	if err != nil {
+		if errors.Is(err, options.ErrMissingConnector) {
+			cli.ShowAppHelp(c)
+			fmt.Fprintf(c.App.Writer, "\nUsage looks like `dsync [options] source_connector destination_connector`\n")
+			fmt.Fprintf(c.App.Writer, "Example: `dsync testconn://./fixture mongodb://localhost:27017`\n")
+			fmt.Fprintf(c.App.Writer, "\nThe following connectors are available:\n")
+			for _, rc := range options.GetRegisteredConnectors() {
+				fmt.Fprintf(c.App.Writer, "  `dsync %v help`\n", rc.Name)
+			}
+		} else if errors.Is(err, options.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
-		SrcConnString:                     o.SrcConnString,
-		DstConnString:                     o.DstConnString,
-		SrcType:                           o.Sourcetype,
-		DstType:                           o.Destinationtype,
-		StateStoreConnString:              o.StateStoreConnString,
-		NsFromString:                      o.NamespaceFrom,
-		VerifyRequestedFlag:               o.Verify || o.VerifyQuickCount,
-		VerifyQuickCountFlag:              o.VerifyQuickCount,
-		CleanupRequestedFlag:              o.Cleanup,
-		FlowStatusReportingInterval:       10,
-		CosmosDeletesEmuRequestedFlag:     o.CosmosDeletesEmu,
-		AdvancedProgressRecalcInterval:    throughputUpdateInterval,
-		LoadLevel:                         o.LoadLevel,
-		InitialSyncNumParallelCopiers:     o.InitialSyncNumParallelCopiers,
-		NumParallelWriters:                o.NumParallelWriters,
-		NumParallelIntegrityCheckTasks:    o.NumParallelIntegrityCheckTasks,
-		CosmosNumParallelPartitionWorkers: o.CosmosNumParallelPartitionWorkers,
-		CosmosReaderMaxNumNamespaces:      o.CosmosReaderMaxNumNamespaces,
-		ServerConnectTimeout:              o.ServerConnectTimeout,
-		PingTimeout:                       o.PingTimeout,
-		CdcResumeTokenUpdateInterval:      o.CdcResumeTokenUpdateInterval,
-		WriterMaxBatchSize:                o.WriterMaxBatchSize,
-		CosmosTargetDocCountPerPartition:  o.CosmosTargetDocCountPerPartition,
-		CosmosDeletesCheckInterval:        o.CosmosDeletesCheckInterval,
-		SyncMode:                          o.Mode,
-		ReverseRequestedFlag:              o.Reverse,
+		Src:                            src,
+		Dst:                            dst,
+		StateStoreConnString:           o.StateStoreConnString,
+		NsFromString:                   o.NamespaceFrom,
+		VerifyRequestedFlag:            o.Verify || o.VerifyQuickCount,
+		VerifyQuickCountFlag:           o.VerifyQuickCount,
+		CleanupRequestedFlag:           o.Cleanup,
+		FlowStatusReportingInterval:    10,
+		AdvancedProgressRecalcInterval: throughputUpdateInterval,
+		LoadLevel:                      o.LoadLevel,
+		InitialSyncNumParallelCopiers:  o.InitialSyncNumParallelCopiers,
+		NumParallelWriters:             o.NumParallelWriters,
+		NumParallelIntegrityCheckTasks: o.NumParallelIntegrityCheckTasks,
+		CdcResumeTokenUpdateInterval:   o.CdcResumeTokenUpdateInterval,
+		WriterMaxBatchSize:             o.WriterMaxBatchSize,
+		SyncMode:                       o.Mode,
+		ReverseRequestedFlag:           o.Reverse,
 	})
 
 	var wg sync.WaitGroup
