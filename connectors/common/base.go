@@ -11,8 +11,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,6 +26,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.akshayshah.org/memhttp"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -76,6 +79,30 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 	return c.status
 }
 
+func HashBson(hasher hash.Hash64, b bson.Raw) error {
+	elems, err := b.Elements()
+	if err != nil {
+		return err
+	}
+	slices.SortFunc(elems, func(i, j bson.RawElement) int {
+		return strings.Compare(i.Key(), j.Key())
+	})
+	for _, e := range elems {
+		hasher.Write([]byte(e.Key()))
+		v := e.Value()
+		hasher.Write([]byte{byte(v.Type)})
+		if v.Type == bson.TypeEmbeddedDocument {
+			hasher.Write([]byte(e.Key()))
+			if err := HashBson(hasher, v.Document()); err != nil {
+				return err
+			}
+		} else {
+			hasher.Write(e)
+		}
+	}
+	return err
+}
+
 // IntegrityCheck implements iface.Connector.
 func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityCheckQuery) (iface.ConnectorDataIntegrityCheckResult, error) {
 	if task.CountOnly {
@@ -116,7 +143,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 		for _, data := range res.Msg.Data {
 			hasher.Reset()
-			_, err := hasher.Write(data)
+			err = HashBson(hasher, bson.Raw(data))
 			if err != nil {
 				slog.Error(fmt.Sprintf("Error hashing during integrity check: %v", err))
 				return iface.ConnectorDataIntegrityCheckResult{}, err
