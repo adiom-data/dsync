@@ -28,13 +28,6 @@ type conn struct {
 	options Options
 }
 
-func tableName(namespace *adiomv1.Namespace) string {
-	if namespace.GetCol() == "" {
-		return namespace.GetDb()
-	}
-	return namespace.GetCol()
-}
-
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
 	var tableNames []string
@@ -47,7 +40,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		}
 	} else {
 		for _, namespace := range namespaces {
-			tableNames = append(tableNames, tableName(namespace))
+			tableNames = append(tableNames, namespace)
 		}
 	}
 
@@ -95,13 +88,10 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			statesCh <- state
 
 			// TODO: reconsider how to map namespaces properly
-			ns := &adiomv1.Namespace{
-				Db:  "dynamodb",
-				Col: name,
-			}
+			ns := name
 			totalSegments := 1
 
-			if r.Msg.GetParallelize() && c.options.DocsPerSegment > 0 {
+			if r.Msg.GetInitialSync() && c.options.DocsPerSegment > 0 {
 				totalSegments = int(tableDetails.Count / uint64(c.options.DocsPerSegment))
 				totalSegments = max(1, min(1000000, totalSegments))
 			}
@@ -156,30 +146,33 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions:  partitions,
-		StartCursor: buf.Bytes(),
+		Partitions:        partitions,
+		UpdatesPartitions: []*adiomv1.Partition{{Cursor: buf.Bytes()}},
 	}), nil
 }
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]) (*connect.Response[adiomv1.GetInfoResponse], error) {
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		DbType:             "dynamodb",
-		Version:            "",
-		Spec:               c.spec,
-		SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+		DbType:  "dynamodb",
+		Version: "",
+		Spec:    c.spec,
 		Capabilities: &adiomv1.Capabilities{
-			Source:    true,
-			Sink:      true,
-			Resumable: true,
-			LsnStream: false,
+			Source: &adiomv1.Capabilities_Source{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				MultiNamespacePlan: true,
+				DefaultPlan:        true,
+			},
+			Sink: &adiomv1.Capabilities_Sink{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+			},
 		},
 	}), nil
 }
 
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetNamespaceMetadata(ctx context.Context, r *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
-	res, err := c.client.TableDetails(ctx, tableName(r.Msg.GetNamespace()))
+	res, err := c.client.TableDetails(ctx, r.Msg.GetNamespace())
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -198,7 +191,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		cursor = r.Msg.GetPartition().GetCursor()
 	}
 
-	res, err := c.client.Scan(ctx, tableName(r.Msg.GetPartition().GetNamespace()), true, cursor)
+	res, err := c.client.Scan(ctx, r.Msg.GetPartition().GetNamespace(), true, cursor)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -208,7 +201,6 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 	return connect.NewResponse(&adiomv1.ListDataResponse{
 		Data:       res.Items,
-		Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 		NextCursor: res.NextCursor,
 	}), nil
 }
@@ -236,9 +228,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			return connect.NewError(connect.CodeInternal, err)
 		}
 	} else {
-		for _, namespace := range namespaces {
-			tableNames = append(tableNames, tableName(namespace))
-		}
+		tableNames = namespaces
 	}
 
 	arnToTableDetails := map[string]TableDetailsResult{}
@@ -301,12 +291,8 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 				}
 				cursor := buf.Bytes()
 				if err := s.Send(&adiomv1.StreamUpdatesResponse{
-					Updates: updates,
-					Namespace: &adiomv1.Namespace{ // TODO: reconsider how to map namespaces properly
-						Db:  "dynamodb",
-						Col: arnToTableDetails[records.StreamARN].Name,
-					},
-					Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+					Updates:    updates,
+					Namespace:  arnToTableDetails[records.StreamARN].Name,
 					NextCursor: cursor,
 				}); err != nil {
 					slog.Error("skipping, error sending update", "err", err)
@@ -348,7 +334,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		batched = append(batched, d)
 
 		if len(batched) == 25 || i == len(data)-1 {
-			err := c.client.BulkInsert(ctx, tableName(r.Msg.GetNamespace()), batched)
+			err := c.client.BulkInsert(ctx, r.Msg.GetNamespace(), batched)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}

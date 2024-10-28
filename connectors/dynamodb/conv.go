@@ -305,7 +305,7 @@ func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiom
 	case streamtypes.OperationTypeRemove:
 		typ = adiomv1.UpdateType_UPDATE_TYPE_DELETE
 		return &adiomv1.Update{
-			Id:   bsonValue,
+			Id:   []*adiomv1.BsonValue{bsonValue},
 			Type: typ,
 		}, nil
 	default:
@@ -327,7 +327,7 @@ func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiom
 	}
 
 	return &adiomv1.Update{
-		Id:   bsonValue,
+		Id:   []*adiomv1.BsonValue{bsonValue},
 		Type: typ,
 		Data: marshaled,
 	}, nil

@@ -67,6 +67,8 @@ type connector struct {
 	resumeTokenMutex sync.RWMutex
 
 	progressTracker *ProgressTracker
+
+	namespaceMappings map[string]string
 }
 
 // GetConnectorStatus implements iface.Connector.
@@ -77,7 +79,7 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 // IntegrityCheck implements iface.Connector.
 func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityCheckQuery) (iface.ConnectorDataIntegrityCheckResult, error) {
 	if task.CountOnly {
-		res, err := c.impl.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{Namespace: &adiomv1.Namespace{Db: task.Db, Col: task.Col}}))
+		res, err := c.impl.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{Namespace: task.Namespace}))
 		if err != nil {
 			return iface.ConnectorDataIntegrityCheckResult{}, err
 		}
@@ -95,15 +97,14 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 	if task.Low != nil {
 		pCursor = task.Low.(primitive.Binary).Data
 	}
+	namespace := task.Namespace
 	for {
 		res, err := c.maybeOptimizedImpl.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 			Partition: &adiomv1.Partition{
-				Namespace: &adiomv1.Namespace{
-					Db:  task.Db,
-					Col: task.Col,
-				},
-				Cursor: pCursor,
+				Namespace: namespace,
+				Cursor:    pCursor,
 			},
+			Type:   adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 			Cursor: cursor,
 		}))
 		if err != nil {
@@ -148,48 +149,75 @@ func (c *connector) Interrupt(flowId iface.FlowID) error {
 	return nil
 }
 
+func (c *connector) mapNamespace(namespace string) string {
+	if res, ok := c.namespaceMappings[namespace]; ok {
+		return res
+	}
+	if left, right, ok := strings.Cut(namespace, "."); ok {
+		if res, ok := c.namespaceMappings[left]; ok {
+			return res + "." + right
+		}
+	}
+	return namespace
+}
+
+func (c *connector) parseNamespaceOptionAndUpdateMap(namespaces []string) ([]string, []string) {
+	var left []string
+	var right []string
+	for _, namespace := range namespaces {
+		if l, r, ok := strings.Cut(namespace, ":"); ok {
+			left = append(left, l)
+			right = append(right, r)
+			c.namespaceMappings[l] = r
+		} else {
+			left = append(left, namespace)
+			right = append(right, namespace)
+		}
+	}
+	return left, right
+}
+
 // RequestCreateReadPlan implements iface.Connector.
 func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	go func() {
-		// Retrieve the latest resume token before we start reading anything
-		// We will use the resume token to start the change stream
-		c.status.SyncState = iface.ReadPlanningSyncState
-		namespaces := adiomNamespaces(options.Namespace)
-		resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
-			Namespaces:  namespaces,
-			Parallelize: options.Mode != iface.SyncModeCDC,
-		}))
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
-			return
-		}
+	// Retrieve the latest resume token before we start reading anything
+	// We will use the resume token to start the change stream
+	c.status.SyncState = iface.ReadPlanningSyncState
+	namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
+	resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
+		Namespaces:  namespaces,
+		InitialSync: options.Mode != iface.SyncModeCDC,
+		Updates:     true,
+	}))
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
+		return c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{})
+	}
 
-		c.resumeToken = resp.Msg.GetStartCursor()
+	c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
 
-		curID := 0
-		var tasks []iface.ReadPlanTask
-		if options.Mode == iface.SyncModeCDC {
-			tasks = nil
-		} else {
-			for _, partition := range resp.Msg.GetPartitions() {
-				curID++
-				task := iface.ReadPlanTask{
-					Id: iface.ReadPlanTaskID(curID),
-				}
-				task.Def.Db = partition.GetNamespace().GetDb()
-				task.Def.Col = partition.GetNamespace().GetCol()
-				task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
-				task.EstimatedDocCount = int64(partition.GetEstimatedCount())
-				tasks = append(tasks, task)
+	curID := 0
+	var tasks []iface.ReadPlanTask
+	if options.Mode == iface.SyncModeCDC {
+		tasks = nil
+	} else {
+		for _, partition := range resp.Msg.GetPartitions() {
+			curID++
+			task := iface.ReadPlanTask{
+				Id: iface.ReadPlanTaskID(curID),
 			}
+			task.Def.Col = partition.GetNamespace()
+			task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
+			task.EstimatedDocCount = int64(partition.GetEstimatedCount())
+			tasks = append(tasks, task)
 		}
-		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
+	}
+	plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
 
-		err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
-		}
-	}()
+	err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+		return err
+	}
 	return nil
 }
 
@@ -226,10 +254,10 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 		Spec:    res.Msg.GetSpec(),
 	}
 	connectorCapabilities := iface.ConnectorCapabilities{
-		Source:         capabilities.GetSource(),
-		Sink:           capabilities.GetSink(),
-		IntegrityCheck: capabilities.GetSource(),
-		Resumability:   capabilities.GetResumable(),
+		Source:         capabilities.GetSource() != nil,
+		Sink:           capabilities.GetSink() != nil,
+		IntegrityCheck: capabilities.GetSource() != nil,
+		Resumability:   true,
 	}
 
 	// Create a new connector details structure
@@ -237,8 +265,7 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 		Desc: c.desc,
 		Type: connectorType,
 		Cap:  connectorCapabilities,
-		// TODO: unsure how to properly set connector id
-		Id: iface.ConnectorID(fmt.Sprintf("%v.%v.%v", connectorType.DbType, connectorType.Version, connectorType.Spec)),
+		Id:   iface.ConnectorID(res.Msg.GetId()),
 	}
 	// Register the connector
 	c.id, err = coord.RegisterConnector(connectorDetails, c)
@@ -249,17 +276,10 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 	return nil
 }
 
-func adiomNamespaces(namespaces []string) []*adiomv1.Namespace {
-	var res []*adiomv1.Namespace
-	for _, ns := range namespaces {
-		db, col, _ := strings.Cut(ns, ".")
-		res = append(res, &adiomv1.Namespace{Db: db, Col: col})
-	}
-	return res
-}
-
 // StartReadToChannel implements iface.Connector.
 func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelID iface.DataChannelID) error {
+	// We'll do namespace mappings on the read side for now, so ensure we have the mapping ready
+	_, _ = c.parseNamespaceOptionAndUpdateMap(options.Namespace)
 
 	c.flowCtx, c.flowCancelFunc = context.WithCancel(c.ctx)
 	c.flowID = flowId
@@ -268,26 +288,11 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
 
 	// If everything, then don't pass any namespaces
-	// Otherwise, we want only unique fully qualified namespaces
-	var streamUpdatesNamespaces []*adiomv1.Namespace
-	if options.Namespace != nil {
-		namespaceMap := map[string]map[string]struct{}{}
+	// Otherwise, we want only unique fully qualified namespaces (which currently is fully contained in task.Def.Col)
+	var streamUpdatesNamespaces []string
+	if len(options.Namespace) == 0 {
 		for _, task := range readPlan.Tasks {
-			if dbMap, ok := namespaceMap[task.Def.Db]; ok {
-				dbMap[task.Def.Col] = struct{}{}
-			} else {
-				namespaceMap[task.Def.Db] = map[string]struct{}{
-					task.Def.Col: {},
-				}
-			}
-		}
-		for db, v := range namespaceMap {
-			for col := range v {
-				streamUpdatesNamespaces = append(streamUpdatesNamespaces, &adiomv1.Namespace{
-					Db:  db,
-					Col: col,
-				})
-			}
+			streamUpdatesNamespaces = append(streamUpdatesNamespaces, task.Def.Col)
 		}
 	}
 
@@ -297,7 +302,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	go func() {
 		defer close(progressResetChan)
 		c.progressTracker.ResetNsProgressEstimatedDocCounts(func(ctx context.Context, ns iface.Namespace) (int64, error) {
-			res, err := c.impl.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{Namespace: &adiomv1.Namespace{Db: ns.Db, Col: ns.Col}}))
+			res, err := c.impl.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{Namespace: ns.Col}))
 			if err != nil {
 				return 0, err
 			}
@@ -412,6 +417,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				defer wg.Done()
 			Loop:
 				for task := range taskChannel {
+					sourceNamespace := task.Def.Col
+					destinationNamespace := c.mapNamespace(sourceNamespace)
 					slog.Debug(fmt.Sprintf("Processing task: %v", task))
 					var docs int64
 					ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
@@ -426,12 +433,10 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					for {
 						res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
 							Partition: &adiomv1.Partition{
-								Namespace: &adiomv1.Namespace{
-									Db:  task.Def.Db,
-									Col: task.Def.Col,
-								},
-								Cursor: pCursor,
+								Namespace: sourceNamespace,
+								Cursor:    pCursor,
 							},
+							Type:   adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 							Cursor: cursor,
 						}))
 						if err != nil {
@@ -448,10 +453,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						dataMessage := iface.DataMessage{
 							DataBatch:    res.Msg.Data,
 							MutationType: iface.MutationType_InsertBatch,
-							Loc: iface.Location{
-								Database:   task.Def.Db,
-								Collection: task.Def.Col,
-							},
+							Loc:          destinationNamespace,
 						}
 						dataChannel <- dataMessage
 						nextCursor := res.Msg.GetNextCursor()
@@ -533,6 +535,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 
 		res, err := c.impl.StreamUpdates(c.flowCtx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
 			Namespaces: streamUpdatesNamespaces,
+			Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 			Cursor:     initialResumeToken,
 		}))
 		if err != nil {
@@ -555,20 +558,19 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 					mutationType = iface.MutationType_Delete
 				}
-				id := d.GetId().GetData()
+				id := d.GetId()[0].GetData()
 				c.progressTracker.UpdateChangeStreamProgressTracking()
 				readerProgress.changeStreamEvents.Add(1)
 				lsn++
+
+				destinationNamespace := c.mapNamespace(msg.GetNamespace())
 				dataChannel <- iface.DataMessage{
 					Data:         &d.Data,
 					MutationType: mutationType,
-					Loc: iface.Location{
-						Database:   msg.GetNamespace().GetDb(),
-						Collection: msg.GetNamespace().GetCol(),
-					},
-					Id:     &id,
-					IdType: byte(d.GetId().GetType()),
-					SeqNum: lsn,
+					Loc:          destinationNamespace,
+					Id:           &id,
+					IdType:       byte(d.GetId()[0].GetType()),
+					SeqNum:       lsn,
 				}
 			}
 
@@ -756,6 +758,7 @@ func NewConnector(desc string, impl adiomv1connect.ConnectorServiceClient, under
 		impl:               impl,
 		maybeOptimizedImpl: maybeOptimizedConnectorService,
 		settings:           settings,
+		namespaceMappings:  map[string]string{},
 	}
 }
 
@@ -766,8 +769,9 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		switch dataMsg.MutationType {
 		case iface.MutationType_InsertBatch:
 			if len(msgs) > 0 {
+				ns := dataMsg.Loc
 				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-					Namespace: &adiomv1.Namespace{Db: dataMsg.Loc.Database, Col: dataMsg.Loc.Collection},
+					Namespace: ns,
 					Updates:   msgs,
 					Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
 				}))
@@ -778,7 +782,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				msgs = nil
 			}
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
-				Namespace: &adiomv1.Namespace{Db: dataMsg.Loc.Database, Col: dataMsg.Loc.Collection},
+				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
 				Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
 			}))
@@ -788,19 +792,19 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			c.status.WriteLSN = max(c.status.WriteLSN, dataMsg.SeqNum)
 		case iface.MutationType_Insert:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   &adiomv1.BsonValue{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)},
+				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
 				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Update:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   &adiomv1.BsonValue{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)},
+				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
 				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Delete:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   &adiomv1.BsonValue{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)},
+				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 			})
 		default:
@@ -808,8 +812,9 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		}
 	}
 	if len(msgs) > 0 {
+		ns := dataMsgs[0].Loc
 		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-			Namespace: &adiomv1.Namespace{Db: dataMsgs[0].Loc.Database, Col: dataMsgs[0].Loc.Collection},
+			Namespace: ns,
 			Updates:   msgs,
 			Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
 		}))

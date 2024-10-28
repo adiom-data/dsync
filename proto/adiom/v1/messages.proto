@@ -3,9 +3,12 @@ syntax = "proto3";
 package adiom.v1;
 option go_package = "github.com/adiom-data/dsync/gen/adiom/v1;adiomv1";
 
+import "google/protobuf/timestamp.proto";
+
 message BsonValue {
     bytes data = 1;
     uint32 type = 2;
+    string name = 3;
 }
 
 enum DataType {
@@ -13,37 +16,53 @@ enum DataType {
     DATA_TYPE_MONGO_BSON = 1; // BSON that must have an _id field
 }
 
-message Namespace {
-    string db = 1;
-    string col = 2;
-}
-
 message Partition {
-    Namespace namespace = 1;
-    string description = 2;
-    bytes cursor = 3;
-    uint64 estimated_count = 4;
+    string namespace = 1;
+
+    // If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+    // This can be utilized so that a load balancer can perform routing based on the header
+    string partition_header = 2;
+    string partition_value = 3;
+
+    bytes cursor = 4;
+    uint64 estimated_count = 5; // If non zero, provides an estimate of the number of documents
 }
 
 message Capabilities {
-    bool source = 1;
-    bool sink = 2;
-    bool resumable = 3;
-    bool lsn_stream = 4;
+    message Source {
+        repeated DataType supported_data_types = 1;
+
+        // whether the StreamLSN endpoint is functional
+        bool lsn_stream = 2;
+
+        // allows requesting a plan for multiple namespaces
+        // useful to support in the scenario that the underlying data source
+        // allows you to listen to multiple namespaces at the same time
+        bool multi_namespace_plan = 3;
+
+        // allows requesting a plan without specifying any namespaces
+        // the behavior is up to the source- usually it means all available namespaces
+        bool default_plan = 4;
+    }
+    message Sink {
+        repeated DataType supported_data_types = 1;
+    }
+    Source source = 1;
+    Sink sink = 2;
 }
 
 message GetInfoRequest {}
 
 message GetInfoResponse {
-    string db_type = 1;
-    string version = 2;
-    string spec = 3;
-    repeated DataType supported_data_types = 4;
+    string id = 1;
+    string db_type = 2;
+    string version = 3;
+    string spec = 4;
     Capabilities capabilities = 5;
 }
 
 message GetNamespaceMetadataRequest {
-    Namespace namespace = 1;
+    string namespace = 1;
 }
 
 message GetNamespaceMetadataResponse {
@@ -51,13 +70,16 @@ message GetNamespaceMetadataResponse {
 }
 
 message GeneratePlanRequest {
-    repeated Namespace namespaces = 1;
-    bool parallelize = 2;
+    // Typically accepts exactly 1 namespace, unless `multi_namespace_plan` or `default_plan` capabilities are enabled
+    repeated string namespaces = 1;
+
+    bool initial_sync = 2;
+    bool updates = 3;
 }
 
 message GeneratePlanResponse {
     repeated Partition partitions = 1;
-    bytes start_cursor = 2;
+    repeated Partition updates_partitions = 2;
 }
 
 enum UpdateType {
@@ -68,26 +90,24 @@ enum UpdateType {
 }
 
 message Update {
-    BsonValue id = 1;
+    repeated BsonValue id = 1;
     UpdateType type = 2;
     bytes data = 3;
 }
 
 message ListDataRequest {
-    Partition partition = 1;
-    repeated BsonValue ids = 2;
-    bytes cursor = 3;
-    // uint64 limit = 4;
+    Partition partition = 1; // must not be modified from the original provided plan
+    DataType type = 2;
+    bytes cursor = 3; // previous cursor may expire after the next cursor is returned successfully
 }
 
 message ListDataResponse {
     repeated bytes data = 1;
-    DataType type = 2;
-    bytes next_cursor = 3;
+    bytes next_cursor = 2;
 }
 
 message WriteDataRequest {
-    Namespace namespace = 1;
+    string namespace = 1;
     repeated bytes data = 2;
     DataType type = 3;
 }
@@ -95,7 +115,7 @@ message WriteDataRequest {
 message WriteDataResponse {}
 
 message WriteUpdatesRequest {
-    Namespace namespace = 1;
+    string namespace = 1;
     repeated Update updates = 2;
     DataType type = 3;
 }
@@ -103,20 +123,21 @@ message WriteUpdatesRequest {
 message WriteUpdatesResponse {}
 
 message StreamUpdatesRequest {
-    repeated Namespace namespaces = 1;
-    bytes cursor = 3;
+    repeated string namespaces = 1;
+    DataType type = 2;
+    bytes cursor = 3; // if present, can be used to resume the stream
 }
 
 message StreamUpdatesResponse {
     repeated Update updates = 1;
-    Namespace namespace = 2;
-    DataType type = 3;
-    bytes next_cursor = 4;
+    string namespace = 2;
+    bytes next_cursor = 3;
+    google.protobuf.Timestamp time = 4; // if present, can be used to help detect stream latency
 }
 
 message StreamLSNRequest {
-    repeated Namespace namespaces = 1;
-    bytes cursor = 3;
+    repeated string namespaces = 1;
+    bytes cursor = 2;
 }
 
 message StreamLSNResponse {

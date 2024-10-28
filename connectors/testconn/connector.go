@@ -35,7 +35,7 @@ type conn struct {
 
 const defaultCol = "testconncol"
 
-var defaultNamespaces = []*adiomv1.Namespace{{Db: "testconn", Col: defaultCol}}
+var defaultNamespaces = []string{"testconn.testconncol"}
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
@@ -45,34 +45,30 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		namespaces = defaultNamespaces
 	}
 	for _, namespace := range namespaces {
-		newNamespace := namespace
-		if namespace.Col == "" {
-			newNamespace = &adiomv1.Namespace{
-				Db:  namespace.Db,
-				Col: defaultCol,
-			}
-		}
 		partitions = append(partitions, &adiomv1.Partition{
-			Namespace: newNamespace,
+			Namespace: namespace,
 		})
 	}
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions: partitions,
+		Partitions:        partitions,
+		UpdatesPartitions: []*adiomv1.Partition{{}},
 	}), nil
 }
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]) (*connect.Response[adiomv1.GetInfoResponse], error) {
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		DbType:             "testconn",
-		Version:            "1",
-		Spec:               "testconn spec",
-		SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+		DbType:  "testconn",
+		Version: "1",
+		Spec:    "testconn spec",
 		Capabilities: &adiomv1.Capabilities{
-			Source:    true,
-			Sink:      true,
-			Resumable: false,
-			LsnStream: true,
+			Source: &adiomv1.Capabilities_Source{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				LsnStream:          false,
+				MultiNamespacePlan: true,
+				DefaultPlan:        true,
+			},
+			Sink: &adiomv1.Capabilities_Sink{SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON}},
 		},
 	}), nil
 }
@@ -110,7 +106,6 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 	return connect.NewResponse(&adiomv1.ListDataResponse{
 		Data: batch,
-		Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 	}), nil
 }
 
@@ -206,15 +201,14 @@ Loop:
 			for _, namespace := range namespaces {
 				err := s.Send(&adiomv1.StreamUpdatesResponse{
 					Updates: []*adiomv1.Update{{
-						Id: &adiomv1.BsonValue{
+						Id: []*adiomv1.BsonValue{{
 							Data: idVal,
 							Type: uint32(idType),
-						},
+						}},
 						Type: updateType,
 						Data: data,
 					}},
 					Namespace: namespace,
-					Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				})
 				if err != nil {
 					if !errors.Is(err, context.Canceled) {
@@ -274,19 +268,19 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	for _, update := range r.Msg.GetUpdates() {
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId().GetType()), Value: update.GetId().GetData()}
+			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("insert\t" + idBson.String() + "\t" + bson.Raw(update.GetData()).String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId().GetType()), Value: update.GetId().GetData()}
+			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("update\t" + idBson.String() + "\t" + bson.Raw(update.GetData()).String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId().GetType()), Value: update.GetId().GetData()}
+			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("delete\t" + idBson.String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)

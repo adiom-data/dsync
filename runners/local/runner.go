@@ -84,8 +84,6 @@ type RunnerLocalSettings struct {
 	CosmosTargetDocCountPerPartition  int64
 	CosmosDeletesCheckInterval        time.Duration
 	SyncMode                          string
-	XSource                           bool
-	XDestination                      bool
 }
 
 const (
@@ -105,9 +103,25 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		NsProgressMap: make(map[iface.Namespace]*iface.NamespaceStatus),
 		Namespaces:    make([]iface.Namespace, 0),
 	}
+	connectorSettings := common.ConnectorSettings{
+		NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
+		NumParallelWriters:        settings.NumParallelWriters,
+		MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+		ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+	}
+	if settings.LoadLevel != "" {
+		btc := getBaseThreadCount(settings.LoadLevel)
+		if connectorSettings.NumParallelCopiers == 0 {
+			connectorSettings.NumParallelCopiers = btc
+		}
+		if connectorSettings.NumParallelWriters == 0 { // default for writer and partition workers are the same
+			connectorSettings.NumParallelWriters = btc / 2
+		}
+	}
+
 	nullRead := settings.SrcConnString == "/dev/random"
 	if nullRead {
-		r.src = connectorRandom.NewRandomReadConnector(sourceName, connectorRandom.ConnectorSettings{})
+		r.src = common.NewLocalConnector(sourceName, connectorRandom.NewConn(connectorRandom.ConnectorSettings{}), connectorSettings)
 		r.runnerProgress.SourceDescription = "/dev/null"
 	} else if settings.SrcType == "CosmosDB" {
 		cosmosSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}}
@@ -119,179 +133,60 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		// check and adjust for configurated settings
 		if settings.LoadLevel != "" {
 			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
-				cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
-			} else {
-				cosmosSettings.InitialSyncNumParallelCopiers = btc
-			}
-			if settings.NumParallelWriters != 0 {
-				cosmosSettings.NumParallelWriters = settings.NumParallelWriters
-			} else { // default for writer and partition workers are the same
-				cosmosSettings.NumParallelWriters = btc / 2
-			}
 			if settings.CosmosNumParallelPartitionWorkers != 0 {
 				cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 			} else {
 				cosmosSettings.NumParallelPartitionWorkers = btc / 2
 			}
 		} else {
-			cosmosSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
-			cosmosSettings.NumParallelWriters = settings.NumParallelWriters
 			cosmosSettings.NumParallelPartitionWorkers = settings.CosmosNumParallelPartitionWorkers
 		}
 		cosmosSettings.MaxNumNamespaces = settings.CosmosReaderMaxNumNamespaces
 		cosmosSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		cosmosSettings.PingTimeout = settings.PingTimeout
-		cosmosSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		cosmosSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		cosmosSettings.TargetDocCountPerPartition = settings.CosmosTargetDocCountPerPartition
 		cosmosSettings.DeletesCheckInterval = settings.CosmosDeletesCheckInterval
 
-		// set all other settings to default
-		connectorSettings := common.ConnectorSettings{
-			NumParallelCopiers:        cosmosSettings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        cosmosSettings.NumParallelWriters,
-			MaxWriterBatchSize:        cosmosSettings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: cosmosSettings.CdcResumeTokenUpdateInterval,
-		}
-		if settings.XSource {
-			slog.Info("Experimental Cosmos Source")
-			r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
-		} else {
-			r.src = connectorCosmos.NewCosmosConnector(sourceName, cosmosSettings)
-		}
+		r.src = common.NewLocalConnector(sourceName, connectorCosmos.NewConn(cosmosSettings), connectorSettings)
 		r.runnerProgress.SourceDescription = "[Cosmos DB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "MongoDB" {
 		mongoSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.SrcConnString}
-		if settings.LoadLevel != "" {
-			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.InitialSyncNumParallelCopiers != 0 { // override the loadlevel settings if user specifies
-				mongoSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
-			} else {
-				mongoSettings.InitialSyncNumParallelCopiers = btc
-			}
-			if settings.NumParallelWriters != 0 {
-				mongoSettings.NumParallelWriters = settings.NumParallelWriters
-			} else { // default for writer and partition workers are the same
-				mongoSettings.NumParallelWriters = btc / 2
-			}
-		} else {
-			mongoSettings.InitialSyncNumParallelCopiers = settings.InitialSyncNumParallelCopiers
-			mongoSettings.NumParallelWriters = settings.NumParallelWriters
-		}
-		mongoSettings.CdcResumeTokenUpdateInterval = settings.CdcResumeTokenUpdateInterval
 		mongoSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		mongoSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		mongoSettings.PingTimeout = settings.PingTimeout
 
-		// set all other settings to default
-		connectorSettings := common.ConnectorSettings{
-			NumParallelCopiers:        mongoSettings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        mongoSettings.NumParallelWriters,
-			MaxWriterBatchSize:        mongoSettings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: mongoSettings.CdcResumeTokenUpdateInterval,
-		}
-		if settings.XSource {
-			slog.Info("Experimental Mongo Source")
-			r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
-		} else {
-			r.src = connectorMongo.NewMongoConnector(sourceName, mongoSettings)
-		}
+		r.src = common.NewLocalConnector(sourceName, connectorMongo.NewConn(mongoSettings), connectorSettings)
 		r.runnerProgress.SourceDescription = "[MongoDB] " + redactMongoConnString(settings.SrcConnString)
 	} else if settings.SrcType == "testconn" {
-		// TODO configure params properly
-		r.src = common.NewLocalConnector(sourceName, testconn.NewConn(settings.SrcConnString), common.ConnectorSettings{
-			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        settings.NumParallelWriters,
-			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
-		})
+		r.src = common.NewLocalConnector(sourceName, testconn.NewConn(settings.SrcConnString), connectorSettings)
 	} else if settings.SrcType == "dynamodb" {
-		r.src = common.NewLocalConnector(sourceName, dynamodb.NewConn(settings.SrcConnString), common.ConnectorSettings{
-			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        settings.NumParallelWriters,
-			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
-		})
+		r.src = common.NewLocalConnector(sourceName, dynamodb.NewConn(settings.SrcConnString), connectorSettings)
 	}
 	//null write?
 	nullWrite := settings.DstConnString == "/dev/null"
 	if nullWrite {
-		r.dst = connectorNull.NewNullConnector(destinationName)
+		r.dst = common.NewLocalConnector(destinationName, connectorNull.NewConn(), connectorSettings)
 		r.runnerProgress.DestinationDescription = "/dev/null"
 	} else if settings.DstType == "CosmosDB" {
 		connSettings := connectorCosmos.ConnectorSettings{ConnectorSettings: connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}}
-		if settings.LoadLevel != "" {
-			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.NumParallelWriters != 0 {
-				connSettings.NumParallelWriters = settings.NumParallelWriters
-			} else {
-				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
-			}
-		} else {
-			connSettings.NumParallelWriters = settings.NumParallelWriters
-		}
 		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		connSettings.PingTimeout = settings.PingTimeout
 
-		// set all other settings to default
-		connectorSettings := common.ConnectorSettings{
-			NumParallelCopiers:        connSettings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        connSettings.NumParallelWriters,
-			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
-		}
-		if settings.XDestination {
-			slog.Info("Experimental Cosmos Destination")
-			r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
-		} else {
-			r.dst = connectorCosmos.NewCosmosConnector(destinationName, connSettings)
-		}
+		r.dst = common.NewLocalConnector(destinationName, connectorCosmos.NewConn(connSettings), connectorSettings)
 		r.runnerProgress.DestinationDescription = "[CosmosDB] " + redactMongoConnString(settings.DstConnString)
 	} else if settings.DstType == "testconn" {
-		// TODO configure params properly
-		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), common.ConnectorSettings{
-			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        settings.NumParallelWriters,
-			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
-		})
+		r.dst = common.NewLocalConnector(destinationName, testconn.NewConn(settings.DstConnString), connectorSettings)
 	} else if settings.DstType == "dynamodb" {
-		r.dst = common.NewLocalConnector(destinationName, dynamodb.NewConn(settings.DstConnString), common.ConnectorSettings{
-			NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        settings.NumParallelWriters,
-			MaxWriterBatchSize:        settings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
-		})
+		r.dst = common.NewLocalConnector(destinationName, dynamodb.NewConn(settings.DstConnString), connectorSettings)
 	} else {
 		connSettings := connectorMongo.ConnectorSettings{ConnectionString: settings.DstConnString}
-		if settings.LoadLevel != "" {
-			btc := getBaseThreadCount(settings.LoadLevel)
-			if settings.NumParallelWriters != 0 {
-				connSettings.NumParallelWriters = settings.NumParallelWriters
-			} else {
-				connSettings.NumParallelWriters = btc * 2 // double the base thread count to have more writers than readers (accounting for latency)
-			}
-		} else {
-			connSettings.NumParallelWriters = settings.NumParallelWriters
-		}
 		connSettings.WriterMaxBatchSize = settings.WriterMaxBatchSize
 		connSettings.ServerConnectTimeout = settings.ServerConnectTimeout
 		connSettings.PingTimeout = settings.PingTimeout
 
-		connectorSettings := common.ConnectorSettings{
-			NumParallelCopiers:        connSettings.InitialSyncNumParallelCopiers,
-			NumParallelWriters:        connSettings.NumParallelWriters,
-			MaxWriterBatchSize:        connSettings.WriterMaxBatchSize,
-			ResumeTokenUpdateInterval: connSettings.CdcResumeTokenUpdateInterval,
-		}
-		if settings.XDestination {
-			slog.Info("Experimental Mongo Destination")
-			r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
-		} else {
-			r.dst = connectorMongo.NewMongoConnector(destinationName, connSettings)
-		}
+		r.dst = common.NewLocalConnector(destinationName, connectorMongo.NewConn(connSettings), connectorSettings)
 		r.runnerProgress.DestinationDescription = "[MongoDB] " + redactMongoConnString(settings.DstConnString)
 	}
 
@@ -396,7 +291,9 @@ func (r *RunnerLocal) Run() error {
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag})
-		if err != nil {
+		if err != nil { 
+			r.runnerProgress.VerificationResult = "ERROR"
+			slog.Error("Data integrity check: ERROR")
 			slog.Error("Failed to perform flow integrity check", "err", err)
 		} else {
 			if integrityCheckRes.Passed {

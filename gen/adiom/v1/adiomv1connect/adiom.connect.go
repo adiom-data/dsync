@@ -39,9 +39,6 @@ const (
 	// ConnectorServiceGetNamespaceMetadataProcedure is the fully-qualified name of the
 	// ConnectorService's GetNamespaceMetadata RPC.
 	ConnectorServiceGetNamespaceMetadataProcedure = "/adiom.v1.ConnectorService/GetNamespaceMetadata"
-	// ConnectorServiceListDataProcedure is the fully-qualified name of the ConnectorService's ListData
-	// RPC.
-	ConnectorServiceListDataProcedure = "/adiom.v1.ConnectorService/ListData"
 	// ConnectorServiceWriteDataProcedure is the fully-qualified name of the ConnectorService's
 	// WriteData RPC.
 	ConnectorServiceWriteDataProcedure = "/adiom.v1.ConnectorService/WriteData"
@@ -51,6 +48,9 @@ const (
 	// ConnectorServiceGeneratePlanProcedure is the fully-qualified name of the ConnectorService's
 	// GeneratePlan RPC.
 	ConnectorServiceGeneratePlanProcedure = "/adiom.v1.ConnectorService/GeneratePlan"
+	// ConnectorServiceListDataProcedure is the fully-qualified name of the ConnectorService's ListData
+	// RPC.
+	ConnectorServiceListDataProcedure = "/adiom.v1.ConnectorService/ListData"
 	// ConnectorServiceStreamUpdatesProcedure is the fully-qualified name of the ConnectorService's
 	// StreamUpdates RPC.
 	ConnectorServiceStreamUpdatesProcedure = "/adiom.v1.ConnectorService/StreamUpdates"
@@ -64,10 +64,10 @@ var (
 	connectorServiceServiceDescriptor                    = v1.File_adiom_v1_adiom_proto.Services().ByName("ConnectorService")
 	connectorServiceGetInfoMethodDescriptor              = connectorServiceServiceDescriptor.Methods().ByName("GetInfo")
 	connectorServiceGetNamespaceMetadataMethodDescriptor = connectorServiceServiceDescriptor.Methods().ByName("GetNamespaceMetadata")
-	connectorServiceListDataMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListData")
 	connectorServiceWriteDataMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("WriteData")
 	connectorServiceWriteUpdatesMethodDescriptor         = connectorServiceServiceDescriptor.Methods().ByName("WriteUpdates")
 	connectorServiceGeneratePlanMethodDescriptor         = connectorServiceServiceDescriptor.Methods().ByName("GeneratePlan")
+	connectorServiceListDataMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListData")
 	connectorServiceStreamUpdatesMethodDescriptor        = connectorServiceServiceDescriptor.Methods().ByName("StreamUpdates")
 	connectorServiceStreamLSNMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("StreamLSN")
 )
@@ -76,12 +76,12 @@ var (
 type ConnectorServiceClient interface {
 	GetInfo(context.Context, *connect.Request[v1.GetInfoRequest]) (*connect.Response[v1.GetInfoResponse], error)
 	GetNamespaceMetadata(context.Context, *connect.Request[v1.GetNamespaceMetadataRequest]) (*connect.Response[v1.GetNamespaceMetadataResponse], error)
-	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	// Sink
 	WriteData(context.Context, *connect.Request[v1.WriteDataRequest]) (*connect.Response[v1.WriteDataResponse], error)
 	WriteUpdates(context.Context, *connect.Request[v1.WriteUpdatesRequest]) (*connect.Response[v1.WriteUpdatesResponse], error)
 	// Source
 	GeneratePlan(context.Context, *connect.Request[v1.GeneratePlanRequest]) (*connect.Response[v1.GeneratePlanResponse], error)
+	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	StreamUpdates(context.Context, *connect.Request[v1.StreamUpdatesRequest]) (*connect.ServerStreamForClient[v1.StreamUpdatesResponse], error)
 	StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest]) (*connect.ServerStreamForClient[v1.StreamLSNResponse], error)
 }
@@ -108,12 +108,6 @@ func NewConnectorServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(connectorServiceGetNamespaceMetadataMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
-		listData: connect.NewClient[v1.ListDataRequest, v1.ListDataResponse](
-			httpClient,
-			baseURL+ConnectorServiceListDataProcedure,
-			connect.WithSchema(connectorServiceListDataMethodDescriptor),
-			connect.WithClientOptions(opts...),
-		),
 		writeData: connect.NewClient[v1.WriteDataRequest, v1.WriteDataResponse](
 			httpClient,
 			baseURL+ConnectorServiceWriteDataProcedure,
@@ -130,6 +124,12 @@ func NewConnectorServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+ConnectorServiceGeneratePlanProcedure,
 			connect.WithSchema(connectorServiceGeneratePlanMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listData: connect.NewClient[v1.ListDataRequest, v1.ListDataResponse](
+			httpClient,
+			baseURL+ConnectorServiceListDataProcedure,
+			connect.WithSchema(connectorServiceListDataMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		streamUpdates: connect.NewClient[v1.StreamUpdatesRequest, v1.StreamUpdatesResponse](
@@ -151,10 +151,10 @@ func NewConnectorServiceClient(httpClient connect.HTTPClient, baseURL string, op
 type connectorServiceClient struct {
 	getInfo              *connect.Client[v1.GetInfoRequest, v1.GetInfoResponse]
 	getNamespaceMetadata *connect.Client[v1.GetNamespaceMetadataRequest, v1.GetNamespaceMetadataResponse]
-	listData             *connect.Client[v1.ListDataRequest, v1.ListDataResponse]
 	writeData            *connect.Client[v1.WriteDataRequest, v1.WriteDataResponse]
 	writeUpdates         *connect.Client[v1.WriteUpdatesRequest, v1.WriteUpdatesResponse]
 	generatePlan         *connect.Client[v1.GeneratePlanRequest, v1.GeneratePlanResponse]
+	listData             *connect.Client[v1.ListDataRequest, v1.ListDataResponse]
 	streamUpdates        *connect.Client[v1.StreamUpdatesRequest, v1.StreamUpdatesResponse]
 	streamLSN            *connect.Client[v1.StreamLSNRequest, v1.StreamLSNResponse]
 }
@@ -167,11 +167,6 @@ func (c *connectorServiceClient) GetInfo(ctx context.Context, req *connect.Reque
 // GetNamespaceMetadata calls adiom.v1.ConnectorService.GetNamespaceMetadata.
 func (c *connectorServiceClient) GetNamespaceMetadata(ctx context.Context, req *connect.Request[v1.GetNamespaceMetadataRequest]) (*connect.Response[v1.GetNamespaceMetadataResponse], error) {
 	return c.getNamespaceMetadata.CallUnary(ctx, req)
-}
-
-// ListData calls adiom.v1.ConnectorService.ListData.
-func (c *connectorServiceClient) ListData(ctx context.Context, req *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error) {
-	return c.listData.CallUnary(ctx, req)
 }
 
 // WriteData calls adiom.v1.ConnectorService.WriteData.
@@ -189,6 +184,11 @@ func (c *connectorServiceClient) GeneratePlan(ctx context.Context, req *connect.
 	return c.generatePlan.CallUnary(ctx, req)
 }
 
+// ListData calls adiom.v1.ConnectorService.ListData.
+func (c *connectorServiceClient) ListData(ctx context.Context, req *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error) {
+	return c.listData.CallUnary(ctx, req)
+}
+
 // StreamUpdates calls adiom.v1.ConnectorService.StreamUpdates.
 func (c *connectorServiceClient) StreamUpdates(ctx context.Context, req *connect.Request[v1.StreamUpdatesRequest]) (*connect.ServerStreamForClient[v1.StreamUpdatesResponse], error) {
 	return c.streamUpdates.CallServerStream(ctx, req)
@@ -203,12 +203,12 @@ func (c *connectorServiceClient) StreamLSN(ctx context.Context, req *connect.Req
 type ConnectorServiceHandler interface {
 	GetInfo(context.Context, *connect.Request[v1.GetInfoRequest]) (*connect.Response[v1.GetInfoResponse], error)
 	GetNamespaceMetadata(context.Context, *connect.Request[v1.GetNamespaceMetadataRequest]) (*connect.Response[v1.GetNamespaceMetadataResponse], error)
-	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	// Sink
 	WriteData(context.Context, *connect.Request[v1.WriteDataRequest]) (*connect.Response[v1.WriteDataResponse], error)
 	WriteUpdates(context.Context, *connect.Request[v1.WriteUpdatesRequest]) (*connect.Response[v1.WriteUpdatesResponse], error)
 	// Source
 	GeneratePlan(context.Context, *connect.Request[v1.GeneratePlanRequest]) (*connect.Response[v1.GeneratePlanResponse], error)
+	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	StreamUpdates(context.Context, *connect.Request[v1.StreamUpdatesRequest], *connect.ServerStream[v1.StreamUpdatesResponse]) error
 	StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest], *connect.ServerStream[v1.StreamLSNResponse]) error
 }
@@ -231,12 +231,6 @@ func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.Han
 		connect.WithSchema(connectorServiceGetNamespaceMetadataMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	connectorServiceListDataHandler := connect.NewUnaryHandler(
-		ConnectorServiceListDataProcedure,
-		svc.ListData,
-		connect.WithSchema(connectorServiceListDataMethodDescriptor),
-		connect.WithHandlerOptions(opts...),
-	)
 	connectorServiceWriteDataHandler := connect.NewUnaryHandler(
 		ConnectorServiceWriteDataProcedure,
 		svc.WriteData,
@@ -253,6 +247,12 @@ func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.Han
 		ConnectorServiceGeneratePlanProcedure,
 		svc.GeneratePlan,
 		connect.WithSchema(connectorServiceGeneratePlanMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	connectorServiceListDataHandler := connect.NewUnaryHandler(
+		ConnectorServiceListDataProcedure,
+		svc.ListData,
+		connect.WithSchema(connectorServiceListDataMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceStreamUpdatesHandler := connect.NewServerStreamHandler(
@@ -273,14 +273,14 @@ func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.Han
 			connectorServiceGetInfoHandler.ServeHTTP(w, r)
 		case ConnectorServiceGetNamespaceMetadataProcedure:
 			connectorServiceGetNamespaceMetadataHandler.ServeHTTP(w, r)
-		case ConnectorServiceListDataProcedure:
-			connectorServiceListDataHandler.ServeHTTP(w, r)
 		case ConnectorServiceWriteDataProcedure:
 			connectorServiceWriteDataHandler.ServeHTTP(w, r)
 		case ConnectorServiceWriteUpdatesProcedure:
 			connectorServiceWriteUpdatesHandler.ServeHTTP(w, r)
 		case ConnectorServiceGeneratePlanProcedure:
 			connectorServiceGeneratePlanHandler.ServeHTTP(w, r)
+		case ConnectorServiceListDataProcedure:
+			connectorServiceListDataHandler.ServeHTTP(w, r)
 		case ConnectorServiceStreamUpdatesProcedure:
 			connectorServiceStreamUpdatesHandler.ServeHTTP(w, r)
 		case ConnectorServiceStreamLSNProcedure:
@@ -302,10 +302,6 @@ func (UnimplementedConnectorServiceHandler) GetNamespaceMetadata(context.Context
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.GetNamespaceMetadata is not implemented"))
 }
 
-func (UnimplementedConnectorServiceHandler) ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.ListData is not implemented"))
-}
-
 func (UnimplementedConnectorServiceHandler) WriteData(context.Context, *connect.Request[v1.WriteDataRequest]) (*connect.Response[v1.WriteDataResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.WriteData is not implemented"))
 }
@@ -316,6 +312,10 @@ func (UnimplementedConnectorServiceHandler) WriteUpdates(context.Context, *conne
 
 func (UnimplementedConnectorServiceHandler) GeneratePlan(context.Context, *connect.Request[v1.GeneratePlanRequest]) (*connect.Response[v1.GeneratePlanResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.GeneratePlan is not implemented"))
+}
+
+func (UnimplementedConnectorServiceHandler) ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.ListData is not implemented"))
 }
 
 func (UnimplementedConnectorServiceHandler) StreamUpdates(context.Context, *connect.Request[v1.StreamUpdatesRequest], *connect.ServerStream[v1.StreamUpdatesResponse]) error {

@@ -21,6 +21,29 @@ import (
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	connectorDBType string = "CosmosDB"               // We're a CosmosDB-compatible connector
+	connectorSpec   string = "MongoDB Provisioned RU" // Only compatible with MongoDB API and provisioned deployments
+)
+
+type ConnectorSettings struct {
+	mongoconn.ConnectorSettings
+	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
+	TargetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	NumParallelPartitionWorkers int    //number of workers used for partitioning
+	partitionKey                string //partition key to use for collections
+
+	EmulateDeletes         bool // if true, we will generate delete events
+	DeletesCheckInterval   time.Duration
+	WitnessMongoConnString string
+}
+
+func setDefault[T comparable](field *T, defaultValue T) {
+	if *field == *new(T) {
+		*field = defaultValue
+	}
+}
+
 type conn struct {
 	adiomv1connect.ConnectorServiceHandler
 
@@ -56,18 +79,20 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	}
 
 	var partitions []*adiomv1.Partition
-	if r.Msg.GetParallelize() {
+	var nsTasks []iface.Namespace
+	for _, partition := range initialPartitions {
+		ns, ok := mongoconn.ToNS(partition.GetNamespace())
+		if !ok {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("namespace should be fully qualified"))
+		}
+		nsTasks = append(nsTasks, ns)
+	}
+
+	if r.Msg.GetInitialSync() {
 		p := planner{
 			Ctx:      ctx,
 			Client:   c.client,
 			settings: c.connectorSettings,
-		}
-		var nsTasks []iface.Namespace
-		for _, partition := range initialPartitions {
-			nsTasks = append(nsTasks, iface.Namespace{
-				Db:  partition.GetNamespace().GetDb(),
-				Col: partition.GetNamespace().GetCol(),
-			})
 		}
 		partitionedTasks, err := p.partitionTasksIfNecessary(nsTasks)
 		if err != nil {
@@ -88,10 +113,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				high = task.Def.High.(bson.RawValue)
 			}
 			partitions = append(partitions, &adiomv1.Partition{
-				Namespace: &adiomv1.Namespace{
-					Db:  task.Def.Db,
-					Col: task.Def.Col,
-				},
+				Namespace:      fmt.Sprintf("%v.%v", task.Def.Db, task.Def.Col),
 				Cursor:         mongoconn.EncodeCursor(low, high),
 				EstimatedCount: uint64(task.EstimatedDocCount),
 			})
@@ -104,18 +126,18 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	//create resume token for each task
 	wg := sync.WaitGroup{}
-	for _, partition := range initialPartitions {
+	for _, nsTask := range nsTasks {
 		wg.Add(1)
-		go func(ns *adiomv1.Namespace) {
+		go func(ns iface.Namespace) {
 			defer wg.Done()
-			loc := iface.Location{Database: ns.GetDb(), Collection: ns.GetCol()}
+			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
 			resumeToken, err := getLatestResumeToken(ctx, c.client, loc)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
 				return
 			}
 			tokenMap.AddToken(loc, resumeToken)
-		}(partition.GetNamespace())
+		}(nsTask)
 	}
 	wg.Wait()
 	slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", tokenMap.Map))
@@ -130,8 +152,8 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	encodedResumeToken := encodeResumeToken(epoch, resumeToken)
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions:  partitions,
-		StartCursor: encodedResumeToken,
+		Partitions:        partitions,
+		UpdatesPartitions: []*adiomv1.Partition{{Cursor: encodedResumeToken}},
 	}), nil
 }
 
@@ -158,11 +180,18 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
+	var namespaces []iface.Namespace
+	for _, partition := range partitions {
+		ns, ok := mongoconn.ToNS(partition.GetNamespace())
+		if !ok {
+			return connect.NewError(connect.CodeInternal, fmt.Errorf("namespace should be fully qualified"))
+		}
+		namespaces = append(namespaces, ns)
+	}
 
 	var wg sync.WaitGroup
 	lsnTracker := NewMultiNsLSNTracker()
-	for _, partition := range partitions {
-		namespace := partition.GetNamespace()
+	for _, namespace := range namespaces {
 		ns := iface.Namespace{Db: namespace.Db, Col: namespace.Col}
 		wg.Add(1)
 		go func() {
@@ -249,10 +278,10 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 		return nil, fmt.Errorf("failed to marshal full document: %v", err)
 	}
 	update := &adiomv1.Update{
-		Id: &adiomv1.BsonValue{
+		Id: []*adiomv1.BsonValue{{
 			Data: idVal,
 			Type: uint32(idType),
-		},
+		}},
 		Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 		Data: fullDocumentRaw,
 	}
@@ -283,10 +312,10 @@ func checkForDeletes(ctx context.Context, client *mongo.Client, witnessClient *m
 				slog.Error(fmt.Sprintf("failed to marshal _id: %v", err))
 			}
 			updatesWithLoc[idWithLoc.loc] = append(updatesWithLoc[idWithLoc.loc], &adiomv1.Update{
-				Id: &adiomv1.BsonValue{
+				Id: []*adiomv1.BsonValue{{
 					Data: idVal,
 					Type: uint32(idType),
-				},
+				}},
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 			})
 
@@ -312,11 +341,18 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
+	var namespaces []iface.Namespace
+	for _, partition := range partitions {
+		ns, ok := mongoconn.ToNS(partition.GetNamespace())
+		if !ok {
+			return connect.NewError(connect.CodeInternal, fmt.Errorf("namespace should be fully qualified"))
+		}
+		namespaces = append(namespaces, ns)
+	}
 
 	if c.connectorSettings.EmulateDeletes {
 		var nss []iface.Namespace
-		for _, partition := range partitions {
-			namespace := partition.GetNamespace()
+		for _, namespace := range namespaces {
 			nss = append(nss, iface.Namespace{Db: namespace.Db, Col: namespace.Col})
 		}
 		go func() {
@@ -332,8 +368,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 					encodedToken, _ := tokenMap.encodeMap()
 					err := s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
-						Namespace:  &adiomv1.Namespace{Db: loc.Database, Col: loc.Collection},
-						Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+						Namespace:  fmt.Sprintf("%v.%v", loc.Database, loc.Collection),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken),
 					})
 					if err != nil {
@@ -360,13 +395,12 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	}
 
 	var wg sync.WaitGroup
-	for _, partition := range partitions {
-		ns := partition.GetNamespace()
+	for _, ns := range namespaces {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			//get task location and retrieve resume token
-			loc := iface.Location{Database: ns.GetDb(), Collection: ns.GetCol()}
+			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
 			token, err := tokenMap.GetToken(loc)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
@@ -417,8 +451,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 					encodedToken, _ := tokenMap.encodeMap()
 					err := s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
-						Namespace:  ns,
-						Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+						Namespace:  fmt.Sprintf("%v.%v", ns.Db, ns.Col),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?
 					})
 					if err != nil {
@@ -458,10 +491,7 @@ func (c *conn) Teardown() {
 func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	setDefault(&settings.ServerConnectTimeout, 15*time.Second)
 	setDefault(&settings.PingTimeout, 10*time.Second)
-	setDefault(&settings.InitialSyncNumParallelCopiers, 8)
 	setDefault(&settings.WriterMaxBatchSize, 0)
-	setDefault(&settings.NumParallelWriters, 4)
-	setDefault(&settings.CdcResumeTokenUpdateInterval, 60*time.Second)
 	setDefault(&settings.MaxNumNamespaces, 8)
 	setDefault(&settings.TargetDocCountPerPartition, 512*1000)
 	setDefault(&settings.NumParallelPartitionWorkers, 4)
@@ -487,7 +517,7 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 		panic(err)
 	}
 
-	mongoConn := mongoconn.NewConnWithClient(client, settings.WriterMaxBatchSize)
+	mongoConn := mongoconn.NewConnWithClient(client, settings.ConnectorSettings)
 	return &conn{
 		ConnectorServiceHandler: mongoConn,
 		connectorSettings:       settings,

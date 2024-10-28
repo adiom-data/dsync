@@ -30,7 +30,7 @@ type RunnerSyncProgress struct {
 	DeletesCaught      uint64 // number of deletes caught
 
 	Throughput    float64                                    // throughput in operations per second
-	NsProgressMap map[iface.Namespace]*iface.NamespaceStatus // map key is namespace: "db.col"
+	NsProgressMap map[iface.Namespace]*iface.NamespaceStatus `json:"-"` // map key is namespace: "db.col"
 	Namespaces    []iface.Namespace                          //use map and get the keys so print order is consistent
 
 	TasksTotal     int64 // total number of tasks
