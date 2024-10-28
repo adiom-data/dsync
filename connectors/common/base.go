@@ -79,21 +79,28 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 	return c.status
 }
 
-func HashBson(hasher hash.Hash64, b bson.Raw) error {
+func HashBson(hasher hash.Hash64, b bson.Raw, arr bool) error {
 	elems, err := b.Elements()
 	if err != nil {
 		return err
 	}
-	slices.SortFunc(elems, func(i, j bson.RawElement) int {
-		return strings.Compare(i.Key(), j.Key())
-	})
+	if !arr {
+		slices.SortFunc(elems, func(i, j bson.RawElement) int {
+			return strings.Compare(i.Key(), j.Key())
+		})
+	}
 	for _, e := range elems {
 		hasher.Write([]byte(e.Key()))
 		v := e.Value()
 		hasher.Write([]byte{byte(v.Type)})
 		if v.Type == bson.TypeEmbeddedDocument {
 			hasher.Write([]byte(e.Key()))
-			if err := HashBson(hasher, v.Document()); err != nil {
+			if err := HashBson(hasher, v.Document(), false); err != nil {
+				return err
+			}
+		} else if v.Type == bson.TypeArray {
+			hasher.Write([]byte(e.Key()))
+			if err := HashBson(hasher, v.Array(), true); err != nil {
 				return err
 			}
 		} else {
@@ -143,7 +150,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 		for _, data := range res.Msg.Data {
 			hasher.Reset()
-			err = HashBson(hasher, bson.Raw(data))
+			err = HashBson(hasher, bson.Raw(data), false)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Error hashing during integrity check: %v", err))
 				return iface.ConnectorDataIntegrityCheckResult{}, err
