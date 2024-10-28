@@ -22,10 +22,6 @@ const DefaultVerbosity = "INFO"
 // XXX: should these definitions be moved to the RunnerLocal?
 var validVerbosities = []string{"DEBUG", "INFO", "WARN", "ERROR"}
 
-var validSources = []string{"MongoDB", "CosmosDB", "testconn", "dynamodb"}
-
-var validDestinations = []string{"MongoDB", "CosmosDB", "testconn", "dynamodb"}
-
 var validLoadLevels = []string{"Low", "Medium", "High", "Beast"}
 
 const (
@@ -72,43 +68,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			},
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:  "sourcetype",
-			Usage: fmt.Sprintf("source database type (%s). When not specified, will autodetect using the source URI", strings.Join(validSources, ",")),
-			Action: func(ctx *cli.Context, source string) error {
-				if !slices.Contains(validSources, source) {
-					return fmt.Errorf("unsupported sourcetype setting %v", source)
-				}
-				return nil
-			},
-			Category: "Endpoint Configuration",
-			Required: false,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:     "source",
-			Usage:    "source connection string",
-			Aliases:  []string{"s"},
-			Category: "Endpoint Configuration",
-			Required: true,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:     "destination",
-			Usage:    "destination connection string",
-			Aliases:  []string{"d"},
-			Category: "Endpoint Configuration",
-			Required: true,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:  "destinationtype",
-			Usage: fmt.Sprintf("destination database type (%s). When not specified, will autodetect using the destination URI", strings.Join(validDestinations, ",")),
-			Action: func(ctx *cli.Context, destination string) error {
-				if !slices.Contains(validDestinations, destination) {
-					return fmt.Errorf("unsupported destinationtype setting %v", destination)
-				}
-				return nil
-			},
-			Required: false,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "metadata",
 			Usage:    "metadata store connection string. Will default to the destination if not provided",
 			Aliases:  []string{"m"},
@@ -141,11 +100,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Name:     "reverse",
 			Usage:    "start the flow in reverse mode - destination to source, and skip the initial data copy",
 			Category: "Special Commands",
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:     "cosmos-deletes-cdc",
-			Usage:    "generate CDC events for CosmosDB deletes",
-			Category: "Cosmos DB-specific Options",
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:  "progress",
@@ -201,39 +155,7 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		},
 		cli.VersionFlag,
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-reader-max-namespaces",
-			Usage:    "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
-			Value:    cosmosDefaultMaxNumNamespaces,
-			Required: false,
-			Category: "Cosmos DB-specific Options",
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "server-timeout",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "ping-timeout",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cdc-resume-token-interval",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:     "writer-batch-size",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:     "cosmos-doc-partition",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-delete-interval",
 			Required: false,
 			Hidden:   true,
 		}),
@@ -249,11 +171,6 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:     "parallel-integrity-check-workers",
-			Required: false,
-			Hidden:   true,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-parallel-partition-workers",
 			Required: false,
 			Hidden:   true,
 		}),

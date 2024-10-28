@@ -13,16 +13,16 @@ clean-dbs:
 	PORT=27018 ./scripts/clean-mongo.sh
 
 verify:
-	$(RUN_CMD) -s "mongodb://mongo1:27017/?replicaSet=data1" -d "mongodb://mongo2:27018/?replicaSet=data2" -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO --verify
+	$(RUN_CMD) -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO --verify "mongodb://mongo1:27017/?replicaSet=data1" "mongodb://mongo2:27018/?replicaSet=data2"
 
 bootstrap1:
-	$(RUN_CMD) -d "mongodb://mongo1:27017/?replicaSet=data1" -sourcetype testconn -s ./fixture -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO
+	$(RUN_CMD) -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO testconn://./fixture "mongodb://mongo1:27017/?replicaSet=data1"
 
 bootstrap2:
-	$(RUN_CMD) -d "mongodb://mongo2:27018/?replicaSet=data2" -sourcetype testconn -s ./fixture -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO
+	$(RUN_CMD) -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO testconn://./fixture "mongodb://mongo2:27018/?replicaSet=data2"
 
 sync12:
-	$(RUN_CMD) -s "mongodb://mongo1:27017/?replicaSet=data1" -d "mongodb://mongo2:27018/?replicaSet=data2" -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO
+	$(RUN_CMD) -m "mongodb://mongo1:27017/?replicaSet=data1" --verbosity INFO "mongodb://mongo1:27017/?replicaSet=data1" "mongodb://mongo2:27018/?replicaSet=data2"
 
 test-all:
 	go test -count=1 -v -p 1 --tags=external ./...
@@ -36,7 +36,7 @@ test-cosmos:
 
 clean-testdb:
 	PORT=27019 ./scripts/clean-mongo.sh	
-	$(RUN_CMD) -d "mongodb://mongotest:27019/?replicaSet=datatest" -sourcetype testconn -s ./fixture -m "mongodb://mongotest:27019/?replicaSet=datatest" --verbosity INFO --namespace testconn.test1,testconn.test2,testconn.test3,testconn.test4
+	$(RUN_CMD) -m "mongodb://mongotest:27019/?replicaSet=datatest" --verbosity INFO --namespace testconn.test1,testconn.test2,testconn.test3,testconn.test4 testconn://./fixture "mongodb://mongotest:27019/?replicaSet=datatest"
 
 test-mongo:
 	MONGO_TEST=mongodb://mongotest:27019/?replicaSet=datatest go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo
