@@ -317,9 +317,13 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	// If everything, then don't pass any namespaces
 	// Otherwise, we want only unique fully qualified namespaces (which currently is fully contained in task.Def.Col)
 	var streamUpdatesNamespaces []string
-	if len(options.Namespace) == 0 {
+	streamUpdatesNamespacesMap := map[string]struct{}{}
+	if len(options.Namespace) > 0 {
 		for _, task := range readPlan.Tasks {
-			streamUpdatesNamespaces = append(streamUpdatesNamespaces, task.Def.Col)
+			streamUpdatesNamespacesMap[task.Def.Col] = struct{}{}
+		}
+		for k := range streamUpdatesNamespacesMap {
+			streamUpdatesNamespaces = append(streamUpdatesNamespaces, k)
 		}
 	}
 
