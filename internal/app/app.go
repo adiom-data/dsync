@@ -48,6 +48,9 @@ func NewApp() *cli.App {
 		Version:   build.VersionInfo(),
 		Copyright: build.CopyrightStr,
 		Action:    runDsync,
+		Commands: []*cli.Command{
+			verifyCommand,
+		},
 	}
 
 	return app
