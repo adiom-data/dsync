@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"connectrpc.com/connect"
 	"github.com/adiom-data/dsync/connectors/cosmos"
@@ -35,8 +34,8 @@ type RegisteredConnector struct {
 
 	// One of Create or CreateRemote should be not nil
 	// Create is for optimizing a local implementation
-	Create       func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error)
-	CreateRemote func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceClient, error)
+	Create       func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error)
+	CreateRemote func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceClient, []string, error)
 }
 
 type ConfiguredConnector struct {
@@ -48,41 +47,30 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 	var src ConfiguredConnector
 	var dst ConfiguredConnector
 	var err error
-	var argSwitch bool
-	var srcArgs []string
-	var dstArgs []string
-	for i, arg := range args {
-		if i > 0 && !strings.HasPrefix(arg, "-") && arg != "help" {
-			argSwitch = true
-		}
-		if argSwitch {
-			dstArgs = append(dstArgs, arg)
-		} else {
-			srcArgs = append(srcArgs, arg)
-		}
-	}
+	srcArgs := args
 	registeredConnectors := GetRegisteredConnectors()
 
 	if len(srcArgs) < 1 {
 		return src, dst, fmt.Errorf("missing source: %w", ErrMissingConnector)
 	}
+	var dstArgs []string
 	for _, registeredConnector := range registeredConnectors {
 		if registeredConnector.IsConnector(srcArgs[0]) {
 			if registeredConnector.Create != nil {
-				if src.Local, err = registeredConnector.Create(srcArgs, additionalSettings); err != nil {
+				if src.Local, dstArgs, err = registeredConnector.Create(srcArgs, additionalSettings); err != nil {
 					return src, dst, err
 				}
 			} else {
-				if src.Remote, err = registeredConnector.CreateRemote(srcArgs, additionalSettings); err != nil {
+				if src.Remote, dstArgs, err = registeredConnector.CreateRemote(srcArgs, additionalSettings); err != nil {
 					return src, dst, err
 				}
 			}
 			break
 		} else if strings.EqualFold(srcArgs[0], registeredConnector.Name) {
 			if registeredConnector.Create != nil {
-				_, err = registeredConnector.Create([]string{srcArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.Create([]string{srcArgs[0], "help"}, additionalSettings)
 			} else {
-				_, err = registeredConnector.CreateRemote([]string{srcArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.CreateRemote([]string{srcArgs[0], "help"}, additionalSettings)
 			}
 			return src, dst, err
 		}
@@ -97,20 +85,20 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 	for _, registeredConnector := range registeredConnectors {
 		if registeredConnector.IsConnector(dstArgs[0]) {
 			if registeredConnector.Create != nil {
-				if dst.Local, err = registeredConnector.Create(dstArgs, additionalSettings); err != nil {
+				if dst.Local, _, err = registeredConnector.Create(dstArgs, additionalSettings); err != nil {
 					return src, dst, err
 				}
 			} else {
-				if dst.Remote, err = registeredConnector.CreateRemote(dstArgs, additionalSettings); err != nil {
+				if dst.Remote, _, err = registeredConnector.CreateRemote(dstArgs, additionalSettings); err != nil {
 					return src, dst, err
 				}
 			}
 			break
 		} else if strings.EqualFold(dstArgs[0], registeredConnector.Name) {
 			if registeredConnector.Create != nil {
-				_, err = registeredConnector.Create([]string{dstArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.Create([]string{dstArgs[0], "help"}, additionalSettings)
 			} else {
-				_, err = registeredConnector.CreateRemote([]string{dstArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.CreateRemote([]string{dstArgs[0], "help"}, additionalSettings)
 			}
 			return src, dst, err
 		}
@@ -121,9 +109,10 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 	return src, dst, nil
 }
 
-func CreateHelper(name string, usage string, flags []cli.Flag, action func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error)) func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-	return func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+func CreateHelper(name string, usage string, flags []cli.Flag, action func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error)) func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+	return func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 		var conn adiomv1connect.ConnectorServiceHandler
+		var restArgs []string
 		app := &cli.App{
 			HelpName:  name,
 			Usage:     "Connector",
@@ -131,17 +120,18 @@ func CreateHelper(name string, usage string, flags []cli.Flag, action func(*cli.
 			Flags:     flags,
 			Action: func(c *cli.Context) error {
 				var err error
+				restArgs = c.Args().Slice()
 				conn, err = action(c, args, as)
 				return err
 			},
 		}
 		if err := app.Run(args); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if conn != nil {
-			return conn, nil
+			return conn, restArgs, nil
 		}
-		return nil, ErrHelp
+		return nil, nil, ErrHelp
 	}
 }
 
@@ -204,7 +194,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				}
 				return false
 			},
-			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := cosmos.ConnectorSettings{}
 				settings.ConnectionString = args[0]
 				if as.BaseThreadCount != 0 {
@@ -223,7 +213,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				}
 				return false
 			},
-			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
 				return CreateHelper("MongoDB", "mongodb://connection-string [options]", MongoFlags(&settings), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					return mongo.NewConn(settings), nil
@@ -235,8 +225,9 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.HasPrefix(s, "grpc://")
 			},
-			CreateRemote: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceClient, error) {
+			CreateRemote: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceClient, []string, error) {
 				var conn adiomv1connect.ConnectorServiceClient
+				var restArgs []string
 				app := &cli.App{
 					HelpName:  "grpc",
 					Usage:     "Connector",
@@ -252,6 +243,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						}),
 					},
 					Action: func(c *cli.Context) error {
+						restArgs = c.Args().Slice()
 						_, endpoint, ok := strings.Cut(args[0], "://")
 						if !ok {
 							return fmt.Errorf("invalid connection string %v", args[0])
@@ -274,12 +266,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					},
 				}
 				if err := app.Run(args); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				if conn != nil {
-					return conn, nil
+					return conn, restArgs, nil
 				}
-				return nil, ErrHelp
+				return nil, nil, ErrHelp
 			},
 		},
 	}
@@ -288,15 +280,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 func CosmosFlags(settings *cosmos.ConnectorSettings) []cli.Flag {
 	return append(MongoFlags(&settings.ConnectorSettings), []cli.Flag{
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-reader-max-namespaces",
-			Usage:    "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
-			Value:    cosmosDefaultMaxNumNamespaces,
-			Required: false,
-			Category: "Cosmos DB-specific Options",
-			Action: func(_ *cli.Context, v int) error {
-				settings.MaxNumNamespaces = v
-				return nil
-			},
+			Name:        "cosmos-reader-max-namespaces",
+			Usage:       "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
+			Value:       cosmosDefaultMaxNumNamespaces,
+			Required:    false,
+			Destination: &settings.MaxNumNamespaces,
+			Category:    "Cosmos DB-specific Options",
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "cosmos-deletes-cdc",
@@ -308,58 +297,41 @@ func CosmosFlags(settings *cosmos.ConnectorSettings) []cli.Flag {
 				return nil
 			},
 		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:     "cosmos-doc-partition",
-			Required: false,
-			Action: func(_ *cli.Context, v int64) error {
-				settings.TargetDocCountPerPartition = v
-				return nil
-			},
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "cosmos-delete-interval",
+			Required:    false,
+			Destination: &settings.DeletesCheckInterval,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-delete-interval",
-			Required: false,
-			Action: func(_ *cli.Context, v int) error {
-				settings.DeletesCheckInterval = time.Duration(v) * time.Second
-				return nil
-			},
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "cosmos-parallel-partition-workers",
-			Required: false,
-			Action: func(_ *cli.Context, v int) error {
-				settings.NumParallelPartitionWorkers = v
-				return nil
-			},
+			Name:        "cosmos-parallel-partition-workers",
+			Required:    false,
+			Destination: &settings.NumParallelPartitionWorkers,
 		}),
 	}...)
 }
 
 func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 	return []cli.Flag{
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "server-timeout",
-			Required: false,
-			Action: func(_ *cli.Context, v int) error {
-				settings.ServerConnectTimeout = time.Duration(v) * time.Second
-				return nil
-			},
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "server-timeout",
+			Required:    false,
+			Destination: &settings.ServerConnectTimeout,
+		}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "ping-timeout",
+			Required:    false,
+			Destination: &settings.PingTimeout,
 		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "ping-timeout",
-			Required: false,
-			Action: func(_ *cli.Context, v int) error {
-				settings.PingTimeout = time.Duration(v) * time.Second
-				return nil
-			},
+			Name:        "writer-batch-size",
+			Required:    false,
+			Destination: &settings.WriterMaxBatchSize,
 		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:     "writer-batch-size",
-			Required: false,
-			Action: func(_ *cli.Context, v int) error {
-				settings.WriterMaxBatchSize = v
-				return nil
-			},
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "doc-partition",
+			Required:    false,
+			Destination: &settings.TargetDocCountPerPartition,
+			Value:       512 * 1000,
 		}),
 	}
 }
