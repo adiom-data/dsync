@@ -21,8 +21,11 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"connectrpc.com/connect"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
+	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/logger"
 	runner "github.com/adiom-data/dsync/runners/local"
 	"github.com/adiom-data/dsync/static"
@@ -126,6 +129,20 @@ func runDsync(c *cli.Context) error {
 		} else if errors.Is(err, options.ErrHelp) {
 			return nil
 		}
+		return err
+	}
+
+	var infoRes *connect.Response[adiomv1.GetInfoResponse]
+	if src.Local != nil {
+		infoRes, err = src.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+	} else {
+		infoRes, err = src.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+	}
+	if err != nil {
+		return err
+	}
+	srcNamespaces, _ := util.NamespaceSplit(o.NamespaceFrom, ":")
+	if err := util.ValidateNamespaces(srcNamespaces, infoRes.Msg.GetCapabilities()); err != nil {
 		return err
 	}
 

@@ -23,6 +23,7 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.akshayshah.org/memhttp"
@@ -184,30 +185,12 @@ func (c *connector) Interrupt(flowId iface.FlowID) error {
 }
 
 func (c *connector) mapNamespace(namespace string) string {
-	if res, ok := c.namespaceMappings[namespace]; ok {
-		return res
-	}
-	if left, right, ok := strings.Cut(namespace, "."); ok {
-		if res, ok := c.namespaceMappings[left]; ok {
-			return res + "." + right
-		}
-	}
-	return namespace
+	return util.MapNamespace(c.namespaceMappings, namespace, ".", ".")
 }
 
 func (c *connector) parseNamespaceOptionAndUpdateMap(namespaces []string) ([]string, []string) {
-	var left []string
-	var right []string
-	for _, namespace := range namespaces {
-		if l, r, ok := strings.Cut(namespace, ":"); ok {
-			left = append(left, l)
-			right = append(right, r)
-			c.namespaceMappings[l] = r
-		} else {
-			left = append(left, namespace)
-			right = append(right, namespace)
-		}
-	}
+	left, right := util.NamespaceSplit(namespaces, ":")
+	c.namespaceMappings = util.Mapify(left, right)
 	return left, right
 }
 

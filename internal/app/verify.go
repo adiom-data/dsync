@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -14,6 +13,7 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/app/options"
+	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/logger"
 	"github.com/cespare/xxhash"
 	"github.com/jrhy/mast"
@@ -75,21 +75,6 @@ type NamespacedID struct {
 	ID        bson.RawValue
 }
 
-func createNamespaceMaps(namespaces []string) (map[string]string, map[string]string) {
-	m := map[string]string{}
-	m2 := map[string]string{}
-	for _, namespace := range namespaces {
-		if l, r, ok := strings.Cut(namespace, ":"); ok {
-			m[l] = namespace
-			m2[r] = namespace
-		} else {
-			m[namespace] = namespace
-			m2[namespace] = namespace
-		}
-	}
-	return m, m2
-}
-
 func connClient(impl adiomv1connect.ConnectorServiceHandler) adiomv1connect.ConnectorServiceClient {
 	_, handler := adiomv1connect.NewConnectorServiceHandler(impl)
 	srv, err := memhttp.New(handler)
@@ -111,15 +96,7 @@ type source struct {
 }
 
 func (s *source) mapNamespace(namespace string) string {
-	if res, ok := s.namespaceMap[namespace]; ok {
-		return res
-	}
-	if left, right, ok := strings.Cut(namespace, "."); ok {
-		if res, ok := s.namespaceMap[left]; ok {
-			return res + ":" + right
-		}
-	}
-	return namespace
+	return util.MapNamespace(s.namespaceMap, namespace, ".", ":")
 }
 
 func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.Partition, namespaces []string, ch chan<- Update) error {
@@ -220,11 +197,8 @@ func (s *source) populateMast(ctx context.Context) error {
 	if !supportedType {
 		return fmt.Errorf("not a valid source")
 	}
-	if len(s.namespaces) == 0 && !srcCapabilities.GetDefaultPlan() {
-		return fmt.Errorf("default plan not allowed")
-	}
-	if len(s.namespaces) > 1 && !srcCapabilities.GetMultiNamespacePlan() {
-		return fmt.Errorf("multiple namespaces not supported")
+	if err := util.ValidateNamespaces(s.namespaces, info.Msg.GetCapabilities()); err != nil {
+		return err
 	}
 
 	// Read Plan
@@ -321,14 +295,10 @@ func runVerify(c *cli.Context) error {
 	cooldown := c.Duration("cooldown")
 	parallelism := c.Int("parallelism")
 	limit := c.Int("limit")
-	leftNamespacesMap, rightNamespacesMap := createNamespaceMaps(namespaces)
-	var leftNamespaces, rightNamespaces []string
-	for n := range leftNamespacesMap {
-		leftNamespaces = append(leftNamespaces, n)
-	}
-	for n := range rightNamespacesMap {
-		rightNamespaces = append(rightNamespaces, n)
-	}
+	leftNamespaces, rightNamespaces := util.NamespaceSplit(namespaces, ":")
+	leftNamespacesMap := util.Mapify(leftNamespaces, namespaces)
+	rightNamespacesMap := util.Mapify(rightNamespaces, namespaces)
+
 	ctx := c.Context
 	left, right, err := options.ConfigureConnectors(c.Args().Slice(), options.AdditionalSettings{})
 	if err != nil {
