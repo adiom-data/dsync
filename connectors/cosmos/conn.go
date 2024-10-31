@@ -29,7 +29,6 @@ const (
 type ConnectorSettings struct {
 	mongoconn.ConnectorSettings
 	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
-	TargetDocCountPerPartition  int64  //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	NumParallelPartitionWorkers int    //number of workers used for partitioning
 	partitionKey                string //partition key to use for collections
 

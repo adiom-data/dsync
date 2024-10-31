@@ -25,14 +25,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
 )
 
 type ConnectorSettings struct {
 	ConnectionString string
 
-	ServerConnectTimeout time.Duration
-	PingTimeout          time.Duration
-	WriterMaxBatchSize   int // applies to batch inserts only; 0 means no limit
+	ServerConnectTimeout       time.Duration
+	PingTimeout                time.Duration
+	WriterMaxBatchSize         int   // applies to batch inserts only; 0 means no limit
+	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -150,8 +152,66 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
+	done := make(chan struct{})
+	eg, ctx := errgroup.WithContext(ctx)
+	var finalPartitions []*adiomv1.Partition
+	ch := make(chan *adiomv1.Partition)
+
+	go func() {
+		defer close(done)
+		for p := range ch {
+			finalPartitions = append(finalPartitions, p)
+		}
+	}()
+
+	for _, partition := range partitions {
+		eg.Go(func() error {
+			ns, _ := ToNS(partition.Namespace)
+			col := c.client.Database(ns.Db).Collection(ns.Col)
+			count, err := col.EstimatedDocumentCount(ctx)
+			if err != nil {
+				return err
+			}
+			if count < c.settings.TargetDocCountPerPartition*2 {
+				ch <- &adiomv1.Partition{
+					Namespace:      partition.GetNamespace(),
+					EstimatedCount: uint64(count),
+				}
+				return nil
+			}
+			numSamples := count / c.settings.TargetDocCountPerPartition
+			res, err := col.Aggregate(ctx, mongo.Pipeline{{{"$sample", bson.D{{"size", numSamples}}}}, {{"$sort", bson.D{{"_id", 1}}}}})
+			if err != nil {
+				return err
+			}
+			var low bson.RawValue
+			for res.Next(ctx) {
+				high := res.Current.Lookup("_id")
+				ch <- &adiomv1.Partition{
+					Namespace:      partition.GetNamespace(),
+					EstimatedCount: uint64(c.settings.TargetDocCountPerPartition),
+					Cursor:         EncodeCursor(low, high),
+				}
+				low = high
+			}
+			ch <- &adiomv1.Partition{
+				Namespace:      partition.GetNamespace(),
+				EstimatedCount: uint64(c.settings.TargetDocCountPerPartition),
+				Cursor:         EncodeCursor(low, bson.RawValue{}),
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		close(ch)
+		return nil, err
+	}
+	close(ch)
+	<-done
+
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		Partitions:        partitions,
+		Partitions:        finalPartitions,
 		UpdatesPartitions: []*adiomv1.Partition{{Cursor: resumeToken}},
 	}), nil
 }
@@ -773,6 +833,7 @@ func (c *conn) Teardown() {
 }
 
 func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
+	setDefault(&connSettings.TargetDocCountPerPartition, 512*1000)
 	client, err := MongoClient(context.Background(), connSettings)
 	if err != nil {
 		slog.Error(fmt.Sprintf("unable to connect to mongo client: %v", err))
