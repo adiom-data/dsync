@@ -11,6 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.24.2
 	github.com/cespare/xxhash v1.1.0
 	github.com/gdamore/tcell/v2 v2.7.4
+	github.com/jrhy/mast v1.2.32
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b
@@ -45,7 +46,6 @@ require (
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jrhy/mast v1.2.32 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
@@ -61,7 +61,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/brianvoe/gofakeit/v7 v7.1.1
+	github.com/brianvoe/gofakeit/v7 v7.1.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0
