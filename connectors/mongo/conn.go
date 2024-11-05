@@ -43,6 +43,12 @@ func setDefault[T comparable](field *T, defaultValue T) {
 	}
 }
 
+type buffer struct {
+	ctr  int64
+	ch   <-chan [][]byte
+	last *adiomv1.ListDataResponse
+}
+
 type conn struct {
 	client *mongo.Client
 
@@ -52,7 +58,7 @@ type conn struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	buffersMutex sync.RWMutex
-	buffers      map[int64]<-chan [][]byte
+	buffers      map[int64]buffer
 }
 
 // get all database names except system databases
@@ -330,7 +336,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		cursorID = c.nextCursorID.Add(1)
 		ch := make(chan [][]byte, 10)
 		c.buffersMutex.Lock()
-		c.buffers[cursorID] = ch
+		c.buffers[cursorID] = buffer{
+			ch: ch,
+		}
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
@@ -376,30 +384,40 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		}
 	}
 	c.buffersMutex.RLock()
-	ch, ok := c.buffers[cursorID]
+	buffer, ok := c.buffers[cursorID]
 	c.buffersMutex.RUnlock()
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
+	if ctr+1 == buffer.ctr && buffer.last != nil {
+		return connect.NewResponse(buffer.last), nil
+	}
+	if ctr != buffer.ctr {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no longer available"))
+	}
 
 	for {
 		select {
-		case dataBatch, ok := <-ch:
-			if !ok {
-				c.buffersMutex.Lock()
-				delete(c.buffers, cursorID)
-				c.buffersMutex.Unlock()
-
-				return connect.NewResponse(&adiomv1.ListDataResponse{
-					Data: dataBatch,
-				}), nil
+		case dataBatch, ok := <-buffer.ch:
+			var nextCursor []byte
+			if ok {
+				nextCursor = binary.AppendVarint(nil, cursorID)
+				nextCursor = binary.AppendVarint(nextCursor, ctr+1)
+				buffer.ctr = buffer.ctr + 1
+			} else {
+				// TODO: somehow cleanup/delete key after some time
 			}
-			nextCursor := binary.AppendVarint(nil, cursorID)
-			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-			return connect.NewResponse(&adiomv1.ListDataResponse{
+
+			resp := &adiomv1.ListDataResponse{
 				Data:       dataBatch,
 				NextCursor: nextCursor,
-			}), nil
+			}
+			buffer.last = resp
+			c.buffersMutex.Lock()
+			c.buffers[cursorID] = buffer
+			c.buffersMutex.Unlock()
+
+			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -849,6 +867,6 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 		settings: settings,
 		ctx:      ctx,
 		cancel:   cancel,
-		buffers:  map[int64]<-chan [][]byte{},
+		buffers:  map[int64]buffer{},
 	}
 }
