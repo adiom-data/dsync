@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -56,6 +57,15 @@ var verifyCommand *cli.Command = &cli.Command{
 			Usage: "max diffs to print",
 			Value: 10,
 		},
+		&cli.BoolFlag{
+			Name:  "simple",
+			Usage: "Use a simple verifier that tails both sources",
+		},
+		&cli.DurationFlag{
+			Name:  "simple-latency",
+			Usage: "When using simple mode, the how stale entries are before being eligible to compare",
+			Value: time.Second * 5,
+		},
 		&cli.StringFlag{
 			Name:  "verbosity",
 			Usage: "DEBUG|INFO|WARN|ERROR",
@@ -91,6 +101,8 @@ type source struct {
 	initialSyncDone chan struct{}
 	partition       int
 	totalPartitions int
+	skipInitialSync bool
+	skipStream      bool
 }
 
 func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.Partition, namespaces []string, ch chan<- Update) error {
@@ -175,7 +187,11 @@ func (s *source) readPartitions(ctx context.Context, partitions []*adiomv1.Parti
 	return eg.Wait()
 }
 
-func (s *source) processSource(ctx context.Context, process func(context.Context, Update) error) error {
+func (s *source) WaitForInitialSync() {
+	<-s.initialSyncDone
+}
+
+func (s *source) ProcessSource(ctx context.Context, process func(context.Context, Update) error) error {
 	// Check capabilities
 	info, err := s.c.GetInfo(ctx, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	if err != nil {
@@ -226,13 +242,17 @@ func (s *source) processSource(ctx context.Context, process func(context.Context
 	ch := make(chan Update)
 	eg.Go(func() error {
 		defer close(ch)
-		if err := s.readPartitions(egCtx, partitions, ch); err != nil {
-			close(s.initialSyncDone)
-			return err
+		if !s.skipInitialSync {
+			if err := s.readPartitions(egCtx, partitions, ch); err != nil {
+				close(s.initialSyncDone)
+				return err
+			}
 		}
 		close(s.initialSyncDone)
-		if err := s.readUpdates(egCtx, updatePartitions, streamUpdatesNamespaces, ch); err != nil {
-			return err
+		if !s.skipStream {
+			if err := s.readUpdates(egCtx, updatePartitions, streamUpdatesNamespaces, ch); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -281,6 +301,219 @@ func processMast(m *mast.Mast, namespaceMap map[string]string) func(context.Cont
 	}
 }
 
+type mastVerify struct {
+	leftSource         source
+	rightSource        source
+	leftNamespacesMap  map[string]string
+	rightNamespacesMap map[string]string
+	limit              int
+	cooldown           time.Duration
+}
+
+func (m *mastVerify) Run(ctx context.Context) error {
+	leftM := mast.NewInMemory()
+	rightM := mast.NewInMemory()
+
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		return m.leftSource.ProcessSource(egCtx, processMast(&leftM, m.leftNamespacesMap))
+	})
+	eg.Go(func() error {
+		return m.rightSource.ProcessSource(egCtx, processMast(&rightM, m.rightNamespacesMap))
+	})
+	eg.Go(func() error {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		m.leftSource.WaitForInitialSync()
+		m.rightSource.WaitForInitialSync()
+		for {
+			select {
+			case <-ticker.C:
+				diffs := 0
+				slog.Info("Verifying", "left_total", leftM.Size(), "right_total", rightM.Size())
+				leftM.DiffIter(egCtx, &rightM, func(added, removed bool, key, addedValue, removedValue interface{}) (bool, error) {
+					if added && removed {
+					} else if added {
+						if h, ok := addedValue.(uint64); h == 0 && ok {
+							return true, nil
+						}
+					} else if removed {
+						if h, ok := removedValue.(uint64); h == 0 && ok {
+							return true, nil
+						}
+					}
+					if diffs < m.limit {
+						slog.Info("diff", "id", key, "left", added, "right", removed, "left_value", addedValue, "right_value", removedValue)
+					}
+					diffs++
+					return true, nil
+				})
+				slog.Info("Total diffs", "diffs", diffs)
+				ticker.Reset(m.cooldown)
+			case <-egCtx.Done():
+				return nil
+			}
+		}
+	})
+
+	return eg.Wait()
+}
+
+type tailVerify struct {
+	leftSource         source
+	rightSource        source
+	leftNamespacesMap  map[string]string
+	rightNamespacesMap map[string]string
+	limit              int
+	cooldown           time.Duration
+	latency            time.Duration
+}
+
+type SimpleTailDiffer struct {
+	lock sync.Mutex
+	m    map[uint64]tailDiff
+}
+
+func (s *SimpleTailDiffer) Add(idHash uint64, id NamespacedID, h uint64, t time.Time, left bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	diff, ok := s.m[idHash]
+	if !ok {
+		if left {
+			s.m[idHash] = tailDiff{
+				id:   id,
+				t:    t,
+				left: h,
+			}
+		} else {
+			s.m[idHash] = tailDiff{
+				id:    id,
+				t:     t,
+				right: h,
+			}
+		}
+		return
+	} else if id.Namespace != diff.id.Namespace || id.ID.String() != diff.id.ID.String() {
+		if !t.After(diff.t) {
+			return
+		}
+		if left {
+			s.m[idHash] = tailDiff{
+				id:   id,
+				t:    t,
+				left: h,
+			}
+		} else {
+			s.m[idHash] = tailDiff{
+				id:    id,
+				t:     t,
+				right: h,
+			}
+		}
+		return
+	}
+	if t.After(diff.t) {
+		diff.t = t
+	}
+	if left {
+		diff.left = h
+	} else {
+		diff.right = h
+	}
+	s.m[idHash] = diff
+}
+
+// GetAndClean will return all items older than `olderThan` and remove them
+// and for now it will lock everything
+func (s *SimpleTailDiffer) GetAndClean(olderThan time.Time) []tailDiff {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	var res []tailDiff
+	for k, v := range s.m {
+		if v.t.Before(olderThan) {
+			res = append(res, v)
+			delete(s.m, k)
+		}
+	}
+	return res
+}
+
+func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, left bool) func(context.Context, Update) error {
+	hasher := xxhash.New()
+	return func(ctx context.Context, update Update) error {
+		innerIDCopy := bson.RawValue{
+			Type:  update.ID[0].Type,
+			Value: bytes.Clone(update.ID[0].Value),
+		}
+		hasher.Reset()
+		hasher.Write(update.ID[0].Value)
+		idHash := hasher.Sum64()
+		namespace := util.MapNamespace(namespaceMap, update.Namespace, ".", ":")
+		id := NamespacedID{namespace, innerIDCopy}
+		if update.Data == nil {
+			std.Add(idHash, id, 0, time.Now(), left)
+			return nil
+		}
+		hasher.Reset()
+		if err := common.HashBson(hasher, update.Data, false); err != nil {
+			return err
+		}
+		h := hasher.Sum64()
+		std.Add(idHash, id, h, time.Now(), left)
+		return nil
+	}
+}
+
+type tailDiff struct {
+	id    NamespacedID
+	t     time.Time
+	left  uint64
+	right uint64
+}
+
+func (v *tailVerify) Run(ctx context.Context) error {
+	std := &SimpleTailDiffer{m: map[uint64]tailDiff{}}
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		v.leftSource.skipInitialSync = true
+		return v.leftSource.ProcessSource(egCtx, processTail(std, v.leftNamespacesMap, true))
+	})
+	eg.Go(func() error {
+		v.rightSource.skipInitialSync = true
+		return v.rightSource.ProcessSource(egCtx, processTail(std, v.rightNamespacesMap, false))
+	})
+	eg.Go(func() error {
+		cumulativeTotal := 0
+		cumulativeDiff := 0
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				diffs := 0
+				items := std.GetAndClean(time.Now().Add(-v.latency))
+				for _, item := range items {
+					if item.left != item.right {
+						if diffs < v.limit {
+							slog.Info("diff", "id", item.id, "left", item.left, "right", item.right)
+						}
+						diffs++
+						cumulativeDiff++
+					}
+				}
+				cumulativeTotal += len(items)
+				slog.Info("Total diffs", "diffs", diffs, "total_checked", len(items), "cumulative_diffs", cumulativeDiff, "cumulative_total", cumulativeTotal)
+				ticker.Reset(v.cooldown)
+			case <-egCtx.Done():
+				return nil
+			}
+		}
+	})
+
+	return eg.Wait()
+}
+
 func runVerify(c *cli.Context) error {
 	if c.Bool("pprof") {
 		go func() {
@@ -303,6 +536,8 @@ func runVerify(c *cli.Context) error {
 	cooldown := c.Duration("cooldown")
 	parallelism := c.Int("parallelism")
 	limit := c.Int("limit")
+	simple := c.Bool("simple")
+	simpleLatency := c.Duration("simple-latency")
 	leftNamespaces, rightNamespaces := util.NamespaceSplit(namespaces, ":")
 	leftNamespacesMap := util.Mapify(leftNamespaces, namespaces)
 	rightNamespacesMap := util.Mapify(rightNamespaces, namespaces)
@@ -321,9 +556,6 @@ func runVerify(c *cli.Context) error {
 		rightC = connClient(right.Local)
 	}
 
-	leftM := mast.NewInMemory()
-	rightM := mast.NewInMemory()
-
 	leftSource := source{
 		c:               leftC,
 		namespaces:      leftNamespaces,
@@ -341,49 +573,35 @@ func runVerify(c *cli.Context) error {
 		totalPartitions: totalPartitions,
 	}
 
-	eg, egCtx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		return leftSource.processSource(egCtx, processMast(&leftM, leftNamespacesMap))
-	})
-	eg.Go(func() error {
-		return rightSource.processSource(egCtx, processMast(&rightM, rightNamespacesMap))
-	})
-	eg.Go(func() error {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		<-leftSource.initialSyncDone
-		<-rightSource.initialSyncDone
-		for {
-			select {
-			case <-ticker.C:
-				diffs := 0
-				slog.Info("Verifying", "left_total", leftM.Size(), "right_total", rightM.Size())
-				leftM.DiffIter(egCtx, &rightM, func(added, removed bool, key, addedValue, removedValue interface{}) (bool, error) {
-					if added && removed {
-					} else if added {
-						if h, ok := addedValue.(uint64); h == 0 && ok {
-							return true, nil
-						}
-					} else if removed {
-						if h, ok := removedValue.(uint64); h == 0 && ok {
-							return true, nil
-						}
-					}
-					if diffs < limit {
-						slog.Info("diff", "id", key, "left", added, "right", removed, "left_value", addedValue, "right_value", removedValue)
-					}
-					diffs++
-					return true, nil
-				})
-				slog.Info("Total diffs", "diffs", diffs)
-				ticker.Reset(cooldown)
-			case <-egCtx.Done():
-				return nil
-			}
+	if simple {
+		tv := tailVerify{
+			leftSource:         leftSource,
+			rightSource:        rightSource,
+			leftNamespacesMap:  leftNamespacesMap,
+			rightNamespacesMap: rightNamespacesMap,
+			limit:              limit,
+			cooldown:           cooldown,
+			latency:            simpleLatency,
 		}
-	})
 
-	if err := eg.Wait(); err != nil {
+		if err := tv.Run(ctx); err != nil {
+			slog.Error("Failed", "err", err)
+			return err
+		}
+
+		return nil
+	}
+
+	mv := mastVerify{
+		leftSource:         leftSource,
+		rightSource:        rightSource,
+		leftNamespacesMap:  leftNamespacesMap,
+		rightNamespacesMap: rightNamespacesMap,
+		limit:              limit,
+		cooldown:           cooldown,
+	}
+
+	if err := mv.Run(ctx); err != nil {
 		slog.Error("Failed", "err", err)
 		return err
 	}

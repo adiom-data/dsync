@@ -506,7 +506,7 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 			Data: fullDocumentRaw,
 		}
-	case "update":
+	case "update", "replace":
 		// get the id of the document that was changed
 		id := change["documentKey"].(bson.M)["_id"]
 		// convert id to raw bson
