@@ -66,7 +66,7 @@ var verifyCommand *cli.Command = &cli.Command{
 
 type Update struct {
 	Namespace string
-	ID        bson.RawValue
+	ID        []bson.RawValue
 	Data      []byte
 }
 
@@ -86,17 +86,11 @@ func connClient(impl adiomv1connect.ConnectorServiceHandler) adiomv1connect.Conn
 
 type source struct {
 	c               adiomv1connect.ConnectorServiceClient
-	m               *mast.Mast
-	namespaceMap    map[string]string
 	namespaces      []string
 	parallelism     int
 	initialSyncDone chan struct{}
 	partition       int
 	totalPartitions int
-}
-
-func (s *source) mapNamespace(namespace string) string {
-	return util.MapNamespace(s.namespaceMap, namespace, ".", ":")
 }
 
 func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.Partition, namespaces []string, ch chan<- Update) error {
@@ -118,7 +112,10 @@ func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.Partitio
 			for s.Receive() {
 				msg := s.Msg()
 				for _, update := range msg.GetUpdates() {
-					idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
+					var idBson []bson.RawValue
+					for _, id := range update.GetId() {
+						idBson = append(idBson, bson.RawValue{Type: bsontype.Type(id.GetType()), Value: id.GetData()})
+					}
 					if update.GetType() == adiomv1.UpdateType_UPDATE_TYPE_DELETE {
 						ch <- Update{
 							Namespace: msg.GetNamespace(),
@@ -164,7 +161,7 @@ func (s *source) readPartitions(ctx context.Context, partitions []*adiomv1.Parti
 					id := bson.Raw(d).Lookup("_id")
 					ch <- Update{
 						Namespace: partition.GetNamespace(),
-						ID:        id,
+						ID:        []bson.RawValue{id},
 						Data:      d,
 					}
 				}
@@ -178,7 +175,7 @@ func (s *source) readPartitions(ctx context.Context, partitions []*adiomv1.Parti
 	return eg.Wait()
 }
 
-func (s *source) populateMast(ctx context.Context) error {
+func (s *source) processSource(ctx context.Context, process func(context.Context, Update) error) error {
 	// Check capabilities
 	info, err := s.c.GetInfo(ctx, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	if err != nil {
@@ -229,8 +226,8 @@ func (s *source) populateMast(ctx context.Context) error {
 	ch := make(chan Update)
 	eg.Go(func() error {
 		defer close(ch)
-		defer close(s.initialSyncDone)
 		if err := s.readPartitions(egCtx, partitions, ch); err != nil {
+			close(s.initialSyncDone)
 			return err
 		}
 		close(s.initialSyncDone)
@@ -246,31 +243,42 @@ func (s *source) populateMast(ctx context.Context) error {
 		for update := range ch {
 			if s.totalPartitions > 0 {
 				hasher.Reset()
-				hasher.Write(update.ID.Value)
+				for _, id := range update.ID {
+					hasher.Write(id.Value)
+				}
 				if hasher.Sum64()%uint64(s.totalPartitions) != uint64(s.partition) {
 					continue
 				}
 			}
-			innerIDCopy := bson.RawValue{
-				Type:  update.ID.Type,
-				Value: bytes.Clone(update.ID.Value),
-			}
-			id := NamespacedID{s.mapNamespace(update.Namespace), innerIDCopy}
-			if update.Data == nil {
-				s.m.Insert(egCtx, id, uint64(0))
-				continue
-			}
-			hasher.Reset()
-			if err := common.HashBson(hasher, update.Data, false); err != nil {
+			if err := process(egCtx, update); err != nil {
 				return err
 			}
-			h := hasher.Sum64()
-			s.m.Insert(egCtx, id, h)
 		}
 		return nil
 	})
 
 	return eg.Wait()
+}
+
+func processMast(m *mast.Mast, namespaceMap map[string]string) func(context.Context, Update) error {
+	hasher := xxhash.New()
+	return func(ctx context.Context, update Update) error {
+		innerIDCopy := bson.RawValue{
+			Type:  update.ID[0].Type,
+			Value: bytes.Clone(update.ID[0].Value),
+		}
+		namespace := util.MapNamespace(namespaceMap, update.Namespace, ".", ":")
+		id := NamespacedID{namespace, innerIDCopy}
+		if update.Data == nil {
+			return m.Insert(ctx, id, uint64(0))
+		}
+		hasher.Reset()
+		if err := common.HashBson(hasher, update.Data, false); err != nil {
+			return err
+		}
+		h := hasher.Sum64()
+		return m.Insert(ctx, id, h)
+	}
 }
 
 func runVerify(c *cli.Context) error {
@@ -318,8 +326,6 @@ func runVerify(c *cli.Context) error {
 
 	leftSource := source{
 		c:               leftC,
-		m:               &leftM,
-		namespaceMap:    leftNamespacesMap,
 		namespaces:      leftNamespaces,
 		parallelism:     parallelism,
 		initialSyncDone: make(chan struct{}),
@@ -328,8 +334,6 @@ func runVerify(c *cli.Context) error {
 	}
 	rightSource := source{
 		c:               rightC,
-		m:               &rightM,
-		namespaceMap:    rightNamespacesMap,
 		namespaces:      rightNamespaces,
 		parallelism:     parallelism,
 		initialSyncDone: make(chan struct{}),
@@ -339,10 +343,10 @@ func runVerify(c *cli.Context) error {
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return leftSource.populateMast(egCtx)
+		return leftSource.processSource(egCtx, processMast(&leftM, leftNamespacesMap))
 	})
 	eg.Go(func() error {
-		return rightSource.populateMast(egCtx)
+		return rightSource.processSource(egCtx, processMast(&rightM, rightNamespacesMap))
 	})
 	eg.Go(func() error {
 		ticker := time.NewTicker(time.Second)
