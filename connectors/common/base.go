@@ -80,7 +80,10 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 	return c.status
 }
 
-func HashBson(hasher hash.Hash64, b bson.Raw, arr bool) error {
+func HashBson(hasher hash.Hash64, b bson.Raw, arr bool, projection map[string]interface{}) error {
+	if projection != nil && len(projection) == 0 {
+		return nil
+	}
 	elems, err := b.Elements()
 	if err != nil {
 		return err
@@ -91,17 +94,29 @@ func HashBson(hasher hash.Hash64, b bson.Raw, arr bool) error {
 		})
 	}
 	for _, e := range elems {
+		var innerProjection map[string]interface{}
+		if arr {
+			innerProjection = projection
+		} else if projection != nil {
+			inner, ok := projection[e.Key()]
+			if !ok {
+				continue
+			}
+			if innerMap, ok := inner.(map[string]interface{}); ok {
+				innerProjection = innerMap
+			}
+		}
 		hasher.Write([]byte(e.Key()))
 		v := e.Value()
 		hasher.Write([]byte{byte(v.Type)})
 		if v.Type == bson.TypeEmbeddedDocument {
 			hasher.Write([]byte(e.Key()))
-			if err := HashBson(hasher, v.Document(), false); err != nil {
+			if err := HashBson(hasher, v.Document(), false, innerProjection); err != nil {
 				return err
 			}
 		} else if v.Type == bson.TypeArray {
 			hasher.Write([]byte(e.Key()))
-			if err := HashBson(hasher, v.Array(), true); err != nil {
+			if err := HashBson(hasher, v.Array(), true, innerProjection); err != nil {
 				return err
 			}
 		} else {
@@ -151,7 +166,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 		for _, data := range res.Msg.Data {
 			hasher.Reset()
-			err = HashBson(hasher, bson.Raw(data), false)
+			err = HashBson(hasher, bson.Raw(data), false, nil)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Error hashing during integrity check: %v", err))
 				return iface.ConnectorDataIntegrityCheckResult{}, err

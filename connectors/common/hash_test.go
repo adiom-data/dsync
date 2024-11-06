@@ -11,13 +11,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func compareHash(t *testing.T, hasher hash.Hash64, left []byte, right []byte) bool {
+func compareHash(t *testing.T, hasher hash.Hash64, left []byte, right []byte, projection map[string]interface{}) bool {
 	hasher.Reset()
-	assert.NoError(t, common.HashBson(hasher, left, false))
+	assert.NoError(t, common.HashBson(hasher, left, false, projection))
 	l := hasher.Sum64()
 	assert.NotZero(t, l)
 	hasher.Reset()
-	assert.NoError(t, common.HashBson(hasher, right, false))
+	assert.NoError(t, common.HashBson(hasher, right, false, projection))
 	r := hasher.Sum64()
 	assert.NotZero(t, r)
 	return l == r
@@ -41,19 +41,19 @@ func Test_HashBson(t *testing.T) {
 	// Test hasher is invariant to reordered documents, but not to reordered arrays
 	for _, i := range same1 {
 		for _, j := range same1 {
-			assert.True(t, compareHash(t, hasher, i, j))
+			assert.True(t, compareHash(t, hasher, i, j, nil))
 		}
 		for _, j := range same2 {
-			assert.False(t, compareHash(t, hasher, i, j))
+			assert.False(t, compareHash(t, hasher, i, j, nil))
 		}
 	}
 
 	for _, i := range same2 {
 		for _, j := range same2 {
-			assert.True(t, compareHash(t, hasher, i, j))
+			assert.True(t, compareHash(t, hasher, i, j, nil))
 		}
 		for _, j := range same1 {
-			assert.False(t, compareHash(t, hasher, i, j))
+			assert.False(t, compareHash(t, hasher, i, j, nil))
 		}
 	}
 
@@ -75,6 +75,18 @@ func Test_HashBson(t *testing.T) {
 		}
 	}
 
+	// Check a projection
+	left, _ := bson.Marshal(bson.D{{"a", bson.A{"a", bson.D{{"b", "2"}, {"c", "4"}}}}, {"b", bson.D{{"a", "1"}, {"b", "2"}}}})
+	right, _ := bson.Marshal(bson.D{{"a", bson.A{"a", bson.D{{"b", "2"}, {"c", "3"}}}}, {"b", bson.D{{"a", "1"}, {"b", "2"}}}})
+	assert.False(t, compareHash(t, hasher, left, right, nil))
+	assert.True(t, compareHash(t, hasher, left, right, map[string]interface{}{
+		"a": map[string]interface{}{"b": struct{}{}},
+		"b": struct{}{},
+	}))
+	assert.False(t, compareHash(t, hasher, left, right, map[string]interface{}{
+		"a": map[string]interface{}{"c": struct{}{}},
+	}))
+
 	// Sanity check an error case
-	assert.Error(t, common.HashBson(hasher, []byte{1, 2}, false))
+	assert.Error(t, common.HashBson(hasher, []byte{1, 2}, false, nil))
 }

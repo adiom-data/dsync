@@ -3,6 +3,7 @@ package dsync
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -65,6 +66,10 @@ var verifyCommand *cli.Command = &cli.Command{
 			Name:  "simple-latency",
 			Usage: "When using simple mode, the how stale entries are before being eligible to compare",
 			Value: time.Second * 5,
+		},
+		&cli.StringFlag{
+			Name:  "projection",
+			Usage: "JSON describing which fields to include in comparisons: {\"field\": {\"inner_field\": true}}",
 		},
 		&cli.StringFlag{
 			Name:  "verbosity",
@@ -280,7 +285,7 @@ func (s *source) ProcessSource(ctx context.Context, process func(context.Context
 	return eg.Wait()
 }
 
-func processMast(m *mast.Mast, namespaceMap map[string]string) func(context.Context, Update) error {
+func processMast(m *mast.Mast, namespaceMap map[string]string, projection map[string]interface{}) func(context.Context, Update) error {
 	hasher := xxhash.New()
 	return func(ctx context.Context, update Update) error {
 		innerIDCopy := bson.RawValue{
@@ -293,7 +298,7 @@ func processMast(m *mast.Mast, namespaceMap map[string]string) func(context.Cont
 			return m.Insert(ctx, id, uint64(0))
 		}
 		hasher.Reset()
-		if err := common.HashBson(hasher, update.Data, false); err != nil {
+		if err := common.HashBson(hasher, update.Data, false, projection); err != nil {
 			return err
 		}
 		h := hasher.Sum64()
@@ -308,6 +313,7 @@ type mastVerify struct {
 	rightNamespacesMap map[string]string
 	limit              int
 	cooldown           time.Duration
+	projection         map[string]interface{}
 }
 
 func (m *mastVerify) Run(ctx context.Context) error {
@@ -316,10 +322,10 @@ func (m *mastVerify) Run(ctx context.Context) error {
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return m.leftSource.ProcessSource(egCtx, processMast(&leftM, m.leftNamespacesMap))
+		return m.leftSource.ProcessSource(egCtx, processMast(&leftM, m.leftNamespacesMap, m.projection))
 	})
 	eg.Go(func() error {
-		return m.rightSource.ProcessSource(egCtx, processMast(&rightM, m.rightNamespacesMap))
+		return m.rightSource.ProcessSource(egCtx, processMast(&rightM, m.rightNamespacesMap, m.projection))
 	})
 	eg.Go(func() error {
 		ticker := time.NewTicker(time.Second)
@@ -367,6 +373,7 @@ type tailVerify struct {
 	limit              int
 	cooldown           time.Duration
 	latency            time.Duration
+	projection         map[string]interface{}
 }
 
 type SimpleTailDiffer struct {
@@ -438,7 +445,7 @@ func (s *SimpleTailDiffer) GetAndClean(olderThan time.Time) []tailDiff {
 	return res
 }
 
-func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, left bool) func(context.Context, Update) error {
+func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, projection map[string]interface{}, left bool) func(context.Context, Update) error {
 	hasher := xxhash.New()
 	return func(ctx context.Context, update Update) error {
 		innerIDCopy := bson.RawValue{
@@ -455,7 +462,7 @@ func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, left boo
 			return nil
 		}
 		hasher.Reset()
-		if err := common.HashBson(hasher, update.Data, false); err != nil {
+		if err := common.HashBson(hasher, update.Data, false, projection); err != nil {
 			return err
 		}
 		h := hasher.Sum64()
@@ -477,11 +484,11 @@ func (v *tailVerify) Run(ctx context.Context) error {
 
 	eg.Go(func() error {
 		v.leftSource.skipInitialSync = true
-		return v.leftSource.ProcessSource(egCtx, processTail(std, v.leftNamespacesMap, true))
+		return v.leftSource.ProcessSource(egCtx, processTail(std, v.leftNamespacesMap, v.projection, true))
 	})
 	eg.Go(func() error {
 		v.rightSource.skipInitialSync = true
-		return v.rightSource.ProcessSource(egCtx, processTail(std, v.rightNamespacesMap, false))
+		return v.rightSource.ProcessSource(egCtx, processTail(std, v.rightNamespacesMap, v.projection, false))
 	})
 	eg.Go(func() error {
 		cumulativeTotal := 0
@@ -538,6 +545,14 @@ func runVerify(c *cli.Context) error {
 	limit := c.Int("limit")
 	simple := c.Bool("simple")
 	simpleLatency := c.Duration("simple-latency")
+	projection := c.String("projection")
+	var projectionMap map[string]interface{}
+	if projection != "" {
+		if err := json.Unmarshal([]byte(projection), &projectionMap); err != nil {
+			slog.Error("Specified projection should be valid json.")
+			return err
+		}
+	}
 	leftNamespaces, rightNamespaces := util.NamespaceSplit(namespaces, ":")
 	leftNamespacesMap := util.Mapify(leftNamespaces, namespaces)
 	rightNamespacesMap := util.Mapify(rightNamespaces, namespaces)
@@ -582,6 +597,7 @@ func runVerify(c *cli.Context) error {
 			limit:              limit,
 			cooldown:           cooldown,
 			latency:            simpleLatency,
+			projection:         projectionMap,
 		}
 
 		if err := tv.Run(ctx); err != nil {
@@ -599,6 +615,7 @@ func runVerify(c *cli.Context) error {
 		rightNamespacesMap: rightNamespacesMap,
 		limit:              limit,
 		cooldown:           cooldown,
+		projection:         projectionMap,
 	}
 
 	if err := mv.Run(ctx); err != nil {
