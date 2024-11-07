@@ -23,6 +23,7 @@ import (
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/build"
 	"github.com/adiom-data/dsync/internal/util"
@@ -47,7 +48,7 @@ func NewApp() *cli.App {
 		Flags:     flags,
 		Name:      "dsync",
 		Usage:     "Copies data from the source to the destination",
-		UsageText: "dsync [options] source [source-options] destination [destination-options]",
+		UsageText: "dsync [options] source [source-options] destination [destination-options] [transform transform-options]",
 		Version:   build.VersionInfo(),
 		Copyright: build.CopyrightStr,
 		Action:    runDsync,
@@ -116,7 +117,7 @@ func runDsync(c *cli.Context) error {
 	if o.LoadLevel != "" {
 		additionalSettings.BaseThreadCount = runner.GetBaseThreadCount(o.LoadLevel)
 	}
-	src, dst, err := options.ConfigureConnectors(c.Args().Slice(), additionalSettings)
+	src, dst, restArgs, err := options.ConfigureConnectors(c.Args().Slice(), additionalSettings)
 	if err != nil {
 		if errors.Is(err, options.ErrMissingConnector) {
 			cli.ShowAppHelp(c)
@@ -130,6 +131,14 @@ func runDsync(c *cli.Context) error {
 			return nil
 		}
 		return err
+	}
+
+	var transform adiomv1connect.TransformServiceClient
+	if len(restArgs) > 0 {
+		transform, _, err = options.ConfigureTransformer(restArgs)
+		if err != nil {
+			return err
+		}
 	}
 
 	var infoRes *connect.Response[adiomv1.GetInfoResponse]
@@ -146,7 +155,39 @@ func runDsync(c *cli.Context) error {
 		return err
 	}
 
+	var dstInfoRes *connect.Response[adiomv1.GetInfoResponse]
+	if dst.Local != nil {
+		dstInfoRes, err = dst.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+	} else {
+		dstInfoRes, err = dst.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+	}
+	if err != nil {
+		return err
+	}
+
+	var transforms []*adiomv1.GetTransformInfoResponse_TransformInfo
+	if transform != nil {
+		transformInfo, err := transform.GetTransformInfo(c.Context, connect.NewRequest(&adiomv1.GetTransformInfoRequest{}))
+		if err != nil {
+			return err
+		}
+		transforms = transformInfo.Msg.GetTransforms()
+	}
+
+	srcType, dstType, err := util.ValidateCompatibility(infoRes.Msg.GetCapabilities(), dstInfoRes.Msg.GetCapabilities(), transforms)
+	if err != nil {
+		return err
+	}
+	if transform != nil {
+		slog.Info("Using Transform", "src", srcType.String(), "dst", dstType.String())
+	} else {
+		slog.Info("Using DataType", "src", srcType.String(), "dst", dstType.String())
+	}
+
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
+		SrcDataType:                    srcType,
+		DstDataType:                    dstType,
+		TransformClient:                transform,
 		Src:                            src,
 		Dst:                            dst,
 		StateStoreConnString:           o.StateStoreConnString,

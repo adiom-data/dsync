@@ -61,3 +61,40 @@ func ValidateNamespaces(namespaces []string, cap *adiomv1.Capabilities) error {
 	}
 	return nil
 }
+
+func ValidateCompatibility(src *adiomv1.Capabilities, dst *adiomv1.Capabilities, transforms []*adiomv1.GetTransformInfoResponse_TransformInfo) (adiomv1.DataType, adiomv1.DataType, error) {
+	if src.GetSource() == nil {
+		return adiomv1.DataType_DATA_TYPE_UNKNOWN, adiomv1.DataType_DATA_TYPE_UNKNOWN, fmt.Errorf("provided source is not a source")
+	}
+	if dst.GetSink() == nil {
+		return adiomv1.DataType_DATA_TYPE_UNKNOWN, adiomv1.DataType_DATA_TYPE_UNKNOWN, fmt.Errorf("provided destination is not a destination")
+	}
+	srcTypes := src.GetSource().GetSupportedDataTypes()
+	dstTypes := dst.GetSink().GetSupportedDataTypes()
+
+	if transforms != nil {
+		// could use maps but these are super small
+		for _, t := range srcTypes {
+			for _, transform := range transforms {
+				if transform.GetRequestType() == t {
+					for _, t2 := range transform.GetResponseTypes() {
+						for _, t3 := range dstTypes {
+							if t2 == t3 {
+								return t, t2, nil
+							}
+						}
+					}
+				}
+			}
+		}
+		return adiomv1.DataType_DATA_TYPE_UNKNOWN, adiomv1.DataType_DATA_TYPE_UNKNOWN, fmt.Errorf("no compatible data path with transform")
+	}
+	for _, t := range srcTypes {
+		for _, t2 := range dstTypes {
+			if t == t2 {
+				return t, t2, nil
+			}
+		}
+	}
+	return adiomv1.DataType_DATA_TYPE_UNKNOWN, adiomv1.DataType_DATA_TYPE_UNKNOWN, fmt.Errorf("no compatible data path")
+}

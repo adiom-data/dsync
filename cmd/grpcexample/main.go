@@ -8,6 +8,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/null"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/transform"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
@@ -23,13 +24,16 @@ func main() {
 		}
 		s := grpc.NewServer()
 		adiomv1.RegisterConnectorServiceServer(s, newConnector())
+		adiomv1.RegisterTransformServiceServer(s, transform.NewIdentityTransformGRPC())
 		s.Serve(l)
 	}()
 
 	nullConn := null.NewConn()
 	mux := http.NewServeMux()
 	path, handler := adiomv1connect.NewConnectorServiceHandler(nullConn)
+	tpath, thandler := adiomv1connect.NewTransformServiceHandler(transform.NewIdentityTransform())
 	mux.Handle(path, handler)
+	mux.Handle(tpath, thandler)
 	http.ListenAndServe(
 		"localhost:8085",
 		h2c.NewHandler(mux, &http2.Server{}),

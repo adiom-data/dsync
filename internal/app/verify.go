@@ -558,7 +558,7 @@ func runVerify(c *cli.Context) error {
 	rightNamespacesMap := util.Mapify(rightNamespaces, namespaces)
 
 	ctx := c.Context
-	left, right, err := options.ConfigureConnectors(c.Args().Slice(), options.AdditionalSettings{})
+	left, right, _, err := options.ConfigureConnectors(c.Args().Slice(), options.AdditionalSettings{})
 	if err != nil {
 		return err
 	}

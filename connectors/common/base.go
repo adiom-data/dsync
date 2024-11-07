@@ -42,6 +42,9 @@ type ConnectorSettings struct {
 	NumParallelWriters        int
 	MaxWriterBatchSize        int
 	ResumeTokenUpdateInterval time.Duration
+	TransformClient           adiomv1connect.TransformServiceClient
+	SourceDataType            adiomv1.DataType
+	DestinationDataType       adiomv1.DataType
 }
 
 type maybeOptimizedConnectorService interface {
@@ -154,7 +157,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 				Namespace: namespace,
 				Cursor:    pCursor,
 			},
-			Type:   adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+			Type:   c.settings.SourceDataType,
 			Cursor: cursor,
 		}))
 		if err != nil {
@@ -472,7 +475,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 								Namespace: sourceNamespace,
 								Cursor:    pCursor,
 							},
-							Type:   adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+							Type:   c.settings.SourceDataType,
 							Cursor: cursor,
 						}))
 						if err != nil {
@@ -486,8 +489,27 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						c.progressTracker.TaskInProgressUpdate(ns, int64(len(res.Msg.Data)))
 						docs += int64(len(res.Msg.Data))
 
+						data := res.Msg.Data
+						if c.settings.TransformClient != nil {
+							transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+								Namespace:    sourceNamespace,
+								Data:         data,
+								RequestType:  c.settings.SourceDataType,
+								ResponseType: c.settings.DestinationDataType,
+							}))
+							if err != nil {
+								slog.Error("err trying to transform data")
+								continue Loop
+							}
+
+							data = transformed.Msg.GetData()
+							if transformed.Msg.GetNamespace() != sourceNamespace {
+								destinationNamespace = transformed.Msg.GetNamespace()
+							}
+						}
+
 						dataMessage := iface.DataMessage{
-							DataBatch:    res.Msg.Data,
+							DataBatch:    data,
 							MutationType: iface.MutationType_InsertBatch,
 							Loc:          destinationNamespace,
 						}
@@ -571,7 +593,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 
 		res, err := c.impl.StreamUpdates(c.flowCtx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
 			Namespaces: streamUpdatesNamespaces,
-			Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+			Type:       c.settings.SourceDataType,
 			Cursor:     initialResumeToken,
 		}))
 		if err != nil {
@@ -584,7 +606,29 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 
 		for res.Receive() {
 			msg := res.Msg()
-			for _, d := range msg.Updates {
+			destinationNamespace := c.mapNamespace(msg.GetNamespace())
+
+			updates := msg.GetUpdates()
+
+			if c.settings.TransformClient != nil {
+				transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+					Namespace:    msg.GetNamespace(),
+					Updates:      updates,
+					RequestType:  c.settings.SourceDataType,
+					ResponseType: c.settings.DestinationDataType,
+				}))
+				if err != nil {
+					slog.Error("err trying to transform updates")
+					continue
+				}
+
+				updates = transformed.Msg.GetUpdates()
+				if transformed.Msg.GetNamespace() != msg.GetNamespace() {
+					destinationNamespace = transformed.Msg.GetNamespace()
+				}
+			}
+
+			for _, d := range updates {
 				var mutationType uint = iface.MutationType_Reserved
 				switch d.Type {
 				case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
@@ -599,7 +643,6 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				readerProgress.changeStreamEvents.Add(1)
 				lsn++
 
-				destinationNamespace := c.mapNamespace(msg.GetNamespace())
 				dataChannel <- iface.DataMessage{
 					Data:         &d.Data,
 					MutationType: mutationType,
@@ -813,7 +856,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 					Namespace: ns,
 					Updates:   msgs,
-					Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
+					Type:      c.settings.DestinationDataType,
 				}))
 				if err != nil {
 					return err
@@ -824,7 +867,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
 				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
-				Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
+				Type:      c.settings.DestinationDataType,
 			}))
 			if err != nil {
 				return err
@@ -856,7 +899,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 			Namespace: ns,
 			Updates:   msgs,
-			Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON, // TODO
+			Type:      c.settings.DestinationDataType,
 		}))
 		if err != nil {
 			return err

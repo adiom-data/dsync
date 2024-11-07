@@ -19,3 +19,8 @@ service ConnectorService {
     rpc StreamUpdates(StreamUpdatesRequest) returns (stream StreamUpdatesResponse);
     rpc StreamLSN(StreamLSNRequest) returns (stream StreamLSNResponse);
 }
+
+service TransformService {
+    rpc GetTransformInfo(GetTransformInfoRequest) returns (GetTransformInfoResponse);
+    rpc GetTransform(GetTransformRequest) returns (GetTransformResponse);
+}

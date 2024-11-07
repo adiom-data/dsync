@@ -396,3 +396,143 @@ var ConnectorService_ServiceDesc = grpc.ServiceDesc{
 	},
 	Metadata: "adiom/v1/adiom.proto",
 }
+
+const (
+	TransformService_GetTransformInfo_FullMethodName = "/adiom.v1.TransformService/GetTransformInfo"
+	TransformService_GetTransform_FullMethodName     = "/adiom.v1.TransformService/GetTransform"
+)
+
+// TransformServiceClient is the client API for TransformService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type TransformServiceClient interface {
+	GetTransformInfo(ctx context.Context, in *GetTransformInfoRequest, opts ...grpc.CallOption) (*GetTransformInfoResponse, error)
+	GetTransform(ctx context.Context, in *GetTransformRequest, opts ...grpc.CallOption) (*GetTransformResponse, error)
+}
+
+type transformServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewTransformServiceClient(cc grpc.ClientConnInterface) TransformServiceClient {
+	return &transformServiceClient{cc}
+}
+
+func (c *transformServiceClient) GetTransformInfo(ctx context.Context, in *GetTransformInfoRequest, opts ...grpc.CallOption) (*GetTransformInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTransformInfoResponse)
+	err := c.cc.Invoke(ctx, TransformService_GetTransformInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *transformServiceClient) GetTransform(ctx context.Context, in *GetTransformRequest, opts ...grpc.CallOption) (*GetTransformResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTransformResponse)
+	err := c.cc.Invoke(ctx, TransformService_GetTransform_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TransformServiceServer is the server API for TransformService service.
+// All implementations must embed UnimplementedTransformServiceServer
+// for forward compatibility.
+type TransformServiceServer interface {
+	GetTransformInfo(context.Context, *GetTransformInfoRequest) (*GetTransformInfoResponse, error)
+	GetTransform(context.Context, *GetTransformRequest) (*GetTransformResponse, error)
+	mustEmbedUnimplementedTransformServiceServer()
+}
+
+// UnimplementedTransformServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedTransformServiceServer struct{}
+
+func (UnimplementedTransformServiceServer) GetTransformInfo(context.Context, *GetTransformInfoRequest) (*GetTransformInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransformInfo not implemented")
+}
+func (UnimplementedTransformServiceServer) GetTransform(context.Context, *GetTransformRequest) (*GetTransformResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransform not implemented")
+}
+func (UnimplementedTransformServiceServer) mustEmbedUnimplementedTransformServiceServer() {}
+func (UnimplementedTransformServiceServer) testEmbeddedByValue()                          {}
+
+// UnsafeTransformServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TransformServiceServer will
+// result in compilation errors.
+type UnsafeTransformServiceServer interface {
+	mustEmbedUnimplementedTransformServiceServer()
+}
+
+func RegisterTransformServiceServer(s grpc.ServiceRegistrar, srv TransformServiceServer) {
+	// If the following call pancis, it indicates UnimplementedTransformServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&TransformService_ServiceDesc, srv)
+}
+
+func _TransformService_GetTransformInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTransformInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransformServiceServer).GetTransformInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TransformService_GetTransformInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransformServiceServer).GetTransformInfo(ctx, req.(*GetTransformInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TransformService_GetTransform_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTransformRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransformServiceServer).GetTransform(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TransformService_GetTransform_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransformServiceServer).GetTransform(ctx, req.(*GetTransformRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// TransformService_ServiceDesc is the grpc.ServiceDesc for TransformService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var TransformService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "adiom.v1.TransformService",
+	HandlerType: (*TransformServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetTransformInfo",
+			Handler:    _TransformService_GetTransformInfo_Handler,
+		},
+		{
+			MethodName: "GetTransform",
+			Handler:    _TransformService_GetTransform_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "adiom/v1/adiom.proto",
+}

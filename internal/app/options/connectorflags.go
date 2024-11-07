@@ -43,7 +43,7 @@ type ConfiguredConnector struct {
 	Remote adiomv1connect.ConnectorServiceClient
 }
 
-func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (ConfiguredConnector, ConfiguredConnector, error) {
+func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (ConfiguredConnector, ConfiguredConnector, []string, error) {
 	var src ConfiguredConnector
 	var dst ConfiguredConnector
 	var err error
@@ -51,18 +51,18 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 	registeredConnectors := GetRegisteredConnectors()
 
 	if len(srcArgs) < 1 {
-		return src, dst, fmt.Errorf("missing source: %w", ErrMissingConnector)
+		return src, dst, nil, fmt.Errorf("missing source: %w", ErrMissingConnector)
 	}
 	var dstArgs []string
 	for _, registeredConnector := range registeredConnectors {
 		if registeredConnector.IsConnector(srcArgs[0]) {
 			if registeredConnector.Create != nil {
 				if src.Local, dstArgs, err = registeredConnector.Create(srcArgs, additionalSettings); err != nil {
-					return src, dst, err
+					return src, dst, nil, err
 				}
 			} else {
 				if src.Remote, dstArgs, err = registeredConnector.CreateRemote(srcArgs, additionalSettings); err != nil {
-					return src, dst, err
+					return src, dst, nil, err
 				}
 			}
 			break
@@ -72,25 +72,26 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 			} else {
 				_, _, err = registeredConnector.CreateRemote([]string{srcArgs[0], "help"}, additionalSettings)
 			}
-			return src, dst, err
+			return src, dst, nil, err
 		}
 	}
 	if src.Local == nil && src.Remote == nil {
-		return src, dst, fmt.Errorf("unsupported source: %w", ErrMissingConnector)
+		return src, dst, nil, fmt.Errorf("unsupported source: %w", ErrMissingConnector)
 	}
 
 	if len(dstArgs) < 1 {
-		return src, dst, fmt.Errorf("missing destination: %w", ErrMissingConnector)
+		return src, dst, nil, fmt.Errorf("missing destination: %w", ErrMissingConnector)
 	}
+	var restArgs []string
 	for _, registeredConnector := range registeredConnectors {
 		if registeredConnector.IsConnector(dstArgs[0]) {
 			if registeredConnector.Create != nil {
-				if dst.Local, _, err = registeredConnector.Create(dstArgs, additionalSettings); err != nil {
-					return src, dst, err
+				if dst.Local, restArgs, err = registeredConnector.Create(dstArgs, additionalSettings); err != nil {
+					return src, dst, nil, err
 				}
 			} else {
-				if dst.Remote, _, err = registeredConnector.CreateRemote(dstArgs, additionalSettings); err != nil {
-					return src, dst, err
+				if dst.Remote, restArgs, err = registeredConnector.CreateRemote(dstArgs, additionalSettings); err != nil {
+					return src, dst, nil, err
 				}
 			}
 			break
@@ -100,13 +101,13 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 			} else {
 				_, _, err = registeredConnector.CreateRemote([]string{dstArgs[0], "help"}, additionalSettings)
 			}
-			return src, dst, err
+			return src, dst, nil, err
 		}
 	}
 	if dst.Local == nil && dst.Remote == nil {
-		return src, dst, fmt.Errorf("unsupported destination: %w", ErrMissingConnector)
+		return src, dst, nil, fmt.Errorf("unsupported destination: %w", ErrMissingConnector)
 	}
-	return src, dst, nil
+	return src, dst, restArgs, nil
 }
 
 func CreateHelper(name string, usage string, flags []cli.Flag, action func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error)) func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
