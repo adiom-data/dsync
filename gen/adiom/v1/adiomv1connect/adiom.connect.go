@@ -23,6 +23,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// ConnectorServiceName is the fully-qualified name of the ConnectorService service.
 	ConnectorServiceName = "adiom.v1.ConnectorService"
+	// TransformServiceName is the fully-qualified name of the TransformService service.
+	TransformServiceName = "adiom.v1.TransformService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -57,6 +59,12 @@ const (
 	// ConnectorServiceStreamLSNProcedure is the fully-qualified name of the ConnectorService's
 	// StreamLSN RPC.
 	ConnectorServiceStreamLSNProcedure = "/adiom.v1.ConnectorService/StreamLSN"
+	// TransformServiceGetTransformInfoProcedure is the fully-qualified name of the TransformService's
+	// GetTransformInfo RPC.
+	TransformServiceGetTransformInfoProcedure = "/adiom.v1.TransformService/GetTransformInfo"
+	// TransformServiceGetTransformProcedure is the fully-qualified name of the TransformService's
+	// GetTransform RPC.
+	TransformServiceGetTransformProcedure = "/adiom.v1.TransformService/GetTransform"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -70,6 +78,9 @@ var (
 	connectorServiceListDataMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListData")
 	connectorServiceStreamUpdatesMethodDescriptor        = connectorServiceServiceDescriptor.Methods().ByName("StreamUpdates")
 	connectorServiceStreamLSNMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("StreamLSN")
+	transformServiceServiceDescriptor                    = v1.File_adiom_v1_adiom_proto.Services().ByName("TransformService")
+	transformServiceGetTransformInfoMethodDescriptor     = transformServiceServiceDescriptor.Methods().ByName("GetTransformInfo")
+	transformServiceGetTransformMethodDescriptor         = transformServiceServiceDescriptor.Methods().ByName("GetTransform")
 )
 
 // ConnectorServiceClient is a client for the adiom.v1.ConnectorService service.
@@ -324,4 +335,98 @@ func (UnimplementedConnectorServiceHandler) StreamUpdates(context.Context, *conn
 
 func (UnimplementedConnectorServiceHandler) StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest], *connect.ServerStream[v1.StreamLSNResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.StreamLSN is not implemented"))
+}
+
+// TransformServiceClient is a client for the adiom.v1.TransformService service.
+type TransformServiceClient interface {
+	GetTransformInfo(context.Context, *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error)
+	GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error)
+}
+
+// NewTransformServiceClient constructs a client for the adiom.v1.TransformService service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewTransformServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) TransformServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &transformServiceClient{
+		getTransformInfo: connect.NewClient[v1.GetTransformInfoRequest, v1.GetTransformInfoResponse](
+			httpClient,
+			baseURL+TransformServiceGetTransformInfoProcedure,
+			connect.WithSchema(transformServiceGetTransformInfoMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getTransform: connect.NewClient[v1.GetTransformRequest, v1.GetTransformResponse](
+			httpClient,
+			baseURL+TransformServiceGetTransformProcedure,
+			connect.WithSchema(transformServiceGetTransformMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// transformServiceClient implements TransformServiceClient.
+type transformServiceClient struct {
+	getTransformInfo *connect.Client[v1.GetTransformInfoRequest, v1.GetTransformInfoResponse]
+	getTransform     *connect.Client[v1.GetTransformRequest, v1.GetTransformResponse]
+}
+
+// GetTransformInfo calls adiom.v1.TransformService.GetTransformInfo.
+func (c *transformServiceClient) GetTransformInfo(ctx context.Context, req *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error) {
+	return c.getTransformInfo.CallUnary(ctx, req)
+}
+
+// GetTransform calls adiom.v1.TransformService.GetTransform.
+func (c *transformServiceClient) GetTransform(ctx context.Context, req *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error) {
+	return c.getTransform.CallUnary(ctx, req)
+}
+
+// TransformServiceHandler is an implementation of the adiom.v1.TransformService service.
+type TransformServiceHandler interface {
+	GetTransformInfo(context.Context, *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error)
+	GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error)
+}
+
+// NewTransformServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewTransformServiceHandler(svc TransformServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	transformServiceGetTransformInfoHandler := connect.NewUnaryHandler(
+		TransformServiceGetTransformInfoProcedure,
+		svc.GetTransformInfo,
+		connect.WithSchema(transformServiceGetTransformInfoMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	transformServiceGetTransformHandler := connect.NewUnaryHandler(
+		TransformServiceGetTransformProcedure,
+		svc.GetTransform,
+		connect.WithSchema(transformServiceGetTransformMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/adiom.v1.TransformService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case TransformServiceGetTransformInfoProcedure:
+			transformServiceGetTransformInfoHandler.ServeHTTP(w, r)
+		case TransformServiceGetTransformProcedure:
+			transformServiceGetTransformHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedTransformServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedTransformServiceHandler struct{}
+
+func (UnimplementedTransformServiceHandler) GetTransformInfo(context.Context, *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.TransformService.GetTransformInfo is not implemented"))
+}
+
+func (UnimplementedTransformServiceHandler) GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.TransformService.GetTransform is not implemented"))
 }

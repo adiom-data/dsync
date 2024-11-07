@@ -1275,6 +1275,233 @@ func (x *StreamLSNResponse) GetNextCursor() []byte {
 	return nil
 }
 
+type GetTransformInfoRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *GetTransformInfoRequest) Reset() {
+	*x = GetTransformInfoRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_adiom_v1_messages_proto_msgTypes[20]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransformInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransformInfoRequest) ProtoMessage() {}
+
+func (x *GetTransformInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[20]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransformInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetTransformInfoRequest) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{20}
+}
+
+type GetTransformInfoResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Transforms []*GetTransformInfoResponse_TransformInfo `protobuf:"bytes,1,rep,name=transforms,proto3" json:"transforms,omitempty"`
+}
+
+func (x *GetTransformInfoResponse) Reset() {
+	*x = GetTransformInfoResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_adiom_v1_messages_proto_msgTypes[21]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransformInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransformInfoResponse) ProtoMessage() {}
+
+func (x *GetTransformInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[21]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransformInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetTransformInfoResponse) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetTransformInfoResponse) GetTransforms() []*GetTransformInfoResponse_TransformInfo {
+	if x != nil {
+		return x.Transforms
+	}
+	return nil
+}
+
+type GetTransformRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Namespace    string    `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates      []*Update `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data         [][]byte  `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	RequestType  DataType  `protobuf:"varint,4,opt,name=request_type,json=requestType,proto3,enum=adiom.v1.DataType" json:"request_type,omitempty"`
+	ResponseType DataType  `protobuf:"varint,5,opt,name=response_type,json=responseType,proto3,enum=adiom.v1.DataType" json:"response_type,omitempty"`
+}
+
+func (x *GetTransformRequest) Reset() {
+	*x = GetTransformRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_adiom_v1_messages_proto_msgTypes[22]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransformRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransformRequest) ProtoMessage() {}
+
+func (x *GetTransformRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[22]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransformRequest.ProtoReflect.Descriptor instead.
+func (*GetTransformRequest) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetTransformRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GetTransformRequest) GetUpdates() []*Update {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+func (x *GetTransformRequest) GetData() [][]byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetTransformRequest) GetRequestType() DataType {
+	if x != nil {
+		return x.RequestType
+	}
+	return DataType_DATA_TYPE_UNKNOWN
+}
+
+func (x *GetTransformRequest) GetResponseType() DataType {
+	if x != nil {
+		return x.ResponseType
+	}
+	return DataType_DATA_TYPE_UNKNOWN
+}
+
+type GetTransformResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Namespace string    `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates   []*Update `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data      [][]byte  `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+}
+
+func (x *GetTransformResponse) Reset() {
+	*x = GetTransformResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_adiom_v1_messages_proto_msgTypes[23]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransformResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransformResponse) ProtoMessage() {}
+
+func (x *GetTransformResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[23]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransformResponse.ProtoReflect.Descriptor instead.
+func (*GetTransformResponse) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetTransformResponse) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GetTransformResponse) GetUpdates() []*Update {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+func (x *GetTransformResponse) GetData() [][]byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type Capabilities_Source struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1295,7 +1522,7 @@ type Capabilities_Source struct {
 func (x *Capabilities_Source) Reset() {
 	*x = Capabilities_Source{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_adiom_v1_messages_proto_msgTypes[20]
+		mi := &file_adiom_v1_messages_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1308,7 +1535,7 @@ func (x *Capabilities_Source) String() string {
 func (*Capabilities_Source) ProtoMessage() {}
 
 func (x *Capabilities_Source) ProtoReflect() protoreflect.Message {
-	mi := &file_adiom_v1_messages_proto_msgTypes[20]
+	mi := &file_adiom_v1_messages_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1363,7 +1590,7 @@ type Capabilities_Sink struct {
 func (x *Capabilities_Sink) Reset() {
 	*x = Capabilities_Sink{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_adiom_v1_messages_proto_msgTypes[21]
+		mi := &file_adiom_v1_messages_proto_msgTypes[25]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1376,7 +1603,7 @@ func (x *Capabilities_Sink) String() string {
 func (*Capabilities_Sink) ProtoMessage() {}
 
 func (x *Capabilities_Sink) ProtoReflect() protoreflect.Message {
-	mi := &file_adiom_v1_messages_proto_msgTypes[21]
+	mi := &file_adiom_v1_messages_proto_msgTypes[25]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1395,6 +1622,61 @@ func (*Capabilities_Sink) Descriptor() ([]byte, []int) {
 func (x *Capabilities_Sink) GetSupportedDataTypes() []DataType {
 	if x != nil {
 		return x.SupportedDataTypes
+	}
+	return nil
+}
+
+type GetTransformInfoResponse_TransformInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestType   DataType   `protobuf:"varint,1,opt,name=request_type,json=requestType,proto3,enum=adiom.v1.DataType" json:"request_type,omitempty"`
+	ResponseTypes []DataType `protobuf:"varint,2,rep,packed,name=response_types,json=responseTypes,proto3,enum=adiom.v1.DataType" json:"response_types,omitempty"`
+}
+
+func (x *GetTransformInfoResponse_TransformInfo) Reset() {
+	*x = GetTransformInfoResponse_TransformInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_adiom_v1_messages_proto_msgTypes[26]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransformInfoResponse_TransformInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransformInfoResponse_TransformInfo) ProtoMessage() {}
+
+func (x *GetTransformInfoResponse_TransformInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[26]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransformInfoResponse_TransformInfo.ProtoReflect.Descriptor instead.
+func (*GetTransformInfoResponse_TransformInfo) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{21, 0}
+}
+
+func (x *GetTransformInfoResponse_TransformInfo) GetRequestType() DataType {
+	if x != nil {
+		return x.RequestType
+	}
+	return DataType_DATA_TYPE_UNKNOWN
+}
+
+func (x *GetTransformInfoResponse_TransformInfo) GetResponseTypes() []DataType {
+	if x != nil {
+		return x.ResponseTypes
 	}
 	return nil
 }
@@ -1548,22 +1830,61 @@ var file_adiom_v1_messages_proto_rawDesc = []byte{
 	0x6d, 0x4c, 0x53, 0x4e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03,
 	0x6c, 0x73, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6c, 0x73, 0x6e, 0x12, 0x1f,
 	0x0a, 0x0b, 0x6e, 0x65, 0x78, 0x74, 0x5f, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x0a, 0x6e, 0x65, 0x78, 0x74, 0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x2a,
-	0x3b, 0x0a, 0x08, 0x44, 0x61, 0x74, 0x61, 0x54, 0x79, 0x70, 0x65, 0x12, 0x15, 0x0a, 0x11, 0x44,
-	0x41, 0x54, 0x41, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e,
-	0x10, 0x00, 0x12, 0x18, 0x0a, 0x14, 0x44, 0x41, 0x54, 0x41, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f,
-	0x4d, 0x4f, 0x4e, 0x47, 0x4f, 0x5f, 0x42, 0x53, 0x4f, 0x4e, 0x10, 0x01, 0x2a, 0x6d, 0x0a, 0x0a,
-	0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x17, 0x0a, 0x13, 0x55, 0x50,
-	0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57,
-	0x4e, 0x10, 0x00, 0x12, 0x16, 0x0a, 0x12, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59,
-	0x50, 0x45, 0x5f, 0x49, 0x4e, 0x53, 0x45, 0x52, 0x54, 0x10, 0x01, 0x12, 0x16, 0x0a, 0x12, 0x55,
-	0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54,
-	0x45, 0x10, 0x02, 0x12, 0x16, 0x0a, 0x12, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59,
-	0x50, 0x45, 0x5f, 0x44, 0x45, 0x4c, 0x45, 0x54, 0x45, 0x10, 0x03, 0x42, 0x32, 0x5a, 0x30, 0x67,
-	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2d,
-	0x64, 0x61, 0x74, 0x61, 0x2f, 0x64, 0x73, 0x79, 0x6e, 0x63, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x61,
-	0x64, 0x69, 0x6f, 0x6d, 0x2f, 0x76, 0x31, 0x3b, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x76, 0x31, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x01, 0x28, 0x0c, 0x52, 0x0a, 0x6e, 0x65, 0x78, 0x74, 0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x22,
+	0x19, 0x0a, 0x17, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x49,
+	0x6e, 0x66, 0x6f, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0xf0, 0x01, 0x0a, 0x18, 0x47,
+	0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x49, 0x6e, 0x66, 0x6f, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x50, 0x0a, 0x0a, 0x74, 0x72, 0x61, 0x6e, 0x73,
+	0x66, 0x6f, 0x72, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x30, 0x2e, 0x61, 0x64,
+	0x69, 0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66,
+	0x6f, 0x72, 0x6d, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e,
+	0x54, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x0a, 0x74,
+	0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x73, 0x1a, 0x81, 0x01, 0x0a, 0x0d, 0x54, 0x72,
+	0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x35, 0x0a, 0x0c, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0e, 0x32, 0x12, 0x2e, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x61, 0x74,
+	0x61, 0x54, 0x79, 0x70, 0x65, 0x52, 0x0b, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x54, 0x79,
+	0x70, 0x65, 0x12, 0x39, 0x0a, 0x0e, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x5f, 0x74,
+	0x79, 0x70, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0e, 0x32, 0x12, 0x2e, 0x61, 0x64, 0x69,
+	0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x54, 0x79, 0x70, 0x65, 0x52, 0x0d,
+	0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x54, 0x79, 0x70, 0x65, 0x73, 0x22, 0xe3, 0x01,
+	0x0a, 0x13, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x6e, 0x61, 0x6d, 0x65, 0x73, 0x70, 0x61,
+	0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x6e, 0x61, 0x6d, 0x65, 0x73, 0x70,
+	0x61, 0x63, 0x65, 0x12, 0x2a, 0x0a, 0x07, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x73, 0x18, 0x02,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e,
+	0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x07, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x73, 0x12,
+	0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x04, 0x64,
+	0x61, 0x74, 0x61, 0x12, 0x35, 0x0a, 0x0c, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x74,
+	0x79, 0x70, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x12, 0x2e, 0x61, 0x64, 0x69, 0x6f,
+	0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x54, 0x79, 0x70, 0x65, 0x52, 0x0b, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x54, 0x79, 0x70, 0x65, 0x12, 0x37, 0x0a, 0x0d, 0x72, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28,
+	0x0e, 0x32, 0x12, 0x2e, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x61, 0x74,
+	0x61, 0x54, 0x79, 0x70, 0x65, 0x52, 0x0c, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x54,
+	0x79, 0x70, 0x65, 0x22, 0x74, 0x0a, 0x14, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66,
+	0x6f, 0x72, 0x6d, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x6e,
+	0x61, 0x6d, 0x65, 0x73, 0x70, 0x61, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09,
+	0x6e, 0x61, 0x6d, 0x65, 0x73, 0x70, 0x61, 0x63, 0x65, 0x12, 0x2a, 0x0a, 0x07, 0x75, 0x70, 0x64,
+	0x61, 0x74, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x61, 0x64, 0x69,
+	0x6f, 0x6d, 0x2e, 0x76, 0x31, 0x2e, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x07, 0x75, 0x70,
+	0x64, 0x61, 0x74, 0x65, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x03, 0x20,
+	0x03, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x2a, 0x3b, 0x0a, 0x08, 0x44, 0x61, 0x74,
+	0x61, 0x54, 0x79, 0x70, 0x65, 0x12, 0x15, 0x0a, 0x11, 0x44, 0x41, 0x54, 0x41, 0x5f, 0x54, 0x59,
+	0x50, 0x45, 0x5f, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x12, 0x18, 0x0a, 0x14,
+	0x44, 0x41, 0x54, 0x41, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x4d, 0x4f, 0x4e, 0x47, 0x4f, 0x5f,
+	0x42, 0x53, 0x4f, 0x4e, 0x10, 0x01, 0x2a, 0x6d, 0x0a, 0x0a, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x54, 0x79, 0x70, 0x65, 0x12, 0x17, 0x0a, 0x13, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54,
+	0x59, 0x50, 0x45, 0x5f, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x12, 0x16, 0x0a,
+	0x12, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x49, 0x4e, 0x53,
+	0x45, 0x52, 0x54, 0x10, 0x01, 0x12, 0x16, 0x0a, 0x12, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f,
+	0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x10, 0x02, 0x12, 0x16, 0x0a,
+	0x12, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x44, 0x45, 0x4c,
+	0x45, 0x54, 0x45, 0x10, 0x03, 0x42, 0x32, 0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2d, 0x64, 0x61, 0x74, 0x61, 0x2f, 0x64,
+	0x73, 0x79, 0x6e, 0x63, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x2f, 0x76,
+	0x31, 0x3b, 0x61, 0x64, 0x69, 0x6f, 0x6d, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x33,
 }
 
 var (
@@ -1579,37 +1900,42 @@ func file_adiom_v1_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_adiom_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_adiom_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_adiom_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_adiom_v1_messages_proto_goTypes = []any{
-	(DataType)(0),                        // 0: adiom.v1.DataType
-	(UpdateType)(0),                      // 1: adiom.v1.UpdateType
-	(*BsonValue)(nil),                    // 2: adiom.v1.BsonValue
-	(*Partition)(nil),                    // 3: adiom.v1.Partition
-	(*Capabilities)(nil),                 // 4: adiom.v1.Capabilities
-	(*GetInfoRequest)(nil),               // 5: adiom.v1.GetInfoRequest
-	(*GetInfoResponse)(nil),              // 6: adiom.v1.GetInfoResponse
-	(*GetNamespaceMetadataRequest)(nil),  // 7: adiom.v1.GetNamespaceMetadataRequest
-	(*GetNamespaceMetadataResponse)(nil), // 8: adiom.v1.GetNamespaceMetadataResponse
-	(*GeneratePlanRequest)(nil),          // 9: adiom.v1.GeneratePlanRequest
-	(*GeneratePlanResponse)(nil),         // 10: adiom.v1.GeneratePlanResponse
-	(*Update)(nil),                       // 11: adiom.v1.Update
-	(*ListDataRequest)(nil),              // 12: adiom.v1.ListDataRequest
-	(*ListDataResponse)(nil),             // 13: adiom.v1.ListDataResponse
-	(*WriteDataRequest)(nil),             // 14: adiom.v1.WriteDataRequest
-	(*WriteDataResponse)(nil),            // 15: adiom.v1.WriteDataResponse
-	(*WriteUpdatesRequest)(nil),          // 16: adiom.v1.WriteUpdatesRequest
-	(*WriteUpdatesResponse)(nil),         // 17: adiom.v1.WriteUpdatesResponse
-	(*StreamUpdatesRequest)(nil),         // 18: adiom.v1.StreamUpdatesRequest
-	(*StreamUpdatesResponse)(nil),        // 19: adiom.v1.StreamUpdatesResponse
-	(*StreamLSNRequest)(nil),             // 20: adiom.v1.StreamLSNRequest
-	(*StreamLSNResponse)(nil),            // 21: adiom.v1.StreamLSNResponse
-	(*Capabilities_Source)(nil),          // 22: adiom.v1.Capabilities.Source
-	(*Capabilities_Sink)(nil),            // 23: adiom.v1.Capabilities.Sink
-	(*timestamppb.Timestamp)(nil),        // 24: google.protobuf.Timestamp
+	(DataType)(0),                                  // 0: adiom.v1.DataType
+	(UpdateType)(0),                                // 1: adiom.v1.UpdateType
+	(*BsonValue)(nil),                              // 2: adiom.v1.BsonValue
+	(*Partition)(nil),                              // 3: adiom.v1.Partition
+	(*Capabilities)(nil),                           // 4: adiom.v1.Capabilities
+	(*GetInfoRequest)(nil),                         // 5: adiom.v1.GetInfoRequest
+	(*GetInfoResponse)(nil),                        // 6: adiom.v1.GetInfoResponse
+	(*GetNamespaceMetadataRequest)(nil),            // 7: adiom.v1.GetNamespaceMetadataRequest
+	(*GetNamespaceMetadataResponse)(nil),           // 8: adiom.v1.GetNamespaceMetadataResponse
+	(*GeneratePlanRequest)(nil),                    // 9: adiom.v1.GeneratePlanRequest
+	(*GeneratePlanResponse)(nil),                   // 10: adiom.v1.GeneratePlanResponse
+	(*Update)(nil),                                 // 11: adiom.v1.Update
+	(*ListDataRequest)(nil),                        // 12: adiom.v1.ListDataRequest
+	(*ListDataResponse)(nil),                       // 13: adiom.v1.ListDataResponse
+	(*WriteDataRequest)(nil),                       // 14: adiom.v1.WriteDataRequest
+	(*WriteDataResponse)(nil),                      // 15: adiom.v1.WriteDataResponse
+	(*WriteUpdatesRequest)(nil),                    // 16: adiom.v1.WriteUpdatesRequest
+	(*WriteUpdatesResponse)(nil),                   // 17: adiom.v1.WriteUpdatesResponse
+	(*StreamUpdatesRequest)(nil),                   // 18: adiom.v1.StreamUpdatesRequest
+	(*StreamUpdatesResponse)(nil),                  // 19: adiom.v1.StreamUpdatesResponse
+	(*StreamLSNRequest)(nil),                       // 20: adiom.v1.StreamLSNRequest
+	(*StreamLSNResponse)(nil),                      // 21: adiom.v1.StreamLSNResponse
+	(*GetTransformInfoRequest)(nil),                // 22: adiom.v1.GetTransformInfoRequest
+	(*GetTransformInfoResponse)(nil),               // 23: adiom.v1.GetTransformInfoResponse
+	(*GetTransformRequest)(nil),                    // 24: adiom.v1.GetTransformRequest
+	(*GetTransformResponse)(nil),                   // 25: adiom.v1.GetTransformResponse
+	(*Capabilities_Source)(nil),                    // 26: adiom.v1.Capabilities.Source
+	(*Capabilities_Sink)(nil),                      // 27: adiom.v1.Capabilities.Sink
+	(*GetTransformInfoResponse_TransformInfo)(nil), // 28: adiom.v1.GetTransformInfoResponse.TransformInfo
+	(*timestamppb.Timestamp)(nil),                  // 29: google.protobuf.Timestamp
 }
 var file_adiom_v1_messages_proto_depIdxs = []int32{
-	22, // 0: adiom.v1.Capabilities.source:type_name -> adiom.v1.Capabilities.Source
-	23, // 1: adiom.v1.Capabilities.sink:type_name -> adiom.v1.Capabilities.Sink
+	26, // 0: adiom.v1.Capabilities.source:type_name -> adiom.v1.Capabilities.Source
+	27, // 1: adiom.v1.Capabilities.sink:type_name -> adiom.v1.Capabilities.Sink
 	4,  // 2: adiom.v1.GetInfoResponse.capabilities:type_name -> adiom.v1.Capabilities
 	3,  // 3: adiom.v1.GeneratePlanResponse.partitions:type_name -> adiom.v1.Partition
 	3,  // 4: adiom.v1.GeneratePlanResponse.updates_partitions:type_name -> adiom.v1.Partition
@@ -1622,14 +1948,21 @@ var file_adiom_v1_messages_proto_depIdxs = []int32{
 	0,  // 11: adiom.v1.WriteUpdatesRequest.type:type_name -> adiom.v1.DataType
 	0,  // 12: adiom.v1.StreamUpdatesRequest.type:type_name -> adiom.v1.DataType
 	11, // 13: adiom.v1.StreamUpdatesResponse.updates:type_name -> adiom.v1.Update
-	24, // 14: adiom.v1.StreamUpdatesResponse.time:type_name -> google.protobuf.Timestamp
-	0,  // 15: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
-	0,  // 16: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	29, // 14: adiom.v1.StreamUpdatesResponse.time:type_name -> google.protobuf.Timestamp
+	28, // 15: adiom.v1.GetTransformInfoResponse.transforms:type_name -> adiom.v1.GetTransformInfoResponse.TransformInfo
+	11, // 16: adiom.v1.GetTransformRequest.updates:type_name -> adiom.v1.Update
+	0,  // 17: adiom.v1.GetTransformRequest.request_type:type_name -> adiom.v1.DataType
+	0,  // 18: adiom.v1.GetTransformRequest.response_type:type_name -> adiom.v1.DataType
+	11, // 19: adiom.v1.GetTransformResponse.updates:type_name -> adiom.v1.Update
+	0,  // 20: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
+	0,  // 21: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
+	0,  // 22: adiom.v1.GetTransformInfoResponse.TransformInfo.request_type:type_name -> adiom.v1.DataType
+	0,  // 23: adiom.v1.GetTransformInfoResponse.TransformInfo.response_types:type_name -> adiom.v1.DataType
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_adiom_v1_messages_proto_init() }
@@ -1879,7 +2212,7 @@ func file_adiom_v1_messages_proto_init() {
 			}
 		}
 		file_adiom_v1_messages_proto_msgTypes[20].Exporter = func(v any, i int) any {
-			switch v := v.(*Capabilities_Source); i {
+			switch v := v.(*GetTransformInfoRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1891,7 +2224,67 @@ func file_adiom_v1_messages_proto_init() {
 			}
 		}
 		file_adiom_v1_messages_proto_msgTypes[21].Exporter = func(v any, i int) any {
+			switch v := v.(*GetTransformInfoResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_adiom_v1_messages_proto_msgTypes[22].Exporter = func(v any, i int) any {
+			switch v := v.(*GetTransformRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_adiom_v1_messages_proto_msgTypes[23].Exporter = func(v any, i int) any {
+			switch v := v.(*GetTransformResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_adiom_v1_messages_proto_msgTypes[24].Exporter = func(v any, i int) any {
+			switch v := v.(*Capabilities_Source); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_adiom_v1_messages_proto_msgTypes[25].Exporter = func(v any, i int) any {
 			switch v := v.(*Capabilities_Sink); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_adiom_v1_messages_proto_msgTypes[26].Exporter = func(v any, i int) any {
+			switch v := v.(*GetTransformInfoResponse_TransformInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1909,7 +2302,7 @@ func file_adiom_v1_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_adiom_v1_messages_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   22,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

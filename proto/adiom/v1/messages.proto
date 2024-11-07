@@ -144,3 +144,27 @@ message StreamLSNResponse {
     uint64 lsn = 1;
     bytes next_cursor = 2;
 }
+
+message GetTransformInfoRequest {}
+
+message GetTransformInfoResponse {
+    message TransformInfo {
+        DataType request_type = 1;
+        repeated DataType response_types = 2;
+    }
+    repeated TransformInfo transforms = 1;
+}
+
+message GetTransformRequest {
+    string namespace = 1;
+    repeated Update updates = 2;
+    repeated bytes data = 3;
+    DataType request_type = 4;
+    DataType response_type = 5;
+}
+
+message GetTransformResponse {
+    string namespace = 1;
+    repeated Update updates = 2;
+    repeated bytes data = 3;
+}

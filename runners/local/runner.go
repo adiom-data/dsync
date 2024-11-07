@@ -14,6 +14,8 @@ import (
 
 	"github.com/adiom-data/dsync/connectors/common"
 	coordinatorSimple "github.com/adiom-data/dsync/coordinators/simple"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/protocol/iface"
 	statestoreMongo "github.com/adiom-data/dsync/statestores/mongo"
@@ -45,6 +47,9 @@ type RunnerLocal struct {
 }
 
 type RunnerLocalSettings struct {
+	SrcDataType          adiomv1.DataType
+	DstDataType          adiomv1.DataType
+	TransformClient      adiomv1connect.TransformServiceClient
 	Src                  options.ConfiguredConnector
 	Dst                  options.ConfiguredConnector
 	StateStoreConnString string
@@ -91,6 +96,9 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		NumParallelWriters:        settings.NumParallelWriters,
 		MaxWriterBatchSize:        settings.WriterMaxBatchSize,
 		ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
+		TransformClient:           settings.TransformClient,
+		SourceDataType:            settings.SrcDataType,
+		DestinationDataType:       settings.DstDataType,
 	}
 	if settings.LoadLevel != "" {
 		btc := GetBaseThreadCount(settings.LoadLevel)
