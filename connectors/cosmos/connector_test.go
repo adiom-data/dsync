@@ -16,7 +16,9 @@ import (
 
 	"github.com/adiom-data/dsync/connectors/common"
 	mongoconn "github.com/adiom-data/dsync/connectors/mongo"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	test2 "github.com/adiom-data/dsync/pkg/test"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/adiom-data/dsync/protocol/test"
@@ -25,6 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/tryvium-travels/memongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -59,6 +62,51 @@ func TestCosmosConnectorSuite(t *testing.T) {
 		connectorFactoryFunc,
 		datastoreFactoryFunc,
 	)
+	suite.Run(t, tSuite)
+}
+
+func TestCosmosConnectorSuite2(t *testing.T) {
+	settings := ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10}
+	client, err := mongoconn.MongoClient(context.Background(), settings.ConnectorSettings)
+	assert.NoError(t, err)
+	col := client.Database("test").Collection("test")
+
+	tSuite := test2.NewConnectorTestSuite("test.test", func() adiomv1connect.ConnectorServiceClient {
+		return test2.ClientFromHandler(NewConn(settings))
+	}, func(ctx context.Context) error {
+		if err := col.Database().Drop(ctx); err != nil {
+			return err
+		}
+
+		_, err := col.InsertOne(ctx, bson.D{{"data", "hi"}})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}, func(ctx context.Context) error {
+		_, err := col.InsertOne(ctx, bson.D{{"data", "update"}})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
+		mongoID := bson.RawValue{
+			Type:  bsontype.Type(id[0].GetType()),
+			Value: id[0].GetData(),
+		}
+		idFilter := bson.D{{Key: "_id", Value: mongoID}}
+		res := col.FindOne(ctx, idFilter)
+		if exists {
+			a.NoError(res.Err())
+		} else {
+			a.ErrorIs(res.Err(), mongo.ErrNoDocuments)
+		}
+
+		return nil
+	}
 	suite.Run(t, tSuite)
 }
 

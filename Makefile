@@ -41,6 +41,10 @@ clean-testdb:
 test-mongo:
 	MONGO_TEST=mongodb://mongotest:27019/?replicaSet=datatest go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo
 
+test-dynamodb:
+	echo 'Ensure that localstack is running'
+	AWS_ACCESS_KEY_ID=foobar AWS_SECRET_ACCESS_KEY=foobar go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/dynamodb
+
 mocks:
 	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Connector
 	mockery --output ./protocol/iface/mocks --srcpkg ./protocol/iface --name Coordinator
