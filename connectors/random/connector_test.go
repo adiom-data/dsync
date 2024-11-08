@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/connectors/common"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	test2 "github.com/adiom-data/dsync/pkg/test"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/test"
 	"github.com/stretchr/testify/suite"
@@ -21,5 +23,12 @@ func TestRandomConnectorSuite(t *testing.T) {
 		return common.NewLocalConnector("test", NewConn(ConnectorSettings{}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
 	}, nil)
 	tSuite.SkipIntegrity = true
+	suite.Run(t, tSuite)
+}
+
+func TestRandomConnectorSuite2(t *testing.T) {
+	tSuite := test2.NewConnectorTestSuite("test", func() adiomv1connect.ConnectorServiceClient {
+		return test2.ClientFromHandler(NewConn(ConnectorSettings{}))
+	}, nil, nil)
 	suite.Run(t, tSuite)
 }

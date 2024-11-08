@@ -15,9 +15,15 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/connectors/common"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	test2 "github.com/adiom-data/dsync/pkg/test"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -37,6 +43,50 @@ func TestMongoConnectorSuite(t *testing.T) {
 		func() test.TestDataStore {
 			return NewMongoTestDataStore(TestMongoConnectionString)
 		})
+	suite.Run(t, tSuite)
+}
+
+func TestMongoConnectorSuite2(t *testing.T) {
+	client, err := MongoClient(context.Background(), ConnectorSettings{ConnectionString: TestMongoConnectionString})
+	assert.NoError(t, err)
+	col := client.Database("test").Collection("test")
+
+	tSuite := test2.NewConnectorTestSuite("test.test", func() adiomv1connect.ConnectorServiceClient {
+		return test2.ClientFromHandler(NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString}))
+	}, func(ctx context.Context) error {
+		if err := col.Database().Drop(ctx); err != nil {
+			return err
+		}
+
+		_, err := col.InsertOne(ctx, bson.D{{"data", "hi"}})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}, func(ctx context.Context) error {
+		_, err := col.InsertOne(ctx, bson.D{{"data", "update"}})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
+		mongoID := bson.RawValue{
+			Type:  bsontype.Type(id[0].GetType()),
+			Value: id[0].GetData(),
+		}
+		idFilter := bson.D{{Key: "_id", Value: mongoID}}
+		res := col.FindOne(ctx, idFilter)
+		if exists {
+			a.NoError(res.Err())
+		} else {
+			a.ErrorIs(res.Err(), mongo.ErrNoDocuments)
+		}
+
+		return nil
+	}
 	suite.Run(t, tSuite)
 }
 
