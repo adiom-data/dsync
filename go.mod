@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.28.0
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.15.12
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.36.5
-	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.24.2
+	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.24.5
 	github.com/cespare/xxhash v1.1.0
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/jrhy/mast v1.2.32
