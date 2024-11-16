@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
 	"github.com/adiom-data/dsync/connectors/mongo"
@@ -68,9 +69,9 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 			break
 		} else if strings.EqualFold(srcArgs[0], registeredConnector.Name) {
 			if registeredConnector.Create != nil {
-				_, _, err = registeredConnector.Create([]string{srcArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.Create([]string{srcArgs[0], "--help"}, additionalSettings)
 			} else {
-				_, _, err = registeredConnector.CreateRemote([]string{srcArgs[0], "help"}, additionalSettings)
+				_, _, err = registeredConnector.CreateRemote([]string{srcArgs[0], "--help"}, additionalSettings)
 			}
 			return src, dst, nil, err
 		}
@@ -220,6 +221,82 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					return mongo.NewConn(settings), nil
 				})(args, as)
 			},
+		},
+		{
+			Name: "AirbyteSource",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(s, "airbyte://")
+			},
+			Create: CreateHelper("AirbyteSource", "airbyte://docker-image", []cli.Flag{
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:     "config",
+					Required: true,
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:  "save-catalog",
+					Usage: "Allows the sink to use the source generated catalog by matching the name.",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:  "sync-mode",
+					Value: "full_refresh",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:  "destination-sync-mode",
+					Value: "append",
+				}),
+				altsrc.NewIntFlag(&cli.IntFlag{
+					Name:  "generation-id",
+					Value: -1,
+				}),
+				altsrc.NewIntFlag(&cli.IntFlag{
+					Name:  "minimum-generation-id",
+					Value: -1,
+				}),
+				altsrc.NewIntFlag(&cli.IntFlag{
+					Name:  "sync-id",
+					Value: -1,
+				}),
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name: "cursor-field",
+				}),
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name:  "primary-key",
+					Usage: "Separator for nested field is a dot: '.'",
+				}),
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				_, dockerImage, ok := strings.Cut(args[0], "://")
+				if !ok {
+					return nil, fmt.Errorf("invalid connection string %v", args[0])
+				}
+				pkRaw := c.StringSlice("primary-key")
+				var pkFinal [][]string
+				for _, pk := range pkRaw {
+					pkFinal = append(pkFinal, strings.Split(pk, "."))
+				}
+				return airbyte.NewSource(dockerImage, c.String("config"), c.String("save-catalog"), c.String("sync-mode"), c.String("destination-sync-mode"), c.Int("sync-id"), c.Int("generation-id"), c.Int("minimum-generation-id"), c.StringSlice("cursor-field"), pkFinal), nil
+			}),
+		},
+		{
+			Name: "AirbyteSink",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(s, "airbyte-sink://")
+			},
+			Create: CreateHelper("AirbyteSink", "airbyte-sink://docker-image", []cli.Flag{
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:     "config",
+					Required: true,
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:     "catalog",
+					Required: true,
+				}),
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				_, dockerImage, ok := strings.Cut(args[0], "://")
+				if !ok {
+					return nil, fmt.Errorf("invalid connection string %v", args[0])
+				}
+				return airbyte.NewSink(dockerImage, c.String("config"), c.String("catalog")), nil
+			}),
 		},
 		{
 			Name: "grpc",

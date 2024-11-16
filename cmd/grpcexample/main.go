@@ -41,9 +41,15 @@ func main() {
 }
 
 func (*nullConnector) GetInfo(context.Context, *adiomv1.GetInfoRequest) (*adiomv1.GetInfoResponse, error) {
+	var all []adiomv1.DataType
+	for d := range adiomv1.DataType_name {
+		all = append(all, adiomv1.DataType(d))
+	}
 	return &adiomv1.GetInfoResponse{
-		DbType:       "/dev/null",
-		Capabilities: &adiomv1.Capabilities{Sink: &adiomv1.Capabilities_Sink{}},
+		DbType: "/dev/null",
+		Capabilities: &adiomv1.Capabilities{Sink: &adiomv1.Capabilities_Sink{
+			SupportedDataTypes: all,
+		}},
 	}, nil
 }
 
