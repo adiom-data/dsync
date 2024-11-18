@@ -45,7 +45,7 @@ export COSMOS_DEMO=$(echo bW9uZ29kYjovL2Nvc21vc2RiLWRlbW8taW5zdGFuY2U6SkhiRWpRb2
 # Feel free to use your own MongoDB connection string
 export MDB_DEST='mongodb://localhost:27017' 
 
-./dsync -s $COSMOS_DEMO -d $MDB_DEST --progress --logfile dsync.log
+./dsync --progress --logfile dsync.log $COSMOS_DEMO $MDB_DEST
 ```
 Now Dsync should be running! Feel free to interrupt the sync process (via Ctrl+C) it once the initial sync is done. The demo database has a few million records and the resources are shared - allow 5-10 minutes for the process to complete.
 
@@ -68,7 +68,7 @@ If you are developing on a mac, you likely need to edit your /etc/hosts file so 
 127.0.0.1       mongo1 mongo2 mongotest
 ```
 
-You need to export COSMOS_TEST to be able to run the cosmos test.
+You need to export COSMOS_TEST to be able to run the cosmos test. For DynamoDB you need to have localstack running.
 
 ```
 make clean-testdb # cleans and populates mongotest for the mongo connector test
@@ -77,6 +77,7 @@ make test-all # if you have everything set up properly, you can run this
 # test specific connectors
 make test-mongo
 make test-cosmos
+make test-dynamodb
 ```
 
 ## Mocks
