@@ -653,10 +653,12 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				}
 			}
 
-			// update the last seen resume token
-			c.resumeTokenMutex.Lock()
-			c.resumeToken = msg.GetNextCursor()
-			c.resumeTokenMutex.Unlock()
+			if msg.GetNextCursor() != nil {
+				// update the last seen resume token
+				c.resumeTokenMutex.Lock()
+				c.resumeToken = msg.GetNextCursor()
+				c.resumeTokenMutex.Unlock()
+			}
 		}
 		if res.Err() != nil {
 			if !errors.Is(res.Err(), context.Canceled) {

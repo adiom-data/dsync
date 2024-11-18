@@ -24,10 +24,14 @@ func (c *conn) GeneratePlan(context.Context, *connect.Request[adiomv1.GeneratePl
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]) (*connect.Response[adiomv1.GetInfoResponse], error) {
+	var all []adiomv1.DataType
+	for d := range adiomv1.DataType_name {
+		all = append(all, adiomv1.DataType(d))
+	}
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
 		DbType: "/dev/null",
 		Capabilities: &adiomv1.Capabilities{
-			Sink: &adiomv1.Capabilities_Sink{SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON}},
+			Sink: &adiomv1.Capabilities_Sink{SupportedDataTypes: all},
 		},
 	}), nil
 }
