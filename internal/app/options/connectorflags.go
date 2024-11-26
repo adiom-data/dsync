@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"connectrpc.com/connect"
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
@@ -16,6 +15,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/random"
 	"github.com/adiom-data/dsync/connectors/testconn"
+	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -109,6 +109,31 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 		return src, dst, nil, fmt.Errorf("unsupported destination: %w", ErrMissingConnector)
 	}
 	return src, dst, restArgs, nil
+}
+
+func CreateHelperWithRestArgs(name string, usage string, flags []cli.Flag, action func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error)) func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+	return func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+		var conn adiomv1connect.ConnectorServiceHandler
+		var restArgs []string
+		app := &cli.App{
+			HelpName:  name,
+			Usage:     "Connector",
+			UsageText: usage,
+			Flags:     flags,
+			Action: func(c *cli.Context) error {
+				var err error
+				conn, restArgs, err = action(c, args, as)
+				return err
+			},
+		}
+		if err := app.Run(args); err != nil {
+			return nil, nil, err
+		}
+		if conn != nil {
+			return conn, restArgs, nil
+		}
+		return nil, nil, ErrHelp
+	}
 }
 
 func CreateHelper(name string, usage string, flags []cli.Flag, action func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error)) func([]string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
@@ -223,6 +248,48 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 		},
 		{
+			Name: "weaviate",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "weaviate")
+			},
+			Create: CreateHelperWithRestArgs("weaviate", "weaviate --url http://weaviate-host:port --has-chunker --has-embedder [grpc://chunker-host:port] [grpc://embedder-host:port]", WeaviateFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				url := c.String("url")
+				groupID := c.String("group-id-field")
+				apiKey := c.String("api-key")
+				chunker := c.Bool("has-chunker")
+				embedder := c.Bool("has-embedder")
+				useIdentityMapper := c.Bool("use-identity-mapper")
+				restArgs := c.Args().Slice()
+				var chunkerClient adiomv1connect.ChunkingServiceClient = vector.NewSimple()
+				var embedderClient adiomv1connect.EmbeddingServiceClient = vector.NewSimple()
+				var err error
+				if chunker {
+					if len(restArgs) == 0 {
+						return nil, nil, ErrMissingChunker
+					}
+					chunkerClient, restArgs, err = ConfigureChunker(restArgs)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+				if embedder {
+					if len(restArgs) == 0 {
+						return nil, nil, ErrMissingEmbedder
+					}
+					embedderClient, restArgs, err = ConfigureEmbedder(restArgs)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+
+				conn, err := vector.NewWeaviateConn(chunkerClient, embedderClient, url, groupID, apiKey, useIdentityMapper)
+				if err != nil {
+					return nil, nil, err
+				}
+				return conn, restArgs, err
+			}),
+		},
+		{
 			Name: "AirbyteSource",
 			IsConnector: func(s string) bool {
 				return strings.HasPrefix(s, "airbyte://")
@@ -304,54 +371,40 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return strings.HasPrefix(s, "grpc://")
 			},
 			CreateRemote: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceClient, []string, error) {
-				var conn adiomv1connect.ConnectorServiceClient
-				var restArgs []string
-				app := &cli.App{
-					HelpName:  "grpc",
-					Usage:     "Connector",
-					UsageText: "grpc://address:port [options]",
-					Flags: []cli.Flag{
-						altsrc.NewBoolFlag(&cli.BoolFlag{
-							Name:  "insecure",
-							Usage: "Connect without TLS",
-						}),
-						altsrc.NewBoolFlag(&cli.BoolFlag{
-							Name:  "gzip",
-							Usage: "Use gzip on requests",
-						}),
-					},
-					Action: func(c *cli.Context) error {
-						restArgs = c.Args().Slice()
-						_, endpoint, ok := strings.Cut(args[0], "://")
-						if !ok {
-							return fmt.Errorf("invalid connection string %v", args[0])
-						}
-						options := []connect.ClientOption{connect.WithGRPC(), connect.WithSendMaxBytes(100000000), connect.WithReadMaxBytes(100000000)}
-						if c.Bool("gzip") {
-							options = append(options, connect.WithSendGzip())
-						}
-						finalEndpoint := "https://" + endpoint
-						httpClient := http.DefaultClient
-						if c.Bool("insecure") {
-							httpClient = insecureClient()
-							finalEndpoint = "http://" + endpoint
-						}
-						if _, _, ok := strings.Cut(endpoint, "://"); ok {
-							finalEndpoint = endpoint
-						}
-						conn = adiomv1connect.NewConnectorServiceClient(httpClient, finalEndpoint, options...)
-						return nil
-					},
-				}
-				if err := app.Run(args); err != nil {
-					return nil, nil, err
-				}
-				if conn != nil {
-					return conn, restArgs, nil
-				}
-				return nil, nil, ErrHelp
+				conn, restArgs, err := GRPCConnector(args)
+				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},
+	}
+}
+
+func WeaviateFlags() []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     "url",
+			Usage:    "With scheme e.g. http://localhost:8080",
+			Required: true,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "group-id-field",
+			Usage: "Chunks from the same document share the same group id",
+			Value: "g_id",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name: "api-key",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "has-chunker",
+			Usage: "Specifies that there will be grpc chunker specified (grpc://chunker-host:port). If embedder also specified, first arg is chunker.",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "has-embedder",
+			Usage: "Specifies that there will be grpc embedder specified (grpc://embedder-host:port). If chunker also specified, last arg is embedder.",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:   "use-identity-mapper",
+			Hidden: true,
+		}),
 	}
 }
 
@@ -415,6 +468,10 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Required:    false,
 			Destination: &settings.TargetDocCountPerPartition,
 			Value:       50 * 1000,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "max-page-size",
+			Destination: &settings.MaxPageSize,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "initial-sync-query",

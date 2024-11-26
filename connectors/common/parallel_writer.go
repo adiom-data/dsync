@@ -253,7 +253,11 @@ func (ww *writerWorker) run() {
 			if (ww.parallelWriter.maxBatchSize > 0 && len(batch) >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
-					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+					if msg.MutationType == iface.MutationType_InsertBatch {
+						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err), "insertbatch", len(*batch[0].Data))
+					} else {
+						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err), "batch", len(batch), "first", batch[0])
+					}
 				}
 				batch = nil
 			}
