@@ -16,6 +16,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/random"
 	"github.com/adiom-data/dsync/connectors/testconn"
+	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -221,6 +222,15 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					return mongo.NewConn(settings), nil
 				})(args, as)
 			},
+		},
+		{
+			Name: "vectordb",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "vectordb")
+			},
+			Create: CreateHelper("vectordb", "vectordb (demo using weaviate local)", nil, func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return vector.NewDemoConn(), nil
+			}),
 		},
 		{
 			Name: "AirbyteSource",
