@@ -88,21 +88,36 @@ func (suite *ConnectorTestSuite) TestAll() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
 						var count int
-						for {
-							res, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+						var numLoops = 5
+						for i := 0; i < numLoops; i++ {
+							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
 								Type:      t,
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							count += len(res.Msg.GetData())
-							if res.Msg.GetNextCursor() == nil {
-								break
-							}
-							suite.Assert().NotEqual(cursor, res.Msg.GetNextCursor())
-							cursor = res.Msg.GetNextCursor()
+							count += len(res1.Msg.GetData())
+
+							res2, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().Equal(res1.Msg.GetData(), res2.Msg.GetData(), "Repeated calls with the same cursor should return identical data")
+							count += len(res2.Msg.GetData())
+							cursor = res2.Msg.GetNextCursor()
+
+							res3, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
+							count += len(res3.Msg.GetData())
 						}
-						suite.Assert().NotZero(count)
+						suite.Assert().GreaterOrEqual(count, 3, "Should process at least 3 pages of data")
 					}
 				}
 			})
