@@ -43,6 +43,14 @@ func setDefault[T comparable](field *T, defaultValue T) {
 	}
 }
 
+type buffer struct {
+	ctr      int64
+	ch       <-chan [][]byte
+	last     *adiomv1.ListDataResponse
+	lastUsed time.Time
+	cleanup  *time.Timer
+}
+
 type conn struct {
 	client *mongo.Client
 
@@ -52,7 +60,8 @@ type conn struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	buffersMutex sync.RWMutex
-	buffers      map[int64]<-chan [][]byte
+	buffers      map[int64]buffer
+	maxPageSize  int64
 }
 
 // get all database names except system databases
@@ -330,7 +339,17 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		cursorID = c.nextCursorID.Add(1)
 		ch := make(chan [][]byte, 10)
 		c.buffersMutex.Lock()
-		c.buffers[cursorID] = ch
+		c.buffers[cursorID] = buffer{
+			ctr:      0,
+			ch:       ch,
+			last:     nil,
+			lastUsed: time.Now(),
+			cleanup: time.AfterFunc(5*time.Minute, func() {
+				c.buffersMutex.Lock()
+				delete(c.buffers, cursorID)
+				c.buffersMutex.Unlock()
+			}),
+		}
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
@@ -348,7 +367,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			var dataBatch [][]byte
 			for cursor.Next(ctx) {
 				dataBatch = append(dataBatch, cursor.Current)
-				if cursor.RemainingBatchLength() == 0 {
+				if len(dataBatch) == int(c.maxPageSize) || cursor.RemainingBatchLength() == 0 {
 					select {
 					case ch <- dataBatch:
 						dataBatch = nil
@@ -376,30 +395,44 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		}
 	}
 	c.buffersMutex.RLock()
-	ch, ok := c.buffers[cursorID]
+	buffer, ok := c.buffers[cursorID]
 	c.buffersMutex.RUnlock()
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
+	if ctr+1 == buffer.ctr && buffer.last != nil { // Handle repeated requests for same page
+		buffer.lastUsed = time.Now()
+		buffer.cleanup.Reset(5 * time.Minute)
+		return connect.NewResponse(buffer.last), nil
+	}
+	if ctr != buffer.ctr { // Reject for old or invalid pages
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no longer available"))
+	}
 
 	for {
 		select {
-		case dataBatch, ok := <-ch:
-			if !ok {
-				c.buffersMutex.Lock()
-				delete(c.buffers, cursorID)
-				c.buffersMutex.Unlock()
-
-				return connect.NewResponse(&adiomv1.ListDataResponse{
-					Data: dataBatch,
-				}), nil
+		case dataBatch, ok := <-buffer.ch:
+			var nextCursor []byte
+			if ok {
+				nextCursor = binary.AppendVarint(nil, cursorID)
+				nextCursor = binary.AppendVarint(nextCursor, ctr+1)
+				buffer.ctr = buffer.ctr + 1
+			} else {
+				// Channel is closed, no more data
+				buffer.last = &adiomv1.ListDataResponse{}
+				return connect.NewResponse(buffer.last), nil
 			}
-			nextCursor := binary.AppendVarint(nil, cursorID)
-			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-			return connect.NewResponse(&adiomv1.ListDataResponse{
+			resp := &adiomv1.ListDataResponse{
 				Data:       dataBatch,
 				NextCursor: nextCursor,
-			}), nil
+			}
+			buffer.last = resp
+			buffer.lastUsed = time.Now()
+			buffer.cleanup.Reset(5 * time.Minute)
+			c.buffersMutex.Lock()
+			c.buffers[cursorID] = buffer
+			c.buffersMutex.Unlock()
+			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -845,10 +878,11 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &conn{
-		client:   client,
-		settings: settings,
-		ctx:      ctx,
-		cancel:   cancel,
-		buffers:  map[int64]<-chan [][]byte{},
+		client:      client,
+		settings:    settings,
+		ctx:         ctx,
+		cancel:      cancel,
+		buffers:     map[int64]buffer{},
+		maxPageSize: 10,
 	}
 }
