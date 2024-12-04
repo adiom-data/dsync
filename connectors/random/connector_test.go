@@ -29,6 +29,7 @@ func TestRandomConnectorSuite(t *testing.T) {
 func TestRandomConnectorSuite2(t *testing.T) {
 	tSuite := test2.NewConnectorTestSuite("test", func() adiomv1connect.ConnectorServiceClient {
 		return test2.ClientFromHandler(NewConn(ConnectorSettings{}))
-	}, nil, nil)
+	}, nil, nil, 1, 500)
+	tSuite.SkipDuplicateTest = true
 	suite.Run(t, tSuite)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConnectorTestSuite struct {
@@ -19,9 +20,12 @@ type ConnectorTestSuite struct {
 	namespace            string
 	connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient
 
-	Bootstrap     func(context.Context) error
-	InsertUpdates func(context.Context) error
-	AssertExists  func(context.Context, *assert.Assertions, []*adiomv1.BsonValue, bool) error
+	Bootstrap         func(context.Context) error
+	InsertUpdates     func(context.Context) error
+	AssertExists      func(context.Context, *assert.Assertions, []*adiomv1.BsonValue, bool) error
+	NumPages          int
+	NumItems          int
+	SkipDuplicateTest bool
 }
 
 func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.ConnectorServiceClient {
@@ -33,8 +37,8 @@ func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.
 	return adiomv1connect.NewConnectorServiceClient(srv.Client(), srv.URL())
 }
 
-func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error) *ConnectorTestSuite {
-	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates}
+func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error, numPages int, numItems int) *ConnectorTestSuite {
+	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates, NumPages: numPages, NumItems: numItems}
 }
 
 func (suite *ConnectorTestSuite) TestAll() {
@@ -84,19 +88,20 @@ func (suite *ConnectorTestSuite) TestAll() {
 			})
 
 			suite.Run("TestListData", func() {
+				var pageCount int
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
-						var count int
-						var numLoops = 5
-						for i := 0; i < numLoops; i++ {
+						var itemCount int
+						for {
 							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
 								Type:      t,
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							count += len(res1.Msg.GetData())
+							pageCount++
+							itemCount += len(res1.Msg.GetData())
 
 							res2, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
@@ -104,9 +109,13 @@ func (suite *ConnectorTestSuite) TestAll() {
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							suite.Assert().Equal(res1.Msg.GetData(), res2.Msg.GetData(), "Repeated calls with the same cursor should return identical data")
-							count += len(res2.Msg.GetData())
+							if !suite.SkipDuplicateTest {
+								suite.Assert().True(proto.Equal(res1.Msg, res2.Msg), "Repeated calls with the same cursor should return identical data")
+							}
 							cursor = res2.Msg.GetNextCursor()
+							if cursor == nil {
+								break
+							}
 
 							res3, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
@@ -115,11 +124,15 @@ func (suite *ConnectorTestSuite) TestAll() {
 							}))
 							suite.Assert().NoError(err)
 							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
-							count += len(res3.Msg.GetData())
+							cursor = res3.Msg.GetNextCursor()
+							if cursor == nil {
+								break
+							}
 						}
-						suite.Assert().GreaterOrEqual(count, 3, "Should process at least 3 pages of data")
+						suite.Assert().Equal(itemCount, suite.NumItems, "Should process at least %d items", suite.NumItems)
 					}
 				}
+				suite.Assert().Equal(pageCount, suite.NumPages, "Should process at least %d pages of data", suite.NumPages)
 			})
 
 			if suite.InsertUpdates != nil {

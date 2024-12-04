@@ -90,7 +90,7 @@ func TestCosmosConnectorSuite2(t *testing.T) {
 			return err
 		}
 		return nil
-	})
+	}, 1, 3)
 
 	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
 		mongoID := bson.RawValue{

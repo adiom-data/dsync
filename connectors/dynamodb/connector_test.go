@@ -126,6 +126,6 @@ func TestDynamoDBConnectorSuite(t *testing.T) {
 		}
 
 		return nil
-	})
+	}, 1, 3)
 	suite.Run(t, tSuite)
 }
