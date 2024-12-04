@@ -324,16 +324,6 @@ func createFindFilterFromCursor(cursor []byte) bson.D {
 	}
 }
 
-func (c *conn) startCleanup(cursorID int64, ttl time.Duration) *time.Timer {
-	return time.AfterFunc(ttl, func() {
-		c.buffersMutex.Lock()
-		defer c.buffersMutex.Unlock()
-		if buffer, ok := c.buffers[cursorID]; ok && time.Since(buffer.lastUsed) > ttl {
-			delete(c.buffers, cursorID)
-		}
-	})
-}
-
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	partition := r.Msg.GetPartition()
@@ -354,7 +344,11 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			ch:       ch,
 			last:     nil,
 			lastUsed: time.Now(),
-			cleanup:  c.startCleanup(cursorID, 5*time.Minute),
+			cleanup: time.AfterFunc(5*time.Minute, func() {
+				c.buffersMutex.Lock()
+				delete(c.buffers, cursorID)
+				c.buffersMutex.Unlock()
+			}),
 		}
 		c.buffersMutex.Unlock()
 
@@ -408,6 +402,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	}
 	if ctr+1 == buffer.ctr && buffer.last != nil { // Handle repeated requests for same page
 		buffer.lastUsed = time.Now()
+		buffer.cleanup.Reset(5 * time.Minute)
 		return connect.NewResponse(buffer.last), nil
 	}
 	if ctr != buffer.ctr { // Reject for old or invalid pages
@@ -424,14 +419,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 				buffer.ctr = buffer.ctr + 1
 			} else {
 				// Channel is closed, no more data
-				buffer.last = &adiomv1.ListDataResponse{
-					Data:       nil,
-					NextCursor: nil,
-				}
-				// buffer.lastUsed = time.Now()
-				// c.buffersMutex.Lock()
-				// c.buffers[cursorID] = buffer
-				// c.buffersMutex.Unlock()
+				buffer.last = &adiomv1.ListDataResponse{}
 				return connect.NewResponse(buffer.last), nil
 			}
 			resp := &adiomv1.ListDataResponse{
@@ -440,6 +428,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			}
 			buffer.last = resp
 			buffer.lastUsed = time.Now()
+			buffer.cleanup.Reset(5 * time.Minute)
 			c.buffersMutex.Lock()
 			c.buffers[cursorID] = buffer
 			c.buffersMutex.Unlock()
