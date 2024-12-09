@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConnectorTestSuite struct {
@@ -89,20 +90,35 @@ func (suite *ConnectorTestSuite) TestAll() {
 						var cursor []byte
 						var count int
 						for {
-							res, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
 								Type:      t,
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							count += len(res.Msg.GetData())
-							if res.Msg.GetNextCursor() == nil {
+							count += len(res1.Msg.GetData())
+
+							res2, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().True(proto.Equal(res1.Msg, res2.Msg), "Repeated calls with the same cursor should return identical data")
+							cursor = res2.Msg.GetNextCursor()
+
+							res3, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
+							if cursor == nil {
 								break
 							}
-							suite.Assert().NotEqual(cursor, res.Msg.GetNextCursor())
-							cursor = res.Msg.GetNextCursor()
 						}
-						suite.Assert().NotZero(count)
+						suite.Assert().GreaterOrEqual(count, 3, "Should process at least 3 pages of data")
 					}
 				}
 			})
