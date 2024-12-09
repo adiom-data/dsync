@@ -44,10 +44,10 @@ func setDefault[T comparable](field *T, defaultValue T) {
 }
 
 type buffer struct {
-	ctr      int64
-	ch       <-chan [][]byte
-	last     *adiomv1.ListDataResponse
-	cleanup  *time.Timer
+	ctr     int64
+	ch      <-chan [][]byte
+	last    *adiomv1.ListDataResponse
+	cleanup *time.Timer
 }
 
 type conn struct {
@@ -55,12 +55,12 @@ type conn struct {
 
 	settings ConnectorSettings
 
-	nextCursorID atomic.Int64
-	ctx          context.Context
-	cancel       context.CancelFunc
-	buffersMutex sync.RWMutex
-	buffers      map[int64]buffer
-	maxPageSize  int64
+	nextCursorID    atomic.Int64
+	ctx             context.Context
+	cancel          context.CancelFunc
+	buffersMutex    sync.RWMutex
+	buffers         map[int64]buffer
+	maxPageSize     int64
 	cleanupInterval time.Duration
 }
 
@@ -339,19 +339,19 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		c.buffersMutex.Lock()
 		cursorID = 1
 		if buff, exists := c.buffers[cursorID]; exists && buff.ctr == 0 {
-            c.buffersMutex.Unlock()
-        } else {
-            ch := make(chan [][]byte, 10)
-            c.buffers[cursorID] = buffer{
-                ctr:      0,
-                ch:       ch,
-                last:     nil,
-                cleanup: time.AfterFunc(c.cleanupInterval, func() {
-                    c.buffersMutex.Lock()
-                    delete(c.buffers, cursorID)
-                    c.buffersMutex.Unlock()
-                }),
-            }
+			c.buffersMutex.Unlock()
+		} else {
+			ch := make(chan [][]byte, 10)
+			c.buffers[cursorID] = buffer{
+				ctr:  0,
+				ch:   ch,
+				last: nil,
+				cleanup: time.AfterFunc(c.cleanupInterval, func() {
+					c.buffersMutex.Lock()
+					delete(c.buffers, cursorID)
+					c.buffersMutex.Unlock()
+				}),
+			}
 			c.buffersMutex.Unlock()
 
 			filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
@@ -425,7 +425,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			buffer.ctr++
 			nextCursor = binary.AppendVarint(nil, cursorID)
 			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-			
+
 			resp := &adiomv1.ListDataResponse{
 				Data:       dataBatch,
 				NextCursor: nextCursor,
@@ -459,7 +459,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		{{"$match", nsFilter}},
 	}, opts)
 	if err != nil {
-		slog.Error(fmt.Sprintf("here LSN tracker: Failed to open change stream: %v", err))
+		slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
 	}
 	defer changeStream.Close(ctx)
@@ -881,12 +881,12 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &conn{
-		client:      client,
-		settings:    settings,
-		ctx:         ctx,
-		cancel:      cancel,
-		buffers:     map[int64]buffer{},
-		maxPageSize: 10,
+		client:          client,
+		settings:        settings,
+		ctx:             ctx,
+		cancel:          cancel,
+		buffers:         map[int64]buffer{},
+		maxPageSize:     10,
 		cleanupInterval: 5 * time.Minute,
 	}
 }

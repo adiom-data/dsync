@@ -38,7 +38,6 @@ func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1
 	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates}
 }
 
-
 func (suite *ConnectorTestSuite) TestAll() {
 	c := suite.connectorFactoryFunc()
 	if suite.AssertExists == nil {
@@ -86,10 +85,10 @@ func (suite *ConnectorTestSuite) TestAll() {
 			})
 
 			suite.Run("TestListData", func() {
-				var count int
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
+						var count int
 						for {
 							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
