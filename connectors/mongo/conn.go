@@ -718,6 +718,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 				}
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
+			batch = nil
 		}
 	}
 	if len(batch) > 0 {
