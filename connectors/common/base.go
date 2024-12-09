@@ -14,6 +14,7 @@ import (
 	"hash"
 	"log/slog"
 	"math"
+	"math/rand/v2"
 	"slices"
 	"strings"
 	"sync"
@@ -540,6 +541,9 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 
 		//iterate over all the tasks and distribute them to copiers
+		rand.Shuffle(len(tasks), func(i, j int) {
+			tasks[i], tasks[j] = tasks[j], tasks[i]
+		})
 		for _, task := range tasks {
 			if task.Status == iface.ReadPlanTaskStatus_Completed {
 				// the task is already completed, so we can just skip it
