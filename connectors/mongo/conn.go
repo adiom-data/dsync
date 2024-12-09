@@ -335,13 +335,11 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	var cursorID, ctr int64
 
 	pageCursor := r.Msg.GetCursor()
-	slog.Debug(fmt.Sprintf("current cursor: %s", string(r.Msg.GetCursor())))
 	if pageCursor == nil {
 		c.buffersMutex.Lock()
 		cursorID = 1
 		if buff, exists := c.buffers[cursorID]; exists && buff.ctr == 0 {
             c.buffersMutex.Unlock()
-			slog.Debug("continue")
         } else {
             ch := make(chan [][]byte, 10)
             c.buffers[cursorID] = buffer{
@@ -406,12 +404,8 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	}
 	if buffer.last != nil { // Handle repeated requests for same page
 		if bytes.Equal(r.Msg.GetCursor(), buffer.last.GetNextCursor()) {
-			slog.Debug("Returning cached response for identical cursor", 
-			"current_cursor", r.Msg.GetCursor(), 
-			"last_next_cursor", buffer.last.GetNextCursor())
 			buffer.cleanup.Reset(c.cleanupInterval)
 		} else if bytes.Equal(pageCursor, r.Msg.GetCursor()) {
-			slog.Debug("return cached")
 			buffer.cleanup.Reset(c.cleanupInterval)
 			return connect.NewResponse(buffer.last), nil
 		}
@@ -437,12 +431,10 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 				NextCursor: nextCursor,
 			}
 			buffer.last = resp
-			
 			buffer.cleanup.Reset(c.cleanupInterval)
 			c.buffersMutex.Lock()
 			c.buffers[cursorID] = buffer
 			c.buffersMutex.Unlock()
-			slog.Debug("return new")
 			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
@@ -617,8 +609,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		{{"$match", nsFilter}},
 	}, opts)
 	if err != nil {
-		slog.Debug("idk")
-		slog.Error(fmt.Sprintf("idk Failed to open change stream: %v", err))
+		slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
 	}
 	defer changeStream.Close(ctx)

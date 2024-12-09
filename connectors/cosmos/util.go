@@ -55,8 +55,7 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := createChangeStream(ctx, client, location, opts)
 	if err != nil {
-		slog.Debug("hi")
-		return nil, fmt.Errorf("hi failed to open change stream: %v", err)
+		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
 	defer changeStream.Close(ctx)
 

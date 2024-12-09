@@ -3,8 +3,6 @@ package test
 import (
 	"context"
 	"errors"
-	"log/slog"
-	"os"
 	"time"
 
 	"connectrpc.com/connect"
@@ -38,14 +36,6 @@ func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.
 
 func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error) *ConnectorTestSuite {
 	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates}
-}
-
-func setupLogger() {
-    // Set up `slog` to log to the console
-    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-        Level: slog.LevelDebug, // Set the desired log level
-    }))
-    slog.SetDefault(logger) // Set the global default logger
 }
 
 
@@ -97,7 +87,6 @@ func (suite *ConnectorTestSuite) TestAll() {
 
 			suite.Run("TestListData", func() {
 				var count int
-				setupLogger()
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
