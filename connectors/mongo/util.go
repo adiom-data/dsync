@@ -75,7 +75,8 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, 
 	slog.Debug("Getting latest resume token...")
 	changeStream, err := client.Watch(ctx, mongo.Pipeline{}) //TODO (AK, 6/2024): We should limit this to just the dummy collection or we can catch something that we don't want :)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open change stream: %v", err)
+		slog.Debug("hello")
+		return nil, fmt.Errorf("hello failed to open change stream: %v", err)
 	}
 	defer changeStream.Close(ctx)
 

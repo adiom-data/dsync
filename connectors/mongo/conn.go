@@ -47,7 +47,6 @@ type buffer struct {
 	ctr      int64
 	ch       <-chan [][]byte
 	last     *adiomv1.ListDataResponse
-	lastUsed time.Time
 	cleanup  *time.Timer
 }
 
@@ -62,6 +61,7 @@ type conn struct {
 	buffersMutex sync.RWMutex
 	buffers      map[int64]buffer
 	maxPageSize  int64
+	cleanupInterval time.Duration
 }
 
 // get all database names except system databases
@@ -335,53 +335,57 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	var cursorID, ctr int64
 
 	pageCursor := r.Msg.GetCursor()
+	slog.Debug(fmt.Sprintf("current cursor: %s", string(r.Msg.GetCursor())))
 	if pageCursor == nil {
-		cursorID = c.nextCursorID.Add(1)
-		ch := make(chan [][]byte, 10)
 		c.buffersMutex.Lock()
-		c.buffers[cursorID] = buffer{
-			ctr:      0,
-			ch:       ch,
-			last:     nil,
-			lastUsed: time.Now(),
-			cleanup: time.AfterFunc(5*time.Minute, func() {
-				c.buffersMutex.Lock()
-				delete(c.buffers, cursorID)
-				c.buffersMutex.Unlock()
-			}),
-		}
-		c.buffersMutex.Unlock()
+		cursorID = 1
+		if buff, exists := c.buffers[cursorID]; exists && buff.ctr == 0 {
+            c.buffersMutex.Unlock()
+			slog.Debug("continue")
+        } else {
+            ch := make(chan [][]byte, 10)
+            c.buffers[cursorID] = buffer{
+                ctr:      0,
+                ch:       ch,
+                last:     nil,
+                cleanup: time.AfterFunc(c.cleanupInterval, func() {
+                    c.buffersMutex.Lock()
+                    delete(c.buffers, cursorID)
+                    c.buffersMutex.Unlock()
+                }),
+            }
+			c.buffersMutex.Unlock()
 
-		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
-		cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+			filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
+			cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+				}
+				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
-
-		go func(ctx context.Context) {
-			defer cursor.Close(ctx)
-			defer close(ch)
-			var dataBatch [][]byte
-			for cursor.Next(ctx) {
-				dataBatch = append(dataBatch, cursor.Current)
-				if len(dataBatch) == int(c.maxPageSize) || cursor.RemainingBatchLength() == 0 {
-					select {
-					case ch <- dataBatch:
-						dataBatch = nil
-					case <-ctx.Done():
-						return
+			go func(ctx context.Context) {
+				defer cursor.Close(ctx)
+				defer close(ch)
+				var dataBatch [][]byte
+				for cursor.Next(ctx) {
+					dataBatch = append(dataBatch, cursor.Current)
+					if len(dataBatch) == int(c.maxPageSize) || cursor.RemainingBatchLength() == 0 {
+						select {
+						case ch <- dataBatch:
+							dataBatch = nil
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
-			}
-			if cursor.Err() != nil {
-				if !errors.Is(cursor.Err(), context.Canceled) {
-					slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+				if cursor.Err() != nil {
+					if !errors.Is(cursor.Err(), context.Canceled) {
+						slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+					}
 				}
-			}
-		}(c.ctx) // This context may outlive the current request
+			}(c.ctx)
+		}
 	} else {
 		var err error
 		br := bytes.NewReader(r.Msg.GetCursor())
@@ -400,10 +404,17 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
-	if ctr+1 == buffer.ctr && buffer.last != nil { // Handle repeated requests for same page
-		buffer.lastUsed = time.Now()
-		buffer.cleanup.Reset(5 * time.Minute)
-		return connect.NewResponse(buffer.last), nil
+	if buffer.last != nil { // Handle repeated requests for same page
+		if bytes.Equal(r.Msg.GetCursor(), buffer.last.GetNextCursor()) {
+			slog.Debug("Returning cached response for identical cursor", 
+			"current_cursor", r.Msg.GetCursor(), 
+			"last_next_cursor", buffer.last.GetNextCursor())
+			buffer.cleanup.Reset(c.cleanupInterval)
+		} else if bytes.Equal(pageCursor, r.Msg.GetCursor()) {
+			slog.Debug("return cached")
+			buffer.cleanup.Reset(c.cleanupInterval)
+			return connect.NewResponse(buffer.last), nil
+		}
 	}
 	if ctr != buffer.ctr { // Reject for old or invalid pages
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no longer available"))
@@ -413,25 +424,25 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		select {
 		case dataBatch, ok := <-buffer.ch:
 			var nextCursor []byte
-			if ok {
-				nextCursor = binary.AppendVarint(nil, cursorID)
-				nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-				buffer.ctr = buffer.ctr + 1
-			} else {
-				// Channel is closed, no more data
+			if !ok {
 				buffer.last = &adiomv1.ListDataResponse{}
 				return connect.NewResponse(buffer.last), nil
 			}
+			buffer.ctr++
+			nextCursor = binary.AppendVarint(nil, cursorID)
+			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
+			
 			resp := &adiomv1.ListDataResponse{
 				Data:       dataBatch,
 				NextCursor: nextCursor,
 			}
 			buffer.last = resp
-			buffer.lastUsed = time.Now()
-			buffer.cleanup.Reset(5 * time.Minute)
+			
+			buffer.cleanup.Reset(c.cleanupInterval)
 			c.buffersMutex.Lock()
 			c.buffers[cursorID] = buffer
 			c.buffersMutex.Unlock()
+			slog.Debug("return new")
 			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
@@ -456,7 +467,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		{{"$match", nsFilter}},
 	}, opts)
 	if err != nil {
-		slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
+		slog.Error(fmt.Sprintf("here LSN tracker: Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
 	}
 	defer changeStream.Close(ctx)
@@ -606,7 +617,8 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		{{"$match", nsFilter}},
 	}, opts)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
+		slog.Debug("idk")
+		slog.Error(fmt.Sprintf("idk Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
 	}
 	defer changeStream.Close(ctx)
@@ -884,5 +896,6 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 		cancel:      cancel,
 		buffers:     map[int64]buffer{},
 		maxPageSize: 10,
+		cleanupInterval: 5 * time.Minute,
 	}
 }

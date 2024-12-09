@@ -418,7 +418,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}))
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
+				slog.Debug("hereee")
+				slog.Error(fmt.Sprintf("hereee LSN tracker: Failed to open change stream: %v", err))
 			}
 			return
 		}

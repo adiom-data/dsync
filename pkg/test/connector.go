@@ -3,6 +3,8 @@ package test
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
 	"time"
 
 	"connectrpc.com/connect"
@@ -12,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConnectorTestSuite struct {
@@ -36,6 +39,15 @@ func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.
 func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error) *ConnectorTestSuite {
 	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates}
 }
+
+func setupLogger() {
+    // Set up `slog` to log to the console
+    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelDebug, // Set the desired log level
+    }))
+    slog.SetDefault(logger) // Set the global default logger
+}
+
 
 func (suite *ConnectorTestSuite) TestAll() {
 	c := suite.connectorFactoryFunc()
@@ -84,12 +96,12 @@ func (suite *ConnectorTestSuite) TestAll() {
 			})
 
 			suite.Run("TestListData", func() {
+				var count int
+				setupLogger()
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
-						var count int
-						var numLoops = 5
-						for i := 0; i < numLoops; i++ {
+						for {
 							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
 								Type:      t,
@@ -104,8 +116,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							suite.Assert().Equal(res1.Msg.GetData(), res2.Msg.GetData(), "Repeated calls with the same cursor should return identical data")
-							count += len(res2.Msg.GetData())
+							suite.Assert().True(proto.Equal(res1.Msg, res2.Msg), "Repeated calls with the same cursor should return identical data")
 							cursor = res2.Msg.GetNextCursor()
 
 							res3, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
@@ -115,7 +126,9 @@ func (suite *ConnectorTestSuite) TestAll() {
 							}))
 							suite.Assert().NoError(err)
 							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
-							count += len(res3.Msg.GetData())
+							if cursor == nil {
+								break
+							}
 						}
 						suite.Assert().GreaterOrEqual(count, 3, "Should process at least 3 pages of data")
 					}
