@@ -47,6 +47,8 @@ type RunnerLocal struct {
 }
 
 type RunnerLocalSettings struct {
+	SrcDescription       string
+	DstDescription       string
 	SrcDataType          adiomv1.DataType
 	DstDataType          adiomv1.DataType
 	TransformClient      adiomv1connect.TransformServiceClient
@@ -85,11 +87,13 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 
 	r := &RunnerLocal{}
 	r.runnerProgress = RunnerSyncProgress{
-		StartTime:     time.Now(),
-		CurrTime:      time.Now(),
-		SyncState:     iface.SetupSyncState,
-		NsProgressMap: make(map[iface.Namespace]*iface.NamespaceStatus),
-		Namespaces:    make([]iface.Namespace, 0),
+		SourceDescription:      settings.SrcDescription,
+		DestinationDescription: settings.DstDescription,
+		StartTime:              time.Now(),
+		CurrTime:               time.Now(),
+		SyncState:              iface.SetupSyncState,
+		NsProgressMap:          make(map[iface.Namespace]*iface.NamespaceStatus),
+		Namespaces:             make([]iface.Namespace, 0),
 	}
 	connectorSettings := common.ConnectorSettings{
 		NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,

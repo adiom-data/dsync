@@ -184,7 +184,12 @@ func runDsync(c *cli.Context) error {
 		slog.Info("Using DataType", "src", srcType.String(), "dst", dstType.String())
 	}
 
+	srcDescription := fmt.Sprintf("%s.%s.%s - %s", infoRes.Msg.GetDbType(), infoRes.Msg.GetVersion(), infoRes.Msg.GetSpec(), infoRes.Msg.GetId())
+	dstDescription := fmt.Sprintf("%s.%s.%s - %s", dstInfoRes.Msg.GetDbType(), dstInfoRes.Msg.GetVersion(), dstInfoRes.Msg.GetSpec(), infoRes.Msg.GetId())
+
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
+		SrcDescription:                 srcDescription,
+		DstDescription:                 dstDescription,
 		SrcDataType:                    srcType,
 		DstDataType:                    dstType,
 		TransformClient:                transform,
