@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConnectorTestSuite struct {
@@ -33,8 +34,8 @@ func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.
 	return adiomv1connect.NewConnectorServiceClient(srv.Client(), srv.URL())
 }
 
-func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error) *ConnectorTestSuite {
-	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates}
+func NewConnectorTestSuite(namespace string, connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient, bootstrap func(context.Context) error, insertUpdates func(context.Context) error, numPages int, numItems int) *ConnectorTestSuite {
+	return &ConnectorTestSuite{namespace: namespace, connectorFactoryFunc: connectorFactoryFunc, Bootstrap: bootstrap, InsertUpdates: insertUpdates, NumPages: numPages, NumItems: numItems}
 }
 
 func (suite *ConnectorTestSuite) TestAll() {
@@ -84,27 +85,50 @@ func (suite *ConnectorTestSuite) TestAll() {
 			})
 
 			suite.Run("TestListData", func() {
+				var pageCount int
+				var expectedPages int
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
-						var count int
+            			var itemCount int
 						for {
-							res, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+							res1, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: p,
 								Type:      t,
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							count += len(res.Msg.GetData())
-							if res.Msg.GetNextCursor() == nil {
+							pageCount++
+                			itemCount += len(res1.Msg.GetData())
+
+							res2, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().True(proto.Equal(res1.Msg, res2.Msg), "Repeated calls with the same cursor should return identical data")
+							cursor = res2.Msg.GetNextCursor();
+							if cursor == nil {
 								break
 							}
-							suite.Assert().NotEqual(cursor, res.Msg.GetNextCursor())
-							cursor = res.Msg.GetNextCursor()
+
+							res3, err := c.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: p,
+								Type:      t,
+								Cursor:    cursor,
+							}))
+							suite.Assert().NoError(err)
+							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
+							cursor = res3.Msg.GetNextCursor()
+							if cursor == nil {
+								break
+							}
 						}
-						suite.Assert().NotZero(count)
+						suite.Assert().GreaterOrEqual(itemCount, 1, "Should process at least %d items", 1)
 					}
 				}
+				suite.Assert().GreaterOrEqual(pageCount, expectedPages, "Should process at least %d pages of data", expectedPages)
 			})
 
 			if suite.InsertUpdates != nil {
@@ -115,6 +139,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetUpdatesPartitions() {
 						var namespaces []string
+						
 						if len(p.GetNamespace()) > 0 {
 							namespaces = append(namespaces, p.GetNamespace())
 						}
