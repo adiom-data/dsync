@@ -217,7 +217,7 @@ func (c *Simple) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 func (c *Simple) maybeCreateReadPlan(srcEndpoint iface.ConnectorICoordinatorSignal, flowDet *FlowDetails) error {
 	fid := flowDet.FlowID
 	// Check if we are resumable and have the flow plan already
-	if flowDet.ReadPlan.Tasks != nil && flowDet.Resumable {
+	if (flowDet.ReadPlan.Tasks != nil || flowDet.ReadPlan.CdcResumeToken != nil) && flowDet.Resumable {
 		slog.Debug("Using the existing read plan for a resumable flow. Flow ID: " + fmt.Sprintf("%v", fid))
 		//reset all in progress tasks to new
 	} else {
@@ -277,7 +277,7 @@ func (c *Simple) FlowStart(fid iface.FlowID) error {
 	// Set resumability flag for the flow
 	flowDet.Resumable = flowCap.Resumability
 
-	if flowDet.ReadPlan.Tasks != nil && !flowDet.Resumable {
+	if (flowDet.ReadPlan.Tasks != nil || flowDet.ReadPlan.CdcResumeToken != nil) && !flowDet.Resumable {
 		slog.Error("Flow is not resumable but we have found the old plan. Please clean the metadata before restarting. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("flow is not resumable but old plan")
 	}
