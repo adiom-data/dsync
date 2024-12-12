@@ -334,7 +334,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
-		cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		cursor, err := collection.Find(ctx, filter)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
