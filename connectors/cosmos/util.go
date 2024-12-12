@@ -63,7 +63,28 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	var id interface{}
 	col := client.Database(location.Database).Collection(location.Collection)
 
-	result, err := col.InsertOne(ctx, bson.M{})
+	cmdResult := client.Database(location.Database).RunCommand(ctx, bson.D{{"customAction", "GetCollection"}, {"collection", location.Collection}})
+	if cmdResult.Err() != nil {
+		return nil, fmt.Errorf("Error retrieving possible shardKeyDefinition %v", cmdResult.Err())
+	}
+	var m map[string]interface{}
+	if err := cmdResult.Decode(&m); err != nil {
+		return nil, fmt.Errorf("Error decoding possible shardKeyDefinition %v", cmdResult.Err())
+	}
+	dummyInsertFilter := bson.M{}
+	if shardKeyDefinition, ok := m["shardKeyDefinition"]; ok {
+		if shardKeyDefinitionMap, ok := shardKeyDefinition.(map[string]interface{}); ok {
+			for k := range shardKeyDefinitionMap {
+				if k == "_id" {
+					continue
+				}
+				dummyInsertFilter[k] = ""
+			}
+		}
+	}
+	slog.Debug("Dummy Insert", "filter", dummyInsertFilter)
+
+	result, err := col.InsertOne(ctx, dummyInsertFilter)
 	if err != nil {
 		if err.(mongo.WriteException).WriteErrors[0].Code == 13 { //unauthorized
 			slog.Warn(fmt.Sprintf("Not authorized to insert dummy record for %v, skipping resume token retrieval - is the namespace read-only?", location))
