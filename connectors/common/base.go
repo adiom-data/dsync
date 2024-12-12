@@ -314,7 +314,7 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 // StartReadToChannel implements iface.Connector.
 func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelID iface.DataChannelID) error {
 	// We'll do namespace mappings on the read side for now, so ensure we have the mapping ready
-	_, _ = c.parseNamespaceOptionAndUpdateMap(options.Namespace)
+	namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
 
 	c.flowCtx, c.flowCancelFunc = context.WithCancel(c.ctx)
 	c.flowID = flowId
@@ -329,6 +329,11 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	if len(options.Namespace) > 0 {
 		for _, task := range readPlan.Tasks {
 			streamUpdatesNamespacesMap[task.Def.Col] = struct{}{}
+		}
+		if len(streamUpdatesNamespacesMap) == 0 {
+			for _, ns := range namespaces {
+				streamUpdatesNamespacesMap[ns] = struct{}{}
+			}
 		}
 		for k := range streamUpdatesNamespacesMap {
 			streamUpdatesNamespaces = append(streamUpdatesNamespaces, k)
