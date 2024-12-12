@@ -543,28 +543,45 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	for i := 0; i < numWorkers; i++ {
 		eg.Go(func() error {
 			for query := range queryCh {
-				srcRes, err := src.Endpoint.IntegrityCheck(ctx, query)
-				if err != nil {
-					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Source integrity query canceled %v", query))
-						return nil
-					}
-					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
-					return err
-				}
+				eg2, ctx := errgroup.WithContext(ctx)
+
 				dstNamespace := mapNamespace(namespaceMap, query.Namespace)
 				dstQuery := query
 				dstQuery.Namespace = dstNamespace
 
-				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, dstQuery)
-				if err != nil {
-					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
-						return nil
+				var srcRes, dstRes iface.ConnectorDataIntegrityCheckResult
+				eg2.Go(func() error {
+					var err error
+					srcRes, err = src.Endpoint.IntegrityCheck(ctx, query)
+					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							slog.Info(fmt.Sprintf("Source integrity query canceled %v", query))
+							return nil
+						}
+						slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
+						return err
 					}
-					slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", query, err))
+					return nil
+				})
+
+				eg2.Go(func() error {
+					var err error
+					dstRes, err = dst.Endpoint.IntegrityCheck(ctx, dstQuery)
+					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
+							return nil
+						}
+						slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", query, err))
+						return err
+					}
+					return nil
+				})
+
+				if err := eg2.Wait(); err != nil {
 					return err
 				}
+
 				matches := srcRes == dstRes
 				if !matches {
 					slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", query, srcRes, dstRes))
