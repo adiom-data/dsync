@@ -495,7 +495,7 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 	setDefault(&settings.TargetDocCountPerPartition, 512*1000)
 	setDefault(&settings.NumParallelPartitionWorkers, 4)
 	setDefault(&settings.DeletesCheckInterval, 60*time.Second)
-	settings.partitionKey = "_id"
+	settings.partitionKey = "uuidstr"
 
 	var witnessMongoClient *mongo.Client
 	// Connect to the witness MongoDB instance

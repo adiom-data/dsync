@@ -9,6 +9,8 @@ package cosmos
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"strings"
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
@@ -28,6 +30,8 @@ func splitRange(value1 bson.RawValue, value2 bson.RawValue, numParts int) ([]bso
 	switch value1.Type {
 	case bson.TypeObjectID:
 		return splitRangeObjectId(value1, value2, numParts)
+	case bson.TypeString:
+		return splitRangeUuidLowercase(numParts)
 	}
 
 	return nil, fmt.Errorf("unsupported type %v", value1.Type)
@@ -40,6 +44,10 @@ func canPartitionRange(value1 bson.RawValue, value2 bson.RawValue) bool {
 	}
 
 	if value1.Type == bson.TypeObjectID /* || value1.Type == bson.TypeInt32 || value1.Type == bson.TypeInt64 */ {
+		return true
+	}
+
+	if value1.Type == bson.TypeString {
 		return true
 	}
 
@@ -77,6 +85,63 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 	boundaries[numParts] = value2
 
 	return boundaries, nil
+}
+
+// splits the possible uuid range e.g. 'e9bb989d-27a5-4b07-a2a9-65b0ecf3cd90' into equal parts
+func splitRangeUuidLowercase(numParts int) ([]bson.RawValue, error) {
+	// Check for valid number of parts
+	if numParts < 1 {
+		return nil, fmt.Errorf("number of parts must be at least 1")
+	}
+
+	// UUID is a 128-bit hexadecimal string (32 characters)
+	// Lowest possible UUID: 00000000-0000-0000-0000-000000000000
+	lowest := "00000000000000000000000000000000"
+
+	// Highest possible UUID: ffffffff-ffff-ffff-ffff-ffffffffffff
+	highest := "ffffffffffffffffffffffffffffffff"
+
+	// Convert hex strings to big integers
+	lowestInt, _ := new(big.Int).SetString(lowest, 16)
+	highestInt, _ := new(big.Int).SetString(highest, 16)
+
+	// Calculate the range and step size
+	rangeSize := new(big.Int).Sub(highestInt, lowestInt)
+	step := new(big.Int).Div(rangeSize, big.NewInt(int64(numParts)))
+
+	// Generate the split points
+	splitPoints := make([]bson.RawValue, numParts+1)
+
+	for i := 0; i <= numParts; i++ {
+		// Calculate the current point
+		currentPoint := new(big.Int).Add(
+			lowestInt,
+			new(big.Int).Mul(step, big.NewInt(int64(i))),
+		)
+
+		// Convert back to 32-character hex string
+		hexString := fmt.Sprintf("%032x", currentPoint)
+
+		// Insert hyphens to make it a standard UUID format
+		splitPoints[i] = bson.RawValue{
+			Type:  bson.TypeString,
+			Value: []byte(insertUUIDHyphens(hexString)),
+		}
+	}
+
+	return splitPoints, nil
+}
+
+// Helper function to insert hyphens into a UUID
+func insertUUIDHyphens(hex string) string {
+	parts := []string{
+		hex[0:8],
+		hex[8:12],
+		hex[12:16],
+		hex[16:20],
+		hex[20:32],
+	}
+	return strings.Join(parts, "-")
 }
 
 // get min and max boundaries for a namespace task
