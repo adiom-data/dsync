@@ -178,6 +178,9 @@ func (cc *planner) parallelNamespaceTaskPreparer(countCheckChannel <-chan iface.
 						continue
 					}
 					slog.Debug(fmt.Sprintf("Number of approximate split points for task %v: %v", nsTask, len(approxBounds)))
+					for _, bound := range approxBounds {
+						slog.Debug(fmt.Sprintf("Approximate split point for task %v: %v", nsTask, bound))
+					}
 
 					//send min and max tasks to finalized channel
 					minTask := cc.createReadPlanTaskForNs(nsTask)
