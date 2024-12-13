@@ -295,19 +295,19 @@ func createFindFilterFromCursor(cursor []byte) bson.D {
 		return bson.D{}
 	} else if low.IsZero() { //only upper boundary
 		return bson.D{
-			{"_id", bson.D{
+			{"uuidstr", bson.D{
 				{"$lte", high},
 			}},
 		}
 	} else if high.IsZero() { //only lower boundary
 		return bson.D{
-			{"_id", bson.D{
+			{"uuidstr", bson.D{
 				{"$gt", low},
 			}},
 		}
 	} else { //both boundaries
 		return bson.D{
-			{"_id", bson.D{
+			{"uuidstr", bson.D{
 				{"$gt", low},
 				{"$lte", high},
 			}},
@@ -334,6 +334,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
+		slog.Debug(fmt.Sprintf("Filter: %v", filter))
 		cursor, err := collection.Find(ctx, filter)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
