@@ -84,6 +84,7 @@ func (cc *planner) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.R
 			for task := range approxTasksChannel {
 				collection := cc.Client.Database(task.Def.Db).Collection(task.Def.Col)
 
+				slog.Debug(fmt.Sprintf("Clarifying bounds for task %v: low=%v, high=%v", task, task.Def.Low, task.Def.High))
 				// first, clarify the low value
 				valLow, errLow := findClosestLowerValue(cc.Ctx, collection, task.Def.PartitionKey, task.Def.Low)
 				if errLow != nil {
