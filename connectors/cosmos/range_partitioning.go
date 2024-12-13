@@ -18,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
 // split the range between two boundaries into equal parts
@@ -123,9 +124,10 @@ func splitRangeUuidLowercase(numParts int) ([]bson.RawValue, error) {
 		hexString := fmt.Sprintf("%032x", currentPoint)
 
 		// Insert hyphens to make it a standard UUID format
+		formattedUUID := insertUUIDHyphens(hexString)
 		splitPoints[i] = bson.RawValue{
 			Type:  bson.TypeString,
-			Value: []byte(insertUUIDHyphens(hexString)),
+			Value: bsoncore.AppendString(nil, formattedUUID),
 		}
 	}
 

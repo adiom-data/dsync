@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/rand"
 )
@@ -82,22 +83,11 @@ func (cc *planner) parallelTaskBoundsClarifier(approxTasksChannel <-chan iface.R
 	for i := 0; i < cc.settings.NumParallelPartitionWorkers; i++ {
 		go func() {
 			for task := range approxTasksChannel {
-				collection := cc.Client.Database(task.Def.Db).Collection(task.Def.Col)
 
 				slog.Debug(fmt.Sprintf("Clarifying bounds for task %v: low=%v, high=%v", task, task.Def.Low, task.Def.High))
-				// first, clarify the low value
-				valLow, errLow := findClosestLowerValue(cc.Ctx, collection, task.Def.PartitionKey, task.Def.Low)
-				if errLow != nil {
-					slog.Error(fmt.Sprintf("Failed to clarify low value for task %v: %v", task, errLow))
-					continue //XXX: this task will be skipped, should we panic here?
-				}
+				valLow := task.Def.Low.(bson.RawValue)
 
-				// then, clarify the high value
-				valHigh, errHigh := findClosestLowerValue(cc.Ctx, collection, task.Def.PartitionKey, task.Def.High)
-				if errHigh != nil {
-					slog.Error(fmt.Sprintf("Failed to clarify high value for task %v: %v", task, errHigh))
-					continue //XXX: this task will be skipped, should we panic here?
-				}
+				valHigh := task.Def.High.(bson.RawValue)
 
 				// if the bounds are the same, then we don't need to do anything
 				if !valLow.Equal(valHigh) {
