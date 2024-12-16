@@ -43,16 +43,25 @@ func setDefault[T comparable](field *T, defaultValue T) {
 	}
 }
 
+type buffer struct {
+	ctr     int64
+	ch      <-chan [][]byte
+	last    *adiomv1.ListDataResponse
+	cleanup *time.Timer
+}
+
 type conn struct {
 	client *mongo.Client
 
 	settings ConnectorSettings
 
-	nextCursorID atomic.Int64
-	ctx          context.Context
-	cancel       context.CancelFunc
-	buffersMutex sync.RWMutex
-	buffers      map[int64]<-chan [][]byte
+	nextCursorID    atomic.Int64
+	ctx             context.Context
+	cancel          context.CancelFunc
+	buffersMutex    sync.RWMutex
+	buffers         map[int64]buffer
+	maxPageSize     int64
+	cleanupInterval time.Duration
 }
 
 // get all database names except system databases
@@ -327,42 +336,54 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 	pageCursor := r.Msg.GetCursor()
 	if pageCursor == nil {
-		cursorID = c.nextCursorID.Add(1)
-		ch := make(chan [][]byte, 10)
 		c.buffersMutex.Lock()
-		c.buffers[cursorID] = ch
-		c.buffersMutex.Unlock()
-
-		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
-		cursor, err := collection.Find(ctx, filter)
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+		cursorID = 1
+		if buff, exists := c.buffers[cursorID]; exists && buff.ctr == 0 {
+			c.buffersMutex.Unlock()
+		} else {
+			ch := make(chan [][]byte, 10)
+			c.buffers[cursorID] = buffer{
+				ctr:  0,
+				ch:   ch,
+				last: nil,
+				cleanup: time.AfterFunc(c.cleanupInterval, func() {
+					c.buffersMutex.Lock()
+					delete(c.buffers, cursorID)
+					c.buffersMutex.Unlock()
+				}),
 			}
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
+			c.buffersMutex.Unlock()
 
-		go func(ctx context.Context) {
-			defer cursor.Close(ctx)
-			defer close(ch)
-			var dataBatch [][]byte
-			for cursor.Next(ctx) {
-				dataBatch = append(dataBatch, cursor.Current)
-				if cursor.RemainingBatchLength() == 0 {
-					select {
-					case ch <- dataBatch:
-						dataBatch = nil
-					case <-ctx.Done():
-						return
+			filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
+			cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
+				}
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			go func(ctx context.Context) {
+				defer cursor.Close(ctx)
+				defer close(ch)
+				var dataBatch [][]byte
+				for cursor.Next(ctx) {
+					dataBatch = append(dataBatch, cursor.Current)
+					if cursor.RemainingBatchLength() == 0 || (c.maxPageSize != 0 && len(dataBatch) == int(c.maxPageSize)) {
+						select {
+						case ch <- dataBatch:
+							dataBatch = nil
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
-			}
-			if cursor.Err() != nil {
-				if !errors.Is(cursor.Err(), context.Canceled) {
-					slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+				if cursor.Err() != nil {
+					if !errors.Is(cursor.Err(), context.Canceled) {
+						slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+					}
 				}
-			}
-		}(c.ctx) // This context may outlive the current request
+			}(c.ctx)
+		}
 	} else {
 		var err error
 		br := bytes.NewReader(r.Msg.GetCursor())
@@ -376,30 +397,45 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		}
 	}
 	c.buffersMutex.RLock()
-	ch, ok := c.buffers[cursorID]
+	buffer, ok := c.buffers[cursorID]
 	c.buffersMutex.RUnlock()
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
+	if buffer.last != nil { // Handle repeated requests for same page
+		if bytes.Equal(r.Msg.GetCursor(), buffer.last.GetNextCursor()) {
+			buffer.cleanup.Reset(c.cleanupInterval)
+		} else if bytes.Equal(pageCursor, r.Msg.GetCursor()) {
+			buffer.cleanup.Reset(c.cleanupInterval)
+			return connect.NewResponse(buffer.last), nil
+		}
+	}
+	if ctr != buffer.ctr { // Reject for old or invalid pages
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no longer available"))
+	}
 
 	for {
 		select {
-		case dataBatch, ok := <-ch:
+		case dataBatch, ok := <-buffer.ch:
+			var nextCursor []byte
 			if !ok {
-				c.buffersMutex.Lock()
-				delete(c.buffers, cursorID)
-				c.buffersMutex.Unlock()
-
-				return connect.NewResponse(&adiomv1.ListDataResponse{
-					Data: dataBatch,
-				}), nil
+				buffer.last = &adiomv1.ListDataResponse{}
+				return connect.NewResponse(buffer.last), nil
 			}
-			nextCursor := binary.AppendVarint(nil, cursorID)
+			buffer.ctr++
+			nextCursor = binary.AppendVarint(nil, cursorID)
 			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-			return connect.NewResponse(&adiomv1.ListDataResponse{
+
+			resp := &adiomv1.ListDataResponse{
 				Data:       dataBatch,
 				NextCursor: nextCursor,
-			}), nil
+			}
+			buffer.last = resp
+			buffer.cleanup.Reset(c.cleanupInterval)
+			c.buffersMutex.Lock()
+			c.buffers[cursorID] = buffer
+			c.buffersMutex.Unlock()
+			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -846,10 +882,12 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &conn{
-		client:   client,
-		settings: settings,
-		ctx:      ctx,
-		cancel:   cancel,
-		buffers:  map[int64]<-chan [][]byte{},
+		client:          client,
+		settings:        settings,
+		ctx:             ctx,
+		cancel:          cancel,
+		buffers:         map[int64]buffer{},
+		maxPageSize:     0,
+		cleanupInterval: 5 * time.Minute,
 	}
 }

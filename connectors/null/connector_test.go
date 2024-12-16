@@ -27,6 +27,6 @@ func TestNullConnectorSuite(t *testing.T) {
 func TestNullConnectorSuite2(t *testing.T) {
 	tSuite := test2.NewConnectorTestSuite("test", func() adiomv1connect.ConnectorServiceClient {
 		return test2.ClientFromHandler(NewConn())
-	}, nil, nil)
+	}, nil, nil, 0, 0)
 	suite.Run(t, tSuite)
 }
