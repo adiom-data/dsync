@@ -358,7 +358,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			cursor, err := collection.Find(ctx, filter)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
-					slog.Debug("Find", "filter", filter)
+					slog.Debug("Find Error", "filter", filter)
 					slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
 				}
 				return nil, connect.NewError(connect.CodeInternal, err)
