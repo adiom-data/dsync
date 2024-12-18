@@ -217,7 +217,7 @@ func (c *Simple) FlowGetOrCreate(o iface.FlowOptions) (iface.FlowID, error) {
 func (c *Simple) maybeCreateReadPlan(srcEndpoint iface.ConnectorICoordinatorSignal, flowDet *FlowDetails) error {
 	fid := flowDet.FlowID
 	// Check if we are resumable and have the flow plan already
-	if flowDet.ReadPlan.Tasks != nil && flowDet.Resumable {
+	if (flowDet.ReadPlan.Tasks != nil || flowDet.ReadPlan.CdcResumeToken != nil) && flowDet.Resumable {
 		slog.Debug("Using the existing read plan for a resumable flow. Flow ID: " + fmt.Sprintf("%v", fid))
 		//reset all in progress tasks to new
 	} else {
@@ -277,7 +277,7 @@ func (c *Simple) FlowStart(fid iface.FlowID) error {
 	// Set resumability flag for the flow
 	flowDet.Resumable = flowCap.Resumability
 
-	if flowDet.ReadPlan.Tasks != nil && !flowDet.Resumable {
+	if (flowDet.ReadPlan.Tasks != nil || flowDet.ReadPlan.CdcResumeToken != nil) && !flowDet.Resumable {
 		slog.Error("Flow is not resumable but we have found the old plan. Please clean the metadata before restarting. Flow ID: " + fmt.Sprintf("%v", fid))
 		return fmt.Errorf("flow is not resumable but old plan")
 	}
@@ -543,28 +543,45 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	for i := 0; i < numWorkers; i++ {
 		eg.Go(func() error {
 			for query := range queryCh {
-				srcRes, err := src.Endpoint.IntegrityCheck(ctx, query)
-				if err != nil {
-					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Source integrity query canceled %v", query))
-						return nil
-					}
-					slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
-					return err
-				}
+				eg2, ctx := errgroup.WithContext(ctx)
+
 				dstNamespace := mapNamespace(namespaceMap, query.Namespace)
 				dstQuery := query
 				dstQuery.Namespace = dstNamespace
 
-				dstRes, err := dst.Endpoint.IntegrityCheck(ctx, dstQuery)
-				if err != nil {
-					if errors.Is(err, context.Canceled) {
-						slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
-						return nil
+				var srcRes, dstRes iface.ConnectorDataIntegrityCheckResult
+				eg2.Go(func() error {
+					var err error
+					srcRes, err = src.Endpoint.IntegrityCheck(ctx, query)
+					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							slog.Info(fmt.Sprintf("Source integrity query canceled %v", query))
+							return nil
+						}
+						slog.Error(fmt.Sprintf("Source integrity check failed %v: %v", query, err))
+						return err
 					}
-					slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", query, err))
+					return nil
+				})
+
+				eg2.Go(func() error {
+					var err error
+					dstRes, err = dst.Endpoint.IntegrityCheck(ctx, dstQuery)
+					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							slog.Info(fmt.Sprintf("Destination integrity query canceled %v", query))
+							return nil
+						}
+						slog.Error(fmt.Sprintf("Destination integrity check failed %v: %v", query, err))
+						return err
+					}
+					return nil
+				})
+
+				if err := eg2.Wait(); err != nil {
 					return err
 				}
+
 				matches := srcRes == dstRes
 				if !matches {
 					slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", query, srcRes, dstRes))

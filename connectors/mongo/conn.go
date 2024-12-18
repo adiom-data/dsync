@@ -35,6 +35,8 @@ type ConnectorSettings struct {
 	PingTimeout                time.Duration
 	WriterMaxBatchSize         int   // applies to batch inserts only; 0 means no limit
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	MaxPageSize                int
+	HaltOnIterationError       bool
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -43,16 +45,30 @@ func setDefault[T comparable](field *T, defaultValue T) {
 	}
 }
 
+type bufferData struct {
+	data [][]byte
+	err  error
+}
+
+type buffer struct {
+	ctr     int64
+	ch      <-chan bufferData
+	last    *adiomv1.ListDataResponse
+	cleanup *time.Timer
+	err     error
+}
+
 type conn struct {
 	client *mongo.Client
 
 	settings ConnectorSettings
 
-	nextCursorID atomic.Int64
-	ctx          context.Context
-	cancel       context.CancelFunc
-	buffersMutex sync.RWMutex
-	buffers      map[int64]<-chan [][]byte
+	nextCursorID    atomic.Int64
+	ctx             context.Context
+	cancel          context.CancelFunc
+	buffersMutex    sync.RWMutex
+	buffers         map[int64]buffer
+	cleanupInterval time.Duration
 }
 
 // get all database names except system databases
@@ -328,29 +344,38 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	pageCursor := r.Msg.GetCursor()
 	if pageCursor == nil {
 		cursorID = c.nextCursorID.Add(1)
-		ch := make(chan [][]byte, 10)
+		ch := make(chan bufferData, 10)
 		c.buffersMutex.Lock()
-		c.buffers[cursorID] = ch
+		c.buffers[cursorID] = buffer{
+			ctr:  0,
+			ch:   ch,
+			last: nil,
+			cleanup: time.AfterFunc(c.cleanupInterval, func() {
+				c.buffersMutex.Lock()
+				delete(c.buffers, cursorID)
+				c.buffersMutex.Unlock()
+			}),
+		}
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
-		cursor, err := collection.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		cursor, err := collection.Find(ctx, filter)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
+				slog.Debug("Find Error", "filter", filter)
 				slog.Error(fmt.Sprintf("Failed to find documents: %v", err))
 			}
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-
 		go func(ctx context.Context) {
 			defer cursor.Close(ctx)
 			defer close(ch)
 			var dataBatch [][]byte
 			for cursor.Next(ctx) {
 				dataBatch = append(dataBatch, cursor.Current)
-				if cursor.RemainingBatchLength() == 0 {
+				if cursor.RemainingBatchLength() == 0 || (c.settings.MaxPageSize != 0 && len(dataBatch) == int(c.settings.MaxPageSize)) {
 					select {
-					case ch <- dataBatch:
+					case ch <- bufferData{data: dataBatch}:
 						dataBatch = nil
 					case <-ctx.Done():
 						return
@@ -360,9 +385,12 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			if cursor.Err() != nil {
 				if !errors.Is(cursor.Err(), context.Canceled) {
 					slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
+					if c.settings.HaltOnIterationError {
+						ch <- bufferData{err: cursor.Err()}
+					}
 				}
 			}
-		}(c.ctx) // This context may outlive the current request
+		}(c.ctx)
 	} else {
 		var err error
 		br := bytes.NewReader(r.Msg.GetCursor())
@@ -376,30 +404,51 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		}
 	}
 	c.buffersMutex.RLock()
-	ch, ok := c.buffers[cursorID]
+	buffer, ok := c.buffers[cursorID]
 	c.buffersMutex.RUnlock()
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid cursor"))
 	}
+	buffer.cleanup.Reset(c.cleanupInterval)
+	if buffer.err != nil {
+		return nil, connect.NewError(connect.CodeInternal, buffer.err)
+	}
+	if ctr+1 == buffer.ctr && buffer.last != nil {
+		return connect.NewResponse(buffer.last), nil
+	}
+	if ctr != buffer.ctr { // Reject for old or invalid pages
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no longer available"))
+	}
 
 	for {
 		select {
-		case dataBatch, ok := <-ch:
-			if !ok {
+		case dataBatch, ok := <-buffer.ch:
+			if dataBatch.err != nil {
+				buffer.err = dataBatch.err
 				c.buffersMutex.Lock()
-				delete(c.buffers, cursorID)
+				c.buffers[cursorID] = buffer
 				c.buffersMutex.Unlock()
-
-				return connect.NewResponse(&adiomv1.ListDataResponse{
-					Data: dataBatch,
-				}), nil
+				return nil, connect.NewError(connect.CodeInternal, buffer.err)
 			}
-			nextCursor := binary.AppendVarint(nil, cursorID)
+			var nextCursor []byte
+			if !ok {
+				buffer.last = &adiomv1.ListDataResponse{}
+				return connect.NewResponse(buffer.last), nil
+			}
+			buffer.ctr++
+			nextCursor = binary.AppendVarint(nil, cursorID)
 			nextCursor = binary.AppendVarint(nextCursor, ctr+1)
-			return connect.NewResponse(&adiomv1.ListDataResponse{
-				Data:       dataBatch,
+
+			resp := &adiomv1.ListDataResponse{
+				Data:       dataBatch.data,
 				NextCursor: nextCursor,
-			}), nil
+			}
+			buffer.last = resp
+			buffer.cleanup.Reset(c.cleanupInterval)
+			c.buffersMutex.Lock()
+			c.buffers[cursorID] = buffer
+			c.buffersMutex.Unlock()
+			return connect.NewResponse(resp), nil
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -718,6 +767,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 				}
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
+			batch = nil
 		}
 	}
 	if len(batch) > 0 {
@@ -845,10 +895,11 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &conn{
-		client:   client,
-		settings: settings,
-		ctx:      ctx,
-		cancel:   cancel,
-		buffers:  map[int64]<-chan [][]byte{},
+		client:          client,
+		settings:        settings,
+		ctx:             ctx,
+		cancel:          cancel,
+		buffers:         map[int64]buffer{},
+		cleanupInterval: 5 * time.Minute,
 	}
 }

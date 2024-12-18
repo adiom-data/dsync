@@ -314,7 +314,7 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 // StartReadToChannel implements iface.Connector.
 func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.ConnectorOptions, readPlan iface.ConnectorReadPlan, dataChannelID iface.DataChannelID) error {
 	// We'll do namespace mappings on the read side for now, so ensure we have the mapping ready
-	_, _ = c.parseNamespaceOptionAndUpdateMap(options.Namespace)
+	namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
 
 	c.flowCtx, c.flowCancelFunc = context.WithCancel(c.ctx)
 	c.flowID = flowId
@@ -329,6 +329,11 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	if len(options.Namespace) > 0 {
 		for _, task := range readPlan.Tasks {
 			streamUpdatesNamespacesMap[task.Def.Col] = struct{}{}
+		}
+		if len(streamUpdatesNamespacesMap) == 0 {
+			for _, ns := range namespaces {
+				streamUpdatesNamespacesMap[ns] = struct{}{}
+			}
 		}
 		for k := range streamUpdatesNamespacesMap {
 			streamUpdatesNamespaces = append(streamUpdatesNamespaces, k)
@@ -458,7 +463,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				for task := range taskChannel {
 					sourceNamespace := task.Def.Col
 					destinationNamespace := c.mapNamespace(sourceNamespace)
-					slog.Debug(fmt.Sprintf("Processing task: %v", task))
+					slog.Debug(fmt.Sprintf("Processing task: %v", task), "task", task.Id)
 					var docs int64
 					ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
 					c.progressTracker.TaskStartedProgressUpdate(ns, task.Id)
@@ -480,7 +485,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						}))
 						if err != nil {
 							if !errors.Is(err, context.Canceled) {
-								slog.Error(fmt.Sprintf("Error listing data: %v", err))
+								slog.Error(fmt.Sprintf("Error listing data: %v", err), "task", task.Id)
 							}
 							continue Loop
 						}
@@ -498,7 +503,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 								ResponseType: c.settings.DestinationDataType,
 							}))
 							if err != nil {
-								slog.Error("err trying to transform data")
+								slog.Error("err trying to transform data", "task", task.Id)
 								continue Loop
 							}
 

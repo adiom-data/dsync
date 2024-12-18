@@ -52,13 +52,23 @@ func TestMongoConnectorSuite2(t *testing.T) {
 	col := client.Database("test").Collection("test")
 
 	tSuite := test2.NewConnectorTestSuite("test.test", func() adiomv1connect.ConnectorServiceClient {
-		return test2.ClientFromHandler(NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString}))
+		return test2.ClientFromHandler(NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString, MaxPageSize: 2}))
 	}, func(ctx context.Context) error {
 		if err := col.Database().Drop(ctx); err != nil {
 			return err
 		}
 
 		_, err := col.InsertOne(ctx, bson.D{{"data", "hi"}})
+		if err != nil {
+			return err
+		}
+
+		_, err = col.InsertOne(ctx, bson.D{{"data", "hi2"}})
+		if err != nil {
+			return err
+		}
+
+		_, err = col.InsertOne(ctx, bson.D{{"data", "hi3"}})
 		if err != nil {
 			return err
 		}
@@ -70,7 +80,7 @@ func TestMongoConnectorSuite2(t *testing.T) {
 			return err
 		}
 		return nil
-	})
+	}, 3, 3)
 
 	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
 		mongoID := bson.RawValue{
