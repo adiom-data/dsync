@@ -83,6 +83,16 @@ func TestCosmosConnectorSuite2(t *testing.T) {
 			return err
 		}
 
+		_, err = col.InsertOne(ctx, bson.D{{"data", "hi2"}})
+		if err != nil {
+			return err
+		}
+
+		_, err = col.InsertOne(ctx, bson.D{{"data", "hi3"}})
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}, func(ctx context.Context) error {
 		_, err := col.InsertOne(ctx, bson.D{{"data", "update"}})
@@ -90,7 +100,7 @@ func TestCosmosConnectorSuite2(t *testing.T) {
 			return err
 		}
 		return nil
-	}, 1, 3)
+	}, 3, 3)
 
 	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
 		mongoID := bson.RawValue{

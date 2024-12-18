@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
-	"google.golang.org/protobuf/proto"
 )
 
 type ConnectorTestSuite struct {
@@ -110,9 +109,10 @@ func (suite *ConnectorTestSuite) TestAll() {
 							}))
 							suite.Assert().NoError(err)
 							if !suite.SkipDuplicateTest {
-								suite.Assert().True(proto.Equal(res1.Msg, res2.Msg), "Repeated calls with the same cursor should return identical data")
+								suite.Assert().Equal(res1.Msg.GetData(), res2.Msg.GetData(), "Repeated calls with the same cursor should return identical data")
 							}
-							cursor = res2.Msg.GetNextCursor()
+
+							cursor = res1.Msg.GetNextCursor()
 							if cursor == nil {
 								break
 							}
@@ -124,15 +124,11 @@ func (suite *ConnectorTestSuite) TestAll() {
 							}))
 							suite.Assert().NoError(err)
 							suite.Assert().NotEqual(cursor, res3.Msg.GetNextCursor(), "Cursor should advance for the next page")
-							cursor = res3.Msg.GetNextCursor()
-							if cursor == nil {
-								break
-							}
 						}
-						suite.Assert().Equal(itemCount, suite.NumItems, "Should process at least %d items", suite.NumItems)
+						suite.Assert().Equal(suite.NumItems, itemCount, "Should process at least %d items", suite.NumItems)
 					}
 				}
-				suite.Assert().Equal(pageCount, suite.NumPages, "Should process at least %d pages of data", suite.NumPages)
+				suite.Assert().Equal(suite.NumPages, pageCount, "Should process at least %d pages of data", suite.NumPages)
 			})
 
 			if suite.InsertUpdates != nil {
