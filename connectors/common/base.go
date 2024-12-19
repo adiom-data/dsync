@@ -25,6 +25,7 @@ import (
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cespare/xxhash"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
@@ -76,6 +77,14 @@ type connector struct {
 	progressTracker *ProgressTracker
 
 	namespaceMappings map[string]string
+}
+
+func isRetryable(err error) bool {
+	if connectErr := new(connect.Error); errors.As(err, &connectErr) {
+		code := connectErr.Code()
+		return code == connect.CodeAborted || code == connect.CodeResourceExhausted || code == connect.CodeUnavailable || code == connect.CodeDeadlineExceeded
+	}
+	return false
 }
 
 // GetConnectorStatus implements iface.Connector.
@@ -459,7 +468,6 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		for i := 0; i < c.settings.NumParallelCopiers; i++ {
 			go func() {
 				defer wg.Done()
-			Loop:
 				for task := range taskChannel {
 					sourceNamespace := task.Def.Col
 					destinationNamespace := c.mapNamespace(sourceNamespace)
@@ -468,66 +476,90 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					ns := iface.Namespace{Db: task.Def.Db, Col: task.Def.Col}
 					c.progressTracker.TaskStartedProgressUpdate(ns, task.Id)
 
-					var cursor []byte
-
-					var pCursor []byte
-					if task.Def.Low != nil {
-						pCursor = task.Def.Low.(primitive.Binary).Data
-					}
-					for {
-						res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
-							Partition: &adiomv1.Partition{
-								Namespace: sourceNamespace,
-								Cursor:    pCursor,
-							},
-							Type:   c.settings.SourceDataType,
-							Cursor: cursor,
-						}))
-						if err != nil {
-							if !errors.Is(err, context.Canceled) {
-								slog.Error(fmt.Sprintf("Error listing data: %v", err), "task", task.Id)
-							}
-							continue Loop
+					backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+					err := backoff.Retry(func() error {
+						if docs > 0 {
+							readerProgress.initialSyncDocs.Add(^uint64(docs - 1))
+							c.progressTracker.TaskInProgressUpdate(ns, int64(-docs))
+							docs = 0
 						}
-
-						readerProgress.initialSyncDocs.Add(uint64(len(res.Msg.Data)))
-						c.progressTracker.TaskInProgressUpdate(ns, int64(len(res.Msg.Data)))
-						docs += int64(len(res.Msg.Data))
-
-						data := res.Msg.Data
-						if c.settings.TransformClient != nil {
-							transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
-								Namespace:    sourceNamespace,
-								Data:         data,
-								RequestType:  c.settings.SourceDataType,
-								ResponseType: c.settings.DestinationDataType,
+						var cursor []byte
+						var pCursor []byte
+						if task.Def.Low != nil {
+							pCursor = task.Def.Low.(primitive.Binary).Data
+						}
+						for {
+							res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
+								Partition: &adiomv1.Partition{
+									Namespace: sourceNamespace,
+									Cursor:    pCursor,
+								},
+								Type:   c.settings.SourceDataType,
+								Cursor: cursor,
 							}))
 							if err != nil {
-								slog.Error("err trying to transform data", "task", task.Id)
-								continue Loop
+								if isRetryable(err) {
+									slog.Debug("Retryable error encountered during ListData- retrying", "task", task.Id)
+									return err
+								} else {
+									if !errors.Is(err, context.Canceled) {
+										slog.Error(fmt.Sprintf("Error listing data: %v", err), "task", task.Id)
+									}
+									return backoff.Permanent(err)
+								}
 							}
 
-							data = transformed.Msg.GetData()
-							if transformed.Msg.GetNamespace() != sourceNamespace {
-								destinationNamespace = transformed.Msg.GetNamespace()
-							}
-						}
+							readerProgress.initialSyncDocs.Add(uint64(len(res.Msg.Data)))
+							c.progressTracker.TaskInProgressUpdate(ns, int64(len(res.Msg.Data)))
+							docs += int64(len(res.Msg.Data))
 
-						dataMessage := iface.DataMessage{
-							DataBatch:    data,
-							MutationType: iface.MutationType_InsertBatch,
-							Loc:          destinationNamespace,
+							data := res.Msg.Data
+							if c.settings.TransformClient != nil {
+								transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+									Namespace:    sourceNamespace,
+									Data:         data,
+									RequestType:  c.settings.SourceDataType,
+									ResponseType: c.settings.DestinationDataType,
+								}))
+								if err != nil {
+									if isRetryable(err) {
+										slog.Debug("Retryable error encountered during transform- retrying", "task", task.Id)
+										return err
+									} else {
+										if !errors.Is(err, context.Canceled) {
+											slog.Error("err trying to transform data", "task", task.Id)
+										}
+										return backoff.Permanent(err)
+									}
+								}
+
+								data = transformed.Msg.GetData()
+								if transformed.Msg.GetNamespace() != sourceNamespace {
+									destinationNamespace = transformed.Msg.GetNamespace()
+								}
+							}
+
+							dataMessage := iface.DataMessage{
+								DataBatch:    data,
+								MutationType: iface.MutationType_InsertBatch,
+								Loc:          destinationNamespace,
+							}
+							dataChannel <- dataMessage
+							nextCursor := res.Msg.GetNextCursor()
+							if len(nextCursor) == 0 {
+								break
+							}
+							if bytes.Equal(cursor, nextCursor) {
+								slog.Error("Cursor and next cursor are non empty and the same")
+								return backoff.Permanent(fmt.Errorf("cursor and next cursor are non empty and the same"))
+							}
+							cursor = nextCursor
 						}
-						dataChannel <- dataMessage
-						nextCursor := res.Msg.GetNextCursor()
-						if len(nextCursor) == 0 {
-							break
-						}
-						if bytes.Equal(cursor, nextCursor) {
-							slog.Error("Cursor and next cursor are non empty and the same")
-							continue Loop
-						}
-						cursor = nextCursor
+						return nil
+					}, backoffConfig)
+					if err != nil {
+						slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
+						continue
 					}
 
 					readerProgress.tasksCompleted.Add(1)
