@@ -558,7 +558,9 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						return nil
 					}, backoffConfig)
 					if err != nil {
-						slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
+						if !errors.Is(err, context.Canceled) {
+							slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
+						}
 						continue
 					}
 

@@ -918,7 +918,7 @@
             let numDocsTotal = 0;
             for (const task of nsStatus.Tasks) {
               numDocsTotal += task.EstimatedDocCount;
-              if (task.Status === "Completed") {
+              if (task.Status === 1) {
                 numCompletedDocs += task.EstimatedDocCount;
               }
               if (nsStatus.ActiveTasksList[task.Id]) {
