@@ -42,6 +42,8 @@ type RunnerSyncProgress struct {
 	VerificationResult string // verification result (if running in the verify mode)
 
 	AdditionalStateInfo string // additional state info
+
+	NamespaceVerifyProgresses []iface.FlowIntegrityStatus
 }
 
 // Update the runner progress struct with the latest progress metrics from the flow status
@@ -94,6 +96,15 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 			eventsDiff = 0
 		}
 		r.runnerProgress.Lag = eventsDiff
+	}
+
+	if r.runnerProgress.SyncState == iface.VerifySyncState {
+		statuses, err := r.coord.GetFlowIntegrityStatus(r.activeFlowID)
+		if err != nil {
+			slog.Error("Failed to get flow integrity status", "err", err)
+			return
+		}
+		r.runnerProgress.NamespaceVerifyProgresses = statuses
 	}
 }
 
