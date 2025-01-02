@@ -977,6 +977,9 @@
               n += status.TasksCompleted;
               d += status.TasksTotal;
             }
+            if (d < 1) {
+              d = 1;
+            }
             totalProgress = Math.round(n/d*100);
           }
 

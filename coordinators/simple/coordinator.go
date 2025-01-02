@@ -519,6 +519,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 			}
 		}
 		for _, q := range dedup {
+			statusIdx[q.Namespace] = len(c.integrityStatus)
 			queries = append(queries, q)
 			c.integrityStatus = append(c.integrityStatus, iface.FlowIntegrityStatus{
 				Namespace:  q.Namespace,
