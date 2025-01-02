@@ -160,7 +160,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 
 			table.SetCell(row+1, 0, tview.NewTableCell(status.Namespace).SetAlign(tview.AlignLeft).SetExpansion(1))
 			table.SetCell(row+1, 1, tview.NewTableCell(fmt.Sprintf("%.0f%%", percentComplete)).SetAlign(tview.AlignLeft).SetExpansion(1))
-			table.SetCell(row+1, 2, tview.NewTableCell(fmt.Sprintf("%d", status.TasksCompleted)).SetAlign(tview.AlignLeft).SetExpansion(1))
+			table.SetCell(row+1, 2, tview.NewTableCell(fmt.Sprintf("%d/%d", status.TasksCompleted, status.TasksTotal)).SetAlign(tview.AlignLeft).SetExpansion(1))
 		}
 
 		//set the progress bar
