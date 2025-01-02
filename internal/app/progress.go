@@ -10,8 +10,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html/template"
-	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -149,6 +147,35 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		headerString := fmt.Sprintf("Dsync Progress Report : %v\nTime Elapsed: %02d:%02d:%02d\n%s", runnerProgress.SyncState, hours, minutes, seconds, stateString)
 		header.SetText(headerString)
 
+		table.SetCell(0, 0, tview.NewTableCell("Namespace").SetAlign(tview.AlignLeft).SetExpansion(1))
+		table.SetCell(0, 1, tview.NewTableCell("Percent Complete").SetAlign(tview.AlignLeft).SetExpansion(1))
+		table.SetCell(0, 2, tview.NewTableCell("Tasks Completed").SetAlign(tview.AlignLeft).SetExpansion(1))
+
+		numerator := 0
+		denominator := 0
+		for row, status := range runnerProgress.NamespaceVerifyProgresses {
+			numerator += status.TasksCompleted
+			denominator += status.TasksTotal
+			percentComplete := float64(status.TasksCompleted) / float64(status.TasksTotal) * 100
+
+			table.SetCell(row+1, 0, tview.NewTableCell(status.Namespace).SetAlign(tview.AlignLeft).SetExpansion(1))
+			table.SetCell(row+1, 1, tview.NewTableCell(fmt.Sprintf("%.0f%%", percentComplete)).SetAlign(tview.AlignLeft).SetExpansion(1))
+			table.SetCell(row+1, 2, tview.NewTableCell(fmt.Sprintf("%d", status.TasksCompleted)).SetAlign(tview.AlignLeft).SetExpansion(1))
+		}
+
+		//set the progress bar
+		progressBarWidth := 80
+
+		if denominator < 1 {
+			denominator = 1
+		}
+
+		totalPercentComplete := float64(numerator) / float64(denominator) * 100
+
+		progress := int(math.Floor(totalPercentComplete / 100 * float64(progressBarWidth)))
+		progressBarString := fmt.Sprintf("[%s%s] %.2f%%\n\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete)
+		progressBar.SetText(progressBarString)
+
 	default:
 		headerString := "This connector does not support progress reporting yet\n"
 		header.SetText(headerString)
@@ -223,208 +250,6 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		denominator = float64(numCompletedDocs + numDocsLeft)
 	}
 	return min(100, percentComplete), numerator, denominator
-}
-
-// generate an html page for the progress report
-func generateHTML(progress runnerLocal.RunnerSyncProgress, errorLog *logger.ReverseBuffer, w io.Writer) string {
-	const tmpl = `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Sync Progress</title>
-		<link rel="icon" href="/web_static/favicon.ico" type="image/x-icon">
-		<style>
-			.container {
-				display: flex;
-				align-items: center;
-				width: 100%;
-				margin: 20px 0;
-			}
-			.progress-bar {
-				width: 50%;
-				background-color: #f3f3f3;
-				border-radius: 25px;
-				margin-right: 20px;
-				position: relative;
-			}
-			.progress {
-				height: 20px;
-				background-color: #4caf50;
-				border-radius: 25px;
-			}
-			.indeterminate {
-				position: relative;
-				width: 50%;
-				height: 20px;
-				background-color: #f3f3f3;
-				overflow: hidden;
-				border-radius: 25px;
-			}
-			.indeterminate::before {
-				content: '';
-				position: absolute;
-				top: 0;
-				left: 0;
-				width: 50%;
-				height: 100%;
-				background: linear-gradient(to right, #4caf50, #8bc34a, #4caf50);
-				animation: move 1.5s linear infinite;
-			}
-			@keyframes move {
-				0% { left: -150%; }
-				100% { left: 100%; }
-			}
-			.info {
-				display: flex;
-				flex-direction: column;
-				font-size: 14px;
-			}
-			table {
-				width: auto;
-				border-collapse: collapse;
-				margin: 20px 0;
-				font-size: 14px;
-			}
-			table, th, td {
-				border: 1px solid #ddd;
-			}
-			th, td {
-				padding: 4px 6px;
-				text-align: left;
-			}
-			th {
-				background-color: #f2f2f2;
-			}
-			#logBox {
-				width: 65%;
-				height: 100px;
-				overflow-y: scroll;
-				border: 1px solid #ccc;
-				font-family: monospace;
-				background-color: #f9f9f9;
-				margin-top: 5px;
-				padding: 10px;
-			}
-		</style>
-	</head>
-	<body>
-		<h1>Sync Progress</h1>
-		<p><strong>Source:</strong> {{ .SourceDescription }}</p>
-		<p><strong>Destination:</strong> {{ .DestinationDescription }}</p>
-		<p><strong>State:</strong> {{ .SyncState }}</p>
-		<p><strong>Time Elapsed:</strong> {{ .Elapsed }}</p>
-
-		{{ if ne .SyncState "" }}
-		<p><strong>Namespaces Synced:</strong> {{ .NumNamespacesCompleted }} / {{ .TotalNamespaces }}</p>
-		<p><strong>Documents Synced:</strong> {{ .NumDocsSynced }}</p>
-		{{ end }}
-		<p>{{ .AdditionalStateInfo }}</p>
-
-		{{ if eq .SyncState "InitialSync" }}
-		<div class="container">
-			<div class="progress-bar">
-				<div class="progress" style="width: {{ .TotalProgress }}%"></div>
-			</div>
-			<div class="info">
-				<p><strong>Total % Complete:</strong> {{ .TotalProgress }}%</p>
-				<p><strong>Total Throughput:</strong> {{ round .TotalThroughput }} ops/sec</p>
-			</div>
-		</div>
-		<h2>Per-Namespace Progress</h2>
-		<table>
-			<tr>
-				<th>Namespace</th>
-				<th>% Complete</th>
-				<th>Tasks</th>
-				<th>Active</th>
-				<th>Docs</th>
-				<th>Throughput</th>
-			</tr>
-			{{ range $ns, $status := .NsProgressMap }}
-			{{ $tasksTotalNS := len $status.Tasks }}
-			<tr>
-				<td>{{ $ns }}</td>
-				<td>{{ calcPercentNS $status }}%</td>
-				<td>{{ $status.TasksCompleted }} / {{ $tasksTotalNS }}</td>
-				<td>{{ $status.TasksStarted }}</td>
-				<td>{{ $status.DocsCopied }}</td>
-				<td>{{ round $status.Throughput }}</td>
-			</tr>
-			{{ end }}
-		</table>
-		{{ else if eq .SyncState "ChangeStream" }}
-		<div class="container">
-			<div class="indeterminate"></div>
-			<div class="info">
-				<p><strong>Total Throughput:</strong> {{ round .TotalThroughput }} ops/sec</p>
-			</div>
-		</div>
-		<table>
-			<tr>
-				<th>Change Stream Events</th>
-				<th>Deletes Caught</th>
-				<th>Events To Catch Up</th>
-			</tr>
-			<tr>
-				<td>{{ .ChangeStreamEvents }}</td>
-				<td>{{ .DeletesCaught }}</td>
-				<td>{{ .Lag }}</td>
-			</tr>
-		</table>
-		{{ else if eq .SyncState "Verify" }}
-		<h2>Verification Result</h2>
-		<p><strong>Verification Result:</strong> {{ .VerificationResult }}</p>
-		{{ end }}
-
-		<h2>Errors</h2>
-		<div id="logBox">
-		<pre>{{ .ErrorLogString }}</pre>
-		</div>
-	</body>
-	<script>
-		function autoRefresh() {
-			window.location = window.location.href;
-		}
-		setInterval('autoRefresh()', 3000);
-	</script>
-	</html>`
-
-	funcMap := template.FuncMap{
-		"calcPercentNS": func(ns *iface.NamespaceStatus) int64 {
-			pct, _, _ := percentCompleteNamespace(ns)
-			return int64(pct)
-		},
-		"round": func(f float64) int {
-			return int(math.Round(f))
-		},
-	}
-
-	t := template.Must(template.New("syncProgress").Funcs(funcMap).Parse(tmpl))
-
-	elapsed := time.Since(progress.StartTime).Round(time.Second)
-
-	data := struct {
-		runnerLocal.RunnerSyncProgress
-		Elapsed         string
-		TotalProgress   int64
-		TotalThroughput float64
-		ErrorLogString  string
-	}{
-		RunnerSyncProgress: progress,
-		Elapsed:            elapsed.String(),
-		TotalProgress:      int64(percentCompleteTotal(progress)),
-		TotalThroughput:    progress.Throughput,
-		ErrorLogString:     errorLog.String(),
-	}
-
-	var htmlOutput string
-	err := t.Execute(w, data)
-	if err != nil {
-		fmt.Println("Error executing template:", err)
-		return ""
-	}
-
-	return htmlOutput
 }
 
 // Convert the iface.Namespace key to a string ("db.col") to support JSON marshal

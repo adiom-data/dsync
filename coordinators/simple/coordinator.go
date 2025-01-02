@@ -29,6 +29,9 @@ type Simple struct {
 	flows    map[iface.FlowID]*FlowDetails
 	mu_flows sync.RWMutex // to make the map thread-safe
 
+	integrityStatus      []iface.FlowIntegrityStatus
+	integrityStatusMutex sync.RWMutex
+
 	numParallelIntegrityCheckTasks int
 }
 
@@ -456,6 +459,14 @@ func createNamespaceMap(namespaces []string) map[string]string {
 	return m
 }
 
+func (c *Simple) GetFlowIntegrityStatus(fid iface.FlowID) ([]iface.FlowIntegrityStatus, error) {
+	c.integrityStatusMutex.RLock()
+	defer c.integrityStatusMutex.RUnlock()
+	res := make([]iface.FlowIntegrityStatus, len(c.integrityStatus))
+	copy(res, c.integrityStatus)
+	return res, nil
+}
+
 func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID, options iface.IntegrityCheckOptions) (iface.FlowDataIntegrityCheckResult, error) {
 	slog.Info("Initiating flow integrity check for flow with ID: " + fmt.Sprintf("%v", fid))
 
@@ -488,6 +499,10 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	namespaceMap := createNamespaceMap(flowDet.Options.SrcConnectorOptions.Namespace)
 	var queries []iface.IntegrityCheckQuery
 
+	c.integrityStatusMutex.Lock()
+	c.integrityStatus = []iface.FlowIntegrityStatus{}
+	statusIdx := map[string]int{}
+
 	if options.QuickCount {
 		dedup := map[string]iface.IntegrityCheckQuery{}
 		for _, task := range flowDet.ReadPlan.Tasks {
@@ -496,6 +511,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 				k = task.Def.Db + "." + task.Def.Col
 			}
 			if _, ok := dedup[k]; !ok {
+				statusIdx[k] = len(c.integrityStatus)
 				dedup[k] = iface.IntegrityCheckQuery{
 					Namespace: k,
 					CountOnly: true,
@@ -503,7 +519,12 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 			}
 		}
 		for _, q := range dedup {
+			statusIdx[q.Namespace] = len(c.integrityStatus)
 			queries = append(queries, q)
+			c.integrityStatus = append(c.integrityStatus, iface.FlowIntegrityStatus{
+				Namespace:  q.Namespace,
+				TasksTotal: 1,
+			})
 		}
 	} else {
 		for _, task := range flowDet.ReadPlan.Tasks {
@@ -517,8 +538,18 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 				Low:          task.Def.Low,
 				High:         task.Def.High,
 			})
+			if i, ok := statusIdx[k]; ok {
+				c.integrityStatus[i].TasksTotal += 1
+			} else {
+				statusIdx[k] = len(c.integrityStatus)
+				c.integrityStatus = append(c.integrityStatus, iface.FlowIntegrityStatus{
+					Namespace:  k,
+					TasksTotal: 1,
+				})
+			}
 		}
 	}
+	c.integrityStatusMutex.Unlock()
 
 	numWorkers := c.numParallelIntegrityCheckTasks
 	if numWorkers < 1 {
@@ -588,6 +619,9 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 					return mismatchErr
 				}
 				slog.Info(fmt.Sprintf("Matched %v, res: %v", query, srcRes))
+				c.integrityStatusMutex.Lock()
+				c.integrityStatus[statusIdx[query.Namespace]].TasksCompleted += 1
+				c.integrityStatusMutex.Unlock()
 			}
 			return nil
 		})

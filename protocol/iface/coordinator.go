@@ -27,8 +27,15 @@ type Coordinator interface {
 	WaitForFlowDone(FlowID) error                                                                                   // Wait for the flow to be done
 	PerformFlowIntegrityCheck(context.Context, FlowID, IntegrityCheckOptions) (FlowDataIntegrityCheckResult, error) // Perform an integrity check on the flow (synchronous)
 	GetFlowStatus(FlowID) (FlowStatus, error)                                                                       // Get the status of the flow
+	GetFlowIntegrityStatus(FlowID) ([]FlowIntegrityStatus, error)                                                   // Status for integrity check
 
 	CoordinatorIConnectorSignal
+}
+
+type FlowIntegrityStatus struct {
+	Namespace      string
+	TasksTotal     int
+	TasksCompleted int
 }
 
 type IntegrityCheckOptions struct {

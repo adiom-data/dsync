@@ -672,7 +672,7 @@
               <h3 class="progress-title">Total % Complete:</h3>
               <span class="progress-value progress-percent" id="total-progress">0%</span>
             </div>
-            <div class="row items-center gap-9">
+            <div id="progress-throughput" class="row items-center gap-9">
               <h3 class="progress-title">Total Throughput:</h3>
               <span class="progress-value progress-ops" id="total-throughput">0 ops/sec</span>
             </div>
@@ -724,6 +724,14 @@
           <div class="verification row-column col bg-block" role="table">
             <h2 class="table-title">Verification Result</h2>
             <span id="verification-result" role="row"></span>
+            <div class="per-namespace-progress overflow-auto" role="table">
+              <div class="table-row table-header" role="row">
+                <div class="table-cell" role="columnheader">Namespace</div>
+                <div class="table-cell" role="columnheader">Complete</div>
+                <div class="table-cell" role="columnheader">Tasks</div>
+              </div>
+              <div id="namespace-rows-verify"></div>        
+            </div>
           </div>
         </div>
           
@@ -891,7 +899,10 @@
               break;
             case "Verify":
               verification.style.display = "block";
+              sectionProgress.style = "flex";
+              progressBar.style.display = "block";
               spinner.style.display = "block";
+              document.querySelector("#progress-throughput").style.display = "none";
             case "ReadPlanning" || "Setup":
               spinner.style.display = "block";
               break;
@@ -957,12 +968,27 @@
           const errorString = data.ErrorLogString.replace(/\n/g, '<br>');
           document.getElementById("error-log").innerHTML = errorString;
 
+          var totalProgress = data.TotalProgress
+          if (SyncState == "Verify") {
+            totalProgress = 12;
+            var n = 0;
+            var d = 0;
+            for (const status of data.RunnerSyncProgress.NamespaceVerifyProgresses) {
+              n += status.TasksCompleted;
+              d += status.TasksTotal;
+            }
+            if (d < 1) {
+              d = 1;
+            }
+            totalProgress = Math.round(n/d*100);
+          }
+
           // Update progress bar and throughput
-          document.querySelector(".section-progress").setAttribute("data-progress", data.TotalProgress);
+          document.querySelector(".section-progress").setAttribute("data-progress", totalProgress);
           document.querySelector(".section-progress").setAttribute("data-throughput", Math.round(data.TotalThroughput));
-          document.getElementById("total-progress-percent").textContent = `${data.TotalProgress}%`;
-          document.getElementById("total-progress").textContent = `${data.TotalProgress}%`;
-          document.querySelector('.progress').style.width = `${data.TotalProgress}%`;
+          document.getElementById("total-progress-percent").textContent = `${totalProgress}%`;
+          document.getElementById("total-progress").textContent = `${totalProgress}%`;
+          document.querySelector('.progress').style.width = `${totalProgress}%`;
           document.getElementById("total-throughput").textContent = `${Math.round(data.TotalThroughput)} ops/sec`;
 
           // Render the namespace progress table
@@ -1020,6 +1046,30 @@
           // Render verification result
           if (SyncState === "Verify") {
             document.getElementById("verification-result").textContent = "Data Integrity Check: " + data.RunnerSyncProgress.VerificationResult;
+
+            const namespaceRows = document.getElementById("namespace-rows-verify");
+            namespaceRows.innerHTML = '';
+
+            const chartData = [];
+            const backgroundColors = [];
+            let colorIndex = 0;
+            for (const status of data.RunnerSyncProgress.NamespaceVerifyProgresses) {
+              const tasksTotalNS = status.TasksTotal;
+              const percentComplete = Math.round(status.TasksCompleted / status.TasksTotal * 100);
+              const row = document.createElement("div");
+              const baseColor = colors[colorIndex % colors.length];
+              const colorWithOpacity = hexToRgba(baseColor, percentComplete);
+              row.className = "table-row row-data";
+              row.setAttribute("role", "row");
+              row.setAttribute("data-name", status.Namespace);
+
+              row.innerHTML = `
+                <div class="table-cell name" role="cell">${status.Namespace}</div>
+                <div class="table-cell" role="cell">${percentComplete}%</div>
+                <div class="table-cell" role="cell">${status.TasksCompleted} / ${tasksTotalNS}</div>
+              `;
+              namespaceRows.appendChild(row);
+            }
           }
         }
 
