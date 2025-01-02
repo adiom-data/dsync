@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -187,6 +188,33 @@ func runDsync(c *cli.Context) error {
 	srcDescription := fmt.Sprintf("%s.%s.%s - %s", infoRes.Msg.GetDbType(), infoRes.Msg.GetVersion(), infoRes.Msg.GetSpec(), infoRes.Msg.GetId())
 	dstDescription := fmt.Sprintf("%s.%s.%s - %s", dstInfoRes.Msg.GetDbType(), dstInfoRes.Msg.GetVersion(), dstInfoRes.Msg.GetSpec(), infoRes.Msg.GetId())
 
+	namespaces := o.NamespaceFrom
+	if o.Reverse {
+		seen := map[string]struct{}{}
+		namespaces = nil
+		for _, n := range o.NamespaceFrom {
+			splitted := strings.Split(n, ":")
+			if len(splitted) > 2 {
+				return fmt.Errorf("invalid namespace mapping %v", n)
+			}
+			dstNs := splitted[0]
+			if len(splitted) == 2 {
+				dstNs := splitted[1]
+				namespaces = append(namespaces, dstNs+":"+splitted[0])
+			} else {
+				namespaces = append(namespaces, dstNs)
+			}
+			if _, ok := seen[dstNs]; ok {
+				return fmt.Errorf("cannot reverse duplicated target namespaces %v", splitted[1])
+			}
+			seen[dstNs] = struct{}{}
+		}
+		dstNamespaces, _ := util.NamespaceSplit(namespaces, ":")
+		if err := util.ValidateNamespaces(dstNamespaces, dstInfoRes.Msg.GetCapabilities()); err != nil {
+			return err
+		}
+	}
+
 	r := runner.NewRunnerLocal(runner.RunnerLocalSettings{
 		SrcDescription:                 srcDescription,
 		DstDescription:                 dstDescription,
@@ -196,7 +224,7 @@ func runDsync(c *cli.Context) error {
 		Src:                            src,
 		Dst:                            dst,
 		StateStoreConnString:           o.StateStoreConnString,
-		NsFromString:                   o.NamespaceFrom,
+		NsFromString:                   namespaces,
 		VerifyRequestedFlag:            o.Verify || o.VerifyQuickCount,
 		VerifyQuickCountFlag:           o.VerifyQuickCount,
 		CleanupRequestedFlag:           o.Cleanup,
