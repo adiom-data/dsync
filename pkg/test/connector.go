@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
@@ -87,8 +88,8 @@ func (suite *ConnectorTestSuite) TestAll() {
 			})
 
 			suite.Run("TestListData", func() {
-				var pageCount int
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
+					var pageCount int
 					for _, p := range planRes.Msg.GetPartitions() {
 						var cursor []byte
 						var itemCount int
@@ -99,6 +100,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
+							slog.Error("asdf", "a", len(res1.Msg.Data))
 							pageCount++
 							itemCount += len(res1.Msg.GetData())
 
@@ -127,8 +129,8 @@ func (suite *ConnectorTestSuite) TestAll() {
 						}
 						suite.Assert().Equal(suite.NumItems, itemCount, "Should process at least %d items", suite.NumItems)
 					}
+					suite.Assert().Equal(suite.NumPages, pageCount, "Should process at least %d pages of data", suite.NumPages)
 				}
-				suite.Assert().Equal(suite.NumPages, pageCount, "Should process at least %d pages of data", suite.NumPages)
 			})
 
 			if suite.InsertUpdates != nil {
