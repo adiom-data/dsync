@@ -2,14 +2,18 @@ package dynamodb
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	streamtypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	"go.mongodb.org/mongo-driver/bson"
@@ -89,6 +93,15 @@ func itemFromBson(item []byte) (map[string]types.AttributeValue, error) {
 	return m.Value, nil
 }
 
+func toInterfaceMap(av types.AttributeValue) (map[string]interface{}, error) {
+	var jsonable map[string]interface{}
+	if err := attributevalue.Unmarshal(av, &jsonable); err != nil {
+		return nil, err
+	}
+
+	return jsonable, nil
+}
+
 func toBson(av types.AttributeValue) (interface{}, error) {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
@@ -157,6 +170,32 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unknown attribute %T", av)
 	}
+}
+
+func itemsToJson(items []map[string]types.AttributeValue, keySchema []string) ([][]byte, error) {
+	jsonItems := make([][]byte, 0, len(items))
+	for _, m := range items {
+		_, id, err := dynamoKeyToJsonId(m, keySchema)
+		if err != nil {
+			return nil, err
+		}
+
+		jsonable, err := toInterfaceMap(&types.AttributeValueMemberM{Value: m})
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: We currently clobber any existing id
+		jsonable["id"] = id
+
+		j, err := json.Marshal(jsonable)
+		if err != nil {
+			return nil, err
+		}
+
+		jsonItems = append(jsonItems, j)
+	}
+	return jsonItems, nil
 }
 
 func itemsToBson(items []map[string]types.AttributeValue, keySchema []string) ([][]byte, error) {
@@ -245,6 +284,60 @@ func dynamoWriteKeyValue(w io.Writer, av types.AttributeValue) error {
 	return nil
 }
 
+func dynamoKeyToJsonId(attr map[string]types.AttributeValue, keySchema []string) ([]*adiomv1.BsonValue, string, error) {
+	var res []*adiomv1.BsonValue
+	var sb strings.Builder
+	var id string
+	for i, k := range keySchema {
+		v, ok := attr[k]
+		if !ok {
+			return nil, "", fmt.Errorf("key schema does not match actual keys")
+		}
+		if i > 0 {
+			sb.WriteString("-")
+		}
+		var s string
+		switch tv := v.(type) {
+		case *types.AttributeValueMemberB:
+			s = base64.StdEncoding.EncodeToString(tv.Value)
+		case *types.AttributeValueMemberN:
+			s = tv.Value
+		case *types.AttributeValueMemberS:
+			s = tv.Value
+		default:
+			return nil, "", fmt.Errorf("key schema type unexpected %T", v)
+		}
+		if k == "id" {
+			id = s
+		}
+		sb.WriteString(s)
+		typ, data, err := bson.MarshalValue(s)
+		if err != nil {
+			return nil, "", err
+		}
+		res = append(res, &adiomv1.BsonValue{
+			Data: data,
+			Type: uint32(typ),
+			Name: k,
+		})
+	}
+	if id == "" {
+		id = sb.String()
+	}
+	if len(keySchema) > 1 {
+		typ, data, err := bson.MarshalValue(id)
+		if err != nil {
+			return nil, "", err
+		}
+		res = append(res, &adiomv1.BsonValue{
+			Data: data,
+			Type: uint32(typ),
+			Name: "id",
+		})
+	}
+	return res, id, nil
+}
+
 func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string) (interface{}, error) {
 	v, ok := attr[keySchema[0]]
 	if !ok {
@@ -253,7 +346,7 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 	if len(keySchema) == 1 {
 		return toBson(v)
 	}
-	v2, ok := attr[keySchema[0]]
+	v2, ok := attr[keySchema[1]]
 	if !ok {
 		return nil, fmt.Errorf("key schema does not match actual keys")
 	}
@@ -281,7 +374,7 @@ func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string) (*a
 	}, nil
 }
 
-func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiomv1.Update, error) {
+func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, keySchema []string) (*adiomv1.Update, error) {
 	converted := map[string]types.AttributeValue{}
 	for k, v := range record.Dynamodb.Keys {
 		v2, err := streamTypeToDynamoType(v)
@@ -290,9 +383,24 @@ func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiom
 		}
 		converted[k] = v2
 	}
-	bsonValue, err := dynamoKeyToId(converted, keySchema)
-	if err != nil {
-		return nil, err
+
+	var id []*adiomv1.BsonValue
+	var jId string // used for json id type
+	switch dataType {
+	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+		bsonValue, err := dynamoKeyToId(converted, keySchema)
+		if err != nil {
+			return nil, err
+		}
+		id = []*adiomv1.BsonValue{bsonValue}
+	case adiomv1.DataType_DATA_TYPE_JSON_ID:
+		var err error
+		id, jId, err = dynamoKeyToJsonId(converted, keySchema)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported data type")
 	}
 
 	var typ adiomv1.UpdateType
@@ -305,7 +413,7 @@ func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiom
 	case streamtypes.OperationTypeRemove:
 		typ = adiomv1.UpdateType_UPDATE_TYPE_DELETE
 		return &adiomv1.Update{
-			Id:   []*adiomv1.BsonValue{bsonValue},
+			Id:   id,
 			Type: typ,
 		}, nil
 	default:
@@ -317,17 +425,35 @@ func streamRecordToUpdate(record streamtypes.Record, keySchema []string) (*adiom
 	if err != nil {
 		return nil, err
 	}
-	b, err := toBson(r)
-	if err != nil {
-		return nil, err
-	}
-	marshaled, err := bson.Marshal(b)
-	if err != nil {
-		return nil, err
+
+	var marshaled []byte
+	switch dataType {
+	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+		b, err := toBson(r)
+		if err != nil {
+			return nil, err
+		}
+		b.(bson.M)["_id"] = id
+		marshaled, err = bson.Marshal(b)
+		if err != nil {
+			return nil, err
+		}
+	case adiomv1.DataType_DATA_TYPE_JSON_ID:
+		j, err := toInterfaceMap(r)
+		if err != nil {
+			return nil, err
+		}
+		j["id"] = jId
+		marshaled, err = json.Marshal(j)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported data type")
 	}
 
 	return &adiomv1.Update{
-		Id:   []*adiomv1.BsonValue{bsonValue},
+		Id:   id,
 		Type: typ,
 		Data: marshaled,
 	}, nil

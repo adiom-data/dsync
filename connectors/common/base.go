@@ -677,7 +677,6 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 					mutationType = iface.MutationType_Delete
 				}
-				id := d.GetId()[0].GetData()
 				c.progressTracker.UpdateChangeStreamProgressTracking()
 				readerProgress.changeStreamEvents.Add(1)
 				lsn++
@@ -686,8 +685,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					Data:         &d.Data,
 					MutationType: mutationType,
 					Loc:          destinationNamespace,
-					Id:           &id,
-					IdType:       byte(d.GetId()[0].GetType()),
+					Id:           d.GetId(),
 					SeqNum:       lsn,
 				}
 			}
@@ -916,19 +914,19 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			c.status.WriteLSN = max(c.status.WriteLSN, dataMsg.SeqNum)
 		case iface.MutationType_Insert:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Update:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Delete:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 			})
 		default:
