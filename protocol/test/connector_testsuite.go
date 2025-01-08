@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/stretchr/testify/assert"
@@ -229,12 +230,16 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 			idType, idVal, _ := bson.MarshalValue(id)
 			bsonDataRaw, _ := bson.Marshal(doc)
 			bsonDataRawUpdated, _ := bson.Marshal(updatedDoc)
+			aid := []*adiomv1.BsonValue{{
+				Data: idVal,
+				Type: uint32(idType),
+			}}
 
-			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
+			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, Id: aid, MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
 			lsn++
-			dataChannel <- iface.DataMessage{Data: &bsonDataRawUpdated, MutationType: iface.MutationType_Update, Loc: loc, SeqNum: lsn, Id: &idVal, IdType: byte(idType)}
+			dataChannel <- iface.DataMessage{Data: &bsonDataRawUpdated, MutationType: iface.MutationType_Update, Loc: loc, SeqNum: lsn, Id: aid}
 			lsn++
-			dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Delete, Loc: loc, SeqNum: lsn, Id: &idVal, IdType: byte(idType)}
+			dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Delete, Loc: loc, SeqNum: lsn, Id: aid}
 			lsn++
 		}
 	}()
