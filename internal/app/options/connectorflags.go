@@ -326,7 +326,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						if !ok {
 							return fmt.Errorf("invalid connection string %v", args[0])
 						}
-						options := []connect.ClientOption{connect.WithGRPC()}
+						options := []connect.ClientOption{connect.WithGRPC(), connect.WithSendMaxBytes(100000000), connect.WithReadMaxBytes(100000000)}
 						if c.Bool("gzip") {
 							options = append(options, connect.WithSendGzip())
 						}

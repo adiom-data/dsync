@@ -146,7 +146,7 @@ func runDsync(c *cli.Context) error {
 	if src.Local != nil {
 		infoRes, err = src.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	} else {
-		infoRes, err = src.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+		infoRes, err = src.Remote.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	}
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func runDsync(c *cli.Context) error {
 	if dst.Local != nil {
 		dstInfoRes, err = dst.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	} else {
-		dstInfoRes, err = dst.Local.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
+		dstInfoRes, err = dst.Remote.GetInfo(c.Context, connect.NewRequest(&adiomv1.GetInfoRequest{}))
 	}
 	if err != nil {
 		return err
