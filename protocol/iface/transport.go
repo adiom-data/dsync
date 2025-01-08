@@ -5,6 +5,8 @@
  */
 package iface
 
+import adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+
 type Location struct {
 	Database   string
 	Collection string
@@ -18,11 +20,10 @@ type DataMessage struct {
 	DataBatch [][]byte
 
 	// header for data messages
-	MutationType uint    //required
-	Loc          string  //required
-	Id           *[]byte //required except for batch inserts (for efficiency)
-	IdType       byte    //required when Id is present
-	SeqNum       int64   //optional field to provide a global ordering of messages
+	MutationType uint                 //required
+	Loc          string               //required
+	Id           []*adiomv1.BsonValue //required except for batch inserts (for efficiency)
+	SeqNum       int64                //optional field to provide a global ordering of messages
 
 	// header for barriers (task completion signals)
 	// combining them in a single struct to allow for a single channel for both data and barriers
