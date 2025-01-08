@@ -9,18 +9,24 @@ package testconn
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type conn struct {
@@ -63,7 +69,7 @@ func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]
 		Spec:    "testconn spec",
 		Capabilities: &adiomv1.Capabilities{
 			Source: &adiomv1.Capabilities_Source{
-				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON, adiomv1.DataType_DATA_TYPE_JSON_ID},
 				LsnStream:          false,
 				MultiNamespacePlan: true,
 				DefaultPlan:        true,
@@ -84,6 +90,77 @@ func (c *conn) GetNamespaceMetadata(context.Context, *connect.Request[adiomv1.Ge
 	}), nil
 }
 
+func bsonToJsonable(bs interface{}) (interface{}, error) {
+	switch b := bs.(type) {
+	case bson.A:
+		var arr []interface{}
+		for _, v := range b {
+			vv, err := bsonToJsonable(v)
+			if err != nil {
+				return nil, err
+			}
+			arr = append(arr, vv)
+		}
+		return arr, nil
+	case bson.D:
+		m := map[string]interface{}{}
+		for _, v := range b {
+			vv, err := bsonToJsonable(v.Value)
+			if err != nil {
+				return nil, err
+			}
+			m[v.Key] = vv
+		}
+		return m, nil
+	case bson.M:
+		m := map[string]interface{}{}
+		for k, v := range b {
+			vv, err := bsonToJsonable(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = vv
+		}
+		return m, nil
+	case bool:
+		return b, nil
+	case int32:
+		return b, nil
+	case int64:
+		return b, nil
+	case float64:
+		return b, nil
+	case string:
+		return b, nil
+	case primitive.DateTime:
+		return b.Time().Format(time.RFC3339), nil
+	case primitive.ObjectID:
+		return b.Hex(), nil
+	case primitive.Binary:
+		return base64.StdEncoding.EncodeToString(b.Data), nil
+	case primitive.Decimal128:
+		return b.String(), nil
+	default:
+		return &types.AttributeValueMemberS{Value: "XUnsupportedX"}, nil
+	}
+}
+
+func toBytes(typ adiomv1.DataType, res interface{}) ([]byte, error) {
+	switch typ {
+	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+		return bson.Marshal(res)
+	case adiomv1.DataType_DATA_TYPE_JSON_ID:
+		jsonable, err := bsonToJsonable(res)
+		if err != nil {
+			return nil, err
+		}
+		asMap := jsonable.(map[string]interface{})
+		asMap["id"] = asMap["_id"]
+		return json.Marshal(jsonable)
+	}
+	return nil, fmt.Errorf("unsupported type")
+}
+
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	lines, err := readFile(c.bootstrapPath)
@@ -97,11 +174,11 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-		bsonBytes, err := bson.Marshal(res)
+		byts, err := toBytes(r.Msg.GetType(), res)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-		batch = append(batch, bsonBytes)
+		batch = append(batch, byts)
 	}
 
 	return connect.NewResponse(&adiomv1.ListDataResponse{
@@ -156,7 +233,13 @@ Loop:
 				slog.Error(err.Error())
 				break Loop
 			}
-			idType, idVal, err := bson.MarshalValue(idRes.(bson.D)[0].Value)
+
+			toMarshal := idRes.(bson.D)[0].Value
+			if r.Msg.GetType() == adiomv1.DataType_DATA_TYPE_JSON_ID {
+				toMarshal = toMarshal.(primitive.ObjectID).Hex()
+			}
+
+			idType, idVal, err := bson.MarshalValue(toMarshal)
 
 			if err != nil {
 				slog.Error(err.Error())
@@ -176,7 +259,7 @@ Loop:
 					slog.Error(err.Error())
 					break Loop
 				}
-				doc, err := bson.Marshal(res)
+				doc, err := toBytes(r.Msg.GetType(), res)
 				if err != nil {
 					slog.Error(err.Error())
 					break Loop
@@ -190,7 +273,7 @@ Loop:
 					slog.Error(err.Error())
 					break Loop
 				}
-				doc, err := bson.Marshal(res)
+				doc, err := toBytes(r.Msg.GetType(), res)
 				if err != nil {
 					slog.Error(err.Error())
 					break Loop

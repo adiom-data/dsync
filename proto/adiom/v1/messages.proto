@@ -14,6 +14,7 @@ message BsonValue {
 enum DataType {
     DATA_TYPE_UNKNOWN = 0;
     DATA_TYPE_MONGO_BSON = 1; // BSON that must have an _id field
+    DATA_TYPE_JSON_ID = 2; // JSON that must have an id field
 }
 
 message Partition {
