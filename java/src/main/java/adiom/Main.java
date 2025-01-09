@@ -1,5 +1,6 @@
 package adiom;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,14 +33,29 @@ import adiom.v1.Messages.Capabilities.Sink;
 import io.grpc.Grpc;
 import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
+import io.grpc.ServerCredentials;
 import io.grpc.Status;
+import io.grpc.TlsServerCredentials;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.stub.StreamObserver;
 
 public class Main {
     public static void main(String[] args) {
+        String cert = System.getenv("CERT_FILE");
+        String key = System.getenv("KEY_FILE");
+        ServerCredentials creds = InsecureServerCredentials.create();
+        try {
+            if (cert != null && key != null) {
+                creds = TlsServerCredentials.create(new File(cert), new File(key));
+            } else {
+                System.out.println("env variables CERT_FILE and KEY_FILE not found, using no credentials.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
         System.out.println("starting server on port " + args[0]);
-        Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), InsecureServerCredentials.create())
+        Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), creds)
                 .addService(new MyConn(args[1], args[2]))
                 .addService(ProtoReflectionServiceV1.newInstance())
                 .maxInboundMessageSize(100000000)
