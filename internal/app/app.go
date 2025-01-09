@@ -55,6 +55,7 @@ func NewApp() *cli.App {
 		Action:    runDsync,
 		Commands: []*cli.Command{
 			verifyCommand,
+			serveCommand,
 		},
 	}
 
