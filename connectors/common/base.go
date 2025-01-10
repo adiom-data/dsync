@@ -447,6 +447,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 	}()
 
+	var initialSyncFailed atomic.Bool
+
 	// kick off the initial sync
 	go func() {
 		defer close(initialSyncDone)
@@ -561,6 +563,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						if !errors.Is(err, context.Canceled) {
 							slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
 						}
+						initialSyncFailed.Store(true)
 						continue
 					}
 
@@ -603,8 +606,13 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		c.status.SyncState = iface.ChangeStreamSyncState
 		defer close(changeStreamDone)
+		if initialSyncFailed.Load() {
+			slog.Error("Some initial sync tasks failed. Canceling flow.")
+			c.flowCancelFunc()
+			return
+		}
+		c.status.SyncState = iface.ChangeStreamSyncState
 
 		go func() {
 			ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
