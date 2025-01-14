@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/VictoriaMetrics/metrics"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/util"
@@ -30,6 +31,15 @@ import (
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	metricTask         = metrics.NewHistogram("task")
+	metricWriteData    = metrics.NewHistogram("write_data")
+	metricWriteUpdates = metrics.NewHistogram("write_updates")
+	metricListData     = metrics.NewHistogram("list_data")
+	metricReadItems    = metrics.NewCounter("read_items")
+	metricWrittenItems = metrics.NewCounter("written_items")
 )
 
 const progressReportingIntervalSec = 10
@@ -161,6 +171,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 	}
 	namespace := task.Namespace
 	for {
+		startTime := time.Now()
 		res, err := c.maybeOptimizedImpl.ListData(ctx, connect.NewRequest(&adiomv1.ListDataRequest{
 			Partition: &adiomv1.Partition{
 				Namespace: namespace,
@@ -169,6 +180,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 			Type:   c.settings.SourceDataType,
 			Cursor: cursor,
 		}))
+		metricListData.UpdateDuration(startTime)
 		if err != nil {
 			if !errors.Is(ctx.Err(), context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to fetch documents for integrity check: %v", err))
@@ -471,6 +483,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 			go func() {
 				defer wg.Done()
 				for task := range taskChannel {
+					taskStartTime := time.Now()
 					sourceNamespace := task.Def.Col
 					destinationNamespace := c.mapNamespace(sourceNamespace)
 					slog.Debug(fmt.Sprintf("Processing task: %v", task), "task", task.Id)
@@ -491,6 +504,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							pCursor = task.Def.Low.(primitive.Binary).Data
 						}
 						for {
+							startTime := time.Now()
 							res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{
 								Partition: &adiomv1.Partition{
 									Namespace: sourceNamespace,
@@ -499,6 +513,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 								Type:   c.settings.SourceDataType,
 								Cursor: cursor,
 							}))
+							metricListData.UpdateDuration(startTime)
 							if err != nil {
 								if isRetryable(err) {
 									slog.Debug("Retryable error encountered during ListData- retrying", "task", task.Id)
@@ -514,6 +529,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							readerProgress.initialSyncDocs.Add(uint64(len(res.Msg.Data)))
 							c.progressTracker.TaskInProgressUpdate(ns, int64(len(res.Msg.Data)))
 							docs += int64(len(res.Msg.Data))
+							metricReadItems.Add(len(res.Msg.Data))
 
 							data := res.Msg.Data
 							if c.settings.TransformClient != nil {
@@ -559,6 +575,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						}
 						return nil
 					}, backoffConfig)
+					metricTask.UpdateDuration(taskStartTime)
 					if err != nil {
 						if !errors.Is(err, context.Canceled) {
 							slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
@@ -911,11 +928,14 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				c.status.WriteLSN = max(c.status.WriteLSN, dataMsgs[i-1].SeqNum)
 				msgs = nil
 			}
+			startTime := time.Now()
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
 				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
 				Type:      c.settings.DestinationDataType,
 			}))
+			metricWriteData.UpdateDuration(startTime)
+			metricWrittenItems.Add(len(dataMsg.DataBatch))
 			if err != nil {
 				return err
 			}
@@ -943,14 +963,17 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 	}
 	if len(msgs) > 0 {
 		ns := dataMsgs[0].Loc
+		startTime := time.Now()
 		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 			Namespace: ns,
 			Updates:   msgs,
 			Type:      c.settings.DestinationDataType,
 		}))
+		metricWriteUpdates.UpdateDuration(startTime)
 		if err != nil {
 			return err
 		}
+		metricWrittenItems.Add(len(msgs))
 		c.status.WriteLSN = max(c.status.WriteLSN, dataMsgs[len(dataMsgs)-1].SeqNum)
 	}
 	return nil

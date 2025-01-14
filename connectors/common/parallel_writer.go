@@ -59,6 +59,7 @@ type ParallelWriter struct {
 
 // NewParallelWriter creates a new ParallelWriter
 func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int) *ParallelWriter {
+	slog.Debug("Parallel Writer", "workers", numWorkers, "maxBatch", maxBatchSize)
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,
