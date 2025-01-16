@@ -6,4 +6,4 @@ For collections with a lot of documents (e.g. 50 mil+), it's best to split the t
 
 Unfortunately, Cosmos DB with MongoDB API doesn't properly support $sample in the aggregation framework or any other methods for statistical splitting that doesn't require scanning the whole collection. For Cosmos DB sources, we implemented a partitioning strategy based on the actual _id values, taking advantage of the Law Of Big Numbers. When _id is of ObjectId type which is a timestamp-based format, and the number of documents is in 10's of millions or more, we create partitions by splitting the time range in the collection into equal parts. This works well for large collections with relatively consistent workloads.
 
-The target partition size is set to 512,000 documents and is subject to change in future versions. This specific value was chosen to provide a meaningful number of partitions without creating much unnecessary overhead.
+The target partition size is set to 50,000 documents and is subject to change in future versions. This specific value was chosen to provide a meaningful number of partitions without creating much unnecessary overhead.

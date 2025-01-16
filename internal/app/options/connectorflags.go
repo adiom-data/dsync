@@ -409,7 +409,7 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Name:        "doc-partition",
 			Required:    false,
 			Destination: &settings.TargetDocCountPerPartition,
-			Value:       512 * 1000,
+			Value:       50 * 1000,
 		}),
 	}
 }
