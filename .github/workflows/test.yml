@@ -23,3 +23,6 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+
+    - name: Mongo
+      run: MONGO_TEST=mongodb://34.133.93.148:27027 go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo

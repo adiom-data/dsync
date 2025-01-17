@@ -76,7 +76,7 @@ func (suite *ConnectorTestSuite) TestConnectorCDCOnly() {
 	dataChannelID2 := iface.DataChannelID("43210")
 	dataChannel := make(chan iface.DataMessage)
 	dataChannel2 := make(chan iface.DataMessage)
-	options := iface.ConnectorOptions{Mode: iface.SyncModeCDC} //CDC-only mode
+	options := iface.ConnectorOptions{Mode: iface.SyncModeCDC, Namespace: []string{NamespaceString()}} //CDC-only mode
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	t.On("GetDataChannelEndpoint", dataChannelID2).Return(dataChannel2, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {

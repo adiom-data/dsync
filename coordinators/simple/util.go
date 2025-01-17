@@ -43,6 +43,7 @@ type FlowDetails struct {
 
 	ReadPlan         iface.ConnectorReadPlan //read plan for the flow
 	readPlanningDone chan struct{}           //for source connector to let us know they're done with read planning
+	readPlanErr      error
 
 	Resumable bool
 }
