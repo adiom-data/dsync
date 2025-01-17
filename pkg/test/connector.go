@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
@@ -100,7 +99,6 @@ func (suite *ConnectorTestSuite) TestAll() {
 								Cursor:    cursor,
 							}))
 							suite.Assert().NoError(err)
-							slog.Error("asdf", "a", len(res1.Msg.Data))
 							pageCount++
 							itemCount += len(res1.Msg.GetData())
 

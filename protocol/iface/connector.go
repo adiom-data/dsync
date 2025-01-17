@@ -44,6 +44,7 @@ type ConnectorReadPlanResult struct {
 	ReadPlan ConnectorReadPlan
 
 	Success bool
+	Error   error
 }
 
 type ConnectorStatus struct {

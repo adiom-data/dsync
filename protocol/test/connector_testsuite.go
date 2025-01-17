@@ -88,7 +88,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	flowID := iface.FlowID("1234")
 	dataChannelID := iface.DataChannelID("4321")
 	dataChannel := make(chan iface.DataMessage)
-	options := iface.ConnectorOptions{}
+	options := iface.ConnectorOptions{
+		Namespace: []string{NamespaceString()},
+	}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
@@ -206,8 +208,8 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageIterCount := 100
 
-	dbName := "test"
-	colName := "test_tcw"
+	dbName := DBString()
+	colName := ColString()
 	// Connect the test data store
 	if suite.datastoreFactoryFunc != nil {
 		dataStore := suite.datastoreFactoryFunc()

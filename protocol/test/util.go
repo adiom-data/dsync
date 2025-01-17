@@ -6,6 +6,8 @@
 package test
 
 import (
+	"fmt"
+	"os"
 	"testing"
 	"time"
 )
@@ -47,4 +49,22 @@ func RunWithTimeout(t *testing.T, receiver interface{}, method GenericMethod, ti
 	}
 
 	return err
+}
+
+func NamespaceString() string {
+	return fmt.Sprintf("%s.%s", DBString(), ColString())
+}
+
+func DBString() string {
+	if r := os.Getenv("TEST_DB"); r != "" {
+		return r
+	}
+	return "testdb"
+}
+
+func ColString() string {
+	if r := os.Getenv("TEST_COL"); r != "" {
+		return r
+	}
+	return "testcol"
 }

@@ -12,6 +12,7 @@ import (
 
 // Tracks progress of the tasks
 type ProgressTracker struct {
+	writeLSNMutex     sync.Mutex
 	muProgressMetrics sync.Mutex
 	Status            *iface.ConnectorStatus
 	Ctx               context.Context
@@ -155,4 +156,10 @@ func (pt *ProgressTracker) UpdateChangeStreamProgressTracking() {
 	pt.muProgressMetrics.Lock()
 	defer pt.muProgressMetrics.Unlock()
 	pt.Status.ProgressMetrics.ChangeStreamEvents++
+}
+
+func (pt *ProgressTracker) UpdateWriteLSN(lsn int64) {
+	pt.writeLSNMutex.Lock()
+	defer pt.writeLSNMutex.Unlock()
+	pt.Status.WriteLSN = max(pt.Status.WriteLSN, lsn)
 }

@@ -85,7 +85,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeInitialCopy() {
 	dataChannelID2 := iface.DataChannelID("43210")
 	dataChannel := make(chan iface.DataMessage)
 	dataChannel2 := make(chan iface.DataMessage)
-	options := iface.ConnectorOptions{}
+	// This is set at the DB level so that it will get multiple messages from each collection
+	// which is used for determining when it interrupts
+	options := iface.ConnectorOptions{Namespace: []string{DBString()}}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	t.On("GetDataChannelEndpoint", dataChannelID2).Return(dataChannel2, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
@@ -295,7 +297,7 @@ func (suite *ConnectorTestSuite) TestConnectorReadResumeCDC() {
 	dataChannelID2 := iface.DataChannelID("43210")
 	dataChannel := make(chan iface.DataMessage)
 	dataChannel2 := make(chan iface.DataMessage)
-	options := iface.ConnectorOptions{}
+	options := iface.ConnectorOptions{Namespace: []string{NamespaceString()}}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	t.On("GetDataChannelEndpoint", dataChannelID2).Return(dataChannel2, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil).Run(func(args mock.Arguments) {
