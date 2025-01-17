@@ -10,6 +10,7 @@ package cosmos
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -37,6 +38,20 @@ const (
 )
 
 var TestCosmosConnectionString = os.Getenv(CosmosEnvironmentVariable)
+
+func DBString() string {
+	if r := os.Getenv("COSMOS_TEST_DB"); r != "" {
+		return r
+	}
+	return "test"
+}
+
+func ColString() string {
+	if r := os.Getenv("COSMOS_TEST_COL"); r != "" {
+		return r
+	}
+	return "test"
+}
 
 type LocalConnector interface {
 	Impl() adiomv1connect.ConnectorServiceHandler
@@ -66,12 +81,13 @@ func TestCosmosConnectorSuite(t *testing.T) {
 }
 
 func TestCosmosConnectorSuite2(t *testing.T) {
-	settings := ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString}, MaxNumNamespaces: 10}
+	settings := ConnectorSettings{ConnectorSettings: mongoconn.ConnectorSettings{ConnectionString: TestCosmosConnectionString, MaxPageSize: 2}, MaxNumNamespaces: 10}
 	client, err := mongoconn.MongoClient(context.Background(), settings.ConnectorSettings)
 	assert.NoError(t, err)
-	col := client.Database("test").Collection("test")
+	col := client.Database(DBString()).Collection(ColString())
+	ns := fmt.Sprintf("%s.%s", DBString(), ColString())
 
-	tSuite := test2.NewConnectorTestSuite("test.test", func() adiomv1connect.ConnectorServiceClient {
+	tSuite := test2.NewConnectorTestSuite(ns, func() adiomv1connect.ConnectorServiceClient {
 		return test2.ClientFromHandler(NewConn(settings))
 	}, func(ctx context.Context) error {
 		if err := col.Database().Drop(ctx); err != nil {
@@ -164,8 +180,8 @@ func TestConnectorDeletesNotEmitted(testState *testing.T) {
 	// Preset the variables
 	var readPlan iface.ConnectorReadPlan
 	flowComplete := make(chan struct{})
-	dummyTestDBName := "db1"
-	dummyTestColName := "col1"
+	dummyTestDBName := test.DBString()
+	dummyTestColName := test.ColString()
 	dataStore.InsertDummy(dummyTestDBName, dummyTestColName, bson.M{"_id": -1})
 
 	// Do some prep
@@ -325,8 +341,8 @@ func TestConnectorDeletesEmitted(testState *testing.T) {
 	// Preset the variables
 	var readPlan iface.ConnectorReadPlan
 	flowComplete := make(chan struct{})
-	dummyTestDBName := "db1"
-	dummyTestColName := "col1"
+	dummyTestDBName := test.DBString()
+	dummyTestColName := test.ColString()
 	dataStore.InsertDummy(dummyTestDBName, dummyTestColName, bson.M{"_id": -1})
 
 	// Do some prep

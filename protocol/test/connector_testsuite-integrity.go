@@ -46,10 +46,10 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	t.AssertExpectations(suite.T())
 	c.AssertExpectations(suite.T())
 
-	qdb := "db"
-	qcol := "col"
+	qdb := DBString()
+	qcol := ColString()
 	q := iface.IntegrityCheckQuery{
-		Namespace: "db.col",
+		Namespace: NamespaceString(),
 	}
 
 	// Check if the connector supports integrity check capabilities
