@@ -28,4 +28,4 @@ jobs:
       run: COSMOS_TEST_DB=testci COSMOS_TEST_COL=testcicol COSMOS_TEST="${{ secrets.COSMOS_TEST }}" go test -run TestCosmosConnectorSuite -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/cosmos
 
     - name: Mongo
-      run: MONGO_TEST=mongodb://34.133.93.148:27027 go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo
+      run: MONGO_TEST=mongodb://34.58.170.143:27027 go test -count=1 -v --tags=external github.com/adiom-data/dsync/connectors/mongo
