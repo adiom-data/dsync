@@ -957,6 +957,996 @@ public final class Messages {
 
   }
 
+  public interface UpdatesPartitionOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.UpdatesPartition)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @return A list containing the namespaces.
+     */
+    java.util.List<java.lang.String>
+        getNamespacesList();
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @return The count of namespaces.
+     */
+    int getNamespacesCount();
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @param index The index of the element to return.
+     * @return The namespaces at the given index.
+     */
+    java.lang.String getNamespaces(int index);
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the namespaces at the given index.
+     */
+    com.google.protobuf.ByteString
+        getNamespacesBytes(int index);
+
+    /**
+     * <pre>
+     * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+     * This can be utilized so that a load balancer can perform routing based on the header
+     * </pre>
+     *
+     * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+     * @return The partitionHeader.
+     */
+    java.lang.String getPartitionHeader();
+    /**
+     * <pre>
+     * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+     * This can be utilized so that a load balancer can perform routing based on the header
+     * </pre>
+     *
+     * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+     * @return The bytes for partitionHeader.
+     */
+    com.google.protobuf.ByteString
+        getPartitionHeaderBytes();
+
+    /**
+     * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+     * @return The partitionValue.
+     */
+    java.lang.String getPartitionValue();
+    /**
+     * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+     * @return The bytes for partitionValue.
+     */
+    com.google.protobuf.ByteString
+        getPartitionValueBytes();
+
+    /**
+     * <code>bytes cursor = 4 [json_name = "cursor"];</code>
+     * @return The cursor.
+     */
+    com.google.protobuf.ByteString getCursor();
+  }
+  /**
+   * Protobuf type {@code adiom.v1.UpdatesPartition}
+   */
+  public static final class UpdatesPartition extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.UpdatesPartition)
+      UpdatesPartitionOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        UpdatesPartition.class.getName());
+    }
+    // Use UpdatesPartition.newBuilder() to construct.
+    private UpdatesPartition(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private UpdatesPartition() {
+      namespaces_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
+      partitionHeader_ = "";
+      partitionValue_ = "";
+      cursor_ = com.google.protobuf.ByteString.EMPTY;
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_UpdatesPartition_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_UpdatesPartition_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.UpdatesPartition.class, adiom.v1.Messages.UpdatesPartition.Builder.class);
+    }
+
+    public static final int NAMESPACES_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private com.google.protobuf.LazyStringArrayList namespaces_ =
+        com.google.protobuf.LazyStringArrayList.emptyList();
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @return A list containing the namespaces.
+     */
+    public com.google.protobuf.ProtocolStringList
+        getNamespacesList() {
+      return namespaces_;
+    }
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @return The count of namespaces.
+     */
+    public int getNamespacesCount() {
+      return namespaces_.size();
+    }
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @param index The index of the element to return.
+     * @return The namespaces at the given index.
+     */
+    public java.lang.String getNamespaces(int index) {
+      return namespaces_.get(index);
+    }
+    /**
+     * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the namespaces at the given index.
+     */
+    public com.google.protobuf.ByteString
+        getNamespacesBytes(int index) {
+      return namespaces_.getByteString(index);
+    }
+
+    public static final int PARTITION_HEADER_FIELD_NUMBER = 2;
+    @SuppressWarnings("serial")
+    private volatile java.lang.Object partitionHeader_ = "";
+    /**
+     * <pre>
+     * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+     * This can be utilized so that a load balancer can perform routing based on the header
+     * </pre>
+     *
+     * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+     * @return The partitionHeader.
+     */
+    @java.lang.Override
+    public java.lang.String getPartitionHeader() {
+      java.lang.Object ref = partitionHeader_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        partitionHeader_ = s;
+        return s;
+      }
+    }
+    /**
+     * <pre>
+     * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+     * This can be utilized so that a load balancer can perform routing based on the header
+     * </pre>
+     *
+     * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+     * @return The bytes for partitionHeader.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getPartitionHeaderBytes() {
+      java.lang.Object ref = partitionHeader_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        partitionHeader_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    public static final int PARTITION_VALUE_FIELD_NUMBER = 3;
+    @SuppressWarnings("serial")
+    private volatile java.lang.Object partitionValue_ = "";
+    /**
+     * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+     * @return The partitionValue.
+     */
+    @java.lang.Override
+    public java.lang.String getPartitionValue() {
+      java.lang.Object ref = partitionValue_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        partitionValue_ = s;
+        return s;
+      }
+    }
+    /**
+     * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+     * @return The bytes for partitionValue.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getPartitionValueBytes() {
+      java.lang.Object ref = partitionValue_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        partitionValue_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    public static final int CURSOR_FIELD_NUMBER = 4;
+    private com.google.protobuf.ByteString cursor_ = com.google.protobuf.ByteString.EMPTY;
+    /**
+     * <code>bytes cursor = 4 [json_name = "cursor"];</code>
+     * @return The cursor.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getCursor() {
+      return cursor_;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < namespaces_.size(); i++) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 1, namespaces_.getRaw(i));
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(partitionHeader_)) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 2, partitionHeader_);
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(partitionValue_)) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 3, partitionValue_);
+      }
+      if (!cursor_.isEmpty()) {
+        output.writeBytes(4, cursor_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      {
+        int dataSize = 0;
+        for (int i = 0; i < namespaces_.size(); i++) {
+          dataSize += computeStringSizeNoTag(namespaces_.getRaw(i));
+        }
+        size += dataSize;
+        size += 1 * getNamespacesList().size();
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(partitionHeader_)) {
+        size += com.google.protobuf.GeneratedMessage.computeStringSize(2, partitionHeader_);
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(partitionValue_)) {
+        size += com.google.protobuf.GeneratedMessage.computeStringSize(3, partitionValue_);
+      }
+      if (!cursor_.isEmpty()) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(4, cursor_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.UpdatesPartition)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.UpdatesPartition other = (adiom.v1.Messages.UpdatesPartition) obj;
+
+      if (!getNamespacesList()
+          .equals(other.getNamespacesList())) return false;
+      if (!getPartitionHeader()
+          .equals(other.getPartitionHeader())) return false;
+      if (!getPartitionValue()
+          .equals(other.getPartitionValue())) return false;
+      if (!getCursor()
+          .equals(other.getCursor())) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getNamespacesCount() > 0) {
+        hash = (37 * hash) + NAMESPACES_FIELD_NUMBER;
+        hash = (53 * hash) + getNamespacesList().hashCode();
+      }
+      hash = (37 * hash) + PARTITION_HEADER_FIELD_NUMBER;
+      hash = (53 * hash) + getPartitionHeader().hashCode();
+      hash = (37 * hash) + PARTITION_VALUE_FIELD_NUMBER;
+      hash = (53 * hash) + getPartitionValue().hashCode();
+      hash = (37 * hash) + CURSOR_FIELD_NUMBER;
+      hash = (53 * hash) + getCursor().hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.UpdatesPartition parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.UpdatesPartition parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.UpdatesPartition parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.UpdatesPartition prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.UpdatesPartition}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.UpdatesPartition)
+        adiom.v1.Messages.UpdatesPartitionOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_UpdatesPartition_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_UpdatesPartition_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.UpdatesPartition.class, adiom.v1.Messages.UpdatesPartition.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.UpdatesPartition.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        namespaces_ =
+            com.google.protobuf.LazyStringArrayList.emptyList();
+        partitionHeader_ = "";
+        partitionValue_ = "";
+        cursor_ = com.google.protobuf.ByteString.EMPTY;
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_UpdatesPartition_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.UpdatesPartition getDefaultInstanceForType() {
+        return adiom.v1.Messages.UpdatesPartition.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.UpdatesPartition build() {
+        adiom.v1.Messages.UpdatesPartition result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.UpdatesPartition buildPartial() {
+        adiom.v1.Messages.UpdatesPartition result = new adiom.v1.Messages.UpdatesPartition(this);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartial0(adiom.v1.Messages.UpdatesPartition result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          namespaces_.makeImmutable();
+          result.namespaces_ = namespaces_;
+        }
+        if (((from_bitField0_ & 0x00000002) != 0)) {
+          result.partitionHeader_ = partitionHeader_;
+        }
+        if (((from_bitField0_ & 0x00000004) != 0)) {
+          result.partitionValue_ = partitionValue_;
+        }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          result.cursor_ = cursor_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.UpdatesPartition) {
+          return mergeFrom((adiom.v1.Messages.UpdatesPartition)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.UpdatesPartition other) {
+        if (other == adiom.v1.Messages.UpdatesPartition.getDefaultInstance()) return this;
+        if (!other.namespaces_.isEmpty()) {
+          if (namespaces_.isEmpty()) {
+            namespaces_ = other.namespaces_;
+            bitField0_ |= 0x00000001;
+          } else {
+            ensureNamespacesIsMutable();
+            namespaces_.addAll(other.namespaces_);
+          }
+          onChanged();
+        }
+        if (!other.getPartitionHeader().isEmpty()) {
+          partitionHeader_ = other.partitionHeader_;
+          bitField0_ |= 0x00000002;
+          onChanged();
+        }
+        if (!other.getPartitionValue().isEmpty()) {
+          partitionValue_ = other.partitionValue_;
+          bitField0_ |= 0x00000004;
+          onChanged();
+        }
+        if (other.getCursor() != com.google.protobuf.ByteString.EMPTY) {
+          setCursor(other.getCursor());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureNamespacesIsMutable();
+                namespaces_.add(s);
+                break;
+              } // case 10
+              case 18: {
+                partitionHeader_ = input.readStringRequireUtf8();
+                bitField0_ |= 0x00000002;
+                break;
+              } // case 18
+              case 26: {
+                partitionValue_ = input.readStringRequireUtf8();
+                bitField0_ |= 0x00000004;
+                break;
+              } // case 26
+              case 34: {
+                cursor_ = input.readBytes();
+                bitField0_ |= 0x00000008;
+                break;
+              } // case 34
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private com.google.protobuf.LazyStringArrayList namespaces_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
+      private void ensureNamespacesIsMutable() {
+        if (!namespaces_.isModifiable()) {
+          namespaces_ = new com.google.protobuf.LazyStringArrayList(namespaces_);
+        }
+        bitField0_ |= 0x00000001;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @return A list containing the namespaces.
+       */
+      public com.google.protobuf.ProtocolStringList
+          getNamespacesList() {
+        namespaces_.makeImmutable();
+        return namespaces_;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @return The count of namespaces.
+       */
+      public int getNamespacesCount() {
+        return namespaces_.size();
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param index The index of the element to return.
+       * @return The namespaces at the given index.
+       */
+      public java.lang.String getNamespaces(int index) {
+        return namespaces_.get(index);
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the namespaces at the given index.
+       */
+      public com.google.protobuf.ByteString
+          getNamespacesBytes(int index) {
+        return namespaces_.getByteString(index);
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param index The index to set the value at.
+       * @param value The namespaces to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNamespaces(
+          int index, java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureNamespacesIsMutable();
+        namespaces_.set(index, value);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param value The namespaces to add.
+       * @return This builder for chaining.
+       */
+      public Builder addNamespaces(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureNamespacesIsMutable();
+        namespaces_.add(value);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param values The namespaces to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllNamespaces(
+          java.lang.Iterable<java.lang.String> values) {
+        ensureNamespacesIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, namespaces_);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNamespaces() {
+        namespaces_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
+        bitField0_ = (bitField0_ & ~0x00000001);;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string namespaces = 1 [json_name = "namespaces"];</code>
+       * @param value The bytes of the namespaces to add.
+       * @return This builder for chaining.
+       */
+      public Builder addNamespacesBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        ensureNamespacesIsMutable();
+        namespaces_.add(value);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object partitionHeader_ = "";
+      /**
+       * <pre>
+       * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+       * This can be utilized so that a load balancer can perform routing based on the header
+       * </pre>
+       *
+       * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+       * @return The partitionHeader.
+       */
+      public java.lang.String getPartitionHeader() {
+        java.lang.Object ref = partitionHeader_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          partitionHeader_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <pre>
+       * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+       * This can be utilized so that a load balancer can perform routing based on the header
+       * </pre>
+       *
+       * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+       * @return The bytes for partitionHeader.
+       */
+      public com.google.protobuf.ByteString
+          getPartitionHeaderBytes() {
+        java.lang.Object ref = partitionHeader_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          partitionHeader_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <pre>
+       * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+       * This can be utilized so that a load balancer can perform routing based on the header
+       * </pre>
+       *
+       * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+       * @param value The partitionHeader to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartitionHeader(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        partitionHeader_ = value;
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+       * This can be utilized so that a load balancer can perform routing based on the header
+       * </pre>
+       *
+       * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPartitionHeader() {
+        partitionHeader_ = getDefaultInstance().getPartitionHeader();
+        bitField0_ = (bitField0_ & ~0x00000002);
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+       * This can be utilized so that a load balancer can perform routing based on the header
+       * </pre>
+       *
+       * <code>string partition_header = 2 [json_name = "partitionHeader"];</code>
+       * @param value The bytes for partitionHeader to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartitionHeaderBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        partitionHeader_ = value;
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object partitionValue_ = "";
+      /**
+       * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+       * @return The partitionValue.
+       */
+      public java.lang.String getPartitionValue() {
+        java.lang.Object ref = partitionValue_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          partitionValue_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+       * @return The bytes for partitionValue.
+       */
+      public com.google.protobuf.ByteString
+          getPartitionValueBytes() {
+        java.lang.Object ref = partitionValue_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          partitionValue_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+       * @param value The partitionValue to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartitionValue(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        partitionValue_ = value;
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPartitionValue() {
+        partitionValue_ = getDefaultInstance().getPartitionValue();
+        bitField0_ = (bitField0_ & ~0x00000004);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string partition_value = 3 [json_name = "partitionValue"];</code>
+       * @param value The bytes for partitionValue to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartitionValueBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        partitionValue_ = value;
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+
+      private com.google.protobuf.ByteString cursor_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>bytes cursor = 4 [json_name = "cursor"];</code>
+       * @return The cursor.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getCursor() {
+        return cursor_;
+      }
+      /**
+       * <code>bytes cursor = 4 [json_name = "cursor"];</code>
+       * @param value The cursor to set.
+       * @return This builder for chaining.
+       */
+      public Builder setCursor(com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        cursor_ = value;
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>bytes cursor = 4 [json_name = "cursor"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearCursor() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        cursor_ = getDefaultInstance().getCursor();
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.UpdatesPartition)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.UpdatesPartition)
+    private static final adiom.v1.Messages.UpdatesPartition DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.UpdatesPartition();
+    }
+
+    public static adiom.v1.Messages.UpdatesPartition getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<UpdatesPartition>
+        PARSER = new com.google.protobuf.AbstractParser<UpdatesPartition>() {
+      @java.lang.Override
+      public UpdatesPartition parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<UpdatesPartition> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<UpdatesPartition> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.UpdatesPartition getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   public interface PartitionOrBuilder extends
       // @@protoc_insertion_point(interface_extends:adiom.v1.Partition)
       com.google.protobuf.MessageOrBuilder {
@@ -7625,27 +8615,27 @@ public final class Messages {
         int index);
 
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
-    java.util.List<adiom.v1.Messages.Partition> 
+    java.util.List<adiom.v1.Messages.UpdatesPartition> 
         getUpdatesPartitionsList();
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
-    adiom.v1.Messages.Partition getUpdatesPartitions(int index);
+    adiom.v1.Messages.UpdatesPartition getUpdatesPartitions(int index);
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     int getUpdatesPartitionsCount();
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
-    java.util.List<? extends adiom.v1.Messages.PartitionOrBuilder> 
+    java.util.List<? extends adiom.v1.Messages.UpdatesPartitionOrBuilder> 
         getUpdatesPartitionsOrBuilderList();
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
-    adiom.v1.Messages.PartitionOrBuilder getUpdatesPartitionsOrBuilder(
+    adiom.v1.Messages.UpdatesPartitionOrBuilder getUpdatesPartitionsOrBuilder(
         int index);
   }
   /**
@@ -7730,41 +8720,41 @@ public final class Messages {
 
     public static final int UPDATES_PARTITIONS_FIELD_NUMBER = 2;
     @SuppressWarnings("serial")
-    private java.util.List<adiom.v1.Messages.Partition> updatesPartitions_;
+    private java.util.List<adiom.v1.Messages.UpdatesPartition> updatesPartitions_;
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     @java.lang.Override
-    public java.util.List<adiom.v1.Messages.Partition> getUpdatesPartitionsList() {
+    public java.util.List<adiom.v1.Messages.UpdatesPartition> getUpdatesPartitionsList() {
       return updatesPartitions_;
     }
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     @java.lang.Override
-    public java.util.List<? extends adiom.v1.Messages.PartitionOrBuilder> 
+    public java.util.List<? extends adiom.v1.Messages.UpdatesPartitionOrBuilder> 
         getUpdatesPartitionsOrBuilderList() {
       return updatesPartitions_;
     }
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     @java.lang.Override
     public int getUpdatesPartitionsCount() {
       return updatesPartitions_.size();
     }
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     @java.lang.Override
-    public adiom.v1.Messages.Partition getUpdatesPartitions(int index) {
+    public adiom.v1.Messages.UpdatesPartition getUpdatesPartitions(int index) {
       return updatesPartitions_.get(index);
     }
     /**
-     * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+     * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
      */
     @java.lang.Override
-    public adiom.v1.Messages.PartitionOrBuilder getUpdatesPartitionsOrBuilder(
+    public adiom.v1.Messages.UpdatesPartitionOrBuilder getUpdatesPartitionsOrBuilder(
         int index) {
       return updatesPartitions_.get(index);
     }
@@ -8150,9 +9140,9 @@ public final class Messages {
                 break;
               } // case 10
               case 18: {
-                adiom.v1.Messages.Partition m =
+                adiom.v1.Messages.UpdatesPartition m =
                     input.readMessage(
-                        adiom.v1.Messages.Partition.parser(),
+                        adiom.v1.Messages.UpdatesPartition.parser(),
                         extensionRegistry);
                 if (updatesPartitionsBuilder_ == null) {
                   ensureUpdatesPartitionsIsMutable();
@@ -8419,22 +9409,22 @@ public final class Messages {
         return partitionsBuilder_;
       }
 
-      private java.util.List<adiom.v1.Messages.Partition> updatesPartitions_ =
+      private java.util.List<adiom.v1.Messages.UpdatesPartition> updatesPartitions_ =
         java.util.Collections.emptyList();
       private void ensureUpdatesPartitionsIsMutable() {
         if (!((bitField0_ & 0x00000002) != 0)) {
-          updatesPartitions_ = new java.util.ArrayList<adiom.v1.Messages.Partition>(updatesPartitions_);
+          updatesPartitions_ = new java.util.ArrayList<adiom.v1.Messages.UpdatesPartition>(updatesPartitions_);
           bitField0_ |= 0x00000002;
          }
       }
 
       private com.google.protobuf.RepeatedFieldBuilder<
-          adiom.v1.Messages.Partition, adiom.v1.Messages.Partition.Builder, adiom.v1.Messages.PartitionOrBuilder> updatesPartitionsBuilder_;
+          adiom.v1.Messages.UpdatesPartition, adiom.v1.Messages.UpdatesPartition.Builder, adiom.v1.Messages.UpdatesPartitionOrBuilder> updatesPartitionsBuilder_;
 
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public java.util.List<adiom.v1.Messages.Partition> getUpdatesPartitionsList() {
+      public java.util.List<adiom.v1.Messages.UpdatesPartition> getUpdatesPartitionsList() {
         if (updatesPartitionsBuilder_ == null) {
           return java.util.Collections.unmodifiableList(updatesPartitions_);
         } else {
@@ -8442,7 +9432,7 @@ public final class Messages {
         }
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public int getUpdatesPartitionsCount() {
         if (updatesPartitionsBuilder_ == null) {
@@ -8452,9 +9442,9 @@ public final class Messages {
         }
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public adiom.v1.Messages.Partition getUpdatesPartitions(int index) {
+      public adiom.v1.Messages.UpdatesPartition getUpdatesPartitions(int index) {
         if (updatesPartitionsBuilder_ == null) {
           return updatesPartitions_.get(index);
         } else {
@@ -8462,10 +9452,10 @@ public final class Messages {
         }
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder setUpdatesPartitions(
-          int index, adiom.v1.Messages.Partition value) {
+          int index, adiom.v1.Messages.UpdatesPartition value) {
         if (updatesPartitionsBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -8479,10 +9469,10 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder setUpdatesPartitions(
-          int index, adiom.v1.Messages.Partition.Builder builderForValue) {
+          int index, adiom.v1.Messages.UpdatesPartition.Builder builderForValue) {
         if (updatesPartitionsBuilder_ == null) {
           ensureUpdatesPartitionsIsMutable();
           updatesPartitions_.set(index, builderForValue.build());
@@ -8493,9 +9483,9 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public Builder addUpdatesPartitions(adiom.v1.Messages.Partition value) {
+      public Builder addUpdatesPartitions(adiom.v1.Messages.UpdatesPartition value) {
         if (updatesPartitionsBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -8509,10 +9499,10 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder addUpdatesPartitions(
-          int index, adiom.v1.Messages.Partition value) {
+          int index, adiom.v1.Messages.UpdatesPartition value) {
         if (updatesPartitionsBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -8526,10 +9516,10 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder addUpdatesPartitions(
-          adiom.v1.Messages.Partition.Builder builderForValue) {
+          adiom.v1.Messages.UpdatesPartition.Builder builderForValue) {
         if (updatesPartitionsBuilder_ == null) {
           ensureUpdatesPartitionsIsMutable();
           updatesPartitions_.add(builderForValue.build());
@@ -8540,10 +9530,10 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder addUpdatesPartitions(
-          int index, adiom.v1.Messages.Partition.Builder builderForValue) {
+          int index, adiom.v1.Messages.UpdatesPartition.Builder builderForValue) {
         if (updatesPartitionsBuilder_ == null) {
           ensureUpdatesPartitionsIsMutable();
           updatesPartitions_.add(index, builderForValue.build());
@@ -8554,10 +9544,10 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder addAllUpdatesPartitions(
-          java.lang.Iterable<? extends adiom.v1.Messages.Partition> values) {
+          java.lang.Iterable<? extends adiom.v1.Messages.UpdatesPartition> values) {
         if (updatesPartitionsBuilder_ == null) {
           ensureUpdatesPartitionsIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
@@ -8569,7 +9559,7 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder clearUpdatesPartitions() {
         if (updatesPartitionsBuilder_ == null) {
@@ -8582,7 +9572,7 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
       public Builder removeUpdatesPartitions(int index) {
         if (updatesPartitionsBuilder_ == null) {
@@ -8595,16 +9585,16 @@ public final class Messages {
         return this;
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public adiom.v1.Messages.Partition.Builder getUpdatesPartitionsBuilder(
+      public adiom.v1.Messages.UpdatesPartition.Builder getUpdatesPartitionsBuilder(
           int index) {
         return getUpdatesPartitionsFieldBuilder().getBuilder(index);
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public adiom.v1.Messages.PartitionOrBuilder getUpdatesPartitionsOrBuilder(
+      public adiom.v1.Messages.UpdatesPartitionOrBuilder getUpdatesPartitionsOrBuilder(
           int index) {
         if (updatesPartitionsBuilder_ == null) {
           return updatesPartitions_.get(index);  } else {
@@ -8612,9 +9602,9 @@ public final class Messages {
         }
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public java.util.List<? extends adiom.v1.Messages.PartitionOrBuilder> 
+      public java.util.List<? extends adiom.v1.Messages.UpdatesPartitionOrBuilder> 
            getUpdatesPartitionsOrBuilderList() {
         if (updatesPartitionsBuilder_ != null) {
           return updatesPartitionsBuilder_.getMessageOrBuilderList();
@@ -8623,33 +9613,33 @@ public final class Messages {
         }
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public adiom.v1.Messages.Partition.Builder addUpdatesPartitionsBuilder() {
+      public adiom.v1.Messages.UpdatesPartition.Builder addUpdatesPartitionsBuilder() {
         return getUpdatesPartitionsFieldBuilder().addBuilder(
-            adiom.v1.Messages.Partition.getDefaultInstance());
+            adiom.v1.Messages.UpdatesPartition.getDefaultInstance());
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public adiom.v1.Messages.Partition.Builder addUpdatesPartitionsBuilder(
+      public adiom.v1.Messages.UpdatesPartition.Builder addUpdatesPartitionsBuilder(
           int index) {
         return getUpdatesPartitionsFieldBuilder().addBuilder(
-            index, adiom.v1.Messages.Partition.getDefaultInstance());
+            index, adiom.v1.Messages.UpdatesPartition.getDefaultInstance());
       }
       /**
-       * <code>repeated .adiom.v1.Partition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
+       * <code>repeated .adiom.v1.UpdatesPartition updates_partitions = 2 [json_name = "updatesPartitions"];</code>
        */
-      public java.util.List<adiom.v1.Messages.Partition.Builder> 
+      public java.util.List<adiom.v1.Messages.UpdatesPartition.Builder> 
            getUpdatesPartitionsBuilderList() {
         return getUpdatesPartitionsFieldBuilder().getBuilderList();
       }
       private com.google.protobuf.RepeatedFieldBuilder<
-          adiom.v1.Messages.Partition, adiom.v1.Messages.Partition.Builder, adiom.v1.Messages.PartitionOrBuilder> 
+          adiom.v1.Messages.UpdatesPartition, adiom.v1.Messages.UpdatesPartition.Builder, adiom.v1.Messages.UpdatesPartitionOrBuilder> 
           getUpdatesPartitionsFieldBuilder() {
         if (updatesPartitionsBuilder_ == null) {
           updatesPartitionsBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              adiom.v1.Messages.Partition, adiom.v1.Messages.Partition.Builder, adiom.v1.Messages.PartitionOrBuilder>(
+              adiom.v1.Messages.UpdatesPartition, adiom.v1.Messages.UpdatesPartition.Builder, adiom.v1.Messages.UpdatesPartitionOrBuilder>(
                   updatesPartitions_,
                   ((bitField0_ & 0x00000002) != 0),
                   getParentForChildren(),
@@ -20899,6 +21889,11 @@ public final class Messages {
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_adiom_v1_BsonValue_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_UpdatesPartition_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_UpdatesPartition_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_adiom_v1_Partition_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -21040,84 +22035,88 @@ public final class Messages {
       "\n\027adiom/v1/messages.proto\022\010adiom.v1\032\037goo" +
       "gle/protobuf/timestamp.proto\"G\n\tBsonValu" +
       "e\022\022\n\004data\030\001 \001(\014R\004data\022\022\n\004type\030\002 \001(\rR\004typ" +
-      "e\022\022\n\004name\030\003 \001(\tR\004name\"\276\001\n\tPartition\022\034\n\tn" +
-      "amespace\030\001 \001(\tR\tnamespace\022)\n\020partition_h" +
-      "eader\030\002 \001(\tR\017partitionHeader\022\'\n\017partitio" +
-      "n_value\030\003 \001(\tR\016partitionValue\022\026\n\006cursor\030" +
-      "\004 \001(\014R\006cursor\022\'\n\017estimated_count\030\005 \001(\004R\016" +
-      "estimatedCount\"\211\003\n\014Capabilities\0225\n\006sourc" +
-      "e\030\001 \001(\0132\035.adiom.v1.Capabilities.SourceR\006" +
-      "source\022/\n\004sink\030\002 \001(\0132\033.adiom.v1.Capabili" +
-      "ties.SinkR\004sink\032\302\001\n\006Source\022D\n\024supported_" +
-      "data_types\030\001 \003(\0162\022.adiom.v1.DataTypeR\022su" +
-      "pportedDataTypes\022\035\n\nlsn_stream\030\002 \001(\010R\tls" +
-      "nStream\0220\n\024multi_namespace_plan\030\003 \001(\010R\022m" +
-      "ultiNamespacePlan\022!\n\014default_plan\030\004 \001(\010R" +
-      "\013defaultPlan\032L\n\004Sink\022D\n\024supported_data_t" +
-      "ypes\030\001 \003(\0162\022.adiom.v1.DataTypeR\022supporte" +
-      "dDataTypes\"\020\n\016GetInfoRequest\"\244\001\n\017GetInfo" +
-      "Response\022\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030\002 \001(" +
-      "\tR\006dbType\022\030\n\007version\030\003 \001(\tR\007version\022\022\n\004s" +
-      "pec\030\004 \001(\tR\004spec\022:\n\014capabilities\030\005 \001(\0132\026." +
-      "adiom.v1.CapabilitiesR\014capabilities\";\n\033G" +
-      "etNamespaceMetadataRequest\022\034\n\tnamespace\030" +
-      "\001 \001(\tR\tnamespace\"4\n\034GetNamespaceMetadata" +
-      "Response\022\024\n\005count\030\001 \001(\004R\005count\"r\n\023Genera" +
-      "tePlanRequest\022\036\n\nnamespaces\030\001 \003(\tR\nnames" +
-      "paces\022!\n\014initial_sync\030\002 \001(\010R\013initialSync" +
-      "\022\030\n\007updates\030\003 \001(\010R\007updates\"\217\001\n\024GenerateP" +
-      "lanResponse\0223\n\npartitions\030\001 \003(\0132\023.adiom." +
-      "v1.PartitionR\npartitions\022B\n\022updates_part" +
-      "itions\030\002 \003(\0132\023.adiom.v1.PartitionR\021updat" +
-      "esPartitions\"k\n\006Update\022#\n\002id\030\001 \003(\0132\023.adi" +
-      "om.v1.BsonValueR\002id\022(\n\004type\030\002 \001(\0162\024.adio" +
-      "m.v1.UpdateTypeR\004type\022\022\n\004data\030\003 \001(\014R\004dat" +
-      "a\"\204\001\n\017ListDataRequest\0221\n\tpartition\030\001 \001(\013" +
-      "2\023.adiom.v1.PartitionR\tpartition\022&\n\004type" +
-      "\030\002 \001(\0162\022.adiom.v1.DataTypeR\004type\022\026\n\006curs" +
-      "or\030\003 \001(\014R\006cursor\"G\n\020ListDataResponse\022\022\n\004" +
-      "data\030\001 \003(\014R\004data\022\037\n\013next_cursor\030\002 \001(\014R\nn" +
-      "extCursor\"l\n\020WriteDataRequest\022\034\n\tnamespa" +
-      "ce\030\001 \001(\tR\tnamespace\022\022\n\004data\030\002 \003(\014R\004data\022" +
-      "&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTypeR\004type\"" +
-      "\023\n\021WriteDataResponse\"\207\001\n\023WriteUpdatesReq" +
-      "uest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007up" +
-      "dates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022&" +
-      "\n\004type\030\003 \001(\0162\022.adiom.v1.DataTypeR\004type\"\026" +
-      "\n\024WriteUpdatesResponse\"v\n\024StreamUpdatesR" +
-      "equest\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022&" +
-      "\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004type\022\026" +
-      "\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025StreamUpdates" +
-      "Response\022*\n\007updates\030\001 \003(\0132\020.adiom.v1.Upd" +
-      "ateR\007updates\022\034\n\tnamespace\030\002 \001(\tR\tnamespa" +
-      "ce\022\037\n\013next_cursor\030\003 \001(\014R\nnextCursor\022.\n\004t" +
-      "ime\030\004 \001(\0132\032.google.protobuf.TimestampR\004t" +
-      "ime\"J\n\020StreamLSNRequest\022\036\n\nnamespaces\030\001 " +
-      "\003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014R\006cursor\"" +
-      "F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001(\004R\003lsn\022\037" +
-      "\n\013next_cursor\030\002 \001(\014R\nnextCursor\"\031\n\027GetTr" +
-      "ansformInfoRequest\"\360\001\n\030GetTransformInfoR" +
-      "esponse\022P\n\ntransforms\030\001 \003(\01320.adiom.v1.G" +
-      "etTransformInfoResponse.TransformInfoR\nt" +
-      "ransforms\032\201\001\n\rTransformInfo\0225\n\014request_t" +
-      "ype\030\001 \001(\0162\022.adiom.v1.DataTypeR\013requestTy" +
-      "pe\0229\n\016response_types\030\002 \003(\0162\022.adiom.v1.Da" +
-      "taTypeR\rresponseTypes\"\343\001\n\023GetTransformRe" +
-      "quest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007u" +
-      "pdates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022" +
-      "\022\n\004data\030\003 \003(\014R\004data\0225\n\014request_type\030\004 \001(" +
-      "\0162\022.adiom.v1.DataTypeR\013requestType\0227\n\rre" +
-      "sponse_type\030\005 \001(\0162\022.adiom.v1.DataTypeR\014r" +
-      "esponseType\"t\n\024GetTransformResponse\022\034\n\tn" +
-      "amespace\030\001 \001(\tR\tnamespace\022*\n\007updates\030\002 \003" +
-      "(\0132\020.adiom.v1.UpdateR\007updates\022\022\n\004data\030\003 " +
-      "\003(\014R\004data*R\n\010DataType\022\025\n\021DATA_TYPE_UNKNO" +
-      "WN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_T" +
-      "YPE_JSON_ID\020\002*m\n\nUpdateType\022\027\n\023UPDATE_TY" +
-      "PE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022" +
-      "UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELE" +
-      "TE\020\003B2Z0github.com/adiom-data/dsync/gen/" +
-      "adiom/v1;adiomv1b\006proto3"
+      "e\022\022\n\004name\030\003 \001(\tR\004name\"\236\001\n\020UpdatesPartiti" +
+      "on\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022)\n\020pa" +
+      "rtition_header\030\002 \001(\tR\017partitionHeader\022\'\n" +
+      "\017partition_value\030\003 \001(\tR\016partitionValue\022\026" +
+      "\n\006cursor\030\004 \001(\014R\006cursor\"\276\001\n\tPartition\022\034\n\t" +
+      "namespace\030\001 \001(\tR\tnamespace\022)\n\020partition_" +
+      "header\030\002 \001(\tR\017partitionHeader\022\'\n\017partiti" +
+      "on_value\030\003 \001(\tR\016partitionValue\022\026\n\006cursor" +
+      "\030\004 \001(\014R\006cursor\022\'\n\017estimated_count\030\005 \001(\004R" +
+      "\016estimatedCount\"\211\003\n\014Capabilities\0225\n\006sour" +
+      "ce\030\001 \001(\0132\035.adiom.v1.Capabilities.SourceR" +
+      "\006source\022/\n\004sink\030\002 \001(\0132\033.adiom.v1.Capabil" +
+      "ities.SinkR\004sink\032\302\001\n\006Source\022D\n\024supported" +
+      "_data_types\030\001 \003(\0162\022.adiom.v1.DataTypeR\022s" +
+      "upportedDataTypes\022\035\n\nlsn_stream\030\002 \001(\010R\tl" +
+      "snStream\0220\n\024multi_namespace_plan\030\003 \001(\010R\022" +
+      "multiNamespacePlan\022!\n\014default_plan\030\004 \001(\010" +
+      "R\013defaultPlan\032L\n\004Sink\022D\n\024supported_data_" +
+      "types\030\001 \003(\0162\022.adiom.v1.DataTypeR\022support" +
+      "edDataTypes\"\020\n\016GetInfoRequest\"\244\001\n\017GetInf" +
+      "oResponse\022\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030\002 \001" +
+      "(\tR\006dbType\022\030\n\007version\030\003 \001(\tR\007version\022\022\n\004" +
+      "spec\030\004 \001(\tR\004spec\022:\n\014capabilities\030\005 \001(\0132\026" +
+      ".adiom.v1.CapabilitiesR\014capabilities\";\n\033" +
+      "GetNamespaceMetadataRequest\022\034\n\tnamespace" +
+      "\030\001 \001(\tR\tnamespace\"4\n\034GetNamespaceMetadat" +
+      "aResponse\022\024\n\005count\030\001 \001(\004R\005count\"r\n\023Gener" +
+      "atePlanRequest\022\036\n\nnamespaces\030\001 \003(\tR\nname" +
+      "spaces\022!\n\014initial_sync\030\002 \001(\010R\013initialSyn" +
+      "c\022\030\n\007updates\030\003 \001(\010R\007updates\"\226\001\n\024Generate" +
+      "PlanResponse\0223\n\npartitions\030\001 \003(\0132\023.adiom" +
+      ".v1.PartitionR\npartitions\022I\n\022updates_par" +
+      "titions\030\002 \003(\0132\032.adiom.v1.UpdatesPartitio" +
+      "nR\021updatesPartitions\"k\n\006Update\022#\n\002id\030\001 \003" +
+      "(\0132\023.adiom.v1.BsonValueR\002id\022(\n\004type\030\002 \001(" +
+      "\0162\024.adiom.v1.UpdateTypeR\004type\022\022\n\004data\030\003 " +
+      "\001(\014R\004data\"\204\001\n\017ListDataRequest\0221\n\tpartiti" +
+      "on\030\001 \001(\0132\023.adiom.v1.PartitionR\tpartition" +
+      "\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004type" +
+      "\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020ListDataResp" +
+      "onse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013next_cursor\030" +
+      "\002 \001(\014R\nnextCursor\"l\n\020WriteDataRequest\022\034\n" +
+      "\tnamespace\030\001 \001(\tR\tnamespace\022\022\n\004data\030\002 \003(" +
+      "\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTyp" +
+      "eR\004type\"\023\n\021WriteDataResponse\"\207\001\n\023WriteUp" +
+      "datesRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespa" +
+      "ce\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007u" +
+      "pdates\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataType" +
+      "R\004type\"\026\n\024WriteUpdatesResponse\"v\n\024Stream" +
+      "UpdatesRequest\022\036\n\nnamespaces\030\001 \003(\tR\nname" +
+      "spaces\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataType" +
+      "R\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025Strea" +
+      "mUpdatesResponse\022*\n\007updates\030\001 \003(\0132\020.adio" +
+      "m.v1.UpdateR\007updates\022\034\n\tnamespace\030\002 \001(\tR" +
+      "\tnamespace\022\037\n\013next_cursor\030\003 \001(\014R\nnextCur" +
+      "sor\022.\n\004time\030\004 \001(\0132\032.google.protobuf.Time" +
+      "stampR\004time\"J\n\020StreamLSNRequest\022\036\n\nnames" +
+      "paces\030\001 \003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014R" +
+      "\006cursor\"F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001(" +
+      "\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\nnextCursor\"" +
+      "\031\n\027GetTransformInfoRequest\"\360\001\n\030GetTransf" +
+      "ormInfoResponse\022P\n\ntransforms\030\001 \003(\01320.ad" +
+      "iom.v1.GetTransformInfoResponse.Transfor" +
+      "mInfoR\ntransforms\032\201\001\n\rTransformInfo\0225\n\014r" +
+      "equest_type\030\001 \001(\0162\022.adiom.v1.DataTypeR\013r" +
+      "equestType\0229\n\016response_types\030\002 \003(\0162\022.adi" +
+      "om.v1.DataTypeR\rresponseTypes\"\343\001\n\023GetTra" +
+      "nsformRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamesp" +
+      "ace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007" +
+      "updates\022\022\n\004data\030\003 \003(\014R\004data\0225\n\014request_t" +
+      "ype\030\004 \001(\0162\022.adiom.v1.DataTypeR\013requestTy" +
+      "pe\0227\n\rresponse_type\030\005 \001(\0162\022.adiom.v1.Dat" +
+      "aTypeR\014responseType\"t\n\024GetTransformRespo" +
+      "nse\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007upd" +
+      "ates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n" +
+      "\004data\030\003 \003(\014R\004data*R\n\010DataType\022\025\n\021DATA_TY" +
+      "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
+      "\n\021DATA_TYPE_JSON_ID\020\002*m\n\nUpdateType\022\027\n\023U" +
+      "PDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSE" +
+      "RT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_T" +
+      "YPE_DELETE\020\003B2Z0github.com/adiom-data/ds" +
+      "ync/gen/adiom/v1;adiomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -21130,14 +22129,20 @@ public final class Messages {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_BsonValue_descriptor,
         new java.lang.String[] { "Data", "Type", "Name", });
-    internal_static_adiom_v1_Partition_descriptor =
+    internal_static_adiom_v1_UpdatesPartition_descriptor =
       getDescriptor().getMessageTypes().get(1);
+    internal_static_adiom_v1_UpdatesPartition_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_UpdatesPartition_descriptor,
+        new java.lang.String[] { "Namespaces", "PartitionHeader", "PartitionValue", "Cursor", });
+    internal_static_adiom_v1_Partition_descriptor =
+      getDescriptor().getMessageTypes().get(2);
     internal_static_adiom_v1_Partition_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Partition_descriptor,
         new java.lang.String[] { "Namespace", "PartitionHeader", "PartitionValue", "Cursor", "EstimatedCount", });
     internal_static_adiom_v1_Capabilities_descriptor =
-      getDescriptor().getMessageTypes().get(2);
+      getDescriptor().getMessageTypes().get(3);
     internal_static_adiom_v1_Capabilities_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Capabilities_descriptor,
@@ -21155,115 +22160,115 @@ public final class Messages {
         internal_static_adiom_v1_Capabilities_Sink_descriptor,
         new java.lang.String[] { "SupportedDataTypes", });
     internal_static_adiom_v1_GetInfoRequest_descriptor =
-      getDescriptor().getMessageTypes().get(3);
+      getDescriptor().getMessageTypes().get(4);
     internal_static_adiom_v1_GetInfoRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetInfoRequest_descriptor,
         new java.lang.String[] { });
     internal_static_adiom_v1_GetInfoResponse_descriptor =
-      getDescriptor().getMessageTypes().get(4);
+      getDescriptor().getMessageTypes().get(5);
     internal_static_adiom_v1_GetInfoResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetInfoResponse_descriptor,
         new java.lang.String[] { "Id", "DbType", "Version", "Spec", "Capabilities", });
     internal_static_adiom_v1_GetNamespaceMetadataRequest_descriptor =
-      getDescriptor().getMessageTypes().get(5);
+      getDescriptor().getMessageTypes().get(6);
     internal_static_adiom_v1_GetNamespaceMetadataRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetNamespaceMetadataRequest_descriptor,
         new java.lang.String[] { "Namespace", });
     internal_static_adiom_v1_GetNamespaceMetadataResponse_descriptor =
-      getDescriptor().getMessageTypes().get(6);
+      getDescriptor().getMessageTypes().get(7);
     internal_static_adiom_v1_GetNamespaceMetadataResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetNamespaceMetadataResponse_descriptor,
         new java.lang.String[] { "Count", });
     internal_static_adiom_v1_GeneratePlanRequest_descriptor =
-      getDescriptor().getMessageTypes().get(7);
+      getDescriptor().getMessageTypes().get(8);
     internal_static_adiom_v1_GeneratePlanRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GeneratePlanRequest_descriptor,
         new java.lang.String[] { "Namespaces", "InitialSync", "Updates", });
     internal_static_adiom_v1_GeneratePlanResponse_descriptor =
-      getDescriptor().getMessageTypes().get(8);
+      getDescriptor().getMessageTypes().get(9);
     internal_static_adiom_v1_GeneratePlanResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GeneratePlanResponse_descriptor,
         new java.lang.String[] { "Partitions", "UpdatesPartitions", });
     internal_static_adiom_v1_Update_descriptor =
-      getDescriptor().getMessageTypes().get(9);
+      getDescriptor().getMessageTypes().get(10);
     internal_static_adiom_v1_Update_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Update_descriptor,
         new java.lang.String[] { "Id", "Type", "Data", });
     internal_static_adiom_v1_ListDataRequest_descriptor =
-      getDescriptor().getMessageTypes().get(10);
+      getDescriptor().getMessageTypes().get(11);
     internal_static_adiom_v1_ListDataRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_ListDataRequest_descriptor,
         new java.lang.String[] { "Partition", "Type", "Cursor", });
     internal_static_adiom_v1_ListDataResponse_descriptor =
-      getDescriptor().getMessageTypes().get(11);
+      getDescriptor().getMessageTypes().get(12);
     internal_static_adiom_v1_ListDataResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_ListDataResponse_descriptor,
         new java.lang.String[] { "Data", "NextCursor", });
     internal_static_adiom_v1_WriteDataRequest_descriptor =
-      getDescriptor().getMessageTypes().get(12);
+      getDescriptor().getMessageTypes().get(13);
     internal_static_adiom_v1_WriteDataRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteDataRequest_descriptor,
         new java.lang.String[] { "Namespace", "Data", "Type", });
     internal_static_adiom_v1_WriteDataResponse_descriptor =
-      getDescriptor().getMessageTypes().get(13);
+      getDescriptor().getMessageTypes().get(14);
     internal_static_adiom_v1_WriteDataResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteDataResponse_descriptor,
         new java.lang.String[] { });
     internal_static_adiom_v1_WriteUpdatesRequest_descriptor =
-      getDescriptor().getMessageTypes().get(14);
+      getDescriptor().getMessageTypes().get(15);
     internal_static_adiom_v1_WriteUpdatesRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteUpdatesRequest_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Type", });
     internal_static_adiom_v1_WriteUpdatesResponse_descriptor =
-      getDescriptor().getMessageTypes().get(15);
+      getDescriptor().getMessageTypes().get(16);
     internal_static_adiom_v1_WriteUpdatesResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteUpdatesResponse_descriptor,
         new java.lang.String[] { });
     internal_static_adiom_v1_StreamUpdatesRequest_descriptor =
-      getDescriptor().getMessageTypes().get(16);
+      getDescriptor().getMessageTypes().get(17);
     internal_static_adiom_v1_StreamUpdatesRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_StreamUpdatesRequest_descriptor,
         new java.lang.String[] { "Namespaces", "Type", "Cursor", });
     internal_static_adiom_v1_StreamUpdatesResponse_descriptor =
-      getDescriptor().getMessageTypes().get(17);
+      getDescriptor().getMessageTypes().get(18);
     internal_static_adiom_v1_StreamUpdatesResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_StreamUpdatesResponse_descriptor,
         new java.lang.String[] { "Updates", "Namespace", "NextCursor", "Time", });
     internal_static_adiom_v1_StreamLSNRequest_descriptor =
-      getDescriptor().getMessageTypes().get(18);
+      getDescriptor().getMessageTypes().get(19);
     internal_static_adiom_v1_StreamLSNRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_StreamLSNRequest_descriptor,
         new java.lang.String[] { "Namespaces", "Cursor", });
     internal_static_adiom_v1_StreamLSNResponse_descriptor =
-      getDescriptor().getMessageTypes().get(19);
+      getDescriptor().getMessageTypes().get(20);
     internal_static_adiom_v1_StreamLSNResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_StreamLSNResponse_descriptor,
         new java.lang.String[] { "Lsn", "NextCursor", });
     internal_static_adiom_v1_GetTransformInfoRequest_descriptor =
-      getDescriptor().getMessageTypes().get(20);
+      getDescriptor().getMessageTypes().get(21);
     internal_static_adiom_v1_GetTransformInfoRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformInfoRequest_descriptor,
         new java.lang.String[] { });
     internal_static_adiom_v1_GetTransformInfoResponse_descriptor =
-      getDescriptor().getMessageTypes().get(21);
+      getDescriptor().getMessageTypes().get(22);
     internal_static_adiom_v1_GetTransformInfoResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformInfoResponse_descriptor,
@@ -21275,13 +22280,13 @@ public final class Messages {
         internal_static_adiom_v1_GetTransformInfoResponse_TransformInfo_descriptor,
         new java.lang.String[] { "RequestType", "ResponseTypes", });
     internal_static_adiom_v1_GetTransformRequest_descriptor =
-      getDescriptor().getMessageTypes().get(22);
+      getDescriptor().getMessageTypes().get(23);
     internal_static_adiom_v1_GetTransformRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformRequest_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Data", "RequestType", "ResponseType", });
     internal_static_adiom_v1_GetTransformResponse_descriptor =
-      getDescriptor().getMessageTypes().get(23);
+      getDescriptor().getMessageTypes().get(24);
     internal_static_adiom_v1_GetTransformResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformResponse_descriptor,
