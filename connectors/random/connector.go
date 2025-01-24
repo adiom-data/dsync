@@ -33,12 +33,12 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				Namespace:      r.Msg.GetNamespaces()[0],
 				EstimatedCount: uint64(c.settings.numCollectionsPerDatabase),
 			}},
-			UpdatesPartitions: []*adiomv1.Partition{{Cursor: []byte{1}}},
+			UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: r.Msg.GetNamespaces(), Cursor: []byte{1}}},
 		}), nil
 	}
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        c.CreateInitialGenerationTasks(),
-		UpdatesPartitions: []*adiomv1.Partition{{Cursor: []byte{1}}},
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Cursor: []byte{1}}},
 	}), nil
 }
 

@@ -147,7 +147,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
-		UpdatesPartitions: []*adiomv1.Partition{{Cursor: buf.Bytes()}},
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: namespaces, Cursor: buf.Bytes()}},
 	}), nil
 }
 

@@ -79,12 +79,16 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	var partitions []*adiomv1.Partition
 	var nsTasks []iface.Namespace
+	var updatesNamespaces []string
 	for _, partition := range initialPartitions {
 		ns, ok := mongoconn.ToNS(partition.GetNamespace())
 		if !ok {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("namespace should be fully qualified"))
 		}
 		nsTasks = append(nsTasks, ns)
+		if len(r.Msg.GetNamespaces()) > 0 {
+			updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
+		}
 	}
 
 	if r.Msg.GetInitialSync() {
@@ -152,7 +156,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
-		UpdatesPartitions: []*adiomv1.Partition{{Cursor: encodedResumeToken}},
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: updatesNamespaces, Cursor: encodedResumeToken}},
 	}), nil
 }
 

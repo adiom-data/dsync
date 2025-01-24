@@ -77,7 +77,6 @@ func (suite *ConnectorTestSuite) TestAll() {
 					suite.Assert().NotEmpty(p.GetNamespace())
 				}
 			})
-
 			suite.Run("TestGetNamespaceMetadata", func() {
 				res, err := c.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{
 					Namespace: suite.namespace,
@@ -138,10 +137,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 			suite.Run("TestStreamUpdates", func() {
 				for _, t := range capabilities.GetSource().GetSupportedDataTypes() {
 					for _, p := range planRes.Msg.GetUpdatesPartitions() {
-						var namespaces []string
-						if len(p.GetNamespace()) > 0 {
-							namespaces = append(namespaces, p.GetNamespace())
-						}
+						namespaces := p.GetNamespaces()
 						ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Second*5))
 						defer cancel()
 						res, err := c.StreamUpdates(ctx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
@@ -169,10 +165,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 			suite.Run("TestStreamLSN", func() {
 				if capabilities.GetSource().GetLsnStream() {
 					for _, p := range planRes.Msg.GetUpdatesPartitions() {
-						var namespaces []string
-						if len(p.GetNamespace()) > 0 {
-							namespaces = append(namespaces, p.GetNamespace())
-						}
+						namespaces := p.GetNamespaces()
 						ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Second*5))
 						defer cancel()
 						res, err := c.StreamLSN(ctx, connect.NewRequest(&adiomv1.StreamLSNRequest{

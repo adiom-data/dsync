@@ -73,7 +73,7 @@ func (s *source) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Ge
 	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
-		UpdatesPartitions: []*adiomv1.Partition{{
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{
 			Cursor: cursor.Bytes(),
 		}},
 	}), nil
