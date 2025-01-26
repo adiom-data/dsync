@@ -910,7 +910,7 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 	ctx, cancel := context.WithCancel(context.Background())
 	query, err := stringToQuery(settings.Query)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to parse query: %v", err))
+		slog.Error(fmt.Sprintf("Failed to parse query (%v): %v", settings.Query, err))
 	}
 	return &conn{
 		client:          client,
