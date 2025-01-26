@@ -37,6 +37,8 @@ type ConnectorSettings struct {
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	MaxPageSize                int
 	HaltOnIterationError       bool
+
+	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -69,6 +71,8 @@ type conn struct {
 	buffersMutex    sync.RWMutex
 	buffers         map[int64]buffer
 	cleanupInterval time.Duration
+
+	query bson.D
 }
 
 // get all database names except system databases
@@ -365,6 +369,10 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		c.buffersMutex.Unlock()
 
 		filter := createFindFilterFromCursor(r.Msg.GetPartition().GetCursor())
+		if len(c.query) > 0 { //if a query is provided, append it to the filter
+			filter = append(filter, c.query...)
+		}
+
 		cursor, err := collection.Find(ctx, filter)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -900,6 +908,10 @@ func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHand
 
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
+	query, err := stringToQuery(settings.Query)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Failed to parse query: %v", err))
+	}
 	return &conn{
 		client:          client,
 		settings:        settings,
@@ -907,5 +919,6 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 		cancel:          cancel,
 		buffers:         map[int64]buffer{},
 		cleanupInterval: 5 * time.Minute,
+		query:           query,
 	}
 }
