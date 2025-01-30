@@ -167,6 +167,12 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
+	var updatesNamespaces []string
+	if len(r.Msg.GetNamespaces()) > 0 {
+		for _, partition := range partitions {
+			updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
+		}
+	}
 
 	done := make(chan struct{})
 	eg, ctx := errgroup.WithContext(ctx)
@@ -228,7 +234,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        finalPartitions,
-		UpdatesPartitions: []*adiomv1.Partition{{Cursor: resumeToken}},
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: updatesNamespaces, Cursor: resumeToken}},
 	}), nil
 }
 

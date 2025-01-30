@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/iface/mocks"
 	"github.com/stretchr/testify/assert"
@@ -87,7 +88,9 @@ func (suite *ConnectorTestSuite) TestConnectorReadAll() {
 	flowID := iface.FlowID("1234")
 	dataChannelID := iface.DataChannelID("4321")
 	dataChannel := make(chan iface.DataMessage)
-	options := iface.ConnectorOptions{}
+	options := iface.ConnectorOptions{
+		Namespace: []string{NamespaceString()},
+	}
 	t.On("GetDataChannelEndpoint", dataChannelID).Return(dataChannel, nil)
 	c.On("NotifyDone", flowID, testConnectorID).Return(nil)
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
@@ -205,8 +208,8 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 	c.On("NotifyTaskDone", flowID, testConnectorID, mock.AnythingOfType("iface.ReadPlanTaskID"), mock.Anything).Return(nil)
 	messageIterCount := 100
 
-	dbName := "test"
-	colName := "test_tcw"
+	dbName := DBString()
+	colName := ColString()
 	// Connect the test data store
 	if suite.datastoreFactoryFunc != nil {
 		dataStore := suite.datastoreFactoryFunc()
@@ -229,12 +232,16 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 			idType, idVal, _ := bson.MarshalValue(id)
 			bsonDataRaw, _ := bson.Marshal(doc)
 			bsonDataRawUpdated, _ := bson.Marshal(updatedDoc)
+			aid := []*adiomv1.BsonValue{{
+				Data: idVal,
+				Type: uint32(idType),
+			}}
 
-			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, Id: &idVal, IdType: byte(idType), MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
+			dataChannel <- iface.DataMessage{Data: &bsonDataRaw, Id: aid, MutationType: iface.MutationType_Insert, Loc: loc, SeqNum: lsn}
 			lsn++
-			dataChannel <- iface.DataMessage{Data: &bsonDataRawUpdated, MutationType: iface.MutationType_Update, Loc: loc, SeqNum: lsn, Id: &idVal, IdType: byte(idType)}
+			dataChannel <- iface.DataMessage{Data: &bsonDataRawUpdated, MutationType: iface.MutationType_Update, Loc: loc, SeqNum: lsn, Id: aid}
 			lsn++
-			dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Delete, Loc: loc, SeqNum: lsn, Id: &idVal, IdType: byte(idType)}
+			dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Delete, Loc: loc, SeqNum: lsn, Id: aid}
 			lsn++
 		}
 	}()

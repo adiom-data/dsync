@@ -223,45 +223,48 @@ func (c *connector) parseNamespaceOptionAndUpdateMap(namespaces []string) ([]str
 
 // RequestCreateReadPlan implements iface.Connector.
 func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.ConnectorOptions) error {
-	// Retrieve the latest resume token before we start reading anything
-	// We will use the resume token to start the change stream
-	c.status.SyncState = iface.ReadPlanningSyncState
-	namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
-	resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
-		Namespaces:  namespaces,
-		InitialSync: options.Mode != iface.SyncModeCDC,
-		Updates:     true,
-	}))
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
-		return c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{})
-	}
-
-	c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
-
-	curID := 0
-	var tasks []iface.ReadPlanTask
-	if options.Mode == iface.SyncModeCDC {
-		tasks = nil
-	} else {
-		for _, partition := range resp.Msg.GetPartitions() {
-			curID++
-			task := iface.ReadPlanTask{
-				Id: iface.ReadPlanTaskID(curID),
-			}
-			task.Def.Col = partition.GetNamespace()
-			task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
-			task.EstimatedDocCount = int64(partition.GetEstimatedCount())
-			tasks = append(tasks, task)
+	go func() {
+		// Retrieve the latest resume token before we start reading anything
+		// We will use the resume token to start the change stream
+		c.status.SyncState = iface.ReadPlanningSyncState
+		namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
+		resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
+			Namespaces:  namespaces,
+			InitialSync: options.Mode != iface.SyncModeCDC,
+			Updates:     true,
+		}))
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
+			c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{Error: err})
+			return
 		}
-	}
-	plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
 
-	err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
-		return err
-	}
+		c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
+
+		curID := 0
+		var tasks []iface.ReadPlanTask
+		if options.Mode == iface.SyncModeCDC {
+			tasks = nil
+		} else {
+			for _, partition := range resp.Msg.GetPartitions() {
+				curID++
+				task := iface.ReadPlanTask{
+					Id: iface.ReadPlanTaskID(curID),
+				}
+				task.Def.Col = partition.GetNamespace()
+				task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
+				task.EstimatedDocCount = int64(partition.GetEstimatedCount())
+				tasks = append(tasks, task)
+			}
+		}
+		plan := iface.ConnectorReadPlan{Tasks: tasks, CdcResumeToken: c.resumeToken}
+
+		err = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{ReadPlan: plan, Success: true})
+		if err != nil {
+			slog.Error(fmt.Sprintf("Failed notifying coordinator about read planning done: %v", err))
+			return
+		}
+	}()
 	return nil
 }
 
@@ -438,7 +441,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 		defer res.Close()
 		for res.Receive() {
-			c.status.WriteLSN = int64(res.Msg().Lsn)
+			c.progressTracker.UpdateWriteLSN(int64(res.Msg().Lsn))
 		}
 		if res.Err() != nil {
 			if !errors.Is(res.Err(), context.Canceled) {
@@ -446,6 +449,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 			}
 		}
 	}()
+
+	var initialSyncFailed atomic.Bool
 
 	// kick off the initial sync
 	go func() {
@@ -561,6 +566,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						if !errors.Is(err, context.Canceled) {
 							slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
 						}
+						initialSyncFailed.Store(true)
 						continue
 					}
 
@@ -603,8 +609,13 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	go func() {
 		//wait for the initial sync to finish
 		<-initialSyncDone
-		c.status.SyncState = iface.ChangeStreamSyncState
 		defer close(changeStreamDone)
+		if initialSyncFailed.Load() {
+			slog.Error("Some initial sync tasks failed. Canceling flow.")
+			c.flowCancelFunc()
+			return
+		}
+		c.status.SyncState = iface.ChangeStreamSyncState
 
 		go func() {
 			ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
@@ -677,7 +688,6 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 					mutationType = iface.MutationType_Delete
 				}
-				id := d.GetId()[0].GetData()
 				c.progressTracker.UpdateChangeStreamProgressTracking()
 				readerProgress.changeStreamEvents.Add(1)
 				lsn++
@@ -686,8 +696,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					Data:         &d.Data,
 					MutationType: mutationType,
 					Loc:          destinationNamespace,
-					Id:           &id,
-					IdType:       byte(d.GetId()[0].GetType()),
+					Id:           d.GetId(),
 					SeqNum:       lsn,
 				}
 			}
@@ -902,7 +911,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				if err != nil {
 					return err
 				}
-				c.status.WriteLSN = max(c.status.WriteLSN, dataMsgs[i-1].SeqNum)
+				c.progressTracker.UpdateWriteLSN(dataMsgs[i-1].SeqNum)
 				msgs = nil
 			}
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
@@ -913,22 +922,22 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			if err != nil {
 				return err
 			}
-			c.status.WriteLSN = max(c.status.WriteLSN, dataMsg.SeqNum)
+			c.progressTracker.UpdateWriteLSN(dataMsg.SeqNum)
 		case iface.MutationType_Insert:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Update:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Delete:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   []*adiomv1.BsonValue{{Data: *dataMsg.Id, Type: uint32(dataMsg.IdType)}},
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 			})
 		default:
@@ -945,7 +954,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		if err != nil {
 			return err
 		}
-		c.status.WriteLSN = max(c.status.WriteLSN, dataMsgs[len(dataMsgs)-1].SeqNum)
+		c.progressTracker.UpdateWriteLSN(dataMsgs[len(dataMsgs)-1].SeqNum)
 	}
 	return nil
 }

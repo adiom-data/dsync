@@ -10,6 +10,7 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -34,6 +35,20 @@ const (
 
 var TestMongoConnectionString = os.Getenv(MongoEnvironmentVariable)
 
+func DBString() string {
+	if r := os.Getenv("MONGO_TEST_DB"); r != "" {
+		return r
+	}
+	return "test"
+}
+
+func ColString() string {
+	if r := os.Getenv("MONGO_TEST_COL"); r != "" {
+		return r
+	}
+	return "test"
+}
+
 // Standard test suite for the connector interface
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(
@@ -49,9 +64,10 @@ func TestMongoConnectorSuite(t *testing.T) {
 func TestMongoConnectorSuite2(t *testing.T) {
 	client, err := MongoClient(context.Background(), ConnectorSettings{ConnectionString: TestMongoConnectionString})
 	assert.NoError(t, err)
-	col := client.Database("test").Collection("test")
+	col := client.Database(DBString()).Collection(ColString())
+	ns := fmt.Sprintf("%s.%s", DBString(), ColString())
 
-	tSuite := test2.NewConnectorTestSuite("test.test", func() adiomv1connect.ConnectorServiceClient {
+	tSuite := test2.NewConnectorTestSuite(ns, func() adiomv1connect.ConnectorServiceClient {
 		return test2.ClientFromHandler(NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString, MaxPageSize: 2}))
 	}, func(ctx context.Context) error {
 		if err := col.Database().Drop(ctx); err != nil {

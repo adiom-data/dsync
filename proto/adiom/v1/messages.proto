@@ -14,6 +14,18 @@ message BsonValue {
 enum DataType {
     DATA_TYPE_UNKNOWN = 0;
     DATA_TYPE_MONGO_BSON = 1; // BSON that must have an _id field
+    DATA_TYPE_JSON_ID = 2; // JSON that must have an id field
+}
+
+message UpdatesPartition {
+    repeated string namespaces = 1;
+
+    // If non empty, ensure metadata header is set "{partition_header}: {partition_value}"
+    // This can be utilized so that a load balancer can perform routing based on the header
+    string partition_header = 2;
+    string partition_value = 3;
+
+    bytes cursor = 4;
 }
 
 message Partition {
@@ -79,7 +91,7 @@ message GeneratePlanRequest {
 
 message GeneratePlanResponse {
     repeated Partition partitions = 1;
-    repeated Partition updates_partitions = 2;
+    repeated UpdatesPartition updates_partitions = 2;
 }
 
 enum UpdateType {

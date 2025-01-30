@@ -234,6 +234,10 @@ func (c *Simple) maybeCreateReadPlan(srcEndpoint iface.ConnectorICoordinatorSign
 		//XXX: we should probably make it async and have a timeout
 		select {
 		case <-flowDet.readPlanningDone:
+			if flowDet.readPlanErr != nil {
+				slog.Error("Read plan failed", "err", flowDet.readPlanErr)
+				return flowDet.readPlanErr
+			}
 			slog.Debug("Read planning done. Flow ID: " + fmt.Sprintf("%v", fid))
 			if flowDet.Resumable {
 				slog.Debug(fmt.Sprintf("Persisting the flow plan for flow %v", flowDet))
@@ -700,18 +704,26 @@ func (c *Simple) PostReadPlanningResult(flowId iface.FlowID, conn iface.Connecto
 		return fmt.Errorf("flow not found")
 	}
 
+	defer close(flowDet.readPlanningDone)
+
+	if res.Error != nil {
+		flowDet.readPlanErr = res.Error
+		return nil
+	}
+
 	//sanity check that the connector is the source
 	if flowDet.Options.SrcId != conn {
-		return fmt.Errorf("connector not the source for the flow")
+		flowDet.readPlanErr = fmt.Errorf("connector not the source for the flow")
+		return nil
 	}
 
 	//check that the result was a success
 	if !res.Success {
-		return fmt.Errorf("read planning failed")
+		flowDet.readPlanErr = fmt.Errorf("read planning failed")
+		return nil
 	}
 
 	flowDet.ReadPlan = res.ReadPlan
-	close(flowDet.readPlanningDone) //close the channel to indicate that we got the plan
 	return nil
 }
 

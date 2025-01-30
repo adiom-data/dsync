@@ -59,7 +59,7 @@ func (c *conn) StreamUpdates(context.Context, *connect.Request[adiomv1.StreamUpd
 }
 
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteData(context.Context, *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
+func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 

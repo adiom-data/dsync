@@ -147,7 +147,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
-		UpdatesPartitions: []*adiomv1.Partition{{Cursor: buf.Bytes()}},
+		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: namespaces, Cursor: buf.Bytes()}},
 	}), nil
 }
 
@@ -159,7 +159,7 @@ func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]
 		Spec:    c.spec,
 		Capabilities: &adiomv1.Capabilities{
 			Source: &adiomv1.Capabilities_Source{
-				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON, adiomv1.DataType_DATA_TYPE_JSON_ID},
 				MultiNamespacePlan: true,
 				DefaultPlan:        true,
 			},
@@ -191,7 +191,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		cursor = r.Msg.GetPartition().GetCursor()
 	}
 
-	res, err := c.client.Scan(ctx, r.Msg.GetPartition().GetNamespace(), true, cursor)
+	res, err := c.client.Scan(ctx, r.Msg.GetType(), r.Msg.GetPartition().GetNamespace(), true, cursor)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
@@ -274,7 +274,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		for records := range ch {
 			var updates []*adiomv1.Update
 			for _, record := range records.Records {
-				update, err := streamRecordToUpdate(record, arnToTableDetails[records.StreamARN].KeySchema)
+				update, err := streamRecordToUpdate(record, r.Msg.GetType(), arnToTableDetails[records.StreamARN].KeySchema)
 				if err != nil {
 					slog.Error("skipping, error creating update,", "err", err)
 					continue Loop

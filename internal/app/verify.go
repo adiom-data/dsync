@@ -110,16 +110,12 @@ type source struct {
 	skipStream      bool
 }
 
-func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.Partition, namespaces []string, ch chan<- Update) error {
+func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.UpdatesPartition, ch chan<- Update) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, partition := range partitions {
 		eg.Go(func() error {
-			ns := namespaces
-			if len(partition.GetNamespace()) > 0 {
-				ns = []string{partition.GetNamespace()}
-			}
 			s, err := s.c.StreamUpdates(ctx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
-				Namespaces: ns,
+				Namespaces: partition.GetNamespaces(),
 				Type:       adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				Cursor:     partition.GetCursor(),
 			}))
@@ -231,16 +227,6 @@ func (s *source) ProcessSource(ctx context.Context, process func(context.Context
 
 	partitions := plan.Msg.GetPartitions()
 	updatePartitions := plan.Msg.GetUpdatesPartitions()
-	streamUpdatesNamespacesMap := map[string]struct{}{}
-	var streamUpdatesNamespaces []string
-	if len(s.namespaces) > 0 {
-		for _, partition := range partitions {
-			streamUpdatesNamespacesMap[partition.GetNamespace()] = struct{}{}
-		}
-		for k := range streamUpdatesNamespacesMap {
-			streamUpdatesNamespaces = append(streamUpdatesNamespaces, k)
-		}
-	}
 
 	// Read
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -255,7 +241,7 @@ func (s *source) ProcessSource(ctx context.Context, process func(context.Context
 		}
 		close(s.initialSyncDone)
 		if !s.skipStream {
-			if err := s.readUpdates(egCtx, updatePartitions, streamUpdatesNamespaces, ch); err != nil {
+			if err := s.readUpdates(egCtx, updatePartitions, ch); err != nil {
 				return err
 			}
 		}

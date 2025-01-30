@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/adiom-data/dsync/connectors/dynamodb/stream"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -101,7 +102,7 @@ func (c *client) CreateScanCursor(segment int, totalSegments int, keySchema []st
 	}.MarshalBinary()
 }
 
-func (c *client) Scan(ctx context.Context, tableName string, consistent bool, cursor []byte) (ScanResult, error) {
+func (c *client) Scan(ctx context.Context, dataType adiomv1.DataType, tableName string, consistent bool, cursor []byte) (ScanResult, error) {
 	var sc scanCursor
 	if err := sc.UnmarshalBinary(cursor); err != nil {
 		return ScanResult{}, err
@@ -134,10 +135,20 @@ func (c *client) Scan(ctx context.Context, tableName string, consistent bool, cu
 		}
 	}
 
-	// TODO: factor in primary key so we can match with updates
-	items, err := itemsToBson(res.Items, sc.keySchema)
-	if err != nil {
-		return ScanResult{}, err
+	var items [][]byte
+
+	switch dataType {
+	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+		// TODO: factor in primary key so we can match with updates
+		items, err = itemsToBson(res.Items, sc.keySchema)
+		if err != nil {
+			return ScanResult{}, err
+		}
+	case adiomv1.DataType_DATA_TYPE_JSON_ID:
+		items, err = itemsToJson(res.Items, sc.keySchema)
+		if err != nil {
+			return ScanResult{}, err
+		}
 	}
 
 	return ScanResult{items, nextCursor}, nil
