@@ -163,3 +163,19 @@ func (pt *ProgressTracker) UpdateWriteLSN(lsn int64) {
 	defer pt.writeLSNMutex.Unlock()
 	pt.Status.WriteLSN = max(pt.Status.WriteLSN, lsn)
 }
+
+func (pt *ProgressTracker) CopyStatus() iface.ConnectorStatus {
+	pt.muProgressMetrics.Lock()
+	defer pt.muProgressMetrics.Unlock()
+	statusCopy := *pt.Status
+	statusCopy.ProgressMetrics.NamespaceProgress = map[iface.Namespace]*iface.NamespaceStatus{}
+	for k, v := range pt.Status.ProgressMetrics.NamespaceProgress {
+		progressCopy := *v
+		progressCopy.ActiveTasksList = map[iface.ReadPlanTaskID]bool{}
+		for k2, v2 := range v.ActiveTasksList {
+			progressCopy.ActiveTasksList[k2] = v2
+		}
+		statusCopy.ProgressMetrics.NamespaceProgress[k] = &progressCopy
+	}
+	return statusCopy
+}

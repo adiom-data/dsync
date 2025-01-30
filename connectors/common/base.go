@@ -89,7 +89,7 @@ func isRetryable(err error) bool {
 
 // GetConnectorStatus implements iface.Connector.
 func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
-	return c.status
+	return c.progressTracker.CopyStatus()
 }
 
 func HashBson(hasher hash.Hash64, b bson.Raw, arr bool, projection map[string]interface{}) error {
