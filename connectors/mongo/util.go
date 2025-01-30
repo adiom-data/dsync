@@ -193,3 +193,18 @@ func redactedSettings(s ConnectorSettings) ConnectorSettings {
 
 	return copy
 }
+
+func stringToQuery(queryStr string) (bson.D, error) {
+	if queryStr == "" {
+		return bson.D{}, nil
+	}
+
+	content := []byte(queryStr)
+
+	var query bson.D
+	err := bson.UnmarshalExtJSON(content, false, &query)
+	if err != nil {
+		return bson.D{}, fmt.Errorf("error parsing query as Extended JSON: %v", err)
+	}
+	return query, nil
+}

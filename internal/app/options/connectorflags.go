@@ -411,6 +411,13 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Destination: &settings.TargetDocCountPerPartition,
 			Value:       50 * 1000,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "initial-sync-query",
+			Usage:       "query filter for the initial data copy (v2 Extended JSON)",
+			Aliases:     []string{"q"},
+			Required:    false,
+			Destination: &settings.Query,
+		}),
 	}
 }
 
