@@ -1,7 +1,9 @@
+Ensure you have at least Java 21.
+
 In this directory (sub $URL and $KEY):
 
 ```
-mvn package
+mvn clean install
 java -cp target/my-app-1-jar-with-dependencies.jar adiom.Main 8089 $URL $KEY
 ```
 
