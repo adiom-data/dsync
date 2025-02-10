@@ -60,7 +60,7 @@ func NewDynamodbStreamHelper(streamClient *dynamodbstreams.Client, streamARN str
 	opts := HelperOptions{
 		DescribeStreamLimiter: DefaultDescribeLimiter,
 		Logger:                slog.Default(),
-		SkipEmpty:             5,
+		SkipEmpty:             20,
 	}
 	for _, fn := range optsFn {
 		fn(&opts)
@@ -292,6 +292,7 @@ func (s *dynamodbStreamHelper) approximateLatestState(ctx context.Context, appro
 
 	streamARN := aws.String(s.streamARN)
 	state := NewStreamState(s.streamARN)
+	var stateMutex sync.Mutex
 
 	eg, egCtx := errgroup.WithContext(ctx)
 
@@ -306,8 +307,7 @@ func (s *dynamodbStreamHelper) approximateLatestState(ctx context.Context, appro
 				return err
 			}
 			shardIterator := shardIteratorRes.ShardIterator
-			var lastSeqNum *string = shard.SequenceNumberRange.StartingSequenceNumber
-			defer s.logger.Debug("using sequence number", "shard_id", *shard.ShardId, "sequence_number", *lastSeqNum)
+			var lastSeqNum *string = aws.String("")
 			skipped := 0
 		Loop:
 			for {
@@ -346,7 +346,10 @@ func (s *dynamodbStreamHelper) approximateLatestState(ctx context.Context, appro
 				}
 			}
 
+			stateMutex.Lock()
 			state.UpdateSequenceNumber(*shard.ShardId, *lastSeqNum)
+			stateMutex.Unlock()
+			s.logger.Debug("using sequence number", "shard_id", *shard.ShardId, "sequence_number", *lastSeqNum)
 			return nil
 		})
 	}
