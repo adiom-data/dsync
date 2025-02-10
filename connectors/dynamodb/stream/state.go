@@ -20,11 +20,11 @@ func NewStreamState(streamARN string) StreamState {
 
 func ShardIteratorInputFromState(state StreamState, after bool) []*dynamodbstreams.GetShardIteratorInput {
 	var res []*dynamodbstreams.GetShardIteratorInput
-	typ := types.ShardIteratorTypeAtSequenceNumber
-	if after {
-		typ = types.ShardIteratorTypeAfterSequenceNumber
-	}
 	for k, v := range state.ShardIDToSequenceNumber {
+		typ := types.ShardIteratorTypeAtSequenceNumber
+		if after {
+			typ = types.ShardIteratorTypeAfterSequenceNumber
+		}
 		var seqNum *string
 		if v != "" {
 			seqNum = aws.String(v)
