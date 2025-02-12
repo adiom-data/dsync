@@ -41,6 +41,10 @@ import io.grpc.stub.StreamObserver;
 
 public class Main {
     public static void main(String[] args) {
+        if (args.length < 3) {
+            System.out.println("3 Required arguments: port url key");
+            return;
+        }
         String cert = System.getenv("CERT_FILE");
         String key = System.getenv("KEY_FILE");
         ServerCredentials creds = InsecureServerCredentials.create();
@@ -54,14 +58,14 @@ public class Main {
             e.printStackTrace();
             return;
         }
+
         System.out.println("starting server on port " + args[0]);
-        Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), creds)
+        try {
+            Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), creds)
                 .addService(new MyConn(args[1], args[2]))
                 .addService(ProtoReflectionServiceV1.newInstance())
                 .maxInboundMessageSize(100000000)
                 .build();
-
-        try {
             s.start();
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
@@ -71,12 +75,14 @@ public class Main {
                         s.shutdown().awaitTermination(10, TimeUnit.SECONDS);
                     } catch (Exception e) {
                         e.printStackTrace();
+                        System.out.println("Shutdown was not clean.");
                     }
                 }
             });
             s.awaitTermination();
         } catch (Exception e) {
             e.printStackTrace();
+            System.out.println("Unable to start. Are your credentials and parameters correct?");
         }
     }
 
