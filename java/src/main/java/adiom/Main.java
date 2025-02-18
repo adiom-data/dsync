@@ -133,6 +133,38 @@ public class Main {
             return helper;
         }
 
+        private boolean doOps(CosmosContainer container, List<CosmosItemOperation> inputOps, int retries) {
+            List<CosmosItemOperation> ops = inputOps;
+            boolean ok = true;
+            for (int i = 0; i <= retries; i++) {
+                List<CosmosItemOperation> retryOps = new ArrayList<CosmosItemOperation>();
+                for (CosmosBulkOperationResponse<Object> r : container.executeBulkOperations(ops)) {
+                    if (r.getException() != null) {
+                        ok = false;
+                        r.getException().printStackTrace();
+                    }
+                    if (!r.getResponse().isSuccessStatusCode()) {
+                        retryOps.add(r.getOperation());
+                    }
+                }
+                if (ok && retryOps.size() > 0) {
+                    if (i == retries) {
+                        System.out.println("" + retryOps.size() + " items failed after " + retries + " retries.");
+                    } else {
+                        ops = retryOps;
+                        try {
+                            int delay = (int)(100 * Math.pow(1.5, i) + Math.random() * 50);
+                            Thread.sleep(delay);
+                        } catch (Exception e) {
+                        }
+                    }
+                } else {
+                    return ok;
+                }
+            }
+            return ok;
+        }
+
         @Override
         public void writeData(WriteDataRequest request, StreamObserver<WriteDataResponse> responseObserver) {
             NsHelper helper = getNsHelper(responseObserver, request.getNamespace());
@@ -147,14 +179,7 @@ public class Main {
                 ops.add(CosmosBulkOperations.getUpsertItemOperation(d, k));
             }
 
-            boolean ok = true;
-            for (CosmosBulkOperationResponse<Object> r : helper.container.executeBulkOperations(ops)) {
-                if (r.getException() != null) {
-                    ok = false;
-                    r.getException().printStackTrace();
-                }
-            }
-            ;
+            boolean ok = doOps(helper.container, ops, 3);
             if (!ok) {
                 responseObserver.onError(Status.ABORTED.asException());
                 return;
@@ -197,14 +222,7 @@ public class Main {
                 }
             }
 
-            boolean ok = true;
-            for (CosmosBulkOperationResponse<Object> r : helper.container.executeBulkOperations(ops)) {
-                if (r.getException() != null) {
-                    ok = false;
-                    r.getException().printStackTrace();
-                }
-            }
-            ;
+            boolean ok = doOps(helper.container, ops, 3);
             if (!ok) {
                 responseObserver.onError(Status.ABORTED.asException());
                 return;
