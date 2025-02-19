@@ -146,14 +146,21 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 		return m, nil
 
 	case *types.AttributeValueMemberN:
-		// TODO: Should we convert to an actual number type?
-		return tv.Value, nil
+		val, err := strconv.Atoi(tv.Value)
+		if err != nil { //store as a string if we fail conversion
+			return tv.Value, err
+		}
+		return val, nil
 
 	case *types.AttributeValueMemberNS:
-		// TODO: Should we convert to an actual number type?
 		var arr bson.A
 		for _, v := range tv.Value {
-			arr = append(arr, v)
+			val, err := strconv.Atoi(v)
+			if err != nil { //store as a string if we fail conversion
+				arr = append(arr, v)
+			} else {
+				arr = append(arr, val)
+			}
 		}
 		return arr, nil
 
