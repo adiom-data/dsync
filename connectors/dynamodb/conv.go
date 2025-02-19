@@ -153,7 +153,7 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 		// TODO: Should we convert to an actual number type?
 		var arr bson.A
 		for _, v := range tv.Value {
-			arr = append(arr, v, nil)
+			arr = append(arr, v)
 		}
 		return arr, nil
 
@@ -163,7 +163,7 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 	case *types.AttributeValueMemberSS:
 		var arr bson.A
 		for _, v := range tv.Value {
-			arr = append(arr, v, nil)
+			arr = append(arr, v)
 		}
 		return arr, nil
 
