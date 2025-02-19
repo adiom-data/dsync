@@ -104,7 +104,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				partitionsCh <- &adiomv1.Partition{
 					Namespace:      ns,
 					Cursor:         cursor,
-					EstimatedCount: tableDetails.Count,
+					EstimatedCount: tableDetails.Count / uint64(max(1, totalSegments)),
 				}
 			}
 			return nil
