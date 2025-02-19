@@ -48,6 +48,8 @@ type RunnerSyncProgress struct {
 
 // Update the runner progress struct with the latest progress metrics from the flow status
 func (r *RunnerLocal) UpdateRunnerProgress() {
+	r.rpMutex.Lock()
+	defer r.rpMutex.Unlock()
 	if r.activeFlowID == iface.FlowID("") { //no active flow - probably not active yet
 		return
 	}
@@ -80,6 +82,14 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	r.runnerProgress.NumNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesCompleted
 	r.runnerProgress.TotalNamespaces = srcStatus.ProgressMetrics.NumNamespaces
 	r.runnerProgress.NumDocsSynced = srcStatus.ProgressMetrics.NumDocsSynced
+
+	// HACK: currently we just copy any old throughput over to the new copy
+	// Find a better way to do this later
+	for k, v := range srcStatus.ProgressMetrics.NamespaceProgress {
+		if old, ok := r.runnerProgress.NsProgressMap[k]; ok {
+			v.Throughput = old.Throughput
+		}
+	}
 	r.runnerProgress.NsProgressMap = srcStatus.ProgressMetrics.NamespaceProgress
 
 	r.runnerProgress.Namespaces = srcStatus.ProgressMetrics.Namespaces

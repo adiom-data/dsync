@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/adiom-data/dsync/connectors/common"
@@ -36,6 +37,7 @@ type RunnerLocal struct {
 	src, dst   iface.Connector
 
 	runnerProgress RunnerSyncProgress //internal structure to keep track of the sync progress. Updated ad-hoc on UpdateRunnerProgress()
+	rpMutex        sync.Mutex
 
 	ctx context.Context
 
