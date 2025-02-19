@@ -127,7 +127,13 @@ public class Main {
                 }
                 helper = new NsHelper();
                 helper.container = this.client.getDatabase(splittedNs[0]).getContainer(splittedNs[1]);
-                helper.pkd = helper.container.read().getProperties().getPartitionKeyDefinition();
+                try {
+                    helper.pkd = helper.container.read().getProperties().getPartitionKeyDefinition();
+                } catch (com.azure.cosmos.CosmosException e) {
+                    responseObserver.onError(
+                        Status.INTERNAL.withDescription("Failed to read container properties for '" + namespace + "'. Does it exist?").asException());
+                    return null;
+                }
                 this.nsHelpers.put(namespace, helper);
             }
             return helper;
