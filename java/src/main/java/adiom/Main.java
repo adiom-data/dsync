@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import com.azure.cosmos.CosmosAsyncClient;
+import com.azure.cosmos.CosmosAsyncContainer;
 import com.azure.cosmos.CosmosClient;
 import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosContainer;
@@ -22,6 +24,7 @@ import com.azure.cosmos.models.FeedRange;
 import com.azure.cosmos.models.FeedResponse;
 import com.azure.cosmos.models.PartitionKey;
 import com.azure.cosmos.models.PartitionKeyDefinition;
+import com.azure.cosmos.util.CosmosPagedFlux;
 import com.azure.cosmos.util.CosmosPagedIterable;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -60,6 +63,7 @@ import io.grpc.Status;
 import io.grpc.TlsServerCredentials;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.stub.StreamObserver;
+import reactor.core.publisher.Flux;
 
 public class Main {
 
@@ -113,12 +117,14 @@ public class Main {
 
     private static class NsHelper {
         public CosmosContainer container;
+        public CosmosAsyncContainer asyncContainer;
         public PartitionKeyDefinition pkd;
     }
 
     private static class MyConn extends ConnectorServiceGrpc.ConnectorServiceImplBase {
 
         private CosmosClient client;
+        private CosmosAsyncClient asyncClient;
         private ConcurrentHashMap<String, NsHelper> nsHelpers;
 
         public MyConn(String endpoint, String key) {
@@ -128,6 +134,10 @@ public class Main {
                     .endpoint(endpoint)
                     .key(key)
                     .buildClient();
+            this.asyncClient = new CosmosClientBuilder()
+                .endpoint(endpoint)
+                .key(key)
+                .buildAsyncClient();
         }
 
         @Override
@@ -155,6 +165,7 @@ public class Main {
                 }
                 helper = new NsHelper();
                 helper.container = this.client.getDatabase(splittedNs[0]).getContainer(splittedNs[1]);
+                helper.asyncContainer = this.asyncClient.getDatabase(splittedNs[0]).getContainer(splittedNs[1]);
                 try {
                     helper.pkd = helper.container.read().getProperties().getPartitionKeyDefinition();
                 } catch (com.azure.cosmos.CosmosException e) {
@@ -322,8 +333,12 @@ public class Main {
                 return;
             }
 
-            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions().setFeedRange(FeedRange.fromString(feedRange));
-            java.util.Iterator<FeedResponse<JsonNode>> it = helper.container.queryItems("select * from c", opts, JsonNode.class).iterableByPage(continuation).iterator();
+            int pageSize = 1000;
+            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions().setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0).setMaxBufferedItemCount(pageSize);
+            CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);            
+            Flux<FeedResponse<JsonNode>> flux = cpi.byPage(continuation, pageSize);
+            java.util.Iterator<FeedResponse<JsonNode>> it = flux.take(1).toIterable().iterator();
+
             if (it.hasNext()) {
                 ListDataResponse.Builder builder = ListDataResponse.newBuilder();
                 FeedResponse<JsonNode> fr = it.next();
@@ -341,6 +356,10 @@ public class Main {
             } else {
                 responseObserver.onNext(ListDataResponse.newBuilder().build());
             }
+            while (it.hasNext()) {
+                it.next();
+            }
+
             responseObserver.onCompleted();
         }
 
