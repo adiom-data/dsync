@@ -385,6 +385,11 @@ func CosmosFlags(settings *cosmos.ConnectorSettings) []cli.Flag {
 			Required:    false,
 			Destination: &settings.NumParallelPartitionWorkers,
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "cosmos-stream-deletes-enabled",
+			Usage:       "If this cosmos instance supports deletes in the change stream (currently a preview feature)",
+			Destination: &settings.WithDelete,
+		}),
 	}...)
 }
 

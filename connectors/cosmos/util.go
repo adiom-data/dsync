@@ -50,10 +50,10 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location, withDelete bool) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
-	changeStream, err := createChangeStream(ctx, client, location, opts)
+	changeStream, err := createChangeStream(ctx, client, location, opts, withDelete)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
@@ -102,6 +102,15 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 		return nil, fmt.Errorf("failed to get resume token from change stream")
 	}
 	col.DeleteOne(ctx, bson.M{"_id": id})
+
+	// If delete are enabled, wait til after the delete event
+	if withDelete {
+		changeStream.Next(ctx)
+		resumeToken = changeStream.ResumeToken()
+		if resumeToken == nil {
+			return nil, fmt.Errorf("failed to get resume token from change stream")
+		}
+	}
 
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
 	rid, err := extractRidFromResumeToken(resumeToken)
