@@ -103,15 +103,6 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	}
 	col.DeleteOne(ctx, bson.M{"_id": id})
 
-	// If delete are enabled, wait til after the delete event
-	if withDelete {
-		changeStream.Next(ctx)
-		resumeToken = changeStream.ResumeToken()
-		if resumeToken == nil {
-			return nil, fmt.Errorf("failed to get resume token from change stream")
-		}
-	}
-
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
 	rid, err := extractRidFromResumeToken(resumeToken)
 	if err != nil {
