@@ -68,7 +68,31 @@ services:
       - ./scripts/wait-for-mongo.sh:/wait-for-mongo.sh
     command: ["/bin/bash", "-c", "./dsync -s mongodb://mongo1:27017/?replicaSet=data1 -d mongodb://mongo2:27018/?replicaSet=data2 -m mongodb://mongo1:27017/?replicaSet=data1 --verbosity INFO"]
 
+  weaviate:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.5
+    ports:
+    - 8080:8080
+    - 50051:50051
+    volumes:
+    - weaviate_data:/var/lib/weaviate
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      ENABLE_API_BASED_MODULES: 'true'
+      ENABLE_MODULES: 'text2vec-ollama,generative-ollama'
+      CLUSTER_HOSTNAME: 'node1'
+
 volumes:
   data1:
   data2:
   datatest:
+  weaviate_data:

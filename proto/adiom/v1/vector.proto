@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package adiom.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/v1;adiomv1";
+
+import "adiom/v1/messages.proto";
+
+service ChunkingService {
+    rpc GetSupportedDataTypes(GetSupportedDataTypesRequest) returns (GetSupportedDataTypesResponse);
+    rpc GetChunked(GetChunkedRequest) returns (GetChunkedResponse);
+}
+
+service EmbeddingService {
+    rpc GetSupportedDataTypes(GetSupportedDataTypesRequest) returns (GetSupportedDataTypesResponse);
+    rpc GetEmbedding(GetEmbeddingRequest) returns (GetEmbeddingResponse);
+}
+
+message GetChunkedRequest {
+    repeated bytes data = 1;
+    DataType type = 2;
+}
+
+message Chunked {
+    repeated bytes data = 1;
+}
+
+message GetChunkedResponse {
+    repeated Chunked data = 1;
+}
+
+message GetEmbeddingRequest {
+    repeated bytes data = 1;
+    DataType type = 2;
+}
+
+message Embedding {
+    repeated double data = 1;
+}
+
+message GetEmbeddingResponse {
+    repeated Embedding data = 1;
+}
+
+message GetSupportedDataTypesRequest {}
+
+message GetSupportedDataTypesResponse {
+    repeated DataType types = 1;
+}
