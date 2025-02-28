@@ -50,10 +50,10 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location, withDelete bool) (bson.Raw, error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
-	changeStream, err := createChangeStream(ctx, client, location, opts)
+	changeStream, err := createChangeStream(ctx, client, location, opts, withDelete)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}

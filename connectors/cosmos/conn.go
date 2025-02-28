@@ -31,6 +31,7 @@ type ConnectorSettings struct {
 	MaxNumNamespaces            int    //we don't want to have too many parallel changestreams (after 10-15 we saw perf impact)
 	NumParallelPartitionWorkers int    //number of workers used for partitioning
 	partitionKey                string //partition key to use for collections
+	WithDelete                  bool
 
 	EmulateDeletes         bool // if true, we will generate delete events
 	DeletesCheckInterval   time.Duration
@@ -134,7 +135,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		go func(ns iface.Namespace) {
 			defer wg.Done()
 			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
-			resumeToken, err := getLatestResumeToken(ctx, c.client, loc)
+			resumeToken, err := getLatestResumeToken(ctx, c.client, loc, c.connectorSettings.WithDelete)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
 				return
@@ -217,7 +218,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
-			changeStream, err := createChangeStream(ctx, c.client, loc, opts)
+			changeStream, err := createChangeStream(ctx, c.client, loc, opts, c.connectorSettings.WithDelete)
 			if err != nil {
 				if errors.Is(ctx.Err(), context.Canceled) {
 					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))
@@ -269,6 +270,17 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal _id: %v", err)
 	}
+
+	if change["operationType"] == "delete" {
+		return &adiomv1.Update{
+			Id: []*adiomv1.BsonValue{{
+				Data: idVal,
+				Type: uint32(idType),
+			}},
+			Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
+		}, nil
+	}
+
 	// get the full state of the document after the change
 	if change["fullDocument"] == nil {
 		//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
@@ -418,7 +430,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
-			changeStream, err := createChangeStream(ctx, c.client, loc, opts)
+			changeStream, err := createChangeStream(ctx, c.client, loc, opts, c.connectorSettings.WithDelete)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))
