@@ -193,6 +193,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		namespaces = append(namespaces, ns)
 	}
 
+	var sendMutex sync.Mutex
 	var wg sync.WaitGroup
 	lsnTracker := NewMultiNsLSNTracker()
 	for _, namespace := range namespaces {
@@ -241,10 +242,12 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 				if changeStream.RemainingBatchLength() == 0 {
 					tokenMap.AddToken(loc, changeStream.ResumeToken())
 					encodedToken, _ := tokenMap.encodeMap()
+					sendMutex.Lock()
 					s.Send(&adiomv1.StreamLSNResponse{
 						Lsn:        uint64(lsnTracker.GetGlobalLSN()) + c.deletesCount.Load(),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?,
 					})
+					sendMutex.Unlock()
 				}
 			}
 			if changeStream.Err() != nil {
@@ -365,6 +368,8 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		namespaces = append(namespaces, ns)
 	}
 
+	var sendMutex sync.Mutex
+
 	if c.connectorSettings.EmulateDeletes {
 		var nss []iface.Namespace
 		for _, namespace := range namespaces {
@@ -381,11 +386,13 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 				for loc, updates := range updatesMap {
 					c.deletesCount.Add(uint64(len(updates)))
 					encodedToken, _ := tokenMap.encodeMap()
+					sendMutex.Lock()
 					err := s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
 						Namespace:  fmt.Sprintf("%v.%v", loc.Database, loc.Collection),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken),
 					})
+					sendMutex.Unlock()
 					if err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
@@ -464,11 +471,13 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 				if changeStream.RemainingBatchLength() == 0 {
 					tokenMap.AddToken(loc, changeStream.ResumeToken())
 					encodedToken, _ := tokenMap.encodeMap()
+					sendMutex.Lock()
 					err := s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
 						Namespace:  fmt.Sprintf("%v.%v", ns.Db, ns.Col),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?
 					})
+					sendMutex.Unlock()
 					if err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
