@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/adiom-data/dsync/connectors/null"
+	"github.com/adiom-data/dsync/connectors/vector"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/transform"
@@ -25,6 +26,7 @@ func main() {
 		s := grpc.NewServer()
 		adiomv1.RegisterConnectorServiceServer(s, newConnector())
 		adiomv1.RegisterTransformServiceServer(s, transform.NewIdentityTransformGRPC())
+		// Currently no dummy standard go grpc implementation for chunking or embedding
 		s.Serve(l)
 	}()
 
@@ -32,8 +34,12 @@ func main() {
 	mux := http.NewServeMux()
 	path, handler := adiomv1connect.NewConnectorServiceHandler(nullConn)
 	tpath, thandler := adiomv1connect.NewTransformServiceHandler(transform.NewIdentityTransform())
+	cpath, chandler := adiomv1connect.NewChunkingServiceHandler(vector.NewSimple())
+	epath, ehandler := adiomv1connect.NewEmbeddingServiceHandler(vector.NewSimple())
 	mux.Handle(path, handler)
 	mux.Handle(tpath, thandler)
+	mux.Handle(cpath, chandler)
+	mux.Handle(epath, ehandler)
 	http.ListenAndServe(
 		"localhost:8085",
 		h2c.NewHandler(mux, &http2.Server{}),
