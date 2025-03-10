@@ -3,6 +3,7 @@ package vector
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -208,7 +209,29 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	if len(r.Msg.GetUpdates()) == 0 {
 		return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 	}
-	err := Batcher(r.Msg.GetUpdates(), c.batchSize, func(updates []*adiomv1.Update) error {
+
+	allUpdates := r.Msg.GetUpdates()
+	dedupedUpdates := []*adiomv1.Update{}
+	seen := map[string]struct{}{}
+	for i := range allUpdates {
+		update := allUpdates[len(allUpdates)-1-i]
+		idPart := update.GetId()[0]
+		var id interface{}
+		bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id)
+		idStr, err := fromBson(id)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		if _, ok := seen[idStr.(string)]; ok {
+			continue
+		}
+		seen[idStr.(string)] = struct{}{}
+		dedupedUpdates = append(dedupedUpdates, update)
+	}
+	slices.Reverse(dedupedUpdates)
+
+	err := Batcher(dedupedUpdates, c.batchSize, func(updates []*adiomv1.Update) error {
+
 		var docs []*VectorDocument
 		var upserts [][]byte
 		for _, update := range updates {
