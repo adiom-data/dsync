@@ -7,12 +7,14 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
 	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/null"
+	"github.com/adiom-data/dsync/connectors/postgres"
 	"github.com/adiom-data/dsync/connectors/random"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
@@ -248,6 +250,22 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 		},
 		{
+			Name: "Postgres",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				settings := postgresSettingsDefault
+				return CreateHelper("Postgres", postgresUsage, PostgresFlags(&settings), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					if c.Bool("manual") {
+						settings.Force = false
+					}
+					settings.URL = args[0]
+					return postgres.NewConn(c.Context, settings)
+				})(args, as)
+			},
+		},
+		{
 			Name: "weaviate",
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "weaviate")
@@ -479,6 +497,88 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Aliases:     []string{"q"},
 			Required:    false,
 			Destination: &settings.Query,
+		}),
+	}
+}
+
+var postgresUsage = `postgresql://user:pass@host:port [options]
+
+Source:
+   Tables must have a primary key and you must specify at least one namespace.
+
+   Initial sync is split into tasks by Bernoulli sampling based on 1 / doc-partition.
+
+   Change streams are powered by logical replication. Ensure that the postgres instance has been configured with 'wal_level=logical'. It should have the permissions to create replication slots and publications unless that is being managed externally via the --manual flag. Note that even though this connector may drop and create the replication slot and publication, you must still manually remove drop resources when you are done with dsync or postgres storage may grow. Also note that if you are running multiple instances for the same source, you will need to configure a different replication slot and/or publication for each one.
+
+   Currently, TOAST fields are not properly supported. Set the replica identity to full as a workaround.
+
+Destination:
+   Not currently supported
+`
+
+var postgresSettingsDefault = postgres.PostgresSettings{
+	Force:                      true,
+	SlotName:                   "dsync_slot",
+	PublicationName:            "dsync_pub",
+	Limit:                      1000,
+	StreamMaxBatchWait:         time.Second * 5,
+	StreamMaxBatchSize:         100,
+	StreamFlushDelay:           time.Minute * 3,
+	EstimatedCountThreshold:    1000000,
+	TargetDocCountPerPartition: 100000,
+}
+
+func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "page-size",
+			Usage:       "Specify pagination limit when fetching for initial sync",
+			Value:       postgresSettingsDefault.Limit,
+			Destination: &settings.Limit,
+		}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "stream-max-batch-wait",
+			Usage:       "Force flush a stream batch after this interval",
+			Value:       postgresSettingsDefault.StreamMaxBatchWait,
+			Destination: &settings.StreamMaxBatchWait,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "stream-max-batch-size",
+			Usage:       "Force flush a stream batch at this limit",
+			Value:       postgresSettingsDefault.StreamMaxBatchSize,
+			Destination: &settings.StreamMaxBatchSize,
+		}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "stream-flush-delay",
+			Usage:       "Delay before notifying postgres backend of stream progress. This should be comfortably larger than saving streaming cursor updates.",
+			Value:       postgresSettingsDefault.StreamFlushDelay,
+			Destination: &settings.StreamFlushDelay,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "manual",
+			Usage: "Use to not recreate replication slot and publication (e.g. if you are managing these outside). You will still need to clean up the slot later even if you don't use this.",
+			Value: !postgresSettingsDefault.Force,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "replication-slot",
+			Value:       postgresSettingsDefault.SlotName,
+			Destination: &postgresSettingsDefault.SlotName,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "publication-name",
+			Value:       postgresSettingsDefault.PublicationName,
+			Destination: &postgresSettingsDefault.PublicationName,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "estimated-count-threshold",
+			Usage:       "If estimated count is less than this, try a full count.",
+			Value:       postgresSettingsDefault.EstimatedCountThreshold,
+			Destination: &settings.EstimatedCountThreshold,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "doc-partition",
+			Value:       postgresSettingsDefault.TargetDocCountPerPartition,
+			Destination: &settings.TargetDocCountPerPartition,
 		}),
 	}
 }
