@@ -271,6 +271,14 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
+func NewQdrantConn(chunker adiomv1connect.ChunkingServiceClient, embedder adiomv1connect.EmbeddingServiceClient, host string, port int) (adiomv1connect.ConnectorServiceHandler, error) {
+	c, err := NewQdrantConnector(host, port)
+	if err != nil {
+		return nil, err
+	}
+	return NewConn(fmt.Sprintf("%v:%v", host, port), "Qdrant", 200, chunker, embedder, c), nil
+}
+
 func NewWeaviateConn(chunker adiomv1connect.ChunkingServiceClient, embedder adiomv1connect.EmbeddingServiceClient, url string, groupID string, apiKey string, useIdentityMapper bool) (adiomv1connect.ConnectorServiceHandler, error) {
 	splitted := strings.SplitN(url, "://", 2)
 	if len(splitted) != 2 {
