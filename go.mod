@@ -1,8 +1,7 @@
 module github.com/adiom-data/dsync
 
 go 1.22.2
-
-toolchain go1.23.8
+toolchain go1.24.1
 
 require (
 	connectrpc.com/connect v1.17.0
@@ -20,7 +19,6 @@ require (
 	github.com/jrhy/mast v1.2.32
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
-	github.com/qdrant/go-client v1.13.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b
 	github.com/samber/slog-multi v1.2.4
 	github.com/stretchr/testify v1.10.0
@@ -31,7 +29,7 @@ require (
 	go.akshayshah.org/memhttp v0.1.0
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
-	golang.org/x/net v0.34.0
+	golang.org/x/net v0.39.0
 	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.3
@@ -83,8 +81,8 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/term v0.28.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250102185135-69823020774d // indirect
 )
 
@@ -102,8 +100,8 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/sync v0.10.0
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/sync v0.13.0
+	golang.org/x/text v0.24.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
