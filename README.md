@@ -106,6 +106,6 @@ make verify # verify should suceed
 
 Please report any bugs here in the GitHub project.
 
-For technical questions and discussions, please use the dsync-dev@adiom.io mailing list.
+For technical questions and discussions, please join our [Discord server](https://discord.gg/8Ymuq6DH).
 
 For commercial inquires, please contact info@adiom.io.
