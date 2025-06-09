@@ -1,6 +1,6 @@
 module github.com/adiom-data/dsync
 
-go 1.22.2
+go 1.23.0
 
 toolchain go1.23.8
 
@@ -20,7 +20,6 @@ require (
 	github.com/jrhy/mast v1.2.32
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
-	github.com/qdrant/go-client v1.13.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b
 	github.com/samber/slog-multi v1.2.4
 	github.com/stretchr/testify v1.10.0
@@ -32,7 +31,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 	golang.org/x/net v0.34.0
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.3
 )
