@@ -115,7 +115,7 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		totalPercentComplete := percentCompleteTotal(runnerProgress)
 
 		progress := int(math.Floor(totalPercentComplete / 100 * float64(progressBarWidth)))
-		progress = max(0, progress)
+		progress = min(progressBarWidth, max(0, progress))
 		progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n\n",
 			strings.Repeat(string('#'), progress),
 			strings.Repeat(" ", max(0, progressBarWidth-progress)),
