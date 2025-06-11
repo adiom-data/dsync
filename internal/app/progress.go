@@ -115,7 +115,11 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		totalPercentComplete := percentCompleteTotal(runnerProgress)
 
 		progress := int(math.Floor(totalPercentComplete / 100 * float64(progressBarWidth)))
-		progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n\n", strings.Repeat(string('#'), progress), strings.Repeat(" ", progressBarWidth-progress), totalPercentComplete, runnerProgress.Throughput)
+		progress = min(progressBarWidth, max(0, progress))
+		progressBarString := fmt.Sprintf("[%s%s] %.2f%%		%.2f docs/sec\n\n",
+			strings.Repeat(string('#'), progress),
+			strings.Repeat(" ", max(0, progressBarWidth-progress)),
+			totalPercentComplete, runnerProgress.Throughput)
 		progressBar.SetText(progressBarString)
 
 	case iface.ChangeStreamSyncState:
@@ -131,7 +135,11 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		//set the indefinite progress bar
 		progressBarWidth := 80
 		cdcPaginatorPosition = (cdcPaginatorPosition + 5) % (progressBarWidth - 4)
-		progressBarString := fmt.Sprintf("[%s%s%s] %.2f events/sec\n\n", strings.Repeat(string('-'), cdcPaginatorPosition), strings.Repeat(">", 3), strings.Repeat("-", progressBarWidth-cdcPaginatorPosition-2), runnerProgress.Throughput)
+		progressBarString := fmt.Sprintf("[%s%s%s] %.2f events/sec\n\n",
+			strings.Repeat(string('-'), max(0, cdcPaginatorPosition)),
+			strings.Repeat(">", 3),
+			strings.Repeat("-", max(0, progressBarWidth-cdcPaginatorPosition-2)),
+			runnerProgress.Throughput)
 		progressBar.SetText(progressBarString)
 
 	case iface.CleanupSyncState:
