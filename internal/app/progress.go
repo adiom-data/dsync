@@ -215,9 +215,7 @@ func percentCompleteTotal(progress runnerLocal.RunnerSyncProgress) float64 {
 func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64, float64) {
 	var percentComplete float64
 	var numerator, denominator float64
-	if len(nsStatus.Tasks) == int(nsStatus.TasksCompleted) {
-		return 100, float64(nsStatus.TasksCompleted), float64(len(nsStatus.Tasks))
-	}
+
 	if len(nsStatus.Tasks) == 1 {
 		//no partitioning
 		docCount := nsStatus.EstimatedDocCount
@@ -261,7 +259,12 @@ func percentCompleteNamespace(nsStatus *iface.NamespaceStatus) (float64, float64
 		numerator = float64(numCompletedDocs + numDocsInProgress)
 		denominator = float64(numCompletedDocs + numDocsLeft)
 	}
-	return max(0, min(99, percentComplete)), numerator, denominator
+
+	if len(nsStatus.Tasks) == int(nsStatus.TasksCompleted) {
+		return 100, denominator, denominator
+	} else {
+		return max(0, min(99, percentComplete)), numerator, denominator
+	}
 }
 
 // Convert the iface.Namespace key to a string ("db.col") to support JSON marshal
