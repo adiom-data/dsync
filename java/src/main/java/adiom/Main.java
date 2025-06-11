@@ -280,6 +280,8 @@ public class Main {
         @Override
         public void generatePlan(GeneratePlanRequest request, StreamObserver<GeneratePlanResponse> responseObserver) {
             GeneratePlanResponse.Builder responseBuilder = GeneratePlanResponse.newBuilder();
+            UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder();
+            ContinuationTokenMap tokenMap = new ContinuationTokenMap();
             for (String namespace : request.getNamespacesList()) {
                 NsHelper helper = getNsHelper(responseObserver, namespace);
                 if (helper == null) {
@@ -292,14 +294,18 @@ public class Main {
                 }
 
                 CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions.createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
-                UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder().addNamespaces(namespace);
+                updatesPartitionBuilder.addNamespaces(namespace);
                 for (FeedResponse<Object> fr : helper.container.queryChangeFeed(ccfro, Object.class).iterableByPage()) {
-                    updatesPartitionBuilder.setCursor(ByteString.copyFromUtf8(fr.getContinuationToken()));
+                    String continuationToken = fr.getContinuationToken();
+                    if (continuationToken != null) {
+                        tokenMap.put(namespace, continuationToken);
+                    }
                 }
-
-                responseBuilder.addUpdatesPartitions(updatesPartitionBuilder);
+    
             }
-
+            ByteString serializedTokenMap = tokenMap.serialize();
+            updatesPartitionBuilder.setCursor(serializedTokenMap);
+            responseBuilder.addUpdatesPartitions(updatesPartitionBuilder);
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
         }
@@ -372,51 +378,86 @@ public class Main {
         @Override
         public void streamUpdates(StreamUpdatesRequest request,
                 StreamObserver<StreamUpdatesResponse> responseObserver) {
-            if (request.getNamespacesCount() != 1) {
-                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Must have exactly 1 namespace, but has " + request.getNamespacesCount()).asException());
-                return;
-            }
-            String namespace = request.getNamespaces(0);
-            NsHelper helper = getNsHelper(responseObserver, namespace);
-            if (helper == null) {
+            if (request.getNamespacesCount() < 1) {
+                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Must have at least 1 namespace, but has " + request.getNamespacesCount()).asException());
                 return;
             }
 
-            String continuation = request.getCursor().toStringUtf8();
+            List<Thread> threads = new ArrayList<>();
+            List<String> namespaces = request.getNamespacesList();
+            // Use ContinuationTokenMap for per-namespace continuation tokens
+            ContinuationTokenMap tokenMap;
+            if (request.getCursor() != null && !request.getCursor().isEmpty()) {
+                tokenMap = ContinuationTokenMap.deserialize(request.getCursor());
+            } else {
+                tokenMap = new ContinuationTokenMap();
+            }
 
-            while (!Context.current().isCancelled()) {
-                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions.createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class).iterableByPage();
-                for (FeedResponse<JsonNode> fr : it) {
-                    List<Update> updates = new ArrayList<>();
-                    for (JsonNode node: fr.getResults()) {
-                        JsonNode opType = node.get("metadata").get("operationType");
-                        if (opType != null && opType.asText() == "delete") {
-                            String id = node.get("metadata").get("id").asText();
-                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE).addId(BsonHelper.toId(id)).build());
-                        } else {
-                            adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
-                            if (opType != null && opType.asText() == "create") {
-                                typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
+            for (String namespace : namespaces) {
+                Thread t = new Thread(() -> {
+                    NsHelper helper = getNsHelper(responseObserver, namespace);
+                    if (helper == null) {
+                        return;
+                    }
+
+                    String continuation = tokenMap.get(namespace);
+
+                    while (!Context.current().isCancelled()) {
+                        Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(
+                                continuation == null ? CosmosChangeFeedRequestOptions.createForProcessingFromNow(FeedRange.forFullRange()).allVersionsAndDeletes() :
+                                        CosmosChangeFeedRequestOptions.createForProcessingFromContinuation(continuation).allVersionsAndDeletes(),
+                                JsonNode.class).iterableByPage();
+                        for (FeedResponse<JsonNode> fr : it) {
+                            List<Update> updates = new ArrayList<>();
+                            for (JsonNode node: fr.getResults()) {
+                                JsonNode opType = node.get("metadata").get("operationType");
+                                if (opType != null && opType.asText().equals("delete")) {
+                                    String id = node.get("metadata").get("id").asText();
+                                    updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE).addId(BsonHelper.toId(id)).build());
+                                } else {
+                                    adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
+                                    if (opType != null && opType.asText().equals("create")) {
+                                        typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
+                                    }
+                                    JsonNode currentNode = node.get("current");
+                                    ObjectNode objectNode = (ObjectNode)(currentNode);
+                                    objectNode.remove(CosmosInternalKeys);
+                                    String id = currentNode.get("id").asText();
+                                    updates.add(Update.newBuilder().setType(typ).setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id)).build());
+                                }
                             }
-                            JsonNode currentNode = node.get("current");
-                            ObjectNode objectNode = (ObjectNode)(currentNode);
-                            objectNode.remove(CosmosInternalKeys);
-                            String id = currentNode.get("id").asText();
-                            updates.add(Update.newBuilder().setType(typ).setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id)).build());
+
+                            continuation = fr.getContinuationToken();
+                            tokenMap.put(namespace, continuation);
+
+                            if (updates.size() > 0) {
+                                StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder()
+                                    .setNamespace(namespace)
+                                    .setNextCursor(tokenMap.serialize())
+                                    .addAllUpdates(updates)
+                                    .build();
+                                synchronized (responseObserver) {
+                                    responseObserver.onNext(item);
+                                }
+                            }
+                        }
+                        try {
+                            Thread.sleep(2000);
+                        } catch (Exception e) {
+                            break;
                         }
                     }
-                    
-                    continuation = fr.getContinuationToken();
+                });
+                t.start();
+                threads.add(t);
+            }
 
-                    if (updates.size() > 0) {
-                        StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder().setNamespace(namespace).setNextCursor(ByteString.copyFromUtf8(continuation)).addAllUpdates(updates).build();
-                        responseObserver.onNext(item);   
-                    }
-                }
+            // Wait for all threads to finish or be interrupted
+            for (Thread t : threads) {
                 try {
-                    Thread.sleep(2000);
-                } catch (Exception e) {
-                    break;
+                    t.join();
+                } catch (InterruptedException e) {
+                    // ignore
                 }
             }
             responseObserver.onCompleted();
