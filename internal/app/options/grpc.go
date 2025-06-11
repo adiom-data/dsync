@@ -30,22 +30,31 @@ var Chunker = ConfigureGRPCFactory("Chunker", ErrInvalidChunker, func(c connect.
 
 var ErrMissingTransform = errors.New("transform is missing")
 var ErrInvalidTransform = errors.New("transform must start with grpc://")
-var Transformer = ConfigureGRPCFactory("Chunker", ErrInvalidTransform, func(c connect.HTTPClient, s string, opts ...connect.ClientOption) interface{} {
-	return adiomv1connect.NewChunkingServiceClient(c, s, opts...)
+var Transformer = ConfigureGRPCFactory("Transform", ErrInvalidTransform, func(c connect.HTTPClient, s string, opts ...connect.ClientOption) interface{} {
+	return adiomv1connect.NewTransformServiceClient(c, s, opts...)
 })
 
 func ConfigureEmbedder(args []string) (adiomv1connect.EmbeddingServiceClient, []string, error) {
 	c, restArgs, err := Embedder(args)
+	if err != nil {
+		return nil, nil, err
+	}
 	return c.(adiomv1connect.EmbeddingServiceClient), restArgs, err
 }
 
 func ConfigureChunker(args []string) (adiomv1connect.ChunkingServiceClient, []string, error) {
 	c, restArgs, err := Chunker(args)
+	if err != nil {
+		return nil, nil, err
+	}
 	return c.(adiomv1connect.ChunkingServiceClient), restArgs, err
 }
 
 func ConfigureTransformer(args []string) (adiomv1connect.TransformServiceClient, []string, error) {
 	c, restArgs, err := Transformer(args)
+	if err != nil {
+		return nil, nil, err
+	}
 	return c.(adiomv1connect.TransformServiceClient), restArgs, err
 }
 
