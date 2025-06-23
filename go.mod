@@ -7,7 +7,7 @@ toolchain go1.23.8
 require (
 	connectrpc.com/connect v1.17.0
 	connectrpc.com/grpcreflect v1.2.0
-	github.com/aws/aws-sdk-go-v2 v1.36.0
+	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.4
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.15.12
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.39.6
@@ -20,7 +20,6 @@ require (
 	github.com/jrhy/mast v1.2.32
 	github.com/lmittmann/tint v1.0.5
 	github.com/mitchellh/hashstructure v1.1.0
-	github.com/qdrant/go-client v1.13.0
 	github.com/rivo/tview v0.0.0-20240807095714-a8dd8799d63b
 	github.com/samber/slog-multi v1.2.4
 	github.com/stretchr/testify v1.10.0
@@ -51,7 +50,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.12 // indirect
-	github.com/aws/smithy-go v1.22.2 // indirect
+	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/go-openapi/analysis v0.23.0 // indirect
