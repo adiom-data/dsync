@@ -167,7 +167,7 @@ func (pt *ProgressTracker) TaskDoneProgressUpdate(ns iface.Namespace, taskId ifa
 	delete(nsStatus.ActiveTasksList, taskId)
 }
 
-// update changeStreamEvents progress counters atomically - only used by Cosmos connector
+// update changeStreamEvents progress counters atomically
 func (pt *ProgressTracker) UpdateChangeStreamProgressTracking() {
 	pt.muProgressMetrics.Lock()
 	defer pt.muProgressMetrics.Unlock()
@@ -180,6 +180,13 @@ func (pt *ProgressTracker) UpdateChangeStreamLastTime(t time.Time) {
 	if !t.IsZero() && t.After(pt.status.ProgressMetrics.LastChangeStreamTime) {
 		pt.status.ProgressMetrics.LastChangeStreamTime = t.UTC()
 	}
+}
+
+// update deletes caught progress counters atomically
+func (pt *ProgressTracker) UpdateChangeStreamProgressTrackingDeletes() {
+	pt.muProgressMetrics.Lock()
+	defer pt.muProgressMetrics.Unlock()
+	pt.status.ProgressMetrics.DeletesCaught++
 }
 
 func (pt *ProgressTracker) UpdateWriteLSN(lsn int64) {
