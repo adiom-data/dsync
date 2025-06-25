@@ -25,6 +25,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -175,7 +176,13 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			for _, partition := range partitions {
 				ns, _ := ToNS(partition.Namespace)
 				col := c.client.Database(ns.Db).Collection(ns.Col)
-				resumeToken, err := getLatestResumeToken(ctx, col)
+				pipeline := mongo.Pipeline{}
+				if len(c.query) > 0 {
+					pipeline = mongo.Pipeline{
+						{{"$match", mapExtraFilterForChangeStream(c.query)}},
+					}
+				}
+				resumeToken, err := getLatestResumeToken(ctx, col, pipeline)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for ns %v: %v", partition.GetNamespace(), err))
 					return nil, connect.NewError(connect.CodeInternal, err)
@@ -187,18 +194,28 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				})
 			}
 		} else {
-			resumeToken, err := getLatestResumeToken(ctx, c.client)
+			var updatesNamespaces []string
+			var namespaces []iface.Namespace
+			if len(r.Msg.GetNamespaces()) > 0 {
+				for _, partition := range partitions {
+					updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
+					ns, ok := ToNS(partition.GetNamespace())
+					if !ok {
+						return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+					}
+					namespaces = append(namespaces, ns)
+				}
+			}
+
+			nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces, c.query)
+			resumeToken, err := getLatestResumeToken(ctx, c.client, mongo.Pipeline{
+				{{"$match", nsFilter}},
+			})
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 
-			var updatesNamespaces []string
-			if len(r.Msg.GetNamespaces()) > 0 {
-				for _, partition := range partitions {
-					updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
-				}
-			}
 			updatesPartitions = []*adiomv1.UpdatesPartition{{Namespaces: updatesNamespaces, Cursor: resumeToken}}
 		}
 	}
@@ -219,7 +236,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		eg.Go(func() error {
 			ns, _ := ToNS(partition.Namespace)
 			col := c.client.Database(ns.Db).Collection(ns.Col)
-			count, err := col.EstimatedDocumentCount(ctx)
+			count, err := c.count(col, ctx)
 			if err != nil {
 				return err
 			}
@@ -296,13 +313,24 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 	}), nil
 }
 
+func (c *conn) count(col *mongo.Collection, ctx context.Context) (int64, error) {
+	if len(c.query) == 0 {
+		return col.EstimatedDocumentCount(ctx)
+	}
+	col2, err := col.Clone(options.Collection().SetReadConcern(readconcern.Available()))
+	if err != nil {
+		return 0, err
+	}
+	return col2.CountDocuments(ctx, c.query)
+}
+
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetNamespaceMetadata(ctx context.Context, r *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
 	collection, _, ok := GetCol(c.client, r.Msg.GetNamespace())
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
-	count, err := collection.EstimatedDocumentCount(ctx)
+	count, err := c.count(collection, ctx)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to count documents: %v", err))
@@ -397,6 +425,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		if len(c.query) > 0 { //if a query is provided, append it to the filter
 			filter = append(filter, c.query...)
 		}
+		slog.Debug("query filter", "filter", filter)
 
 		cursor, err := collection.Find(ctx, filter)
 		if err != nil {
@@ -513,15 +542,24 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		}
 		watcher = c.client.Database(namespaces[0].Db).Collection(namespaces[0].Col)
 		pipeline = mongo.Pipeline{}
+		if len(c.query) > 0 {
+			pipeline = mongo.Pipeline{
+				{{"$match", mapExtraFilterForChangeStream(c.query)}},
+			}
+		}
 	} else {
 		watcher = c.client
-		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
-		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
+		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces, c.query)
+		slog.Debug("LSN Filter", "filter", nsFilter)
 		pipeline = mongo.Pipeline{
 			{{"$match", nsFilter}},
 		}
 	}
 	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
+	if len(c.query) > 0 {
+		opts = opts.SetFullDocument("updateLookup")
+		pipeline = append(pipeline, bson.D{{"$project", bson.M{"_id": 1}}})
+	}
 
 	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
@@ -554,16 +592,76 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 	return nil
 }
 
+func extraFilterForChangeStream(filters bson.D) bson.D {
+	mapped := mapExtraFilterForChangeStream(filters).(bson.D)
+	return bson.D{{"$or", []bson.D{mapped, {{"operationType", "delete"}}}}}
+}
+
+func mapExtraFilterForChangeStream(filters interface{}) interface{} {
+	switch filter := filters.(type) {
+	case bson.A:
+		var newFilters bson.A
+		for _, f := range filter {
+			newFilters = append(newFilters, mapExtraFilterForChangeStream(f))
+		}
+		return newFilters
+	case bson.D:
+		var newFilters bson.D
+		for _, f := range filter {
+			newValue := mapExtraFilterForChangeStream(f.Value)
+			if !strings.HasPrefix(f.Key, "$") {
+				newKey := fmt.Sprintf("fullDocument.%v", f.Key)
+				newFilters = append(newFilters, bson.E{newKey, newValue})
+			} else {
+				newFilters = append(newFilters, bson.E{f.Key, newValue})
+			}
+		}
+		return newFilters
+	case bson.M:
+		newFilters := bson.M{}
+		for k, v := range filter {
+			newValue := mapExtraFilterForChangeStream(v)
+			if !strings.HasPrefix(k, "$") {
+				newKey := fmt.Sprintf("fullDocument.%v", k)
+				newFilters[newKey] = newValue
+			} else {
+				newFilters[k] = newValue
+			}
+		}
+		return newFilters
+	default:
+		return filter
+	}
+}
+
+// create a change stream filter that covers all namespaces except system
+func createChangeStreamNamespaceFilter(extraFilters bson.D) bson.D {
+	filter := []bson.D{
+		{{"ns.db", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedDBPatternCS}}}}},
+		{{"ns.coll", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedSystemCollPatternCS}}}}},
+	}
+	if len(extraFilters) > 0 {
+		filter = append(filter, extraFilterForChangeStream(extraFilters))
+	}
+	return bson.D{{"$and", filter}}
+}
+
 // creates a filter for the change stream to include only the specified namespaces
-func createChangeStreamNamespaceFilterFromNamespaces(namespaces []iface.Namespace) bson.D {
+func createChangeStreamNamespaceFilterFromNamespaces(namespaces []iface.Namespace, extraFilters bson.D) bson.D {
 	if len(namespaces) == 0 {
-		return createChangeStreamNamespaceFilter()
+		return createChangeStreamNamespaceFilter(extraFilters)
 	}
 
 	var filters []bson.D
 	for _, namespace := range namespaces {
 		filters = append(filters, bson.D{{"ns.db", namespace.Db}, {"ns.coll", namespace.Col}})
 	}
+
+	if len(extraFilters) > 0 {
+		return bson.D{{"$and", []bson.D{{{"$or", filters}}, extraFilterForChangeStream(extraFilters)}}}
+
+	}
+
 	return bson.D{{"$or", filters}}
 }
 
@@ -672,9 +770,14 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		}
 		watcher = c.client.Database(namespaces[0].Db).Collection(namespaces[0].Col)
 		pipeline = mongo.Pipeline{}
+		if len(c.query) > 0 {
+			pipeline = mongo.Pipeline{
+				{{"$match", mapExtraFilterForChangeStream(c.query)}},
+			}
+		}
 	} else {
 		watcher = c.client
-		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
+		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces, c.query)
 		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 		pipeline = mongo.Pipeline{
 			{{"$match", nsFilter}},
@@ -920,6 +1023,9 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 			dii, isNew := addToIdIndexMap2(hashToDataIdIndex, update)
 			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}}}
+			if len(c.query) > 0 {
+				idFilter = append(idFilter, c.query...)
+			}
 			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
 			if isNew {
 				dii.index = len(models)
@@ -982,6 +1088,7 @@ func NewConn(connSettings ConnectorSettings) (adiomv1connect.ConnectorServiceHan
 
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
 	ctx, cancel := context.WithCancel(context.Background())
+	slog.Debug("Query", "query", settings.Query)
 	query, err := stringToQuery(settings.Query)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to parse query (%v): %v", settings.Query, err))

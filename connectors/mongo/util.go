@@ -60,9 +60,10 @@ type Watchable interface {
 	Watch(ctx context.Context, pipeline interface{}, opts ...*options.ChangeStreamOptions) (*mongo.ChangeStream, error)
 }
 
-func getLatestResumeToken(ctx context.Context, client Watchable) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client Watchable, pipeline mongo.Pipeline) (bson.Raw, error) {
 	slog.Debug("Getting latest resume token...")
-	changeStream, err := client.Watch(ctx, mongo.Pipeline{})
+	changeStream, err := client.Watch(ctx, pipeline)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
