@@ -399,6 +399,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	type ReaderProgress struct {
 		initialSyncDocs    atomic.Uint64
 		changeStreamEvents atomic.Uint64
+		deleteEvents       atomic.Uint64
 		tasksTotal         uint64
 		tasksCompleted     atomic.Uint64
 	}
@@ -424,8 +425,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				operations_delta := readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents.Load() - operations
 				opsPerSec := math.Floor(float64(operations_delta) / elapsedTime)
 				// Print reader progress
-				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Operations per Second - %.2f",
-					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted.Load(), readerProgress.tasksTotal, readerProgress.changeStreamEvents.Load(), opsPerSec))
+				slog.Info(fmt.Sprintf("Reader Progress: Initial Sync Docs - %d (%d/%d tasks completed), Change Stream Events - %d, Delete Events - %d Operations per Second - %.2f",
+					readerProgress.initialSyncDocs.Load(), readerProgress.tasksCompleted.Load(), readerProgress.tasksTotal, readerProgress.changeStreamEvents.Load(), readerProgress.deleteEvents.Load(), opsPerSec))
 
 				startTime = time.Now()
 				operations = readerProgress.initialSyncDocs.Load() + readerProgress.changeStreamEvents.Load()
@@ -692,13 +693,17 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				switch d.Type {
 				case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
 					mutationType = iface.MutationType_Insert
+					c.progressTracker.UpdateChangeStreamProgressTracking()
+					readerProgress.changeStreamEvents.Add(1)
 				case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
 					mutationType = iface.MutationType_Update
+					c.progressTracker.UpdateChangeStreamProgressTracking()
+					readerProgress.changeStreamEvents.Add(1)
 				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 					mutationType = iface.MutationType_Delete
+					c.progressTracker.UpdateChangeStreamProgressTrackingDeletes()
+					readerProgress.deleteEvents.Add(1)
 				}
-				c.progressTracker.UpdateChangeStreamProgressTracking()
-				readerProgress.changeStreamEvents.Add(1)
 				lsn++
 
 				dataChannel <- iface.DataMessage{

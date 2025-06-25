@@ -71,9 +71,9 @@ func insertDummyRecord(ctx context.Context, client *mongo.Client) error {
 	return nil
 }
 
-func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client *mongo.Client, pipeline mongo.Pipeline) (bson.Raw, error) {
 	slog.Debug("Getting latest resume token...")
-	changeStream, err := client.Watch(ctx, mongo.Pipeline{}) //TODO (AK, 6/2024): We should limit this to just the dummy collection or we can catch something that we don't want :)
+	changeStream, err := client.Watch(ctx, pipeline) //TODO (AK, 6/2024): We should limit this to just the dummy collection or we can catch something that we don't want :)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
