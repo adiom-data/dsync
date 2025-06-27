@@ -53,7 +53,11 @@ func ColString() string {
 func TestMongoConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(
 		func() iface.Connector {
-			return common.NewLocalConnector("test", NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString}), common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
+			conn, err := NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString})
+			if err != nil {
+				t.FailNow()
+			}
+			return common.NewLocalConnector("test", conn, common.ConnectorSettings{ResumeTokenUpdateInterval: 5 * time.Second})
 		},
 		func() test.TestDataStore {
 			return NewMongoTestDataStore(TestMongoConnectionString)
@@ -68,7 +72,11 @@ func TestMongoConnectorSuite2(t *testing.T) {
 	ns := fmt.Sprintf("%s.%s", DBString(), ColString())
 
 	tSuite := test2.NewConnectorTestSuite(ns, func() adiomv1connect.ConnectorServiceClient {
-		return test2.ClientFromHandler(NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString, MaxPageSize: 2}))
+		conn, err := NewConn(ConnectorSettings{ConnectionString: TestMongoConnectionString, MaxPageSize: 2})
+		if err != nil {
+			t.FailNow()
+		}
+		return test2.ClientFromHandler(conn)
 	}, func(ctx context.Context) error {
 		if err := col.Database().Drop(ctx); err != nil {
 			return err
