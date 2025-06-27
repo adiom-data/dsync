@@ -255,7 +255,9 @@ func (s *source) ProcessSource(ctx context.Context, process func(context.Context
 			if s.totalPartitions > 0 {
 				hasher.Reset()
 				for _, id := range update.ID {
-					hasher.Write(id.Value)
+					if _, err := hasher.Write(id.Value); err != nil {
+						return err
+					}
 				}
 				if hasher.Sum64()%uint64(s.totalPartitions) != uint64(s.partition) {
 					continue
@@ -323,7 +325,7 @@ func (m *mastVerify) Run(ctx context.Context) error {
 			case <-ticker.C:
 				diffs := 0
 				slog.Info("Verifying", "left_total", leftM.Size(), "right_total", rightM.Size())
-				leftM.DiffIter(egCtx, &rightM, func(added, removed bool, key, addedValue, removedValue interface{}) (bool, error) {
+				_ = leftM.DiffIter(egCtx, &rightM, func(added, removed bool, key, addedValue, removedValue interface{}) (bool, error) {
 					if added && removed {
 					} else if added {
 						if h, ok := addedValue.(uint64); h == 0 && ok {
@@ -439,7 +441,9 @@ func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, projecti
 			Value: bytes.Clone(update.ID[0].Value),
 		}
 		hasher.Reset()
-		hasher.Write(update.ID[0].Value)
+		if _, err := hasher.Write(update.ID[0].Value); err != nil {
+			return err
+		}
 		idHash := hasher.Sum64()
 		namespace := util.MapNamespace(namespaceMap, update.Namespace, ".", ":")
 		id := NamespacedID{namespace, innerIDCopy}
@@ -512,7 +516,7 @@ func runVerify(c *cli.Context) error {
 		go func() {
 			host := fmt.Sprintf("localhost:%d", c.Int("pprof-port"))
 			slog.Info("Starting pprof server on " + host)
-			http.ListenAndServe(host, nil)
+			_ = http.ListenAndServe(host, nil) // #nosec G114
 		}()
 	}
 	slog.Info("Starting Verifier", "namespaces", c.StringSlice("namespaces"))

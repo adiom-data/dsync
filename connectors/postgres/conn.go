@@ -154,7 +154,9 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 		return nil, err
 	}
 	hasher := xxhash.New()
-	hasher.Write([]byte(url))
+	if _, err := hasher.Write([]byte(url)); err != nil {
+		return nil, err
+	}
 	id := hasher.Sum64()
 	c, err := pgxpool.New(ctx, url)
 	if err != nil {

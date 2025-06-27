@@ -118,21 +118,31 @@ func HashBson(hasher hash.Hash64, b bson.Raw, arr bool, projection map[string]in
 				innerProjection = innerMap
 			}
 		}
-		hasher.Write([]byte(e.Key()))
+		if _, err := hasher.Write([]byte(e.Key())); err != nil {
+			return err
+		}
 		v := e.Value()
-		hasher.Write([]byte{byte(v.Type)})
+		if _, err := hasher.Write([]byte{byte(v.Type)}); err != nil {
+			return err
+		}
 		if v.Type == bson.TypeEmbeddedDocument {
-			hasher.Write([]byte(e.Key()))
+			if _, err := hasher.Write([]byte(e.Key())); err != nil {
+				return err
+			}
 			if err := HashBson(hasher, v.Document(), false, innerProjection); err != nil {
 				return err
 			}
 		} else if v.Type == bson.TypeArray {
-			hasher.Write([]byte(e.Key()))
+			if _, err := hasher.Write([]byte(e.Key())); err != nil {
+				return err
+			}
 			if err := HashBson(hasher, v.Array(), true, innerProjection); err != nil {
 				return err
 			}
 		} else {
-			hasher.Write(e)
+			if _, err := hasher.Write([]byte(e)); err != nil {
+				return err
+			}
 		}
 	}
 	return err
@@ -235,7 +245,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 		}))
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
-			c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{Error: err})
+			_ = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{Error: err})
 			return
 		}
 
@@ -357,7 +367,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	c.progressTracker.RestoreProgressDetails(tasks)
 	go func() {
 		defer close(progressResetChan)
-		c.progressTracker.ResetNsProgressEstimatedDocCounts(func(ctx context.Context, ns iface.Namespace) (int64, error) {
+		_ = c.progressTracker.ResetNsProgressEstimatedDocCounts(func(ctx context.Context, ns iface.Namespace) (int64, error) {
 			res, err := c.impl.GetNamespaceMetadata(ctx, connect.NewRequest(&adiomv1.GetNamespaceMetadataRequest{Namespace: ns.Col}))
 			if err != nil {
 				return 0, err
@@ -575,7 +585,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					c.progressTracker.TaskDoneProgressUpdate(ns, task.Id)
 					slog.Debug(fmt.Sprintf("Done processing task: %v", task))
 					//notify the coordinator that the task is done from our side
-					c.coord.NotifyTaskDone(flowId, c.id, task.Id, &iface.TaskDoneMeta{DocsCopied: docs})
+					_ = c.coord.NotifyTaskDone(flowId, c.id, task.Id, &iface.TaskDoneMeta{DocsCopied: docs})
 					//send a barrier message to signal the end of the task
 					if c.resumable { //send only if the flow supports resumability otherwise who knows what will happen on the recieving side
 						dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_TaskComplete, BarrierTaskId: (uint)(task.Id)}
@@ -822,7 +832,6 @@ func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 		return nil
 	case iface.BarrierType_CdcResumeTokenUpdate:
 		// notify the coordinator that the task is done from our side
-		c.coord.UpdateCDCResumeToken(c.flowID, c.id, barrierMsg.BarrierCdcResumeToken)
 		if err := c.coord.UpdateCDCResumeToken(c.flowID, c.id, barrierMsg.BarrierCdcResumeToken); err != nil {
 			return err
 		}

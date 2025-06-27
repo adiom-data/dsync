@@ -804,7 +804,7 @@ type dataIdIndex struct {
 // returns the new item or existing item, and whether or not a new item was added
 func addToIdIndexMap2(m map[int][]*dataIdIndex, update *adiomv1.Update) (*dataIdIndex, bool) {
 	hasher := xxhash.New()
-	hasher.Write(update.GetId()[0].GetData())
+	_, _ = hasher.Write(update.GetId()[0].GetData())
 	h := int(hasher.Sum64())
 	items, found := m[h]
 	if found {

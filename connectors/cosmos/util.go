@@ -7,12 +7,9 @@
 package cosmos
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -21,7 +18,6 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -101,7 +97,9 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	if resumeToken == nil {
 		return nil, fmt.Errorf("failed to get resume token from change stream")
 	}
-	col.DeleteOne(ctx, bson.M{"_id": id})
+	if _, err := col.DeleteOne(ctx, bson.M{"_id": id}); err != nil {
+		return nil, err
+	}
 
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
 	rid, err := extractRidFromResumeToken(resumeToken)
@@ -192,53 +190,4 @@ func extractJSONChangeStreamContinuationValue(jsonBytes []byte) (int, error) {
 		contTotal += cont
 	}
 	return contTotal, nil
-}
-
-// Extract the continuation value based on the kind of the changestream resume token
-func getChangeStreamContinuationValue(change bson.M) (int, error) {
-	kind := change["_id"].(bson.M)["_kind"].(int32)
-	switch kind {
-	case 1: // JSON string in _data
-		jsonBytes := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
-		return extractJSONChangeStreamContinuationValue(jsonBytes)
-	case 4: // GZIP compressed JSON string in _data
-		bytesCompressed := change["_id"].(bson.M)["_data"].(primitive.Binary).Data
-		jsonBytes, err := gzipDecompress(bytesCompressed)
-		if err != nil {
-			return 0, fmt.Errorf("error decompressing continuation value: %v", err)
-		}
-		return extractJSONChangeStreamContinuationValue(jsonBytes)
-	default:
-		return 0, fmt.Errorf("unsupported kind of change stream event: %v", kind)
-	}
-}
-
-// gzipDecompress decompresses the input gzipped byte array and returns the original data
-func gzipDecompress(compressedData []byte) ([]byte, error) {
-	// Create a bytes reader to read the compressed data
-	buffer := bytes.NewBuffer(compressedData)
-
-	// Create a new gzip reader
-	gz, err := gzip.NewReader(buffer)
-	if err != nil {
-		return nil, err
-	}
-	defer gz.Close()
-
-	gz.Multistream(false)
-	// Decompress the data
-	var decompressedData bytes.Buffer
-	if _, err := io.Copy(&decompressedData, gz); err != nil {
-		return nil, err
-	}
-
-	return decompressedData.Bytes(), nil
-}
-
-func redactedSettings(s ConnectorSettings) ConnectorSettings {
-	copy := s
-	copy.ConnectionString = "REDACTED"
-	copy.WitnessMongoConnString = "REDACTED"
-
-	return copy
 }

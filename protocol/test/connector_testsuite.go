@@ -215,7 +215,7 @@ func (suite *ConnectorTestSuite) TestConnectorWrite() {
 		dataStore := suite.datastoreFactoryFunc()
 		err = dataStore.Setup()
 		assert.NoError(suite.T(), err)
-		dataStore.DeleteNamespace(dbName, colName)
+		_ = dataStore.DeleteNamespace(dbName, colName)
 	}
 
 	// Start a go routine to write to the data channel

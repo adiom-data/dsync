@@ -270,14 +270,26 @@ func streamTypeToDynamoType(st streamtypes.AttributeValue) (types.AttributeValue
 func dynamoWriteKeyValue(w io.Writer, av types.AttributeValue) error {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
-		binary.Write(w, binary.BigEndian, len(tv.Value))
-		w.Write(tv.Value)
+		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+			return err
+		}
+		if _, err := w.Write(tv.Value); err != nil {
+			return err
+		}
 	case *types.AttributeValueMemberN:
-		binary.Write(w, binary.BigEndian, len(tv.Value))
-		w.Write([]byte(tv.Value))
+		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte(tv.Value)); err != nil {
+			return err
+		}
 	case *types.AttributeValueMemberS:
-		binary.Write(w, binary.BigEndian, len(tv.Value))
-		w.Write([]byte(tv.Value))
+		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte(tv.Value)); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("key schema type unexpected %T", av)
 	}
@@ -351,8 +363,12 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 		return nil, fmt.Errorf("key schema does not match actual keys")
 	}
 	var buf bytes.Buffer
-	dynamoWriteKeyValue(&buf, v)
-	dynamoWriteKeyValue(&buf, v2)
+	if err := dynamoWriteKeyValue(&buf, v); err != nil {
+		return nil, err
+	}
+	if err := dynamoWriteKeyValue(&buf, v2); err != nil {
+		return nil, err
+	}
 	return primitive.Binary{
 		Subtype: bson.TypeBinaryGeneric,
 		Data:    buf.Bytes(),

@@ -94,7 +94,7 @@ func (bwa *ParallelWriter) StopAndWait() {
 func hashDataMsgId(dataMsg iface.DataMessage) int {
 	hash := fnv.New32a()
 	for _, d := range dataMsg.Id {
-		hash.Write(d.GetData())
+		_, _ = hash.Write(d.GetData())
 	}
 	return int(hash.Sum32())
 }

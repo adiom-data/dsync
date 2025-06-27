@@ -299,7 +299,7 @@ func (r *RunnerLocal) Run() error {
 
 func (r *RunnerLocal) GracefulShutdown() {
 	slog.Debug("RunnerLocal GracefulShutdown")
-	r.src.Interrupt(r.activeFlowID)
+	_ = r.src.Interrupt(r.activeFlowID)
 	if r.cancelIntegrityCtx != nil {
 		r.cancelIntegrityCtx()
 	}
