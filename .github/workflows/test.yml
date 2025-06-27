@@ -18,6 +18,11 @@ jobs:
       with:
         go-version: '1.24'
 
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: -exclude=G115 ./...
+
     - name: Build
       run: go build -v ./...
 

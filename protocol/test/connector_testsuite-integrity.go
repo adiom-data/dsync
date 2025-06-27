@@ -71,12 +71,12 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	assert.NoError(suite.T(), err)
 	count1 := res.Count
 
-	dataStore.InsertDummy(qdb, qcol+"Other", testRecord)
+	_ = dataStore.InsertDummy(qdb, qcol+"Other", testRecord)
 	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count2 := res.Count
 
-	dataStore.InsertDummy(qdb, qcol, testRecord)
+	_ = dataStore.InsertDummy(qdb, qcol, testRecord)
 	res, err = connector.IntegrityCheck(ctx, q)
 	assert.NoError(suite.T(), err)
 	count3 := res.Count
@@ -87,5 +87,5 @@ func (suite *ConnectorTestSuite) TestConnectorDataIntegrity() {
 	assert.Equal(suite.T(), count1+1, count3)
 
 	connector.Teardown()
-	dataStore.Teardown()
+	_ = dataStore.Teardown()
 }

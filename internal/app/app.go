@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
@@ -72,7 +72,7 @@ func runDsync(c *cli.Context) error {
 		go func() {
 			host := fmt.Sprintf("localhost:%d", o.PprofPort)
 			slog.Info("Starting pprof server on " + host)
-			http.ListenAndServe(host, nil)
+			_ = http.ListenAndServe(host, nil) // #nosec G114
 		}()
 	}
 
@@ -89,7 +89,7 @@ func runDsync(c *cli.Context) error {
 
 	errorTextView := tview.NewTextView().SetScrollable(true).SetDynamicColors(true).ScrollToEnd()
 	if o.Logfile != "" { // need to log to a file
-		logFile, err := os.OpenFile(o.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		logFile, err := os.OpenFile(o.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			panic(err)
 		}
@@ -106,7 +106,8 @@ func runDsync(c *cli.Context) error {
 		host := fmt.Sprintf("localhost:%d", o.WebPort)
 		slog.Info("Starting web server to serve progress report on " + host)
 		server = &http.Server{
-			Addr: host,
+			Addr:              host,
+			ReadHeaderTimeout: time.Second * 10,
 		}
 	}
 	logger.Setup(lo)
@@ -122,7 +123,7 @@ func runDsync(c *cli.Context) error {
 	src, dst, restArgs, err := options.ConfigureConnectors(c.Args().Slice(), additionalSettings)
 	if err != nil {
 		if errors.Is(err, options.ErrMissingConnector) {
-			cli.ShowAppHelp(c)
+			_ = cli.ShowAppHelp(c)
 			fmt.Fprintf(c.App.Writer, "\nUsage looks like `dsync [options] source_connector destination_connector`\n")
 			fmt.Fprintf(c.App.Writer, "Example: `dsync testconn://./fixture mongodb://localhost:27017`\n")
 			fmt.Fprintf(c.App.Writer, "\nThe following connectors are available:\n")

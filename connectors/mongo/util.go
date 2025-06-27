@@ -158,42 +158,6 @@ func GetMongoFlavor(connectionString string) MongoFlavor {
 	return FlavorMongoDB
 }
 
-// create a find query for a task
-func createFindFilter(q iface.IntegrityCheckQuery) bson.D {
-	if q.PartitionKey == "" {
-		return bson.D{}
-	}
-	if q.Low == nil && q.High == nil { //no boundaries
-		return bson.D{}
-	} else if q.Low == nil && q.High != nil { //only upper boundary
-		return bson.D{
-			{q.PartitionKey, bson.D{
-				{"$lt", q.High},
-			}},
-		}
-	} else if q.Low != nil && q.High == nil { //only lower boundary
-		return bson.D{
-			{q.PartitionKey, bson.D{
-				{"$gte", q.Low},
-			}},
-		}
-	} else { //both boundaries
-		return bson.D{
-			{q.PartitionKey, bson.D{
-				{"$gte", q.Low},
-				{"$lt", q.High},
-			}},
-		}
-	}
-}
-
-func redactedSettings(s ConnectorSettings) ConnectorSettings {
-	copy := s
-	copy.ConnectionString = "REDACTED"
-
-	return copy
-}
-
 func stringToQuery(queryStr string) (bson.D, error) {
 	if queryStr == "" {
 		return bson.D{}, nil

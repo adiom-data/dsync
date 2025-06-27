@@ -94,8 +94,9 @@ func runServe(c *cli.Context) error {
 	}
 
 	srv := http.Server{
-		Addr:    address,
-		Handler: handler,
+		Addr:              address,
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second * 10,
 	}
 
 	var eg errgroup.Group

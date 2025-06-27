@@ -192,7 +192,7 @@ func (c *conn) StreamLSN(context.Context, *connect.Request[adiomv1.StreamLSNRequ
 }
 
 func readFile(path string) ([]string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}

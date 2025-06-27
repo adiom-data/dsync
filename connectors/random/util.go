@@ -8,7 +8,7 @@ package random
 import (
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/brianvoe/gofakeit/v7"
@@ -220,7 +220,7 @@ func (rc *conn) generateOperation() (adiomv1.UpdateType, error) {
 		return 0, fmt.Errorf("probabilities must sum to 1.0, sum is %f", totalProb)
 	}
 	//generate random float and choose operation based on probabilities
-	r := rand.Float64()
+	r := rand.Float64() // #nosec G404
 	sum := 0.0
 	for i, prob := range rc.settings.probabilities {
 		sum += prob

@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+// #nosec
+
 func main() {
 	// Runs 2 servers - one using standard go grpc, and the other using connect
 	// This is for testing purposes only.
@@ -27,7 +29,7 @@ func main() {
 		adiomv1.RegisterConnectorServiceServer(s, newConnector())
 		adiomv1.RegisterTransformServiceServer(s, transform.NewIdentityTransformGRPC())
 		// Currently no dummy standard go grpc implementation for chunking or embedding
-		s.Serve(l)
+		_ = s.Serve(l)
 	}()
 
 	nullConn := null.NewConn()
@@ -40,7 +42,7 @@ func main() {
 	mux.Handle(tpath, thandler)
 	mux.Handle(cpath, chandler)
 	mux.Handle(epath, ehandler)
-	http.ListenAndServe(
+	_ = http.ListenAndServe(
 		"localhost:8085",
 		h2c.NewHandler(mux, &http2.Server{}),
 	)

@@ -243,7 +243,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 					tokenMap.AddToken(loc, changeStream.ResumeToken())
 					encodedToken, _ := tokenMap.encodeMap()
 					sendMutex.Lock()
-					s.Send(&adiomv1.StreamLSNResponse{
+					_ = s.Send(&adiomv1.StreamLSNResponse{
 						Lsn:        uint64(lsnTracker.GetGlobalLSN()) + c.deletesCount.Load(),
 						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?,
 					})

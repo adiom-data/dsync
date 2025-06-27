@@ -204,14 +204,14 @@ func (suite *ConnectorTestSuite) TestAll() {
 			suite.Run("TestWriteData", func() {
 				for _, t := range supported {
 					if t == adiomv1.DataType_DATA_TYPE_MONGO_BSON {
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
 						_, err := c.WriteData(ctx, connect.NewRequest(&adiomv1.WriteDataRequest{
 							Namespace: suite.namespace,
 							Data:      [][]byte{sampleBson},
 							Type:      t,
 						}))
 						suite.Assert().NoError(err)
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
 					}
 				}
 			})
@@ -219,7 +219,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 			suite.Run("TestWriteUpdates", func() {
 				for _, t := range supported {
 					if t == adiomv1.DataType_DATA_TYPE_MONGO_BSON {
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
 						_, err := c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 							Namespace: suite.namespace,
 							Updates: []*adiomv1.Update{{
@@ -230,7 +230,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 							Type: t,
 						}))
 						suite.Assert().NoError(err)
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
 
 						_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 							Namespace: suite.namespace,
@@ -241,7 +241,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 							Type: t,
 						}))
 						suite.Assert().NoError(err)
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
 
 						_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 							Namespace: suite.namespace,
@@ -253,7 +253,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 							Type: t,
 						}))
 						suite.Assert().NoError(err)
-						suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
 					}
 				}
 			})

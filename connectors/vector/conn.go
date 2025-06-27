@@ -174,7 +174,9 @@ func (c *conn) upsertVectorDocuments(ctx context.Context, data [][]byte, dataTyp
 		}
 		var id string
 		v := bson.Raw(originalData).Lookup("_id")
-		bson.UnmarshalValue(v.Type, v.Value, &id)
+		if err := bson.UnmarshalValue(v.Type, v.Value, &id); err != nil {
+			return nil, err
+		}
 		docs = append(docs, &VectorDocument{
 			Chunks: chunks,
 			ID:     id,
@@ -217,7 +219,9 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		update := allUpdates[len(allUpdates)-1-i]
 		idPart := update.GetId()[0]
 		var id interface{}
-		bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id)
+		if err := bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
 		idStr, err := fromBson(id)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
@@ -237,7 +241,9 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		for _, update := range updates {
 			idPart := update.GetId()[0]
 			var id interface{}
-			bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id)
+			if err := bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
+				return err
+			}
 			idStr, err := fromBson(id)
 			if err != nil {
 				return err
