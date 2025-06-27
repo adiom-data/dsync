@@ -245,7 +245,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
 				return CreateHelper("MongoDB", "mongodb://connection-string [options]", MongoFlags(&settings), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-					return mongo.NewConn(settings), nil
+					return mongo.NewConn(settings)
 				})(args, as)
 			},
 		},

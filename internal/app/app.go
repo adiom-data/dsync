@@ -263,12 +263,14 @@ func runDsync(c *cli.Context) error {
 				}()
 				slog.Info("Attempting graceful shutdown.")
 				r.GracefulShutdown()
-				shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
-				defer shutdownCancel()
-				if err := server.Shutdown(shutdownCtx); err != nil {
-					slog.Debug("Server Shutdown Failed", "error", err)
-				} else {
-					slog.Info("Server gracefully stopped")
+				if needWebServer {
+					shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+					defer shutdownCancel()
+					if err := server.Shutdown(shutdownCtx); err != nil {
+						slog.Debug("Server Shutdown Failed", "error", err)
+					} else {
+						slog.Info("Server gracefully stopped")
+					}
 				}
 				break
 
@@ -348,6 +350,9 @@ func runDsync(c *cli.Context) error {
 			err := server.ListenAndServe()
 			if err == http.ErrServerClosed {
 				return
+			}
+			if err != nil {
+				slog.Warn("Progress Server could not be started so it will not be available.", "err", err)
 			}
 		}()
 	}

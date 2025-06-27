@@ -896,14 +896,14 @@ func (c *conn) Teardown() {
 	_ = c.client.Disconnect(context.Background())
 }
 
-func NewConn(connSettings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
+func NewConn(connSettings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 	setDefault(&connSettings.TargetDocCountPerPartition, 512*1000)
 	client, err := MongoClient(context.Background(), connSettings)
 	if err != nil {
 		slog.Error(fmt.Sprintf("unable to connect to mongo client: %v", err))
-		panic(err)
+		return nil, err
 	}
-	return NewConnWithClient(client, connSettings)
+	return NewConnWithClient(client, connSettings), nil
 }
 
 func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler {
