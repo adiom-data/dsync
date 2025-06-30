@@ -23,6 +23,8 @@ type Simple struct {
 	t   iface.Transport
 	s   iface.Statestore
 
+	flowMutex sync.Mutex
+
 	connectors    map[iface.ConnectorID]ConnectorDetailsWithEp
 	mu_connectors sync.RWMutex // to make the map thread-safe
 
@@ -399,6 +401,9 @@ func (c *Simple) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {
 }
 
 func (c *Simple) NotifyTaskDone(flowId iface.FlowID, conn iface.ConnectorID, taskId iface.ReadPlanTaskID, taskData *iface.TaskDoneMeta) error {
+	c.flowMutex.Lock()
+	defer c.flowMutex.Unlock()
+
 	// Get the flow details
 	flowDet, ok := c.getFlow(flowId)
 	if !ok {
@@ -641,6 +646,8 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 }
 
 func (c *Simple) GetFlowStatus(fid iface.FlowID) (iface.FlowStatus, error) {
+	c.flowMutex.Lock()
+	defer c.flowMutex.Unlock()
 	res := iface.FlowStatus{}
 
 	// Get the flow details

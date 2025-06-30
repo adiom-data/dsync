@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	VersionStr   = "0.15-beta"
-	CopyrightStr = "Adiom Inc., 2024"
+	VersionStr   = "0.17.0"
+	CopyrightStr = "Adiom Inc., 2025"
 )
 
 var Commit = func() string {
