@@ -14,6 +14,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -272,7 +273,7 @@ func convertNamespaceMapToStringKeys(originalMap map[iface.Namespace]*iface.Name
 }
 
 // Push updates using SSE server
-func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal, errorLog *logger.ReverseBuffer, w http.ResponseWriter, r *http.Request) {
+func progressUpdatesHandler(runnerCtx context.Context, runner *runnerLocal.RunnerLocal, errorLog *logger.ReverseBuffer, w http.ResponseWriter, r *http.Request, mut *sync.Mutex) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -281,10 +282,13 @@ func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-r.Context().Done():
+			return
+		case <-runnerCtx.Done():
 			slog.Debug("Context cancelled, stopping progress updates.")
 			return
 		case <-ticker.C:
+			mut.Lock()
 			runner.UpdateRunnerProgress()
 			progress := runner.GetRunnerProgress()
 			elapsed := time.Since(progress.StartTime).Round(time.Second)
@@ -307,8 +311,11 @@ func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal
 				NsProgressMap:      convertedNamespaceMap,
 			}
 
+			verificationResult := progress.VerificationResult
+
 			// Convert data to JSON and send as event to client
 			jsonData, err := json.Marshal(data)
+			mut.Unlock()
 			if err != nil {
 				slog.Error("Error marshaling JSON:", "err", err)
 				break
@@ -318,7 +325,7 @@ func progressUpdatesHandler(ctx context.Context, runner *runnerLocal.RunnerLocal
 				flusher.Flush()
 			}
 
-			if progress.VerificationResult != "" {
+			if verificationResult != "" {
 				// Verification is complete, send final update and stop
 				slog.Debug("Verification complete, stopping progress updates.")
 				return
