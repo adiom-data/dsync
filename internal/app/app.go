@@ -340,9 +340,14 @@ func runDsync(c *cli.Context) error {
 
 	// Start a web server to serve real-time progress updates
 	if needWebServer {
+		// For now, use a mutex to make sure there is no race condition on the runner.
+		// Ideally the handler should not even depend on the runner.
+		// This "hack" will at least ensure this does not crash out when there is more
+		// than one window open.
+		var mut sync.Mutex
 		http.Handle("/", http.StripPrefix("/", http.FileServer(http.FS(static.WebStatic))))
 		http.HandleFunc("/progress", func(w http.ResponseWriter, req *http.Request) {
-			progressUpdatesHandler(runnerCtx, r, wsErrorLog, w, req)
+			progressUpdatesHandler(runnerCtx, r, wsErrorLog, w, req, &mut)
 		})
 		wg.Add(1)
 		go func() {
