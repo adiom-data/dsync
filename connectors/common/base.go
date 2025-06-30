@@ -67,7 +67,6 @@ type connector struct {
 	flowID         iface.FlowID
 	flowCtx        context.Context
 	flowCancelFunc context.CancelFunc
-	status         iface.ConnectorStatus
 
 	settings         ConnectorSettings
 	resumable        bool
@@ -236,7 +235,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 	go func() {
 		// Retrieve the latest resume token before we start reading anything
 		// We will use the resume token to start the change stream
-		c.status.SyncState = iface.ReadPlanningSyncState
+		c.progressTracker.UpdateSyncState(iface.ReadPlanningSyncState)
 		namespaces, _ := c.parseNamespaceOptionAndUpdateMap(options.Namespace)
 		resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
 			Namespaces:  namespaces,
@@ -289,8 +288,8 @@ func (c *connector) Setup(ctx context.Context, t iface.Transport) error {
 	c.ctx = ctx
 	c.t = t
 
-	c.status = iface.ConnectorStatus{WriteLSN: 0}
-	c.progressTracker = NewProgressTracker(&c.status, c.ctx)
+	status := iface.ConnectorStatus{WriteLSN: 0}
+	c.progressTracker = NewProgressTracker(&status, c.ctx)
 
 	coord, err := c.t.GetCoordinatorEndpoint("local")
 	if err != nil {
@@ -472,7 +471,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 
 		slog.Info(fmt.Sprintf("Connector %s is starting initial sync for flow %s", c.id, flowId))
-		c.status.SyncState = iface.InitialSyncSyncState
+		c.progressTracker.UpdateSyncState(iface.InitialSyncSyncState)
 
 		//create a channel to distribute tasks to copiers
 		taskChannel := make(chan iface.ReadPlanTask)
@@ -625,7 +624,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 			c.flowCancelFunc()
 			return
 		}
-		c.status.SyncState = iface.ChangeStreamSyncState
+		c.progressTracker.UpdateSyncState(iface.ChangeStreamSyncState)
 
 		go func() {
 			ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
@@ -662,7 +661,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 			}
 			return
 		}
-		c.status.CDCActive = true
+		c.progressTracker.CDCActive()
 
 		for res.Receive() {
 			msg := res.Msg()
