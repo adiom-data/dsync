@@ -70,10 +70,8 @@ func (c *Simple) addConnector(connector ConnectorDetailsWithEp) iface.ConnectorI
 
 	var cid iface.ConnectorID
 
-	// If details.Id is not empty, means that the connector is being re-registered
 	if connector.Details.Id != "" {
-		//TODO: check if the connector is already in the map - this would be an error
-		slog.Debug("Re-registering connector with ID: " + (string)(connector.Details.Id))
+		connector.Details.Id += "-" + iface.ConnectorID(connector.Details.Desc)
 		cid = connector.Details.Id
 	} else {
 		// we need to generate a new unique ID
