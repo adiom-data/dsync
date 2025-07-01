@@ -6,14 +6,14 @@ We solve data migration and replication between databases. We focus on challenge
 
 # Introduction to Dsync
 
-Dsync is an open-source tool developed by [Adiom](https://adiom.io). Dsync is designed for seamless, fast, secure data migration and synchronization between databases, ensuring resiliency, ease of use, and production-grade performance. Dsync features first-class support for Cosmos DB (MongoDB RU, vCore, NoSQL), DynamoDB, MongoDB, FerretDB. Several connectors are in development: PostgreSQL, HBase, Qdrant, Weaviate. 
+Dsync is an open-source command line tool developed by [Adiom](https://adiom.io). Dsync is designed for seamless, fast, secure data migration and synchronization between databases, ensuring resiliency, ease of use, and production-grade performance. Dsync features first-class support for Cosmos DB (MongoDB RU, vCore, NoSQL), DynamoDB, MongoDB, FerretDB. Several connectors are in development: PostgreSQL, HBase, Qdrant, Weaviate. 
 
 Common use cases for dsync:
 * Live database migration
 * Database replication
 * Data mobility
 
-Dsync is flexible and supports external connectors and transformers via gRPC.
+Dsync is lightweight, flexible, and supports external connectors and transformers via gRPC. To run dsync, you just need to run the binary on your laptop, VM, or a docker container. Compute (CPU and RAM) is the only requirement, no storage is needed (except for logs)!
 
 ![image](https://github.com/user-attachments/assets/5ad786fb-c180-4716-a443-e7bb0fef3619)
 
