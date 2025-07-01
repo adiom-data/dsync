@@ -2,16 +2,25 @@
 
 _Complete documentation can be found [here](https://docs.adiom.io)_
 
-We solve data migration and replication between NoSQL databases. We focus on challenges specific to large datasets and mission-critical applications. Our mission is to make database migration and replication easy for engineers and DevOps, reducing the need for custom solutions.
+We solve data migration and replication between databases. We focus on challenges specific to large datasets and mission-critical applications. Our mission is to make database migration and replication easy for engineers and DevOps, reducing the need for custom solutions.
 
 # Introduction to Dsync
-> **_NOTE: Dsync is currently in beta and is undergoing active development and testing._**
 
-Dsync is an open-source tool developed by [Adiom](https://adiom.io). Dsync is designed for fast, secure data migration and synchronization between NoSQL databases, ensuring resiliency, ease of use, and production-grade performance. Currenly its primary use case is live database migration between Cosmos DB, DynamoDB and MongoDB Atlas. Over time we will extend it to other data stores databases (e.g. Snowflake, BigQuery) and add advanced features such as bidirectional communication and many-to-many flows. 
+Dsync is an open-source tool developed by [Adiom](https://adiom.io). Dsync is designed for seamless, fast, secure data migration and synchronization between databases, ensuring resiliency, ease of use, and production-grade performance. Dsync features first-class support for Cosmos DB (MongoDB RU, vCore, NoSQL), DynamoDB, MongoDB, FerretDB. Several connectors are in development: PostgreSQL, HBase, Qdrant, Weaviate. 
+
+Common use cases for dsync:
+* Live database migration
+* Database replication
+* Data mobility
+
+Dsync is flexible and supports external connectors and transformers via gRPC.
+
+![image](https://github.com/user-attachments/assets/5ad786fb-c180-4716-a443-e7bb0fef3619)
 
 Given source and destination databases, dsync completes an initial sync transferring all data from the source database to the destination database. After the initial sync, it continuously monitors the source database for any changes and updates the destination database accordingly.
 
 ![Dsync progress reporting sample](/img/screenshot.png?width=20&raw=true)
+
 
 # Quickstart
 Follow these simple instructions to get dsync up and running and perform a migration from our Cosmos DB demo instance to your MongoDB destination.
