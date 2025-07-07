@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tryvium-travels/memongo v0.12.0
 	github.com/urfave/cli/v2 v2.27.7
-	github.com/weaviate/weaviate v1.31.3
+	github.com/weaviate/weaviate v1.31.5
 	github.com/weaviate/weaviate-go-client/v5 v5.2.1
 	go.akshayshah.org/memhttp v0.1.0
 	go.mongodb.org/mongo-driver v1.17.4
