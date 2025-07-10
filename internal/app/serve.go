@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	"connectrpc.com/grpcreflect"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/app/options"
@@ -44,6 +45,10 @@ var serveCommand *cli.Command = &cli.Command{
 			Name:  "key-file",
 			Usage: "Key file",
 		},
+		&cli.BoolFlag{
+			Name:  "no-gzip",
+			Usage: "Disable gzip compression",
+		},
 	},
 }
 
@@ -53,6 +58,7 @@ func runServe(c *cli.Context) error {
 	address := c.String("address")
 	certFile := c.String("cert-file")
 	keyFile := c.String("key-file")
+	noGzip := c.Bool("no-gzip")
 	clearText := false
 	if certFile == "" && keyFile == "" {
 		clearText = true
@@ -81,7 +87,11 @@ func runServe(c *cli.Context) error {
 
 	reflector := grpcreflect.NewStaticReflector(adiomv1connect.ConnectorServiceName)
 	mux := http.NewServeMux()
-	path, serviceHandler := adiomv1connect.NewConnectorServiceHandler(connector)
+	var opts []connect.HandlerOption
+	if noGzip {
+		opts = append(opts, connect.WithCompression("gzip", nil, nil))
+	}
+	path, serviceHandler := adiomv1connect.NewConnectorServiceHandler(connector, opts...)
 	mux.Handle(path, serviceHandler)
 	mux.Handle(grpcreflect.NewHandlerV1(reflector))
 	mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))

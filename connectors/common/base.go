@@ -861,7 +861,7 @@ type localConnector struct {
 }
 
 func NewLocalConnector(desc string, impl adiomv1connect.ConnectorServiceHandler, settings ConnectorSettings) *localConnector {
-	_, handler := adiomv1connect.NewConnectorServiceHandler(impl)
+	_, handler := adiomv1connect.NewConnectorServiceHandler(impl, connect.WithCompression("gzip", nil, nil))
 	srv, err := memhttp.New(handler)
 	if err != nil {
 		panic(err)
