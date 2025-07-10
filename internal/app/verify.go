@@ -91,7 +91,7 @@ type NamespacedID struct {
 }
 
 func connClient(impl adiomv1connect.ConnectorServiceHandler) adiomv1connect.ConnectorServiceClient {
-	_, handler := adiomv1connect.NewConnectorServiceHandler(impl)
+	_, handler := adiomv1connect.NewConnectorServiceHandler(impl, connect.WithCompression("gzip", nil, nil))
 	srv, err := memhttp.New(handler)
 	if err != nil {
 		panic(err)
