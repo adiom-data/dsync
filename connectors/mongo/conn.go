@@ -750,6 +750,9 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 					slog.Error(fmt.Sprintf("Skipping failure to insert document into collection: %v", we.WriteError))
 				}
 			}
+		} else {
+			slog.Error(fmt.Sprintf("Bulk write failed: %v", bwErr))
+			return bwErr
 		}
 
 		// redo them all as a bulk replace
