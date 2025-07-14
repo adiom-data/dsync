@@ -61,11 +61,12 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	}
 	srcStatus := flowStatus.SrcStatus
 	stateInfo := ""
+	allTasksCompleted := flowStatus.Status.TasksDone == flowStatus.Status.TasksTotal
 
 	switch {
 	case r.runnerProgress.SyncState == iface.VerifySyncState || r.runnerProgress.SyncState == iface.CleanupSyncState:
 		// Do nothing, keep the current state
-	case srcStatus.SyncState == iface.ChangeStreamSyncState && !flowStatus.AllTasksCompleted:
+	case srcStatus.SyncState == iface.ChangeStreamSyncState && !allTasksCompleted:
 		// Source is already in the change stream mode but not all tasks were fully completed
 		r.runnerProgress.SyncState = iface.InitialSyncSyncState
 		stateInfo += "Finalizing initial sync... "
@@ -79,7 +80,6 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	r.runnerProgress.AdditionalStateInfo = stateInfo
 
 	r.runnerProgress.CurrTime = time.Now()
-	r.runnerProgress.NumNamespacesCompleted = srcStatus.ProgressMetrics.NumNamespacesCompleted
 	r.runnerProgress.TotalNamespaces = srcStatus.ProgressMetrics.NumNamespaces
 	r.runnerProgress.NumDocsSynced = srcStatus.ProgressMetrics.NumDocsSynced
 
@@ -92,10 +92,23 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	}
 	r.runnerProgress.NsProgressMap = srcStatus.ProgressMetrics.NamespaceProgress
 
+	r.runnerProgress.NumNamespacesCompleted = 0
+	for ns, m := range flowStatus.StatusByNamespace {
+		progress := r.runnerProgress.NsProgressMap[ns]
+		if progress == nil {
+			slog.Warn("progress map does not exist- skipping", "ns", ns)
+			continue
+		}
+		progress.TasksCompleted = m.TasksDone
+		if m.TasksDone == m.TasksTotal {
+			r.runnerProgress.NumNamespacesCompleted += 1
+		}
+	}
+
 	r.runnerProgress.Namespaces = srcStatus.ProgressMetrics.Namespaces
-	r.runnerProgress.TasksTotal = srcStatus.ProgressMetrics.TasksTotal
+	r.runnerProgress.TasksTotal = flowStatus.Status.TasksTotal
 	r.runnerProgress.TasksStarted = srcStatus.ProgressMetrics.TasksStarted
-	r.runnerProgress.TasksCompleted = srcStatus.ProgressMetrics.TasksCompleted
+	r.runnerProgress.TasksCompleted = flowStatus.Status.TasksDone
 	r.runnerProgress.ChangeStreamEvents = srcStatus.ProgressMetrics.ChangeStreamEvents
 	r.runnerProgress.DeletesCaught = srcStatus.ProgressMetrics.DeletesCaught
 
