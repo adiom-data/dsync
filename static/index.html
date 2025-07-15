@@ -912,6 +912,9 @@
         // Calculate the percent complete for the given namespace
         function calcPercentNS(nsStatus) {
           let percentComplete;
+          if (nsStatus.Tasks.length == nsStatus.TasksCompleted) {
+            return 100;
+          }
           if (nsStatus.Tasks.length == 1) {
             // no partitioning
             const docCount = nsStatus.EstimatedDocCount
@@ -950,7 +953,7 @@
             if (nsStatus.DocsCopied === nsStatus.EstimatedDocCount) {
               percentComplete = 100;
             }
-            return Math.min(100, percentComplete);
+            return Math.max(0, Math.min(99, percentComplete));
         }
 
         // Get server-sent events data
