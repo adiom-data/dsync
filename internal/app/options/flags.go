@@ -37,20 +37,6 @@ var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC}
 
 const defaultMode = iface.SyncModeFull
 
-type ListFlag struct {
-	Values []string
-}
-
-func (f *ListFlag) Set(value string) error {
-	value = strings.ReplaceAll(value, " ", "")
-	f.Values = strings.Split(value, ",")
-	return nil
-}
-
-func (f *ListFlag) String() string {
-	return strings.Join(f.Values, ", ")
-}
-
 // GetFlagsAndBeforeFunc defines all CLI options as flags and returns
 // a BeforeFunc to parse a configuration file before any other actions.
 func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
@@ -74,12 +60,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Category: "Endpoint Configuration",
 			Required: false,
 		}),
-		altsrc.NewGenericFlag(&cli.GenericFlag{
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
 			Name:     "namespace",
 			Usage:    "list of namespaces 'db1,db2.collection,db3.collection:otherdb.othercollection' (comma-separated) to sync from on the source and a colon to map names.",
 			Aliases:  []string{"ns", "nsFrom"},
 			Category: "Flow Options",
-			Value:    &ListFlag{},
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "verify",

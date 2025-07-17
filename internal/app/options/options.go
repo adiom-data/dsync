@@ -52,7 +52,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.Verbosity = c.String("verbosity")
 	o.StateStoreConnString = c.String("metadata")
 	o.Logfile = c.String("logfile")
-	o.NamespaceFrom = c.Generic("namespace").(*ListFlag).Values
+	o.NamespaceFrom = c.StringSlice("namespace")
 	o.Verify = c.Bool("verify")
 	o.VerifyQuickCount = c.Bool("verify-quick-count")
 	o.Cleanup = c.Bool("cleanup")
