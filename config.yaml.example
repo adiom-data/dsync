@@ -1,0 +1,17 @@
+# Example configuration for dsync
+# You can specify namespaces as a list under the 'namespace' key.
+# For example:
+# namespace:
+#    - db1
+#    - db2.collection
+#    - db3.collection:otherdb.othercollection
+
+# Other options:
+# verbosity: INFO
+# metadata: ""
+# logfile: "dsync.log"
+# load-level: "Medium"
+# mode: "Full"
+# pprof: false
+# pprof-port: 8081
+# web-port: 8080
