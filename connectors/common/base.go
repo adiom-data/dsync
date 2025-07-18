@@ -528,6 +528,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							docs += int64(len(res.Msg.Data))
 
 							data := res.Msg.Data
+							var updates []*adiomv1.Update
 							if c.settings.TransformClient != nil {
 								transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
 									Namespace:    sourceNamespace,
@@ -547,18 +548,36 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									}
 								}
 
-								data = transformed.Msg.GetData()
 								if transformed.Msg.GetNamespace() != sourceNamespace {
 									destinationNamespace = transformed.Msg.GetNamespace()
 								}
+								data = transformed.Msg.GetData()
+								updates = transformed.Msg.GetUpdates()
+
+							}
+							if c.settings.TransformClient == nil {
+								slog.Info(fmt.Sprintf("No transform client set, passing data as is for namespace %s", destinationNamespace))
+							}
+							if len(updates) > 0 {
+								slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
+								for _, update := range updates {
+									dataMessage := iface.DataMessage{
+										Data:         &update.Data,
+										MutationType: iface.MutationType_Apply,
+										Loc:          destinationNamespace,
+									}
+									dataChannel <- dataMessage
+								}
+							} else {
+								slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), destinationNamespace))
+								dataMessage := iface.DataMessage{
+									DataBatch:    data,
+									MutationType: iface.MutationType_InsertBatch,
+									Loc:          destinationNamespace,
+								}
+								dataChannel <- dataMessage
 							}
 
-							dataMessage := iface.DataMessage{
-								DataBatch:    data,
-								MutationType: iface.MutationType_InsertBatch,
-								Loc:          destinationNamespace,
-							}
-							dataChannel <- dataMessage
 							nextCursor := res.Msg.GetNextCursor()
 							if len(nextCursor) == 0 {
 								break
@@ -947,6 +966,12 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			msgs = append(msgs, &adiomv1.Update{
 				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
+			})
+		case iface.MutationType_Apply:
+			msgs = append(msgs, &adiomv1.Update{
+				Id:   dataMsg.Id,
+				Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY,
+				Data: *dataMsg.Data,
 			})
 		default:
 			slog.Error(fmt.Sprintf("unsupported operation type during batch: %v", dataMsg.MutationType))

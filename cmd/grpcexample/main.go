@@ -27,7 +27,7 @@ func main() {
 		}
 		s := grpc.NewServer()
 		adiomv1.RegisterConnectorServiceServer(s, newConnector())
-		adiomv1.RegisterTransformServiceServer(s, transform.NewIdentityTransformGRPC())
+		adiomv1.RegisterTransformServiceServer(s, transform.NewMappingTransformGRPC())
 		// Currently no dummy standard go grpc implementation for chunking or embedding
 		_ = s.Serve(l)
 	}()
@@ -35,7 +35,7 @@ func main() {
 	nullConn := null.NewConn()
 	mux := http.NewServeMux()
 	path, handler := adiomv1connect.NewConnectorServiceHandler(nullConn)
-	tpath, thandler := adiomv1connect.NewTransformServiceHandler(transform.NewIdentityTransform())
+	tpath, thandler := adiomv1connect.NewTransformServiceHandler(transform.NewMappingTransform())
 	cpath, chandler := adiomv1connect.NewChunkingServiceHandler(vector.NewSimple())
 	epath, ehandler := adiomv1connect.NewEmbeddingServiceHandler(vector.NewSimple())
 	mux.Handle(path, handler)

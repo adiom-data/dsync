@@ -800,8 +800,9 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 }
 
 type dataIdIndex struct {
-	dataId []byte
-	index  int
+	dataId     []byte
+	index      int
+	updateType adiomv1.UpdateType
 }
 
 // returns the new item or existing item, and whether or not a new item was added
@@ -817,7 +818,7 @@ func addToIdIndexMap2(m map[int][]*dataIdIndex, update *adiomv1.Update) (*dataId
 			}
 		}
 	}
-	item := &dataIdIndex{update.GetId()[0].GetData(), -1}
+	item := &dataIdIndex{update.GetId()[0].GetData(), -1, update.GetType()}
 	m[h] = append(items, item)
 	return item, true
 }
@@ -829,14 +830,15 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
 	var models []mongo.WriteModel
+	var orderedModels []mongo.WriteModel
 	// keeps track of the index in models for a particular document because we want all ids to be unique in the batch
 	hashToDataIdIndex := map[int][]*dataIdIndex{}
 
 	for _, update := range r.Msg.GetUpdates() {
-		idType := bsontype.Type(update.GetId()[0].GetType())
 
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+			idType := bsontype.Type(update.GetId()[0].GetType())
 			dii, isNew := addToIdIndexMap2(hashToDataIdIndex, update)
 			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}}}
 			model := mongo.NewReplaceOneModel().SetFilter(idFilter).SetReplacement(bson.Raw(update.GetData())).SetUpsert(true)
@@ -847,6 +849,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 				models[dii.index] = model
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+			idType := bsontype.Type(update.GetId()[0].GetType())
 			dii, isNew := addToIdIndexMap2(hashToDataIdIndex, update)
 			idFilter := bson.D{{Key: "_id", Value: bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}}}
 			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
@@ -856,10 +859,31 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			} else {
 				models[dii.index] = model
 			}
+		case adiomv1.UpdateType_UPDATE_TYPE_APPLY:
+			var data map[string]interface{}
+			err := bson.Unmarshal(update.GetData(), &data)
+			if err != nil {
+				return nil, err
+			}
+			filter, filterOk := data["filter"].(map[string]interface{})
+			updateOp, updateOk := data["update"].(map[string]interface{})
+
+			if !filterOk || !updateOk {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("invalid data structure in update"))
+			}
+
+			model := mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(updateOp).SetUpsert(true)
+			orderedModels = append(orderedModels, model)
 		}
 	}
 
-	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+	ordered := false
+	finalModels := models
+	if len(orderedModels) > 0 {
+		ordered = true
+		finalModels = append(orderedModels, models...)
+	}
+	_, err := col.BulkWrite(ctx, finalModels, options.BulkWrite().SetOrdered(ordered))
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))

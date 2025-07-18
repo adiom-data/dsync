@@ -39,6 +39,7 @@ const (
 	MutationType_InsertBatch
 	MutationType_Update
 	MutationType_Delete
+	MutationType_Apply
 
 	MutationType_Barrier
 )
