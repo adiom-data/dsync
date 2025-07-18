@@ -99,6 +99,7 @@ enum UpdateType {
     UPDATE_TYPE_INSERT = 1;
     UPDATE_TYPE_UPDATE = 2;
     UPDATE_TYPE_DELETE = 3;
+    UPDATE_TYPE_APPLY = 4;
 }
 
 message Update {

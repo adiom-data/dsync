@@ -188,6 +188,10 @@ public final class Messages {
      * <code>UPDATE_TYPE_DELETE = 3;</code>
      */
     UPDATE_TYPE_DELETE(3),
+    /**
+     * <code>UPDATE_TYPE_APPLY = 4;</code>
+     */
+    UPDATE_TYPE_APPLY(4),
     UNRECOGNIZED(-1),
     ;
 
@@ -216,6 +220,10 @@ public final class Messages {
      * <code>UPDATE_TYPE_DELETE = 3;</code>
      */
     public static final int UPDATE_TYPE_DELETE_VALUE = 3;
+    /**
+     * <code>UPDATE_TYPE_APPLY = 4;</code>
+     */
+    public static final int UPDATE_TYPE_APPLY_VALUE = 4;
 
 
     public final int getNumber() {
@@ -246,6 +254,7 @@ public final class Messages {
         case 1: return UPDATE_TYPE_INSERT;
         case 2: return UPDATE_TYPE_UPDATE;
         case 3: return UPDATE_TYPE_DELETE;
+        case 4: return UPDATE_TYPE_APPLY;
         default: return null;
       }
     }
@@ -22112,11 +22121,12 @@ public final class Messages {
       "ates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n" +
       "\004data\030\003 \003(\014R\004data*R\n\010DataType\022\025\n\021DATA_TY" +
       "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
-      "\n\021DATA_TYPE_JSON_ID\020\002*m\n\nUpdateType\022\027\n\023U" +
-      "PDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSE" +
-      "RT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_T" +
-      "YPE_DELETE\020\003B2Z0github.com/adiom-data/ds" +
-      "ync/gen/adiom/v1;adiomv1b\006proto3"
+      "\n\021DATA_TYPE_JSON_ID\020\002*\204\001\n\nUpdateType\022\027\n\023" +
+      "UPDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INS" +
+      "ERT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_" +
+      "TYPE_DELETE\020\003\022\025\n\021UPDATE_TYPE_APPLY\020\004B2Z0" +
+      "github.com/adiom-data/dsync/gen/adiom/v1" +
+      ";adiomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
