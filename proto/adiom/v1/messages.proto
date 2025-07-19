@@ -165,6 +165,7 @@ message GetTransformInfoResponse {
         repeated DataType response_types = 2;
     }
     repeated TransformInfo transforms = 1;
+    bool use_multiple_responses = 2;
 }
 
 message GetTransformRequest {
@@ -175,8 +176,15 @@ message GetTransformRequest {
     DataType response_type = 5;
 }
 
+message TransformResponse {
+    string namespace = 1;
+    repeated Update updates = 2;
+    repeated bytes data = 3;
+}
+
 message GetTransformResponse {
     string namespace = 1;
     repeated Update updates = 2;
     repeated bytes data = 3;
+    repeated TransformResponse responses = 4; // If `use_multiple_responses` is true, use this
 }
