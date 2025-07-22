@@ -26,39 +26,41 @@ func (m *mappingTransform) GetTransform(ctx context.Context, r *connect.Request[
 
 	// process initial sync data
 	if len(data) > 0 {
-		slog.Debug(fmt.Sprintf("Initial synce, mapping transform: namespace %s to store", namespace))
+		slog.Debug(fmt.Sprintf("Initial sync, mapping transform: namespace %s to store", namespace))
 		transform, err := GetInitialSyncTransform(ctx, namespace, data)
 		if err != nil {
 			return nil, err
 		}
 		return connect.NewResponse(transform), nil
-	}
-
-	// process change stream updates
-	if len(updates) > 0 {
+	} else if len(updates) > 0 { // process change stream updates
 		// handle updates
-	}
+		return connect.NewResponse(&adiomv1.GetTransformResponse{
+			Namespace: r.Msg.Namespace,
+			Updates:   r.Msg.GetUpdates(),
+			Data:      r.Msg.GetData(),
+		}), nil
 
-	// pass through original request
-	return connect.NewResponse(&adiomv1.GetTransformResponse{
-		Namespace: r.Msg.Namespace,
-		Updates:   r.Msg.GetUpdates(),
-		Data:      r.Msg.GetData(),
-	}), nil
-	// }
+	} else {
+		// pass through original request
+		return connect.NewResponse(&adiomv1.GetTransformResponse{
+			Namespace: r.Msg.Namespace,
+			Updates:   r.Msg.GetUpdates(),
+			Data:      r.Msg.GetData(),
+		}), nil
+	}
 }
 
 // helper function to convert base table inserts to update type apply mutations
-func baseInsertToUpdate(data []byte, update *adiomv1.Update) error {
+func baseInsertToUpdate(data []byte) (*adiomv1.Update, error) {
 
 	var doc bson.M
 	err := bson.Unmarshal(data, &doc)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, err)
+		return nil, err
 	}
 	id, ok := doc["_id"]
 	if !ok {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("no id field"))
+		return nil, fmt.Errorf("no id field")
 	}
 
 	// set all fields of original document for the update, filter by id, upsert set to True on connector WriteUpdates fn
@@ -73,14 +75,23 @@ func baseInsertToUpdate(data []byte, update *adiomv1.Update) error {
 
 	marshalled, err := bson.Marshal(updateMessage)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	update = &adiomv1.Update{
-		//Id:TODO
+	typ, d, err := bson.MarshalValue(id)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	keys := []*adiomv1.BsonValue{{
+		Name: "_id",
+		Data: d,
+		Type: uint32(typ),
+	}}
+	update := &adiomv1.Update{
+		Id:   keys,
 		Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
 		Data: marshalled,
 	}
-	return nil
+	return update, nil
 
 }
 
@@ -88,9 +99,10 @@ func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte)
 	var updates []*adiomv1.Update
 	for _, d := range data {
 		var update *adiomv1.Update
+		var err error
 		// base table, convert to update type apply and set all fields of original document
 		if namespace == "public.store" {
-			err := baseInsertToUpdate(d, update)
+			update, err = baseInsertToUpdate(d)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
@@ -145,15 +157,16 @@ func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte)
 			// }
 
 			// Create UpdateTypeApply update
-			typ, data, err := bson.MarshalValue(fk_id)
+			typ, val, err := bson.MarshalValue(fk_id)
 			if err != nil {
 				return nil, err
 			}
 			keys := []*adiomv1.BsonValue{{
 				Name: "_id",
-				Data: data,
+				Data: val,
 				Type: uint32(typ),
 			}}
+
 			update = &adiomv1.Update{
 				Id:   keys,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
@@ -205,23 +218,27 @@ func (m *mappingTransformGRPC) GetTransform(ctx context.Context, r *adiomv1.GetT
 	// }, nil
 
 	namespace := r.Namespace
-	if namespace == "public.store" {
+
+	data := r.GetData()
+	updates := r.GetUpdates()
+
+	slog.Debug("Getting grpc transform for namespace: " + namespace)
+
+	if len(data) > 0 {
+		transform, err := GetInitialSyncTransform(ctx, namespace, data)
+		if err != nil {
+			return nil, err
+		} else {
+			return transform, nil
+		}
+	} else if len(updates) > 0 {
+		// handle updates
 		return &adiomv1.GetTransformResponse{
 			Namespace: r.Namespace,
 			Updates:   r.GetUpdates(),
 			Data:      r.GetData(),
 		}, nil
 	} else {
-		data := r.GetData()
-		updates := r.GetUpdates()
-
-		if len(data) > 0 {
-			return GetInitialSyncTransform(ctx, namespace, data)
-		}
-
-		if len(updates) > 0 {
-			// handle updates
-		}
 		return &adiomv1.GetTransformResponse{
 			Namespace: r.Namespace,
 			Updates:   r.GetUpdates(),
