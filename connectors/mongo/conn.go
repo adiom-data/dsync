@@ -867,12 +867,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			}
 			filter, filterOk := data["filter"].(map[string]interface{})
 			updateOp, updateOk := data["update"].(map[string]interface{})
+			upsert, upsertOk := data["upsert"].(bool)
 
-			if !filterOk || !updateOk {
+			if !filterOk || !updateOk || !upsertOk {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("invalid data structure in update"))
 			}
-
-			model := mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(updateOp).SetUpsert(true)
+			model := mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(updateOp).SetUpsert(upsert)
 			orderedModels = append(orderedModels, model)
 		}
 	}
