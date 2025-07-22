@@ -21,103 +21,144 @@ type mappingTransform struct {
 // GetTransform implements adiomv1connect.TransformServiceHandler.
 func (m *mappingTransform) GetTransform(ctx context.Context, r *connect.Request[adiomv1.GetTransformRequest]) (*connect.Response[adiomv1.GetTransformResponse], error) {
 	namespace := r.Msg.Namespace
-	if namespace == "public.store" {
-		// TODO: Passing through as insert causes race condition with updates that perform upserts, need to fix
-		slog.Debug("Namespace Store, Pass through transform")
-		return connect.NewResponse(&adiomv1.GetTransformResponse{
-			Namespace: r.Msg.Namespace,
-			Updates:   r.Msg.GetUpdates(),
-			Data:      r.Msg.GetData(),
-		}), nil
-	} else {
-		data := r.Msg.GetData()
-		updates := r.Msg.GetUpdates()
+	data := r.Msg.GetData()
+	updates := r.Msg.GetUpdates()
 
-		if len(data) > 0 {
-			slog.Debug(fmt.Sprintf("Initial synce, mapping transform: namespace %s to store", namespace))
-			transform, err := GetInitialSyncTransform(ctx, namespace, data)
-			if err != nil {
-				return nil, err
-			}
-			return connect.NewResponse(transform), nil
+	// process initial sync data
+	if len(data) > 0 {
+		slog.Debug(fmt.Sprintf("Initial synce, mapping transform: namespace %s to store", namespace))
+		transform, err := GetInitialSyncTransform(ctx, namespace, data)
+		if err != nil {
+			return nil, err
 		}
-
-		if len(updates) > 0 {
-			// handle updates
-		}
-		return connect.NewResponse(&adiomv1.GetTransformResponse{
-			Namespace: r.Msg.Namespace,
-			Updates:   r.Msg.GetUpdates(),
-			Data:      r.Msg.GetData(),
-		}), nil
+		return connect.NewResponse(transform), nil
 	}
+
+	// process change stream updates
+	if len(updates) > 0 {
+		// handle updates
+	}
+
+	// pass through original request
+	return connect.NewResponse(&adiomv1.GetTransformResponse{
+		Namespace: r.Msg.Namespace,
+		Updates:   r.Msg.GetUpdates(),
+		Data:      r.Msg.GetData(),
+	}), nil
+	// }
+}
+
+// helper function to convert base table inserts to update type apply mutations
+func baseInsertToUpdate(data []byte, update *adiomv1.Update) error {
+
+	var doc bson.M
+	err := bson.Unmarshal(data, &doc)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, err)
+	}
+	id, ok := doc["_id"]
+	if !ok {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("no id field"))
+	}
+
+	// set all fields of original document for the update, filter by id, upsert set to True on connector WriteUpdates fn
+	updateMessage := bson.M{
+		"filter": bson.M{
+			"_id": id,
+		},
+		"update": bson.M{
+			"$set": doc,
+		},
+	}
+
+	marshalled, err := bson.Marshal(updateMessage)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, err)
+	}
+	update = &adiomv1.Update{
+		//Id:TODO
+		Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
+		Data: marshalled,
+	}
+	return nil
+
 }
 
 func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte) (*adiomv1.GetTransformResponse, error) {
 	var updates []*adiomv1.Update
 	for _, d := range data {
-		var doc bson.M
-		err := bson.Unmarshal(d, &doc)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
-		id, ok := doc["_id"]
-		if !ok {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no primary key mapping"))
-		}
-		fk_id, ok := doc["store_id"]
-		if !ok || fk_id == nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no foreign key mapping for namespace %s", namespace))
-		}
+		var update *adiomv1.Update
+		// base table, convert to update type apply and set all fields of original document
+		if namespace == "public.store" {
+			err := baseInsertToUpdate(d, update)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+		} else { // mappings, convert to update type apply and use findAndModify operation
+			var doc bson.M
+			err := bson.Unmarshal(d, &doc)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			id, ok := doc["_id"]
+			if !ok {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no primary key mapping"))
+			}
+			fk_id, ok := doc["store_id"]
+			if !ok || fk_id == nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no foreign key mapping for namespace %s", namespace))
+			}
 
-		slog.Debug(fmt.Sprintf("Mapping transform: namespace %s, id %v, store_id %v", namespace, id, fk_id))
+			slog.Debug(fmt.Sprintf("Mapping transform: namespace %s, id %v, store_id %v", namespace, id, fk_id))
 
-		// Get proper array field name - THIS IS THE KEY FIX
-		arrayFieldName := getArrayFieldName(namespace)
+			arrayFieldName := getArrayFieldName(namespace)
 
-		findAndModifyOp := bson.M{
-			"filter": bson.M{
-				"_id": fk_id,
-				arrayFieldName: bson.M{
-					"$not": bson.M{
-						"$elemMatch": bson.M{
-							"_id": id,
+			// filter by base table id, check if array field contains the document by the id field, if not, push to array
+			findAndModifyOp := bson.M{
+				"filter": bson.M{
+					"_id": fk_id,
+					arrayFieldName: bson.M{
+						"$not": bson.M{
+							"$elemMatch": bson.M{
+								"_id": id,
+							},
 						},
 					},
 				},
-			},
-			"update": bson.M{
-				"$push": bson.M{
-					arrayFieldName: doc,
+				"update": bson.M{
+					"$push": bson.M{
+						arrayFieldName: doc,
+					},
 				},
-			},
-		}
+			}
+			// test idempotency: insert specific document multiple times, hardcoded
 
-		marshalled, err := bson.Marshal(findAndModifyOp)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
+			marshalled, err := bson.Marshal(findAndModifyOp)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
 
-		// // Create the primary key for the update
-		// keys, err := bson.Marshal(bson.M{"_id": fk_id})
-		// if err != nil {
-		//     return nil, connect.NewError(connect.CodeInternal, err)
-		// }
+			// // Create the primary key for the update
+			// keys, err := bson.Marshal(bson.M{"_id": fk_id})
+			// if err != nil {
+			//     return nil, connect.NewError(connect.CodeInternal, err)
+			// }
 
-		// Create UpdateTypeApply update
-		typ, data, err := bson.MarshalValue(fk_id)
-		if err != nil {
-			return nil, err
-		}
-		keys := []*adiomv1.BsonValue{{
-			Name: "_id",
-			Data: data,
-			Type: uint32(typ),
-		}}
-		update := &adiomv1.Update{
-			Id:   keys,
-			Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
-			Data: marshalled,
+			// Create UpdateTypeApply update
+			typ, data, err := bson.MarshalValue(fk_id)
+			if err != nil {
+				return nil, err
+			}
+			keys := []*adiomv1.BsonValue{{
+				Name: "_id",
+				Data: data,
+				Type: uint32(typ),
+			}}
+			update = &adiomv1.Update{
+				Id:   keys,
+				Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
+				Data: marshalled,
+			}
 		}
 
 		updates = append(updates, update)
