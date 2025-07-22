@@ -51,7 +51,7 @@ func (m *mappingTransform) GetTransform(ctx context.Context, r *connect.Request[
 }
 
 // helper function to convert base table inserts to update type apply mutations
-func baseInsertToUpdate(data []byte) (*adiomv1.Update, error) {
+func insertAsUpdate(data []byte) (*adiomv1.Update, error) {
 
 	var doc bson.M
 	err := bson.Unmarshal(data, &doc)
@@ -71,6 +71,7 @@ func baseInsertToUpdate(data []byte) (*adiomv1.Update, error) {
 		"update": bson.M{
 			"$set": doc,
 		},
+		"upsert": true, // upsert to create the document if it doesn't exist
 	}
 
 	marshalled, err := bson.Marshal(updateMessage)
@@ -95,6 +96,57 @@ func baseInsertToUpdate(data []byte) (*adiomv1.Update, error) {
 
 }
 
+func embeddedDocumentUpdate(namespace string, data []byte) (*adiomv1.Update, error) {
+	// convert embedded document to update type apply mutation
+	var doc bson.M
+	err := bson.Unmarshal(data, &doc)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	id, ok := doc["_id"]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no id field"))
+	}
+
+	arrayFieldName := getArrayFieldName(namespace)
+	//foreignKey := fmt.Sprintf("%s_id", arrayFieldName)
+
+	// filter by base table id, check if array field contains the document by the id field, if not, push to array
+	updateOp := bson.M{
+		"filter": bson.M{
+			"address_id": id,
+		},
+		"update": bson.M{
+			"$set": bson.M{
+				arrayFieldName: doc,
+			},
+		},
+		"upsert": false,
+	}
+
+	marshalled, err := bson.Marshal(updateOp)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	typ, d, err := bson.MarshalValue(id)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	keys := []*adiomv1.BsonValue{{
+		Name: "_id",
+		Data: d,
+		Type: uint32(typ),
+	}}
+
+	update := &adiomv1.Update{
+		Id:   keys,
+		Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY,
+		Data: marshalled,
+	}
+	return update, nil
+}
+
 func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte) (*adiomv1.GetTransformResponse, error) {
 	var updates []*adiomv1.Update
 	for _, d := range data {
@@ -102,7 +154,13 @@ func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte)
 		var err error
 		// base table, convert to update type apply and set all fields of original document
 		if namespace == "public.store" {
-			update, err = baseInsertToUpdate(d)
+			update, err = insertAsUpdate(d)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+		} else if namespace == "public.address" {
+			// address is embedded in store, convert to update type apply and set all fields of original document
+			update, err = embeddedDocumentUpdate(namespace, d)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
@@ -142,6 +200,7 @@ func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte)
 						arrayFieldName: doc,
 					},
 				},
+				"upsert": true, // upsert to create the array if it doesn't exist
 			}
 			// test idempotency: insert specific document multiple times, hardcoded
 
@@ -273,7 +332,7 @@ func getArrayFieldName(namespace string) string {
 	case "public.staff":
 		return "staff"
 	case "public.address":
-		return "addresses"
+		return "address"
 	case "public.inventory":
 		return "inventory" // NOT "public.inventory"
 	default:
