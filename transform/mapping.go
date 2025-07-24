@@ -15,8 +15,31 @@ import (
 type mappingTransform struct {
 }
 
-// namespaces: store, customer, staff, address, inventory
-// mappings: all namespaces map to store
+// Hardcoded mappings for 1 GB dataset:
+// orders {
+//   customer {}
+//   lineitems []
+// }
+// part {
+//   partsupp {}
+// }
+// supplier {
+//   partsupp {}
+// 	 nation {
+//     region {}
+//   }
+// }
+
+// table_name | row_count
+// ------------+-----------
+//  customer   |    150000
+//  lineitem   |   6001215
+//  nation     |        25
+//  orders     |   1500000
+//  part       |    200000
+//  partsupp   |    800000
+//  region     |         5
+//  supplier   |     10000
 
 // GetTransform implements adiomv1connect.TransformServiceHandler.
 func (m *mappingTransform) GetTransform(ctx context.Context, r *connect.Request[adiomv1.GetTransformRequest]) (*connect.Response[adiomv1.GetTransformResponse], error) {
@@ -96,7 +119,7 @@ func insertAsUpdate(data []byte) (*adiomv1.Update, error) {
 
 }
 
-func embeddedDocumentUpdate(namespace string, data []byte) (*adiomv1.Update, error) {
+func embeddedDocumentUpdate(namespace string, data []byte, foreignKey string) (*adiomv1.Update, error) {
 	// convert embedded document to update type apply mutation
 	var doc bson.M
 	err := bson.Unmarshal(data, &doc)
@@ -114,7 +137,7 @@ func embeddedDocumentUpdate(namespace string, data []byte) (*adiomv1.Update, err
 	// filter by base table id, check if array field contains the document by the id field, if not, push to array
 	updateOp := bson.M{
 		"filter": bson.M{
-			"address_id": id,
+			foreignKey: id,
 		},
 		"update": bson.M{
 			"$set": bson.M{
@@ -147,90 +170,136 @@ func embeddedDocumentUpdate(namespace string, data []byte) (*adiomv1.Update, err
 	return update, nil
 }
 
+func embeddedArrayUpdate(namespace string, data []byte, foreignKey string) (*adiomv1.Update, error) {
+	var doc bson.M
+	err := bson.Unmarshal(data, &doc)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	id, ok := doc["_id"]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no primary key mapping"))
+	}
+	fk_id, ok := doc[foreignKey]
+	if !ok || fk_id == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no foreign key mapping for namespace %s", namespace))
+	}
+
+	slog.Debug(fmt.Sprintf("Mapping transform: namespace %s, id %v, store_id %v", namespace, id, fk_id))
+
+	arrayFieldName := getArrayFieldName(namespace)
+
+	// filter by base table id, check if array field contains the document by the id field, if not, push to array
+	findAndModifyOp := bson.M{
+		"filter": bson.M{
+			"_id": fk_id,
+			arrayFieldName: bson.M{
+				"$not": bson.M{
+					"$elemMatch": bson.M{
+						"_id": id,
+					},
+				},
+			},
+		},
+		"update": bson.M{
+			"$push": bson.M{
+				arrayFieldName: doc,
+			},
+		},
+		"upsert": true, // upsert to create the array if it doesn't exist
+	}
+	// test idempotency: insert specific document multiple times, hardcoded
+
+	marshalled, err := bson.Marshal(findAndModifyOp)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	// // Create the primary key for the update
+	// keys, err := bson.Marshal(bson.M{"_id": fk_id})
+	// if err != nil {
+	//     return nil, connect.NewError(connect.CodeInternal, err)
+	// }
+
+	// Create UpdateTypeApply update
+	typ, val, err := bson.MarshalValue(fk_id)
+	if err != nil {
+		return nil, err
+	}
+	keys := []*adiomv1.BsonValue{{
+		Name: "_id",
+		Data: val,
+		Type: uint32(typ),
+	}}
+
+	update := &adiomv1.Update{
+		Id:   keys,
+		Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
+		Data: marshalled,
+	}
+	return update, nil
+}
+
 func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte) (*adiomv1.GetTransformResponse, error) {
+	// Hardcoded mappings for 1 GB dataset:
+	// orders {
+	//   customer {}
+	//   lineitems []
+	// }
+	// part {
+	//   partsupp {}
+	// }
+	// supplier {
+	//   partsupp {}
+	// 	 nation {
+	//     region {}
+	//   }
+	// }
 	var updates []*adiomv1.Update
+	var dstNamespace string
 	for _, d := range data {
 		var update *adiomv1.Update
 		var err error
-		// base table, convert to update type apply and set all fields of original document
-		if namespace == "public.store" {
+
+		switch namespace {
+		case "public.customer":
+			dstNamespace = "public.orders"
+			update, err = embeddedDocumentUpdate(namespace, d, "o_custkey")
+			slog.Debug(fmt.Sprintf("Mapping transform: namespace %s, update: %v", namespace, update))
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+		case "public.orders", "public.part", "public.supplier":
+			dstNamespace = namespace
 			update, err = insertAsUpdate(d)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-		} else if namespace == "public.address" {
-			// address is embedded in store, convert to update type apply and set all fields of original document
-			update, err = embeddedDocumentUpdate(namespace, d)
+
+		case "public.nation":
+			dstNamespace = "public.supplier"
+			update, err = embeddedDocumentUpdate(namespace, d, "s_nationkey")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-		} else { // mappings, convert to update type apply and use findAndModify operation
-			var doc bson.M
-			err := bson.Unmarshal(d, &doc)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, err)
-			}
-			id, ok := doc["_id"]
-			if !ok {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("no primary key mapping"))
-			}
-			fk_id, ok := doc["store_id"]
-			if !ok || fk_id == nil {
-				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no foreign key mapping for namespace %s", namespace))
-			}
-
-			slog.Debug(fmt.Sprintf("Mapping transform: namespace %s, id %v, store_id %v", namespace, id, fk_id))
-
-			arrayFieldName := getArrayFieldName(namespace)
-
-			// filter by base table id, check if array field contains the document by the id field, if not, push to array
-			findAndModifyOp := bson.M{
-				"filter": bson.M{
-					"_id": fk_id,
-					arrayFieldName: bson.M{
-						"$not": bson.M{
-							"$elemMatch": bson.M{
-								"_id": id,
-							},
-						},
-					},
-				},
-				"update": bson.M{
-					"$push": bson.M{
-						arrayFieldName: doc,
-					},
-				},
-				"upsert": true, // upsert to create the array if it doesn't exist
-			}
-			// test idempotency: insert specific document multiple times, hardcoded
-
-			marshalled, err := bson.Marshal(findAndModifyOp)
+		case "public.region":
+			dstNamespace = "public.supplier"
+			update, err = embeddedDocumentUpdate(namespace, d, "nation.n_regionkey")
+		case "public.lineitem":
+			dstNamespace = "public.orders"
+			update, err = embeddedArrayUpdate(namespace, d, "l_orderkey")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 
-			// // Create the primary key for the update
-			// keys, err := bson.Marshal(bson.M{"_id": fk_id})
-			// if err != nil {
-			//     return nil, connect.NewError(connect.CodeInternal, err)
-			// }
-
-			// Create UpdateTypeApply update
-			typ, val, err := bson.MarshalValue(fk_id)
+		case "public.partsupp":
+			//findAndModify, add to part and suppliers
+			dstNamespace = "public.part"
+			update, err = embeddedArrayUpdate(namespace, d, "ps_partkey")
 			if err != nil {
-				return nil, err
+				return nil, connect.NewError(connect.CodeInternal, err)
 			}
-			keys := []*adiomv1.BsonValue{{
-				Name: "_id",
-				Data: val,
-				Type: uint32(typ),
-			}}
 
-			update = &adiomv1.Update{
-				Id:   keys,
-				Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY, // New update type
-				Data: marshalled,
-			}
 		}
 
 		updates = append(updates, update)
@@ -239,7 +308,7 @@ func GetInitialSyncTransform(_ context.Context, namespace string, data [][]byte)
 	}
 
 	return &adiomv1.GetTransformResponse{
-		Namespace: "public.store",
+		Namespace: dstNamespace,
 		Updates:   updates,
 		Data:      nil,
 	}, nil
@@ -328,13 +397,15 @@ func NewMappingTransformGRPC() adiomv1.TransformServiceServer {
 func getArrayFieldName(namespace string) string {
 	switch namespace {
 	case "public.customer":
-		return "customers"
-	case "public.staff":
-		return "staff"
-	case "public.address":
-		return "address"
-	case "public.inventory":
-		return "inventory" // NOT "public.inventory"
+		return "customer"
+	case "public.nation":
+		return "nation"
+	case "public.region":
+		return "nation.region"
+	case "public.lineitem":
+		return "lineitems"
+	case "public.partsupp":
+		return "partsupp"
 	default:
 		return "items"
 	}
