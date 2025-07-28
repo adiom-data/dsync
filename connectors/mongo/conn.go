@@ -25,6 +25,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -317,7 +318,11 @@ func (c *conn) count(col *mongo.Collection, ctx context.Context) (int64, error) 
 	if len(c.query) == 0 {
 		return col.EstimatedDocumentCount(ctx)
 	}
-	return col.CountDocuments(ctx, c.query)
+	col2, err := col.Clone(options.Collection().SetReadConcern(readconcern.Available()))
+	if err != nil {
+		return 0, err
+	}
+	return col2.CountDocuments(ctx, c.query)
 }
 
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
