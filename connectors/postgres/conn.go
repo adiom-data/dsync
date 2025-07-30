@@ -724,13 +724,18 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 			idVals := make([]interface{}, len(keys))
 			for i, k := range keys {
-				idVals[i] = extractBsonValue(update.GetId(), k)
+				if k == "_id" {
+					idVals[i] = pgx.Identifier([]string{string(update.GetId()[0].GetData())}).Sanitize()
+				} else {
+					idVals[i] = extractBsonValue(update.GetId(), k)
+				}
 			}
 			where := []string{}
 			for i, k := range keys {
 				where = append(where, fmt.Sprintf("%s=$%d", pgx.Identifier([]string{k}).Sanitize(), i+1))
 			}
 			query := fmt.Sprintf("DELETE FROM %s WHERE %s", sanitizedNamespace, strings.Join(where, " AND "))
+			slog.Info(fmt.Sprintf("Executing delete query: %s with values: %v\n", query, idVals))
 			if _, err := c.c.Exec(ctx, query, idVals...); err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("delete failed: %w", err))
 			}
