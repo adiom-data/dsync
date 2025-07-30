@@ -701,10 +701,10 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
 				if k == "_id" {
 					vals = append(vals, update.GetId()[0].GetData())
+					slog.Info(fmt.Sprintf("Using _id value: %v for column: %s", v, k))
 				} else {
 					vals = append(vals, v)
 				}
-				vals = append(vals, v)
 				placeholders = append(placeholders, fmt.Sprintf("$%d", len(vals)))
 			}
 			conflictCols := make([]string, len(keys))
@@ -718,7 +718,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 				}
 			}
 			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s", sanitizedNamespace, strings.Join(cols, ", "), strings.Join(placeholders, ", "), strings.Join(conflictCols, ", "), strings.Join(setUpdates, ", "))
-			slog.Info("Executing upsert query: %s with values: %v\n", query, vals)
+			slog.Info(fmt.Sprintf("Executing upsert query: %s with values: %v\n", query, vals))
 			if _, err := c.c.Exec(ctx, query, vals...); err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("upsert failed: %w", err))
 			}
