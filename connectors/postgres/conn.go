@@ -300,6 +300,9 @@ func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]
 				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
 				MultiNamespacePlan: true,
 			},
+			Sink: &adiomv1.Capabilities_Sink{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+			},
 		},
 	}), nil
 }
@@ -619,13 +622,112 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 }
 
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteData(context.Context, *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
-	panic("unimplemented")
+func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
+	namespace := req.Msg.GetNamespace()
+	data := req.Msg.GetData()
+	if len(data) == 0 {
+		return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
+	}
+	keys := c.pkeys[namespace]
+	if len(keys) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown primary key for namespace: %s", namespace))
+	}
+	sanitizedNamespace := SanitizeNamespace(namespace)
+	for _, raw := range data {
+		var m map[string]interface{}
+		if err := bson.Unmarshal(raw, &m); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
+		}
+		var cols []string
+		var vals []interface{}
+		var placeholders []string
+		for k, v := range m {
+			cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
+			vals = append(vals, v)
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(vals)))
+		}
+		query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", sanitizedNamespace, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+		if _, err := c.c.Exec(ctx, query, vals...); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("insert failed: %w", err))
+		}
+	}
+	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
-	panic("unimplemented")
+func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
+	namespace := req.Msg.GetNamespace()
+	updates := req.Msg.GetUpdates()
+	keys := c.pkeys[namespace]
+	if len(keys) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown primary key for namespace: %s", namespace))
+	}
+	sanitizedNamespace := SanitizeNamespace(namespace)
+	for _, update := range updates {
+		switch update.GetType() {
+		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+			var m map[string]interface{}
+			if err := bson.Unmarshal(update.GetData(), &m); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
+			}
+			var cols []string
+			var vals []interface{}
+			var placeholders []string
+			for k, v := range m {
+				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
+				vals = append(vals, v)
+				placeholders = append(placeholders, fmt.Sprintf("$%d", len(vals)))
+			}
+			conflictCols := make([]string, len(keys))
+			for i, k := range keys {
+				conflictCols[i] = pgx.Identifier([]string{k}).Sanitize()
+			}
+			setUpdates := []string{}
+			for _, col := range cols {
+				if !contains(conflictCols, col) {
+					setUpdates = append(setUpdates, fmt.Sprintf("%s=EXCLUDED.%s", col, col))
+				}
+			}
+			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s", sanitizedNamespace, strings.Join(cols, ", "), strings.Join(placeholders, ", "), strings.Join(conflictCols, ", "), strings.Join(setUpdates, ", "))
+			if _, err := c.c.Exec(ctx, query, vals...); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("upsert failed: %w", err))
+			}
+		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+			idVals := make([]interface{}, len(keys))
+			for i, k := range keys {
+				idVals[i] = extractBsonValue(update.GetId(), k)
+			}
+			where := []string{}
+			for i, k := range keys {
+				where = append(where, fmt.Sprintf("%s=$%d", pgx.Identifier([]string{k}).Sanitize(), i+1))
+			}
+			query := fmt.Sprintf("DELETE FROM %s WHERE %s", sanitizedNamespace, strings.Join(where, " AND "))
+			if _, err := c.c.Exec(ctx, query, idVals...); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("delete failed: %w", err))
+			}
+		}
+	}
+	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
+}
+
+func contains(arr []string, s string) bool {
+	for _, a := range arr {
+		if a == s {
+			return true
+		}
+	}
+	return false
+}
+
+func extractBsonValue(bsonVals []*adiomv1.BsonValue, key string) interface{} {
+	for _, v := range bsonVals {
+		if v.GetName() == "_id" || v.GetName() == key {
+			var out interface{}
+			_ = bson.Unmarshal(v.GetData(), &out)
+			return out
+		}
+	}
+	return nil
 }
 
 func createReplicationUrl(urlString string) (string, error) {
