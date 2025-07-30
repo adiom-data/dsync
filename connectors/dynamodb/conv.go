@@ -358,6 +358,8 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 	}
 	slog.Info("Converting DynamoDB key to BSON", "keySchema", keySchema, "value", v)
 	if len(keySchema) == 1 {
+		x, _ := toBson(v)
+		slog.Info("Single key schema, returning as BSON value", "key", keySchema[0], "value", x)
 		return toBson(v)
 	}
 	v2, ok := attr[keySchema[1]]
