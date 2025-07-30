@@ -700,8 +700,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 			for k, v := range m {
 				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
 				if k == "_id" {
-					vals = append(vals, update.GetId()[0].GetData())
-					slog.Info(fmt.Sprintf("Using _id value: %v for column: %s", v, k))
+					vals = append(vals, string(update.GetId()[0].GetData()))
 				} else {
 					vals = append(vals, v)
 				}
