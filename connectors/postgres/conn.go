@@ -633,22 +633,40 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown primary key for namespace: %s", namespace))
 	}
 	sanitizedNamespace := SanitizeNamespace(namespace)
-	for _, raw := range data {
+	batchSize := 1000 // reasonable default, can be tuned or made configurable
+	var batchCols []string
+	var batchVals [][]interface{}
+	for i, raw := range data {
 		var m map[string]interface{}
 		if err := bson.Unmarshal(raw, &m); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 		}
 		var cols []string
 		var vals []interface{}
-		var placeholders []string
 		for k, v := range m {
 			cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
 			vals = append(vals, v)
-			placeholders = append(placeholders, fmt.Sprintf("$%d", len(vals)))
 		}
-		query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", sanitizedNamespace, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
-		if _, err := c.c.Exec(ctx, query, vals...); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("insert failed: %w", err))
+		if len(batchCols) == 0 {
+			batchCols = cols
+		}
+		batchVals = append(batchVals, vals)
+		if len(batchVals) == batchSize || i == len(data)-1 {
+			var placeholders []string
+			flatVals := []interface{}{}
+			for _, vals := range batchVals {
+				rowPlaceholders := []string{}
+				for k := range vals {
+					rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("$%d", len(flatVals)+k+1))
+				}
+				placeholders = append(placeholders, fmt.Sprintf("(%s)", strings.Join(rowPlaceholders, ", ")))
+				flatVals = append(flatVals, vals...)
+			}
+			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", sanitizedNamespace, strings.Join(batchCols, ", "), strings.Join(placeholders, ", "))
+			if _, err := c.c.Exec(ctx, query, flatVals...); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("batch insert failed: %w", err))
+			}
+			batchVals = nil
 		}
 	}
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
