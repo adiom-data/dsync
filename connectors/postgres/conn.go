@@ -641,14 +641,19 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 		if err := bson.Unmarshal(raw, &m); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 		}
-		var cols []string
-		var vals []interface{}
-		for k, v := range m {
-			cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
-			vals = append(vals, v)
-		}
 		if len(batchCols) == 0 {
-			batchCols = cols
+			for k := range m {
+				batchCols = append(batchCols, pgx.Identifier([]string{k}).Sanitize())
+			}
+		}
+		vals := make([]interface{}, len(batchCols))
+		for j, col := range batchCols {
+			origCol := strings.Trim(col, `"`)
+			if v, ok := m[origCol]; ok {
+				vals[j] = v
+			} else {
+				vals[j] = nil
+			}
 		}
 		batchVals = append(batchVals, vals)
 		if len(batchVals) == batchSize || i == len(data)-1 {
