@@ -700,7 +700,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 			for k, v := range m {
 				slog.Info(fmt.Sprintf("Processing column: %s with value: %v", k, v))
 				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
-				if k == "_id" {
+				if k == "_id" { //TODO: it looks like DynamoDB connector replaces doc _id with Adiom's BsonValue rather than BSON: https://github.com/adiom-data/dsync/blob/23c5e405c85927a8eeb34a74f7943f1bd7263c43/connectors/dynamodb/conv.go#L452
 					vals = append(vals, pgx.Identifier([]string{string(update.GetId()[0].GetData())}).Sanitize())
 				} else {
 					vals = append(vals, v)
