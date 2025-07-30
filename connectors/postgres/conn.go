@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strconv"
 	"strings"
@@ -717,6 +718,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 				}
 			}
 			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s", sanitizedNamespace, strings.Join(cols, ", "), strings.Join(placeholders, ", "), strings.Join(conflictCols, ", "), strings.Join(setUpdates, ", "))
+			slog.Info("Executing upsert query: %s with values: %v\n", query, vals)
 			if _, err := c.c.Exec(ctx, query, vals...); err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("upsert failed: %w", err))
 			}
