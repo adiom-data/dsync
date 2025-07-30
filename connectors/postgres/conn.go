@@ -698,6 +698,16 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 			var placeholders []string
 			for k, v := range m {
 				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
+				if k == "_id" {
+					var decoded interface{}
+					if err := bson.Unmarshal(v.([]byte), &decoded); err == nil {
+						vals = append(vals, decoded)
+					} else {
+						vals = append(vals, v)
+					}
+				} else {
+					vals = append(vals, v)
+				}
 				vals = append(vals, v)
 				placeholders = append(placeholders, fmt.Sprintf("$%d", len(vals)))
 			}
