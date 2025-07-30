@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -356,10 +355,7 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 	if !ok {
 		return nil, fmt.Errorf("key schema does not match actual keys")
 	}
-	slog.Info("Converting DynamoDB key to BSON", "keySchema", keySchema, "value", v)
 	if len(keySchema) == 1 {
-		x, _ := toBson(v)
-		slog.Info("Single key schema, returning as BSON value", "key", keySchema[0], "value", x)
 		return toBson(v)
 	}
 	v2, ok := attr[keySchema[1]]

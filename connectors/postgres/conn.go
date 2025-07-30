@@ -698,6 +698,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 			var vals []interface{}
 			var placeholders []string
 			for k, v := range m {
+				slog.Info(fmt.Sprintf("Processing column: %s with value: %v", k, v))
 				cols = append(cols, pgx.Identifier([]string{k}).Sanitize())
 				if k == "_id" {
 					vals = append(vals, pgx.Identifier([]string{string(update.GetId()[0].GetData())}).Sanitize())
