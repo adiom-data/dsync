@@ -75,8 +75,9 @@ const (
 )
 
 const (
-	SyncModeFull = "Full"
-	SyncModeCDC  = "CDC"
+	SyncModeFull     = "Full"
+	SyncModeCDC      = "CDC"
+	SyncModeSnapshot = "Snapshot"
 )
 
 type ProgressMetrics struct {
