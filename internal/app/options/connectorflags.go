@@ -16,6 +16,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/postgres"
 	"github.com/adiom-data/dsync/connectors/random"
+	"github.com/adiom-data/dsync/connectors/spanner"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
@@ -393,6 +394,19 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},
+		{
+			Name: "Spanner",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "spanner") || strings.HasPrefix(s, "spanner://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				settings := spanner.SpannerSettings{}
+				return CreateHelper("Spanner", "spanner [options]", SpannerFlags(&settings), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					//settings.Database = args[0]
+					return spanner.NewConn(c.Context, settings)
+				})(args, as)
+			},
+		},
 	}
 }
 
@@ -579,6 +593,23 @@ func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
 			Name:        "doc-partition",
 			Value:       postgresSettingsDefault.TargetDocCountPerPartition,
 			Destination: &settings.TargetDocCountPerPartition,
+		}),
+	}
+}
+
+func SpannerFlags(settings *spanner.SpannerSettings) []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "database",
+			Usage:       "Spanner database string (projects/PROJECT/instances/INSTANCE/databases/DATABASE)",
+			Required:    true,
+			Destination: &settings.Database,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "page-size",
+			Usage:       "Specify pagination limit when fetching for initial sync",
+			Value:       1000,
+			Destination: &settings.Limit,
 		}),
 	}
 }
