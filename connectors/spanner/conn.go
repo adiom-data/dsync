@@ -37,6 +37,7 @@ func NewConn(ctx context.Context, settings SpannerSettings) (*conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &conn{
 		client:   client,
 		settings: settings,
@@ -142,6 +143,12 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 		if err := bson.Unmarshal(raw, &m); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 		}
+		//HACK: replace _id key with id
+		if m["_id"] != nil {
+			m["id"] = m["_id"]
+			delete(m, "_id")
+		}
+
 		muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 	}
 	_, err := c.client.Apply(ctx, muts)
