@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"cloud.google.com/go/spanner"
 	"connectrpc.com/connect"
@@ -170,15 +171,25 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 			if err := bson.Unmarshal(update.GetData(), &m); err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 			}
+
+			slog.Info("Writing update", "namespace", namespace, "update", update)
+
+			//HACK: replace _id key with id
+			if m["_id"] != nil {
+				m["id"] = m["_id"]
+				delete(m, "_id")
+			}
+
 			muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 			// TODO: Extract primary key from update.GetId() and create Delete mutation
+			slog.Info("Writing delete", "namespace", namespace, "update", update)
 		}
 	}
-	_, err := c.client.Apply(ctx, muts)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+	// _, err := c.client.Apply(ctx, muts)
+	// if err != nil {
+	// 	return nil, connect.NewError(connect.CodeInternal, err)
+	// }
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
