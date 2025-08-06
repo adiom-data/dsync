@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"connectrpc.com/connect"
@@ -153,7 +154,10 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 
 		muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 	}
+	start := time.Now()
 	_, err := c.client.Apply(ctx, muts)
+	duration := time.Since(start)
+	slog.Info("WriteData Apply duration", "namespace", namespace, "count", len(muts), "duration", duration, "avg_per_mutation", duration/time.Duration(len(muts)))
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
