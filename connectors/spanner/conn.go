@@ -182,25 +182,21 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 			}
 
-			slog.Info("Writing update", "namespace", namespace, "update", update)
-
 			//HACK: replace _id key with id and the proper value
 			if m["_id"] != nil {
 				m["id"] = id
 				delete(m, "_id")
 			}
 
-			slog.Info(fmt.Sprintf("Processing update: %v", m))
-
 			muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 			muts = append(muts, spanner.Delete(namespace, spanner.Key{id}))
 		}
 	}
-	// _, err := c.client.Apply(ctx, muts)
-	// if err != nil {
-	// 	return nil, connect.NewError(connect.CodeInternal, err)
-	// }
+	_, err := c.client.Apply(ctx, muts)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
