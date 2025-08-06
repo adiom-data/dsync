@@ -10,6 +10,7 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"google.golang.org/api/iterator"
 )
 
@@ -165,6 +166,15 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 	updates := req.Msg.GetUpdates()
 	var muts []*spanner.Mutation
 	for _, update := range updates {
+
+		idType := bsontype.Type(update.GetId()[0].GetType())
+		rv := bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}
+		var id interface{}
+		if err := rv.Unmarshal(&id); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal id: %w", err))
+		}
+		slog.Info("Processing update", "namespace", namespace, "id", id, "updateType", update.GetType())
+
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
 			var m map[string]interface{}
@@ -179,6 +189,8 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 				m["id"] = m["_id"]
 				delete(m, "_id")
 			}
+
+			slog.Info(fmt.Sprintf("Processing update: %v", m))
 
 			muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
