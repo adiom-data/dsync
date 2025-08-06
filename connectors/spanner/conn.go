@@ -184,9 +184,9 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 
 			slog.Info("Writing update", "namespace", namespace, "update", update)
 
-			//HACK: replace _id key with id
+			//HACK: replace _id key with id and the proper value
 			if m["_id"] != nil {
-				m["id"] = m["_id"]
+				m["id"] = id
 				delete(m, "_id")
 			}
 
@@ -194,8 +194,7 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 
 			muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			// TODO: Extract primary key from update.GetId() and create Delete mutation
-			slog.Info("Writing delete", "namespace", namespace, "update", update)
+			muts = append(muts, spanner.Delete(namespace, spanner.Key{id}))
 		}
 	}
 	// _, err := c.client.Apply(ctx, muts)
