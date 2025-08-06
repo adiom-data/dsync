@@ -167,13 +167,14 @@ func (c *conn) WriteUpdates(ctx context.Context, req *connect.Request[adiomv1.Wr
 	var muts []*spanner.Mutation
 	for _, update := range updates {
 
+		//get the id from the update
 		idType := bsontype.Type(update.GetId()[0].GetType())
 		rv := bson.RawValue{Type: idType, Value: update.GetId()[0].GetData()}
 		var id interface{}
 		if err := rv.Unmarshal(&id); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal id: %w", err))
 		}
-		slog.Info("Processing update", "namespace", namespace, "id", id, "updateType", update.GetType())
+		slog.Debug("Processing update", "namespace", namespace, "id", id, "updateType", update.GetType())
 
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
