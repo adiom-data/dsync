@@ -408,6 +408,14 @@ var TPCHMappingConfig = NamespaceMappingConfig{
 			PrimaryKey:      "_id",
 			UpdateType:      "insert",
 		},
+		{
+			TargetNamespace: "public.supplier",
+			SourceNamespace: "public.part",
+			ForeignKey:      "parts._id",
+			PrimaryKey:      "_id",
+			FieldName:       "parts.$.part",
+			UpdateType:      "embeddedDoc",
+		}, // need to add index: db.supplier.createIndex({"parts._id": 1});
 	},
 	"public.supplier": {
 		{
