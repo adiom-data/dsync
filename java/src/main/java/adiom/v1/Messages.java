@@ -21892,6 +21892,2956 @@ public final class Messages {
 
   }
 
+  public interface GetFanOutTransformRequestOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.GetFanOutTransformRequest)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The namespace.
+     */
+    java.lang.String getNamespace();
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The bytes for namespace.
+     */
+    com.google.protobuf.ByteString
+        getNamespaceBytes();
+
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    java.util.List<adiom.v1.Messages.Update> 
+        getUpdatesList();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    adiom.v1.Messages.Update getUpdates(int index);
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    int getUpdatesCount();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+        getUpdatesOrBuilderList();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+        int index);
+
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    java.util.List<com.google.protobuf.ByteString> getDataList();
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    int getDataCount();
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    com.google.protobuf.ByteString getData(int index);
+
+    /**
+     * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+     * @return The enum numeric value on the wire for requestType.
+     */
+    int getRequestTypeValue();
+    /**
+     * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+     * @return The requestType.
+     */
+    adiom.v1.Messages.DataType getRequestType();
+
+    /**
+     * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+     * @return The enum numeric value on the wire for responseType.
+     */
+    int getResponseTypeValue();
+    /**
+     * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+     * @return The responseType.
+     */
+    adiom.v1.Messages.DataType getResponseType();
+  }
+  /**
+   * Protobuf type {@code adiom.v1.GetFanOutTransformRequest}
+   */
+  public static final class GetFanOutTransformRequest extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.GetFanOutTransformRequest)
+      GetFanOutTransformRequestOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        GetFanOutTransformRequest.class.getName());
+    }
+    // Use GetFanOutTransformRequest.newBuilder() to construct.
+    private GetFanOutTransformRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private GetFanOutTransformRequest() {
+      namespace_ = "";
+      updates_ = java.util.Collections.emptyList();
+      data_ = emptyList(com.google.protobuf.ByteString.class);
+      requestType_ = 0;
+      responseType_ = 0;
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformRequest_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformRequest_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.GetFanOutTransformRequest.class, adiom.v1.Messages.GetFanOutTransformRequest.Builder.class);
+    }
+
+    public static final int NAMESPACE_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private volatile java.lang.Object namespace_ = "";
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The namespace.
+     */
+    @java.lang.Override
+    public java.lang.String getNamespace() {
+      java.lang.Object ref = namespace_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        namespace_ = s;
+        return s;
+      }
+    }
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The bytes for namespace.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNamespaceBytes() {
+      java.lang.Object ref = namespace_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        namespace_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    public static final int UPDATES_FIELD_NUMBER = 2;
+    @SuppressWarnings("serial")
+    private java.util.List<adiom.v1.Messages.Update> updates_;
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<adiom.v1.Messages.Update> getUpdatesList() {
+      return updates_;
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+        getUpdatesOrBuilderList() {
+      return updates_;
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public int getUpdatesCount() {
+      return updates_.size();
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.Update getUpdates(int index) {
+      return updates_.get(index);
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+        int index) {
+      return updates_.get(index);
+    }
+
+    public static final int DATA_FIELD_NUMBER = 3;
+    @SuppressWarnings("serial")
+    private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ =
+        emptyList(com.google.protobuf.ByteString.class);
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    @java.lang.Override
+    public java.util.List<com.google.protobuf.ByteString>
+        getDataList() {
+      return data_;
+    }
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    public int getDataCount() {
+      return data_.size();
+    }
+    /**
+     * <code>repeated bytes data = 3 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    public com.google.protobuf.ByteString getData(int index) {
+      return data_.get(index);
+    }
+
+    public static final int REQUEST_TYPE_FIELD_NUMBER = 4;
+    private int requestType_ = 0;
+    /**
+     * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+     * @return The enum numeric value on the wire for requestType.
+     */
+    @java.lang.Override public int getRequestTypeValue() {
+      return requestType_;
+    }
+    /**
+     * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+     * @return The requestType.
+     */
+    @java.lang.Override public adiom.v1.Messages.DataType getRequestType() {
+      adiom.v1.Messages.DataType result = adiom.v1.Messages.DataType.forNumber(requestType_);
+      return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
+    }
+
+    public static final int RESPONSE_TYPE_FIELD_NUMBER = 5;
+    private int responseType_ = 0;
+    /**
+     * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+     * @return The enum numeric value on the wire for responseType.
+     */
+    @java.lang.Override public int getResponseTypeValue() {
+      return responseType_;
+    }
+    /**
+     * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+     * @return The responseType.
+     */
+    @java.lang.Override public adiom.v1.Messages.DataType getResponseType() {
+      adiom.v1.Messages.DataType result = adiom.v1.Messages.DataType.forNumber(responseType_);
+      return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(namespace_)) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 1, namespace_);
+      }
+      for (int i = 0; i < updates_.size(); i++) {
+        output.writeMessage(2, updates_.get(i));
+      }
+      for (int i = 0; i < data_.size(); i++) {
+        output.writeBytes(3, data_.get(i));
+      }
+      if (requestType_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
+        output.writeEnum(4, requestType_);
+      }
+      if (responseType_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
+        output.writeEnum(5, responseType_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(namespace_)) {
+        size += com.google.protobuf.GeneratedMessage.computeStringSize(1, namespace_);
+      }
+      for (int i = 0; i < updates_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, updates_.get(i));
+      }
+      {
+        int dataSize = 0;
+        for (int i = 0; i < data_.size(); i++) {
+          dataSize += com.google.protobuf.CodedOutputStream
+            .computeBytesSizeNoTag(data_.get(i));
+        }
+        size += dataSize;
+        size += 1 * getDataList().size();
+      }
+      if (requestType_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeEnumSize(4, requestType_);
+      }
+      if (responseType_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeEnumSize(5, responseType_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.GetFanOutTransformRequest)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.GetFanOutTransformRequest other = (adiom.v1.Messages.GetFanOutTransformRequest) obj;
+
+      if (!getNamespace()
+          .equals(other.getNamespace())) return false;
+      if (!getUpdatesList()
+          .equals(other.getUpdatesList())) return false;
+      if (!getDataList()
+          .equals(other.getDataList())) return false;
+      if (requestType_ != other.requestType_) return false;
+      if (responseType_ != other.responseType_) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + NAMESPACE_FIELD_NUMBER;
+      hash = (53 * hash) + getNamespace().hashCode();
+      if (getUpdatesCount() > 0) {
+        hash = (37 * hash) + UPDATES_FIELD_NUMBER;
+        hash = (53 * hash) + getUpdatesList().hashCode();
+      }
+      if (getDataCount() > 0) {
+        hash = (37 * hash) + DATA_FIELD_NUMBER;
+        hash = (53 * hash) + getDataList().hashCode();
+      }
+      hash = (37 * hash) + REQUEST_TYPE_FIELD_NUMBER;
+      hash = (53 * hash) + requestType_;
+      hash = (37 * hash) + RESPONSE_TYPE_FIELD_NUMBER;
+      hash = (53 * hash) + responseType_;
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformRequest parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.GetFanOutTransformRequest prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.GetFanOutTransformRequest}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.GetFanOutTransformRequest)
+        adiom.v1.Messages.GetFanOutTransformRequestOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformRequest_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.GetFanOutTransformRequest.class, adiom.v1.Messages.GetFanOutTransformRequest.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.GetFanOutTransformRequest.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        namespace_ = "";
+        if (updatesBuilder_ == null) {
+          updates_ = java.util.Collections.emptyList();
+        } else {
+          updates_ = null;
+          updatesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        requestType_ = 0;
+        responseType_ = 0;
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformRequest_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformRequest getDefaultInstanceForType() {
+        return adiom.v1.Messages.GetFanOutTransformRequest.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformRequest build() {
+        adiom.v1.Messages.GetFanOutTransformRequest result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformRequest buildPartial() {
+        adiom.v1.Messages.GetFanOutTransformRequest result = new adiom.v1.Messages.GetFanOutTransformRequest(this);
+        buildPartialRepeatedFields(result);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartialRepeatedFields(adiom.v1.Messages.GetFanOutTransformRequest result) {
+        if (updatesBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) != 0)) {
+            updates_ = java.util.Collections.unmodifiableList(updates_);
+            bitField0_ = (bitField0_ & ~0x00000002);
+          }
+          result.updates_ = updates_;
+        } else {
+          result.updates_ = updatesBuilder_.build();
+        }
+      }
+
+      private void buildPartial0(adiom.v1.Messages.GetFanOutTransformRequest result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          result.namespace_ = namespace_;
+        }
+        if (((from_bitField0_ & 0x00000004) != 0)) {
+          data_.makeImmutable();
+          result.data_ = data_;
+        }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          result.requestType_ = requestType_;
+        }
+        if (((from_bitField0_ & 0x00000010) != 0)) {
+          result.responseType_ = responseType_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.GetFanOutTransformRequest) {
+          return mergeFrom((adiom.v1.Messages.GetFanOutTransformRequest)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.GetFanOutTransformRequest other) {
+        if (other == adiom.v1.Messages.GetFanOutTransformRequest.getDefaultInstance()) return this;
+        if (!other.getNamespace().isEmpty()) {
+          namespace_ = other.namespace_;
+          bitField0_ |= 0x00000001;
+          onChanged();
+        }
+        if (updatesBuilder_ == null) {
+          if (!other.updates_.isEmpty()) {
+            if (updates_.isEmpty()) {
+              updates_ = other.updates_;
+              bitField0_ = (bitField0_ & ~0x00000002);
+            } else {
+              ensureUpdatesIsMutable();
+              updates_.addAll(other.updates_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.updates_.isEmpty()) {
+            if (updatesBuilder_.isEmpty()) {
+              updatesBuilder_.dispose();
+              updatesBuilder_ = null;
+              updates_ = other.updates_;
+              bitField0_ = (bitField0_ & ~0x00000002);
+              updatesBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getUpdatesFieldBuilder() : null;
+            } else {
+              updatesBuilder_.addAllMessages(other.updates_);
+            }
+          }
+        }
+        if (!other.data_.isEmpty()) {
+          if (data_.isEmpty()) {
+            data_ = other.data_;
+            data_.makeImmutable();
+            bitField0_ |= 0x00000004;
+          } else {
+            ensureDataIsMutable();
+            data_.addAll(other.data_);
+          }
+          onChanged();
+        }
+        if (other.requestType_ != 0) {
+          setRequestTypeValue(other.getRequestTypeValue());
+        }
+        if (other.responseType_ != 0) {
+          setResponseTypeValue(other.getResponseTypeValue());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                namespace_ = input.readStringRequireUtf8();
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 10
+              case 18: {
+                adiom.v1.Messages.Update m =
+                    input.readMessage(
+                        adiom.v1.Messages.Update.parser(),
+                        extensionRegistry);
+                if (updatesBuilder_ == null) {
+                  ensureUpdatesIsMutable();
+                  updates_.add(m);
+                } else {
+                  updatesBuilder_.addMessage(m);
+                }
+                break;
+              } // case 18
+              case 26: {
+                com.google.protobuf.ByteString v = input.readBytes();
+                ensureDataIsMutable();
+                data_.add(v);
+                break;
+              } // case 26
+              case 32: {
+                requestType_ = input.readEnum();
+                bitField0_ |= 0x00000008;
+                break;
+              } // case 32
+              case 40: {
+                responseType_ = input.readEnum();
+                bitField0_ |= 0x00000010;
+                break;
+              } // case 40
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private java.lang.Object namespace_ = "";
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return The namespace.
+       */
+      public java.lang.String getNamespace() {
+        java.lang.Object ref = namespace_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          namespace_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return The bytes for namespace.
+       */
+      public com.google.protobuf.ByteString
+          getNamespaceBytes() {
+        java.lang.Object ref = namespace_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          namespace_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @param value The namespace to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNamespace(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        namespace_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNamespace() {
+        namespace_ = getDefaultInstance().getNamespace();
+        bitField0_ = (bitField0_ & ~0x00000001);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @param value The bytes for namespace to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNamespaceBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        namespace_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+
+      private java.util.List<adiom.v1.Messages.Update> updates_ =
+        java.util.Collections.emptyList();
+      private void ensureUpdatesIsMutable() {
+        if (!((bitField0_ & 0x00000002) != 0)) {
+          updates_ = new java.util.ArrayList<adiom.v1.Messages.Update>(updates_);
+          bitField0_ |= 0x00000002;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder> updatesBuilder_;
+
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.Update> getUpdatesList() {
+        if (updatesBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(updates_);
+        } else {
+          return updatesBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public int getUpdatesCount() {
+        if (updatesBuilder_ == null) {
+          return updates_.size();
+        } else {
+          return updatesBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update getUpdates(int index) {
+        if (updatesBuilder_ == null) {
+          return updates_.get(index);
+        } else {
+          return updatesBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder setUpdates(
+          int index, adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.set(index, value);
+          onChanged();
+        } else {
+          updatesBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder setUpdates(
+          int index, adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.add(value);
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          int index, adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.add(index, value);
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.add(builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          int index, adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder addAllUpdates(
+          java.lang.Iterable<? extends adiom.v1.Messages.Update> values) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, updates_);
+          onChanged();
+        } else {
+          updatesBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder clearUpdates() {
+        if (updatesBuilder_ == null) {
+          updates_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000002);
+          onChanged();
+        } else {
+          updatesBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public Builder removeUpdates(int index) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.remove(index);
+          onChanged();
+        } else {
+          updatesBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder getUpdatesBuilder(
+          int index) {
+        return getUpdatesFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+          int index) {
+        if (updatesBuilder_ == null) {
+          return updates_.get(index);  } else {
+          return updatesBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+           getUpdatesOrBuilderList() {
+        if (updatesBuilder_ != null) {
+          return updatesBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(updates_);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder addUpdatesBuilder() {
+        return getUpdatesFieldBuilder().addBuilder(
+            adiom.v1.Messages.Update.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder addUpdatesBuilder(
+          int index) {
+        return getUpdatesFieldBuilder().addBuilder(
+            index, adiom.v1.Messages.Update.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 2 [json_name = "updates"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.Update.Builder> 
+           getUpdatesBuilderList() {
+        return getUpdatesFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder> 
+          getUpdatesFieldBuilder() {
+        if (updatesBuilder_ == null) {
+          updatesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder>(
+                  updates_,
+                  ((bitField0_ & 0x00000002) != 0),
+                  getParentForChildren(),
+                  isClean());
+          updates_ = null;
+        }
+        return updatesBuilder_;
+      }
+
+      private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ = emptyList(com.google.protobuf.ByteString.class);
+      private void ensureDataIsMutable() {
+        if (!data_.isModifiable()) {
+          data_ = makeMutableCopy(data_);
+        }
+        bitField0_ |= 0x00000004;
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @return A list containing the data.
+       */
+      public java.util.List<com.google.protobuf.ByteString>
+          getDataList() {
+        data_.makeImmutable();
+        return data_;
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @return The count of data.
+       */
+      public int getDataCount() {
+        return data_.size();
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @param index The index of the element to return.
+       * @return The data at the given index.
+       */
+      public com.google.protobuf.ByteString getData(int index) {
+        return data_.get(index);
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @param index The index to set the value at.
+       * @param value The data to set.
+       * @return This builder for chaining.
+       */
+      public Builder setData(
+          int index, com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.set(index, value);
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @param value The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addData(com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.add(value);
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @param values The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllData(
+          java.lang.Iterable<? extends com.google.protobuf.ByteString> values) {
+        ensureDataIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, data_);
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 3 [json_name = "data"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearData() {
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        bitField0_ = (bitField0_ & ~0x00000004);
+        onChanged();
+        return this;
+      }
+
+      private int requestType_ = 0;
+      /**
+       * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+       * @return The enum numeric value on the wire for requestType.
+       */
+      @java.lang.Override public int getRequestTypeValue() {
+        return requestType_;
+      }
+      /**
+       * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+       * @param value The enum numeric value on the wire for requestType to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRequestTypeValue(int value) {
+        requestType_ = value;
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+       * @return The requestType.
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.DataType getRequestType() {
+        adiom.v1.Messages.DataType result = adiom.v1.Messages.DataType.forNumber(requestType_);
+        return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
+      }
+      /**
+       * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+       * @param value The requestType to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRequestType(adiom.v1.Messages.DataType value) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        bitField0_ |= 0x00000008;
+        requestType_ = value.getNumber();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.DataType request_type = 4 [json_name = "requestType"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRequestType() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        requestType_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private int responseType_ = 0;
+      /**
+       * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+       * @return The enum numeric value on the wire for responseType.
+       */
+      @java.lang.Override public int getResponseTypeValue() {
+        return responseType_;
+      }
+      /**
+       * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+       * @param value The enum numeric value on the wire for responseType to set.
+       * @return This builder for chaining.
+       */
+      public Builder setResponseTypeValue(int value) {
+        responseType_ = value;
+        bitField0_ |= 0x00000010;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+       * @return The responseType.
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.DataType getResponseType() {
+        adiom.v1.Messages.DataType result = adiom.v1.Messages.DataType.forNumber(responseType_);
+        return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
+      }
+      /**
+       * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+       * @param value The responseType to set.
+       * @return This builder for chaining.
+       */
+      public Builder setResponseType(adiom.v1.Messages.DataType value) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        bitField0_ |= 0x00000010;
+        responseType_ = value.getNumber();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.DataType response_type = 5 [json_name = "responseType"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearResponseType() {
+        bitField0_ = (bitField0_ & ~0x00000010);
+        responseType_ = 0;
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.GetFanOutTransformRequest)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.GetFanOutTransformRequest)
+    private static final adiom.v1.Messages.GetFanOutTransformRequest DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.GetFanOutTransformRequest();
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformRequest getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<GetFanOutTransformRequest>
+        PARSER = new com.google.protobuf.AbstractParser<GetFanOutTransformRequest>() {
+      @java.lang.Override
+      public GetFanOutTransformRequest parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<GetFanOutTransformRequest> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<GetFanOutTransformRequest> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.GetFanOutTransformRequest getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface NamespaceTransformDataOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.NamespaceTransformData)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    java.util.List<adiom.v1.Messages.Update> 
+        getUpdatesList();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    adiom.v1.Messages.Update getUpdates(int index);
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    int getUpdatesCount();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+        getUpdatesOrBuilderList();
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+        int index);
+
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    java.util.List<com.google.protobuf.ByteString> getDataList();
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    int getDataCount();
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    com.google.protobuf.ByteString getData(int index);
+  }
+  /**
+   * Protobuf type {@code adiom.v1.NamespaceTransformData}
+   */
+  public static final class NamespaceTransformData extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.NamespaceTransformData)
+      NamespaceTransformDataOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        NamespaceTransformData.class.getName());
+    }
+    // Use NamespaceTransformData.newBuilder() to construct.
+    private NamespaceTransformData(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private NamespaceTransformData() {
+      updates_ = java.util.Collections.emptyList();
+      data_ = emptyList(com.google.protobuf.ByteString.class);
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_NamespaceTransformData_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_NamespaceTransformData_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.NamespaceTransformData.class, adiom.v1.Messages.NamespaceTransformData.Builder.class);
+    }
+
+    public static final int UPDATES_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private java.util.List<adiom.v1.Messages.Update> updates_;
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<adiom.v1.Messages.Update> getUpdatesList() {
+      return updates_;
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+        getUpdatesOrBuilderList() {
+      return updates_;
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public int getUpdatesCount() {
+      return updates_.size();
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.Update getUpdates(int index) {
+      return updates_.get(index);
+    }
+    /**
+     * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+        int index) {
+      return updates_.get(index);
+    }
+
+    public static final int DATA_FIELD_NUMBER = 2;
+    @SuppressWarnings("serial")
+    private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ =
+        emptyList(com.google.protobuf.ByteString.class);
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    @java.lang.Override
+    public java.util.List<com.google.protobuf.ByteString>
+        getDataList() {
+      return data_;
+    }
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    public int getDataCount() {
+      return data_.size();
+    }
+    /**
+     * <code>repeated bytes data = 2 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    public com.google.protobuf.ByteString getData(int index) {
+      return data_.get(index);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < updates_.size(); i++) {
+        output.writeMessage(1, updates_.get(i));
+      }
+      for (int i = 0; i < data_.size(); i++) {
+        output.writeBytes(2, data_.get(i));
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (int i = 0; i < updates_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, updates_.get(i));
+      }
+      {
+        int dataSize = 0;
+        for (int i = 0; i < data_.size(); i++) {
+          dataSize += com.google.protobuf.CodedOutputStream
+            .computeBytesSizeNoTag(data_.get(i));
+        }
+        size += dataSize;
+        size += 1 * getDataList().size();
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.NamespaceTransformData)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.NamespaceTransformData other = (adiom.v1.Messages.NamespaceTransformData) obj;
+
+      if (!getUpdatesList()
+          .equals(other.getUpdatesList())) return false;
+      if (!getDataList()
+          .equals(other.getDataList())) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getUpdatesCount() > 0) {
+        hash = (37 * hash) + UPDATES_FIELD_NUMBER;
+        hash = (53 * hash) + getUpdatesList().hashCode();
+      }
+      if (getDataCount() > 0) {
+        hash = (37 * hash) + DATA_FIELD_NUMBER;
+        hash = (53 * hash) + getDataList().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.NamespaceTransformData parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.NamespaceTransformData parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.NamespaceTransformData parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.NamespaceTransformData prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.NamespaceTransformData}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.NamespaceTransformData)
+        adiom.v1.Messages.NamespaceTransformDataOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_NamespaceTransformData_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_NamespaceTransformData_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.NamespaceTransformData.class, adiom.v1.Messages.NamespaceTransformData.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.NamespaceTransformData.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        if (updatesBuilder_ == null) {
+          updates_ = java.util.Collections.emptyList();
+        } else {
+          updates_ = null;
+          updatesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_NamespaceTransformData_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.NamespaceTransformData getDefaultInstanceForType() {
+        return adiom.v1.Messages.NamespaceTransformData.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.NamespaceTransformData build() {
+        adiom.v1.Messages.NamespaceTransformData result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.NamespaceTransformData buildPartial() {
+        adiom.v1.Messages.NamespaceTransformData result = new adiom.v1.Messages.NamespaceTransformData(this);
+        buildPartialRepeatedFields(result);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartialRepeatedFields(adiom.v1.Messages.NamespaceTransformData result) {
+        if (updatesBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            updates_ = java.util.Collections.unmodifiableList(updates_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.updates_ = updates_;
+        } else {
+          result.updates_ = updatesBuilder_.build();
+        }
+      }
+
+      private void buildPartial0(adiom.v1.Messages.NamespaceTransformData result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000002) != 0)) {
+          data_.makeImmutable();
+          result.data_ = data_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.NamespaceTransformData) {
+          return mergeFrom((adiom.v1.Messages.NamespaceTransformData)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.NamespaceTransformData other) {
+        if (other == adiom.v1.Messages.NamespaceTransformData.getDefaultInstance()) return this;
+        if (updatesBuilder_ == null) {
+          if (!other.updates_.isEmpty()) {
+            if (updates_.isEmpty()) {
+              updates_ = other.updates_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureUpdatesIsMutable();
+              updates_.addAll(other.updates_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.updates_.isEmpty()) {
+            if (updatesBuilder_.isEmpty()) {
+              updatesBuilder_.dispose();
+              updatesBuilder_ = null;
+              updates_ = other.updates_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              updatesBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getUpdatesFieldBuilder() : null;
+            } else {
+              updatesBuilder_.addAllMessages(other.updates_);
+            }
+          }
+        }
+        if (!other.data_.isEmpty()) {
+          if (data_.isEmpty()) {
+            data_ = other.data_;
+            data_.makeImmutable();
+            bitField0_ |= 0x00000002;
+          } else {
+            ensureDataIsMutable();
+            data_.addAll(other.data_);
+          }
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                adiom.v1.Messages.Update m =
+                    input.readMessage(
+                        adiom.v1.Messages.Update.parser(),
+                        extensionRegistry);
+                if (updatesBuilder_ == null) {
+                  ensureUpdatesIsMutable();
+                  updates_.add(m);
+                } else {
+                  updatesBuilder_.addMessage(m);
+                }
+                break;
+              } // case 10
+              case 18: {
+                com.google.protobuf.ByteString v = input.readBytes();
+                ensureDataIsMutable();
+                data_.add(v);
+                break;
+              } // case 18
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<adiom.v1.Messages.Update> updates_ =
+        java.util.Collections.emptyList();
+      private void ensureUpdatesIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          updates_ = new java.util.ArrayList<adiom.v1.Messages.Update>(updates_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder> updatesBuilder_;
+
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.Update> getUpdatesList() {
+        if (updatesBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(updates_);
+        } else {
+          return updatesBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public int getUpdatesCount() {
+        if (updatesBuilder_ == null) {
+          return updates_.size();
+        } else {
+          return updatesBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update getUpdates(int index) {
+        if (updatesBuilder_ == null) {
+          return updates_.get(index);
+        } else {
+          return updatesBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder setUpdates(
+          int index, adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.set(index, value);
+          onChanged();
+        } else {
+          updatesBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder setUpdates(
+          int index, adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.add(value);
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          int index, adiom.v1.Messages.Update value) {
+        if (updatesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureUpdatesIsMutable();
+          updates_.add(index, value);
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.add(builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder addUpdates(
+          int index, adiom.v1.Messages.Update.Builder builderForValue) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          updatesBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder addAllUpdates(
+          java.lang.Iterable<? extends adiom.v1.Messages.Update> values) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, updates_);
+          onChanged();
+        } else {
+          updatesBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder clearUpdates() {
+        if (updatesBuilder_ == null) {
+          updates_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          updatesBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public Builder removeUpdates(int index) {
+        if (updatesBuilder_ == null) {
+          ensureUpdatesIsMutable();
+          updates_.remove(index);
+          onChanged();
+        } else {
+          updatesBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder getUpdatesBuilder(
+          int index) {
+        return getUpdatesFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.UpdateOrBuilder getUpdatesOrBuilder(
+          int index) {
+        if (updatesBuilder_ == null) {
+          return updates_.get(index);  } else {
+          return updatesBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public java.util.List<? extends adiom.v1.Messages.UpdateOrBuilder> 
+           getUpdatesOrBuilderList() {
+        if (updatesBuilder_ != null) {
+          return updatesBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(updates_);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder addUpdatesBuilder() {
+        return getUpdatesFieldBuilder().addBuilder(
+            adiom.v1.Messages.Update.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public adiom.v1.Messages.Update.Builder addUpdatesBuilder(
+          int index) {
+        return getUpdatesFieldBuilder().addBuilder(
+            index, adiom.v1.Messages.Update.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.Update updates = 1 [json_name = "updates"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.Update.Builder> 
+           getUpdatesBuilderList() {
+        return getUpdatesFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder> 
+          getUpdatesFieldBuilder() {
+        if (updatesBuilder_ == null) {
+          updatesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              adiom.v1.Messages.Update, adiom.v1.Messages.Update.Builder, adiom.v1.Messages.UpdateOrBuilder>(
+                  updates_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          updates_ = null;
+        }
+        return updatesBuilder_;
+      }
+
+      private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ = emptyList(com.google.protobuf.ByteString.class);
+      private void ensureDataIsMutable() {
+        if (!data_.isModifiable()) {
+          data_ = makeMutableCopy(data_);
+        }
+        bitField0_ |= 0x00000002;
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @return A list containing the data.
+       */
+      public java.util.List<com.google.protobuf.ByteString>
+          getDataList() {
+        data_.makeImmutable();
+        return data_;
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @return The count of data.
+       */
+      public int getDataCount() {
+        return data_.size();
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @param index The index of the element to return.
+       * @return The data at the given index.
+       */
+      public com.google.protobuf.ByteString getData(int index) {
+        return data_.get(index);
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @param index The index to set the value at.
+       * @param value The data to set.
+       * @return This builder for chaining.
+       */
+      public Builder setData(
+          int index, com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.set(index, value);
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @param value The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addData(com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.add(value);
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @param values The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllData(
+          java.lang.Iterable<? extends com.google.protobuf.ByteString> values) {
+        ensureDataIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, data_);
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 2 [json_name = "data"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearData() {
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        bitField0_ = (bitField0_ & ~0x00000002);
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.NamespaceTransformData)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.NamespaceTransformData)
+    private static final adiom.v1.Messages.NamespaceTransformData DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.NamespaceTransformData();
+    }
+
+    public static adiom.v1.Messages.NamespaceTransformData getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<NamespaceTransformData>
+        PARSER = new com.google.protobuf.AbstractParser<NamespaceTransformData>() {
+      @java.lang.Override
+      public NamespaceTransformData parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<NamespaceTransformData> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<NamespaceTransformData> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.NamespaceTransformData getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface GetFanOutTransformResponseOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.GetFanOutTransformResponse)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    int getNamespacesCount();
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    boolean containsNamespaces(
+        java.lang.String key);
+    /**
+     * Use {@link #getNamespacesMap()} instead.
+     */
+    @java.lang.Deprecated
+    java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+    getNamespaces();
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+    getNamespacesMap();
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    /* nullable */
+adiom.v1.Messages.NamespaceTransformData getNamespacesOrDefault(
+        java.lang.String key,
+        /* nullable */
+adiom.v1.Messages.NamespaceTransformData defaultValue);
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    adiom.v1.Messages.NamespaceTransformData getNamespacesOrThrow(
+        java.lang.String key);
+  }
+  /**
+   * Protobuf type {@code adiom.v1.GetFanOutTransformResponse}
+   */
+  public static final class GetFanOutTransformResponse extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.GetFanOutTransformResponse)
+      GetFanOutTransformResponseOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        GetFanOutTransformResponse.class.getName());
+    }
+    // Use GetFanOutTransformResponse.newBuilder() to construct.
+    private GetFanOutTransformResponse(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private GetFanOutTransformResponse() {
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_descriptor;
+    }
+
+    @SuppressWarnings({"rawtypes"})
+    @java.lang.Override
+    protected com.google.protobuf.MapFieldReflectionAccessor internalGetMapFieldReflection(
+        int number) {
+      switch (number) {
+        case 1:
+          return internalGetNamespaces();
+        default:
+          throw new RuntimeException(
+              "Invalid map field number: " + number);
+      }
+    }
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.GetFanOutTransformResponse.class, adiom.v1.Messages.GetFanOutTransformResponse.Builder.class);
+    }
+
+    public static final int NAMESPACES_FIELD_NUMBER = 1;
+    private static final class NamespacesDefaultEntryHolder {
+      static final com.google.protobuf.MapEntry<
+          java.lang.String, adiom.v1.Messages.NamespaceTransformData> defaultEntry =
+              com.google.protobuf.MapEntry
+              .<java.lang.String, adiom.v1.Messages.NamespaceTransformData>newDefaultInstance(
+                  adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_descriptor, 
+                  com.google.protobuf.WireFormat.FieldType.STRING,
+                  "",
+                  com.google.protobuf.WireFormat.FieldType.MESSAGE,
+                  adiom.v1.Messages.NamespaceTransformData.getDefaultInstance());
+    }
+    @SuppressWarnings("serial")
+    private com.google.protobuf.MapField<
+        java.lang.String, adiom.v1.Messages.NamespaceTransformData> namespaces_;
+    private com.google.protobuf.MapField<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+    internalGetNamespaces() {
+      if (namespaces_ == null) {
+        return com.google.protobuf.MapField.emptyMapField(
+            NamespacesDefaultEntryHolder.defaultEntry);
+      }
+      return namespaces_;
+    }
+    public int getNamespacesCount() {
+      return internalGetNamespaces().getMap().size();
+    }
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    @java.lang.Override
+    public boolean containsNamespaces(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      return internalGetNamespaces().getMap().containsKey(key);
+    }
+    /**
+     * Use {@link #getNamespacesMap()} instead.
+     */
+    @java.lang.Override
+    @java.lang.Deprecated
+    public java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> getNamespaces() {
+      return getNamespacesMap();
+    }
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    @java.lang.Override
+    public java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> getNamespacesMap() {
+      return internalGetNamespaces().getMap();
+    }
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    @java.lang.Override
+    public /* nullable */
+adiom.v1.Messages.NamespaceTransformData getNamespacesOrDefault(
+        java.lang.String key,
+        /* nullable */
+adiom.v1.Messages.NamespaceTransformData defaultValue) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> map =
+          internalGetNamespaces().getMap();
+      return map.containsKey(key) ? map.get(key) : defaultValue;
+    }
+    /**
+     * <pre>
+     * Map from namespace to its transformed updates and data
+     * </pre>
+     *
+     * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.NamespaceTransformData getNamespacesOrThrow(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> map =
+          internalGetNamespaces().getMap();
+      if (!map.containsKey(key)) {
+        throw new java.lang.IllegalArgumentException();
+      }
+      return map.get(key);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      com.google.protobuf.GeneratedMessage
+        .serializeStringMapTo(
+          output,
+          internalGetNamespaces(),
+          NamespacesDefaultEntryHolder.defaultEntry,
+          1);
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (java.util.Map.Entry<java.lang.String, adiom.v1.Messages.NamespaceTransformData> entry
+           : internalGetNamespaces().getMap().entrySet()) {
+        com.google.protobuf.MapEntry<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+        namespaces__ = NamespacesDefaultEntryHolder.defaultEntry.newBuilderForType()
+            .setKey(entry.getKey())
+            .setValue(entry.getValue())
+            .build();
+        size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(1, namespaces__);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.GetFanOutTransformResponse)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.GetFanOutTransformResponse other = (adiom.v1.Messages.GetFanOutTransformResponse) obj;
+
+      if (!internalGetNamespaces().equals(
+          other.internalGetNamespaces())) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (!internalGetNamespaces().getMap().isEmpty()) {
+        hash = (37 * hash) + NAMESPACES_FIELD_NUMBER;
+        hash = (53 * hash) + internalGetNamespaces().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.GetFanOutTransformResponse parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.GetFanOutTransformResponse prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.GetFanOutTransformResponse}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.GetFanOutTransformResponse)
+        adiom.v1.Messages.GetFanOutTransformResponseOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_descriptor;
+      }
+
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapFieldReflectionAccessor internalGetMapFieldReflection(
+          int number) {
+        switch (number) {
+          case 1:
+            return internalGetNamespaces();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapFieldReflectionAccessor internalGetMutableMapFieldReflection(
+          int number) {
+        switch (number) {
+          case 1:
+            return internalGetMutableNamespaces();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.GetFanOutTransformResponse.class, adiom.v1.Messages.GetFanOutTransformResponse.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.GetFanOutTransformResponse.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        internalGetMutableNamespaces().clear();
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_GetFanOutTransformResponse_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformResponse getDefaultInstanceForType() {
+        return adiom.v1.Messages.GetFanOutTransformResponse.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformResponse build() {
+        adiom.v1.Messages.GetFanOutTransformResponse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.GetFanOutTransformResponse buildPartial() {
+        adiom.v1.Messages.GetFanOutTransformResponse result = new adiom.v1.Messages.GetFanOutTransformResponse(this);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartial0(adiom.v1.Messages.GetFanOutTransformResponse result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          result.namespaces_ = internalGetNamespaces().build(NamespacesDefaultEntryHolder.defaultEntry);
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.GetFanOutTransformResponse) {
+          return mergeFrom((adiom.v1.Messages.GetFanOutTransformResponse)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.GetFanOutTransformResponse other) {
+        if (other == adiom.v1.Messages.GetFanOutTransformResponse.getDefaultInstance()) return this;
+        internalGetMutableNamespaces().mergeFrom(
+            other.internalGetNamespaces());
+        bitField0_ |= 0x00000001;
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                com.google.protobuf.MapEntry<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+                namespaces__ = input.readMessage(
+                    NamespacesDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+                internalGetMutableNamespaces().ensureBuilderMap().put(
+                    namespaces__.getKey(), namespaces__.getValue());
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 10
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private static final class NamespacesConverter implements com.google.protobuf.MapFieldBuilder.Converter<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder, adiom.v1.Messages.NamespaceTransformData> {
+        @java.lang.Override
+        public adiom.v1.Messages.NamespaceTransformData build(adiom.v1.Messages.NamespaceTransformDataOrBuilder val) {
+          if (val instanceof adiom.v1.Messages.NamespaceTransformData) { return (adiom.v1.Messages.NamespaceTransformData) val; }
+          return ((adiom.v1.Messages.NamespaceTransformData.Builder) val).build();
+        }
+
+        @java.lang.Override
+        public com.google.protobuf.MapEntry<java.lang.String, adiom.v1.Messages.NamespaceTransformData> defaultEntry() {
+          return NamespacesDefaultEntryHolder.defaultEntry;
+        }
+      };
+      private static final NamespacesConverter namespacesConverter = new NamespacesConverter();
+
+      private com.google.protobuf.MapFieldBuilder<
+          java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder, adiom.v1.Messages.NamespaceTransformData, adiom.v1.Messages.NamespaceTransformData.Builder> namespaces_;
+      private com.google.protobuf.MapFieldBuilder<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder, adiom.v1.Messages.NamespaceTransformData, adiom.v1.Messages.NamespaceTransformData.Builder>
+          internalGetNamespaces() {
+        if (namespaces_ == null) {
+          return new com.google.protobuf.MapFieldBuilder<>(namespacesConverter);
+        }
+        return namespaces_;
+      }
+      private com.google.protobuf.MapFieldBuilder<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder, adiom.v1.Messages.NamespaceTransformData, adiom.v1.Messages.NamespaceTransformData.Builder>
+          internalGetMutableNamespaces() {
+        if (namespaces_ == null) {
+          namespaces_ = new com.google.protobuf.MapFieldBuilder<>(namespacesConverter);
+        }
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return namespaces_;
+      }
+      public int getNamespacesCount() {
+        return internalGetNamespaces().ensureBuilderMap().size();
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      @java.lang.Override
+      public boolean containsNamespaces(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        return internalGetNamespaces().ensureBuilderMap().containsKey(key);
+      }
+      /**
+       * Use {@link #getNamespacesMap()} instead.
+       */
+      @java.lang.Override
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> getNamespaces() {
+        return getNamespacesMap();
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      @java.lang.Override
+      public java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> getNamespacesMap() {
+        return internalGetNamespaces().getImmutableMap();
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      @java.lang.Override
+      public /* nullable */
+adiom.v1.Messages.NamespaceTransformData getNamespacesOrDefault(
+          java.lang.String key,
+          /* nullable */
+adiom.v1.Messages.NamespaceTransformData defaultValue) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder> map = internalGetMutableNamespaces().ensureBuilderMap();
+        return map.containsKey(key) ? namespacesConverter.build(map.get(key)) : defaultValue;
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.NamespaceTransformData getNamespacesOrThrow(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder> map = internalGetMutableNamespaces().ensureBuilderMap();
+        if (!map.containsKey(key)) {
+          throw new java.lang.IllegalArgumentException();
+        }
+        return namespacesConverter.build(map.get(key));
+      }
+      public Builder clearNamespaces() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        internalGetMutableNamespaces().clear();
+        return this;
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      public Builder removeNamespaces(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        internalGetMutableNamespaces().ensureBuilderMap()
+            .remove(key);
+        return this;
+      }
+      /**
+       * Use alternate mutation accessors instead.
+       */
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData>
+          getMutableNamespaces() {
+        bitField0_ |= 0x00000001;
+        return internalGetMutableNamespaces().ensureMessageMap();
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      public Builder putNamespaces(
+          java.lang.String key,
+          adiom.v1.Messages.NamespaceTransformData value) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        if (value == null) { throw new NullPointerException("map value"); }
+        internalGetMutableNamespaces().ensureBuilderMap()
+            .put(key, value);
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      public Builder putAllNamespaces(
+          java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformData> values) {
+        for (java.util.Map.Entry<java.lang.String, adiom.v1.Messages.NamespaceTransformData> e : values.entrySet()) {
+          if (e.getKey() == null || e.getValue() == null) {
+            throw new NullPointerException();
+          }
+        }
+        internalGetMutableNamespaces().ensureBuilderMap()
+            .putAll(values);
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <pre>
+       * Map from namespace to its transformed updates and data
+       * </pre>
+       *
+       * <code>map&lt;string, .adiom.v1.NamespaceTransformData&gt; namespaces = 1 [json_name = "namespaces"];</code>
+       */
+      public adiom.v1.Messages.NamespaceTransformData.Builder putNamespacesBuilderIfAbsent(
+          java.lang.String key) {
+        java.util.Map<java.lang.String, adiom.v1.Messages.NamespaceTransformDataOrBuilder> builderMap = internalGetMutableNamespaces().ensureBuilderMap();
+        adiom.v1.Messages.NamespaceTransformDataOrBuilder entry = builderMap.get(key);
+        if (entry == null) {
+          entry = adiom.v1.Messages.NamespaceTransformData.newBuilder();
+          builderMap.put(key, entry);
+        }
+        if (entry instanceof adiom.v1.Messages.NamespaceTransformData) {
+          entry = ((adiom.v1.Messages.NamespaceTransformData) entry).toBuilder();
+          builderMap.put(key, entry);
+        }
+        return (adiom.v1.Messages.NamespaceTransformData.Builder) entry;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.GetFanOutTransformResponse)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.GetFanOutTransformResponse)
+    private static final adiom.v1.Messages.GetFanOutTransformResponse DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.GetFanOutTransformResponse();
+    }
+
+    public static adiom.v1.Messages.GetFanOutTransformResponse getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<GetFanOutTransformResponse>
+        PARSER = new com.google.protobuf.AbstractParser<GetFanOutTransformResponse>() {
+      @java.lang.Override
+      public GetFanOutTransformResponse parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<GetFanOutTransformResponse> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<GetFanOutTransformResponse> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.GetFanOutTransformResponse getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_adiom_v1_BsonValue_descriptor;
   private static final 
@@ -22032,6 +24982,26 @@ public final class Messages {
   private static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_adiom_v1_GetTransformResponse_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_GetFanOutTransformRequest_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_GetFanOutTransformRequest_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_NamespaceTransformData_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_NamespaceTransformData_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_GetFanOutTransformResponse_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_GetFanOutTransformResponse_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -22119,14 +25089,27 @@ public final class Messages {
       "aTypeR\014responseType\"t\n\024GetTransformRespo" +
       "nse\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007upd" +
       "ates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n" +
-      "\004data\030\003 \003(\014R\004data*R\n\010DataType\022\025\n\021DATA_TY" +
-      "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
-      "\n\021DATA_TYPE_JSON_ID\020\002*\204\001\n\nUpdateType\022\027\n\023" +
-      "UPDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INS" +
-      "ERT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_" +
-      "TYPE_DELETE\020\003\022\025\n\021UPDATE_TYPE_APPLY\020\004B2Z0" +
-      "github.com/adiom-data/dsync/gen/adiom/v1" +
-      ";adiomv1b\006proto3"
+      "\004data\030\003 \003(\014R\004data\"\351\001\n\031GetFanOutTransform" +
+      "Request\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n" +
+      "\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007update" +
+      "s\022\022\n\004data\030\003 \003(\014R\004data\0225\n\014request_type\030\004 " +
+      "\001(\0162\022.adiom.v1.DataTypeR\013requestType\0227\n\r" +
+      "response_type\030\005 \001(\0162\022.adiom.v1.DataTypeR" +
+      "\014responseType\"X\n\026NamespaceTransformData\022" +
+      "*\n\007updates\030\001 \003(\0132\020.adiom.v1.UpdateR\007upda" +
+      "tes\022\022\n\004data\030\002 \003(\014R\004data\"\323\001\n\032GetFanOutTra" +
+      "nsformResponse\022T\n\nnamespaces\030\001 \003(\01324.adi" +
+      "om.v1.GetFanOutTransformResponse.Namespa" +
+      "cesEntryR\nnamespaces\032_\n\017NamespacesEntry\022" +
+      "\020\n\003key\030\001 \001(\tR\003key\0226\n\005value\030\002 \001(\0132 .adiom" +
+      ".v1.NamespaceTransformDataR\005value:\0028\001*R\n" +
+      "\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020\000\022\030\n\024DATA" +
+      "_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE_JSON_ID\020" +
+      "\002*\204\001\n\nUpdateType\022\027\n\023UPDATE_TYPE_UNKNOWN\020" +
+      "\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPDATE_TYPE" +
+      "_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020\003\022\025\n\021UPD" +
+      "ATE_TYPE_APPLY\020\004B2Z0github.com/adiom-dat" +
+      "a/dsync/gen/adiom/v1;adiomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -22301,6 +25284,30 @@ public final class Messages {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformResponse_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Data", });
+    internal_static_adiom_v1_GetFanOutTransformRequest_descriptor =
+      getDescriptor().getMessageTypes().get(25);
+    internal_static_adiom_v1_GetFanOutTransformRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_GetFanOutTransformRequest_descriptor,
+        new java.lang.String[] { "Namespace", "Updates", "Data", "RequestType", "ResponseType", });
+    internal_static_adiom_v1_NamespaceTransformData_descriptor =
+      getDescriptor().getMessageTypes().get(26);
+    internal_static_adiom_v1_NamespaceTransformData_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_NamespaceTransformData_descriptor,
+        new java.lang.String[] { "Updates", "Data", });
+    internal_static_adiom_v1_GetFanOutTransformResponse_descriptor =
+      getDescriptor().getMessageTypes().get(27);
+    internal_static_adiom_v1_GetFanOutTransformResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_GetFanOutTransformResponse_descriptor,
+        new java.lang.String[] { "Namespaces", });
+    internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_descriptor =
+      internal_static_adiom_v1_GetFanOutTransformResponse_descriptor.getNestedTypes().get(0);
+    internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_GetFanOutTransformResponse_NamespacesEntry_descriptor,
+        new java.lang.String[] { "Key", "Value", });
     descriptor.resolveAllFeaturesImmutable();
     com.google.protobuf.TimestampProto.getDescriptor();
   }

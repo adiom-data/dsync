@@ -77,6 +77,37 @@ public final class TransformServiceGrpc {
     return getGetTransformMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<adiom.v1.Messages.GetFanOutTransformRequest,
+      adiom.v1.Messages.GetFanOutTransformResponse> getGetFanOutTransformMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "GetFanOutTransform",
+      requestType = adiom.v1.Messages.GetFanOutTransformRequest.class,
+      responseType = adiom.v1.Messages.GetFanOutTransformResponse.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<adiom.v1.Messages.GetFanOutTransformRequest,
+      adiom.v1.Messages.GetFanOutTransformResponse> getGetFanOutTransformMethod() {
+    io.grpc.MethodDescriptor<adiom.v1.Messages.GetFanOutTransformRequest, adiom.v1.Messages.GetFanOutTransformResponse> getGetFanOutTransformMethod;
+    if ((getGetFanOutTransformMethod = TransformServiceGrpc.getGetFanOutTransformMethod) == null) {
+      synchronized (TransformServiceGrpc.class) {
+        if ((getGetFanOutTransformMethod = TransformServiceGrpc.getGetFanOutTransformMethod) == null) {
+          TransformServiceGrpc.getGetFanOutTransformMethod = getGetFanOutTransformMethod =
+              io.grpc.MethodDescriptor.<adiom.v1.Messages.GetFanOutTransformRequest, adiom.v1.Messages.GetFanOutTransformResponse>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "GetFanOutTransform"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  adiom.v1.Messages.GetFanOutTransformRequest.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  adiom.v1.Messages.GetFanOutTransformResponse.getDefaultInstance()))
+              .setSchemaDescriptor(new TransformServiceMethodDescriptorSupplier("GetFanOutTransform"))
+              .build();
+        }
+      }
+    }
+    return getGetFanOutTransformMethod;
+  }
+
   /**
    * Creates a new async stub that supports all call types for the service
    */
@@ -138,6 +169,13 @@ public final class TransformServiceGrpc {
         io.grpc.stub.StreamObserver<adiom.v1.Messages.GetTransformResponse> responseObserver) {
       io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getGetTransformMethod(), responseObserver);
     }
+
+    /**
+     */
+    default void getFanOutTransform(adiom.v1.Messages.GetFanOutTransformRequest request,
+        io.grpc.stub.StreamObserver<adiom.v1.Messages.GetFanOutTransformResponse> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getGetFanOutTransformMethod(), responseObserver);
+    }
   }
 
   /**
@@ -182,6 +220,14 @@ public final class TransformServiceGrpc {
       io.grpc.stub.ClientCalls.asyncUnaryCall(
           getChannel().newCall(getGetTransformMethod(), getCallOptions()), request, responseObserver);
     }
+
+    /**
+     */
+    public void getFanOutTransform(adiom.v1.Messages.GetFanOutTransformRequest request,
+        io.grpc.stub.StreamObserver<adiom.v1.Messages.GetFanOutTransformResponse> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getGetFanOutTransformMethod(), getCallOptions()), request, responseObserver);
+    }
   }
 
   /**
@@ -212,6 +258,13 @@ public final class TransformServiceGrpc {
     public adiom.v1.Messages.GetTransformResponse getTransform(adiom.v1.Messages.GetTransformRequest request) {
       return io.grpc.stub.ClientCalls.blockingUnaryCall(
           getChannel(), getGetTransformMethod(), getCallOptions(), request);
+    }
+
+    /**
+     */
+    public adiom.v1.Messages.GetFanOutTransformResponse getFanOutTransform(adiom.v1.Messages.GetFanOutTransformRequest request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getGetFanOutTransformMethod(), getCallOptions(), request);
     }
   }
 
@@ -246,10 +299,19 @@ public final class TransformServiceGrpc {
       return io.grpc.stub.ClientCalls.futureUnaryCall(
           getChannel().newCall(getGetTransformMethod(), getCallOptions()), request);
     }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<adiom.v1.Messages.GetFanOutTransformResponse> getFanOutTransform(
+        adiom.v1.Messages.GetFanOutTransformRequest request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getGetFanOutTransformMethod(), getCallOptions()), request);
+    }
   }
 
   private static final int METHODID_GET_TRANSFORM_INFO = 0;
   private static final int METHODID_GET_TRANSFORM = 1;
+  private static final int METHODID_GET_FAN_OUT_TRANSFORM = 2;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -275,6 +337,10 @@ public final class TransformServiceGrpc {
         case METHODID_GET_TRANSFORM:
           serviceImpl.getTransform((adiom.v1.Messages.GetTransformRequest) request,
               (io.grpc.stub.StreamObserver<adiom.v1.Messages.GetTransformResponse>) responseObserver);
+          break;
+        case METHODID_GET_FAN_OUT_TRANSFORM:
+          serviceImpl.getFanOutTransform((adiom.v1.Messages.GetFanOutTransformRequest) request,
+              (io.grpc.stub.StreamObserver<adiom.v1.Messages.GetFanOutTransformResponse>) responseObserver);
           break;
         default:
           throw new AssertionError();
@@ -308,6 +374,13 @@ public final class TransformServiceGrpc {
               adiom.v1.Messages.GetTransformRequest,
               adiom.v1.Messages.GetTransformResponse>(
                 service, METHODID_GET_TRANSFORM)))
+        .addMethod(
+          getGetFanOutTransformMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              adiom.v1.Messages.GetFanOutTransformRequest,
+              adiom.v1.Messages.GetFanOutTransformResponse>(
+                service, METHODID_GET_FAN_OUT_TRANSFORM)))
         .build();
   }
 
@@ -358,6 +431,7 @@ public final class TransformServiceGrpc {
               .setSchemaDescriptor(new TransformServiceFileDescriptorSupplier())
               .addMethod(getGetTransformInfoMethod())
               .addMethod(getGetTransformMethod())
+              .addMethod(getGetFanOutTransformMethod())
               .build();
         }
       }

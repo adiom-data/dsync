@@ -21,6 +21,18 @@ func (i *identityTransform) GetTransform(_ context.Context, r *connect.Request[a
 	}), nil
 }
 
+func (i *identityTransform) GetFanOutTransform(_ context.Context, r *connect.Request[adiomv1.GetFanOutTransformRequest]) (*connect.Response[adiomv1.GetFanOutTransformResponse], error) {
+	nsData := &adiomv1.NamespaceTransformData{
+		Data:    r.Msg.GetData(),
+		Updates: r.Msg.GetUpdates(),
+	}
+	return connect.NewResponse(&adiomv1.GetFanOutTransformResponse{
+		Namespaces: map[string]*adiomv1.NamespaceTransformData{
+			r.Msg.Namespace: nsData,
+		},
+	}), nil
+}
+
 // GetTransformInfo implements adiomv1connect.TransformServiceHandler.
 func (i *identityTransform) GetTransformInfo(context.Context, *connect.Request[adiomv1.GetTransformInfoRequest]) (*connect.Response[adiomv1.GetTransformInfoResponse], error) {
 	var infos []*adiomv1.GetTransformInfoResponse_TransformInfo
@@ -64,6 +76,18 @@ func (i *identityTransformGRPC) GetTransformInfo(context.Context, *adiomv1.GetTr
 	}
 	return &adiomv1.GetTransformInfoResponse{
 		Transforms: infos,
+	}, nil
+}
+
+func (i *identityTransformGRPC) GetFanOutTransform(_ context.Context, r *adiomv1.GetFanOutTransformRequest) (*adiomv1.GetFanOutTransformResponse, error) {
+	nsData := &adiomv1.NamespaceTransformData{
+		Data:    r.GetData(),
+		Updates: r.GetUpdates(),
+	}
+	return &adiomv1.GetFanOutTransformResponse{
+		Namespaces: map[string]*adiomv1.NamespaceTransformData{
+			r.Namespace: nsData,
+		},
 	}, nil
 }
 

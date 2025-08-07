@@ -1511,6 +1511,179 @@ func (x *GetTransformResponse) GetData() [][]byte {
 	return nil
 }
 
+type GetFanOutTransformRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates       []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data          [][]byte               `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	RequestType   DataType               `protobuf:"varint,4,opt,name=request_type,json=requestType,proto3,enum=adiom.v1.DataType" json:"request_type,omitempty"`
+	ResponseType  DataType               `protobuf:"varint,5,opt,name=response_type,json=responseType,proto3,enum=adiom.v1.DataType" json:"response_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFanOutTransformRequest) Reset() {
+	*x = GetFanOutTransformRequest{}
+	mi := &file_adiom_v1_messages_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFanOutTransformRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFanOutTransformRequest) ProtoMessage() {}
+
+func (x *GetFanOutTransformRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFanOutTransformRequest.ProtoReflect.Descriptor instead.
+func (*GetFanOutTransformRequest) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetFanOutTransformRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GetFanOutTransformRequest) GetUpdates() []*Update {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+func (x *GetFanOutTransformRequest) GetData() [][]byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetFanOutTransformRequest) GetRequestType() DataType {
+	if x != nil {
+		return x.RequestType
+	}
+	return DataType_DATA_TYPE_UNKNOWN
+}
+
+func (x *GetFanOutTransformRequest) GetResponseType() DataType {
+	if x != nil {
+		return x.ResponseType
+	}
+	return DataType_DATA_TYPE_UNKNOWN
+}
+
+type NamespaceTransformData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Updates       []*Update              `protobuf:"bytes,1,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data          [][]byte               `protobuf:"bytes,2,rep,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceTransformData) Reset() {
+	*x = NamespaceTransformData{}
+	mi := &file_adiom_v1_messages_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceTransformData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceTransformData) ProtoMessage() {}
+
+func (x *NamespaceTransformData) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceTransformData.ProtoReflect.Descriptor instead.
+func (*NamespaceTransformData) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *NamespaceTransformData) GetUpdates() []*Update {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+func (x *NamespaceTransformData) GetData() [][]byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type GetFanOutTransformResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Map from namespace to its transformed updates and data
+	Namespaces    map[string]*NamespaceTransformData `protobuf:"bytes,1,rep,name=namespaces,proto3" json:"namespaces,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFanOutTransformResponse) Reset() {
+	*x = GetFanOutTransformResponse{}
+	mi := &file_adiom_v1_messages_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFanOutTransformResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFanOutTransformResponse) ProtoMessage() {}
+
+func (x *GetFanOutTransformResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_adiom_v1_messages_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFanOutTransformResponse.ProtoReflect.Descriptor instead.
+func (*GetFanOutTransformResponse) Descriptor() ([]byte, []int) {
+	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetFanOutTransformResponse) GetNamespaces() map[string]*NamespaceTransformData {
+	if x != nil {
+		return x.Namespaces
+	}
+	return nil
+}
+
 type Capabilities_Source struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	SupportedDataTypes []DataType             `protobuf:"varint,1,rep,packed,name=supported_data_types,json=supportedDataTypes,proto3,enum=adiom.v1.DataType" json:"supported_data_types,omitempty"`
@@ -1529,7 +1702,7 @@ type Capabilities_Source struct {
 
 func (x *Capabilities_Source) Reset() {
 	*x = Capabilities_Source{}
-	mi := &file_adiom_v1_messages_proto_msgTypes[25]
+	mi := &file_adiom_v1_messages_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1714,7 @@ func (x *Capabilities_Source) String() string {
 func (*Capabilities_Source) ProtoMessage() {}
 
 func (x *Capabilities_Source) ProtoReflect() protoreflect.Message {
-	mi := &file_adiom_v1_messages_proto_msgTypes[25]
+	mi := &file_adiom_v1_messages_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1594,7 +1767,7 @@ type Capabilities_Sink struct {
 
 func (x *Capabilities_Sink) Reset() {
 	*x = Capabilities_Sink{}
-	mi := &file_adiom_v1_messages_proto_msgTypes[26]
+	mi := &file_adiom_v1_messages_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1606,7 +1779,7 @@ func (x *Capabilities_Sink) String() string {
 func (*Capabilities_Sink) ProtoMessage() {}
 
 func (x *Capabilities_Sink) ProtoReflect() protoreflect.Message {
-	mi := &file_adiom_v1_messages_proto_msgTypes[26]
+	mi := &file_adiom_v1_messages_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1639,7 +1812,7 @@ type GetTransformInfoResponse_TransformInfo struct {
 
 func (x *GetTransformInfoResponse_TransformInfo) Reset() {
 	*x = GetTransformInfoResponse_TransformInfo{}
-	mi := &file_adiom_v1_messages_proto_msgTypes[27]
+	mi := &file_adiom_v1_messages_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1651,7 +1824,7 @@ func (x *GetTransformInfoResponse_TransformInfo) String() string {
 func (*GetTransformInfoResponse_TransformInfo) ProtoMessage() {}
 
 func (x *GetTransformInfoResponse_TransformInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_adiom_v1_messages_proto_msgTypes[27]
+	mi := &file_adiom_v1_messages_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1796,7 +1969,23 @@ const file_adiom_v1_messages_proto_rawDesc = "" +
 	"\x14GetTransformResponse\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
-	"\x04data\x18\x03 \x03(\fR\x04data*R\n" +
+	"\x04data\x18\x03 \x03(\fR\x04data\"\xe9\x01\n" +
+	"\x19GetFanOutTransformRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
+	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
+	"\x04data\x18\x03 \x03(\fR\x04data\x125\n" +
+	"\frequest_type\x18\x04 \x01(\x0e2\x12.adiom.v1.DataTypeR\vrequestType\x127\n" +
+	"\rresponse_type\x18\x05 \x01(\x0e2\x12.adiom.v1.DataTypeR\fresponseType\"X\n" +
+	"\x16NamespaceTransformData\x12*\n" +
+	"\aupdates\x18\x01 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
+	"\x04data\x18\x02 \x03(\fR\x04data\"\xd3\x01\n" +
+	"\x1aGetFanOutTransformResponse\x12T\n" +
+	"\n" +
+	"namespaces\x18\x01 \x03(\v24.adiom.v1.GetFanOutTransformResponse.NamespacesEntryR\n" +
+	"namespaces\x1a_\n" +
+	"\x0fNamespacesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x126\n" +
+	"\x05value\x18\x02 \x01(\v2 .adiom.v1.NamespaceTransformDataR\x05value:\x028\x01*R\n" +
 	"\bDataType\x12\x15\n" +
 	"\x11DATA_TYPE_UNKNOWN\x10\x00\x12\x18\n" +
 	"\x14DATA_TYPE_MONGO_BSON\x10\x01\x12\x15\n" +
@@ -1822,7 +2011,7 @@ func file_adiom_v1_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_adiom_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_adiom_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_adiom_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_adiom_v1_messages_proto_goTypes = []any{
 	(DataType)(0),                                  // 0: adiom.v1.DataType
 	(UpdateType)(0),                                // 1: adiom.v1.UpdateType
@@ -1851,14 +2040,18 @@ var file_adiom_v1_messages_proto_goTypes = []any{
 	(*GetTransformInfoResponse)(nil),               // 24: adiom.v1.GetTransformInfoResponse
 	(*GetTransformRequest)(nil),                    // 25: adiom.v1.GetTransformRequest
 	(*GetTransformResponse)(nil),                   // 26: adiom.v1.GetTransformResponse
-	(*Capabilities_Source)(nil),                    // 27: adiom.v1.Capabilities.Source
-	(*Capabilities_Sink)(nil),                      // 28: adiom.v1.Capabilities.Sink
-	(*GetTransformInfoResponse_TransformInfo)(nil), // 29: adiom.v1.GetTransformInfoResponse.TransformInfo
-	(*timestamppb.Timestamp)(nil),                  // 30: google.protobuf.Timestamp
+	(*GetFanOutTransformRequest)(nil),              // 27: adiom.v1.GetFanOutTransformRequest
+	(*NamespaceTransformData)(nil),                 // 28: adiom.v1.NamespaceTransformData
+	(*GetFanOutTransformResponse)(nil),             // 29: adiom.v1.GetFanOutTransformResponse
+	(*Capabilities_Source)(nil),                    // 30: adiom.v1.Capabilities.Source
+	(*Capabilities_Sink)(nil),                      // 31: adiom.v1.Capabilities.Sink
+	(*GetTransformInfoResponse_TransformInfo)(nil), // 32: adiom.v1.GetTransformInfoResponse.TransformInfo
+	nil,                           // 33: adiom.v1.GetFanOutTransformResponse.NamespacesEntry
+	(*timestamppb.Timestamp)(nil), // 34: google.protobuf.Timestamp
 }
 var file_adiom_v1_messages_proto_depIdxs = []int32{
-	27, // 0: adiom.v1.Capabilities.source:type_name -> adiom.v1.Capabilities.Source
-	28, // 1: adiom.v1.Capabilities.sink:type_name -> adiom.v1.Capabilities.Sink
+	30, // 0: adiom.v1.Capabilities.source:type_name -> adiom.v1.Capabilities.Source
+	31, // 1: adiom.v1.Capabilities.sink:type_name -> adiom.v1.Capabilities.Sink
 	5,  // 2: adiom.v1.GetInfoResponse.capabilities:type_name -> adiom.v1.Capabilities
 	4,  // 3: adiom.v1.GeneratePlanResponse.partitions:type_name -> adiom.v1.Partition
 	3,  // 4: adiom.v1.GeneratePlanResponse.updates_partitions:type_name -> adiom.v1.UpdatesPartition
@@ -1871,21 +2064,27 @@ var file_adiom_v1_messages_proto_depIdxs = []int32{
 	0,  // 11: adiom.v1.WriteUpdatesRequest.type:type_name -> adiom.v1.DataType
 	0,  // 12: adiom.v1.StreamUpdatesRequest.type:type_name -> adiom.v1.DataType
 	12, // 13: adiom.v1.StreamUpdatesResponse.updates:type_name -> adiom.v1.Update
-	30, // 14: adiom.v1.StreamUpdatesResponse.time:type_name -> google.protobuf.Timestamp
-	29, // 15: adiom.v1.GetTransformInfoResponse.transforms:type_name -> adiom.v1.GetTransformInfoResponse.TransformInfo
+	34, // 14: adiom.v1.StreamUpdatesResponse.time:type_name -> google.protobuf.Timestamp
+	32, // 15: adiom.v1.GetTransformInfoResponse.transforms:type_name -> adiom.v1.GetTransformInfoResponse.TransformInfo
 	12, // 16: adiom.v1.GetTransformRequest.updates:type_name -> adiom.v1.Update
 	0,  // 17: adiom.v1.GetTransformRequest.request_type:type_name -> adiom.v1.DataType
 	0,  // 18: adiom.v1.GetTransformRequest.response_type:type_name -> adiom.v1.DataType
 	12, // 19: adiom.v1.GetTransformResponse.updates:type_name -> adiom.v1.Update
-	0,  // 20: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
-	0,  // 21: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
-	0,  // 22: adiom.v1.GetTransformInfoResponse.TransformInfo.request_type:type_name -> adiom.v1.DataType
-	0,  // 23: adiom.v1.GetTransformInfoResponse.TransformInfo.response_types:type_name -> adiom.v1.DataType
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	12, // 20: adiom.v1.GetFanOutTransformRequest.updates:type_name -> adiom.v1.Update
+	0,  // 21: adiom.v1.GetFanOutTransformRequest.request_type:type_name -> adiom.v1.DataType
+	0,  // 22: adiom.v1.GetFanOutTransformRequest.response_type:type_name -> adiom.v1.DataType
+	12, // 23: adiom.v1.NamespaceTransformData.updates:type_name -> adiom.v1.Update
+	33, // 24: adiom.v1.GetFanOutTransformResponse.namespaces:type_name -> adiom.v1.GetFanOutTransformResponse.NamespacesEntry
+	0,  // 25: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
+	0,  // 26: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
+	0,  // 27: adiom.v1.GetTransformInfoResponse.TransformInfo.request_type:type_name -> adiom.v1.DataType
+	0,  // 28: adiom.v1.GetTransformInfoResponse.TransformInfo.response_types:type_name -> adiom.v1.DataType
+	28, // 29: adiom.v1.GetFanOutTransformResponse.NamespacesEntry.value:type_name -> adiom.v1.NamespaceTransformData
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_adiom_v1_messages_proto_init() }
@@ -1899,7 +2098,7 @@ func file_adiom_v1_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_adiom_v1_messages_proto_rawDesc), len(file_adiom_v1_messages_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   28,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

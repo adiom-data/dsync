@@ -533,7 +533,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							data := res.Msg.Data
 							var updates []*adiomv1.Update
 							if c.settings.TransformClient != nil {
-								transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+								transformed, err := c.settings.TransformClient.GetFanOutTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetFanOutTransformRequest{
 									Namespace:    sourceNamespace,
 									Data:         data,
 									RequestType:  c.settings.SourceDataType,
@@ -551,26 +551,78 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									}
 								}
 
-								if transformed.Msg.GetNamespace() != sourceNamespace {
-									destinationNamespace = transformed.Msg.GetNamespace()
-								}
-								data = transformed.Msg.GetData()
-								updates = transformed.Msg.GetUpdates()
-
-							}
-							if c.settings.TransformClient == nil {
-								slog.Info(fmt.Sprintf("No transform client set, passing data as is for namespace %s", destinationNamespace))
-							}
-							if len(updates) > 0 {
-								slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
-								for _, update := range updates {
-									dataMessage := iface.DataMessage{
-										Data:         &update.Data,
-										MutationType: iface.MutationType_Apply,
-										Loc:          destinationNamespace,
+								for namespace, nsData := range transformed.Msg.GetNamespaces() {
+									data = nsData.GetData()
+									updates = nsData.GetUpdates()
+									if len(data) > 0 {
+										slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), namespace))
+										dataMessage := iface.DataMessage{
+											DataBatch:    data,
+											MutationType: iface.MutationType_InsertBatch,
+											Loc:          namespace,
+										}
+										dataChannel <- dataMessage
 									}
-									dataChannel <- dataMessage
+									if len(updates) > 0 {
+										slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
+										for _, update := range updates {
+											dataMessage := iface.DataMessage{
+												Data:         &update.Data,
+												MutationType: iface.MutationType_Apply,
+												Loc:          namespace,
+											}
+											dataChannel <- dataMessage
+										}
+									}
+
 								}
+								// } else {
+								// 	transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+								// 		Namespace:    sourceNamespace,
+								// 		Data:         data,
+								// 		RequestType:  c.settings.SourceDataType,
+								// 		ResponseType: c.settings.DestinationDataType,
+								// 	}))
+								// 	if err != nil {
+								// 		if isRetryable(err) {
+								// 			slog.Debug("Retryable error encountered during transform- retrying", "task", task.Id)
+								// 			return err
+								// 		} else {
+								// 			if !errors.Is(err, context.Canceled) {
+								// 				slog.Error("err trying to transform data", "task", task.Id)
+								// 			}
+								// 			return backoff.Permanent(err)
+								// 		}
+								// 	}
+
+								// 	if transformed.Msg.GetNamespace() != sourceNamespace {
+								// 		destinationNamespace = transformed.Msg.GetNamespace()
+								// 	}
+								// 	data = transformed.Msg.GetData()
+								// 	updates = transformed.Msg.GetUpdates()
+
+								// 	if len(updates) > 0 {
+								// 		slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
+								// 		for _, update := range updates {
+								// 			dataMessage := iface.DataMessage{
+								// 				Data:         &update.Data,
+								// 				MutationType: iface.MutationType_Apply,
+								// 				Loc:          destinationNamespace,
+								// 			}
+								// 			dataChannel <- dataMessage
+								// 		}
+								// 	} else {
+								// 		slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), destinationNamespace))
+								// 		dataMessage := iface.DataMessage{
+								// 			DataBatch:    data,
+								// 			MutationType: iface.MutationType_InsertBatch,
+								// 			Loc:          destinationNamespace,
+								// 		}
+								// 		dataChannel <- dataMessage
+								// 	}
+
+								// }
+
 							} else {
 								slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), destinationNamespace))
 								dataMessage := iface.DataMessage{

@@ -23,4 +23,5 @@ service ConnectorService {
 service TransformService {
     rpc GetTransformInfo(GetTransformInfoRequest) returns (GetTransformInfoResponse);
     rpc GetTransform(GetTransformRequest) returns (GetTransformResponse);
+    rpc GetFanOutTransform(GetFanOutTransformRequest) returns (GetFanOutTransformResponse);
 }

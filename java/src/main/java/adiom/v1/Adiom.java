@@ -51,13 +51,16 @@ public final class Adiom {
       "adiom.v1.StreamUpdatesRequest\032\037.adiom.v1" +
       ".StreamUpdatesResponse0\001\022F\n\tStreamLSN\022\032." +
       "adiom.v1.StreamLSNRequest\032\033.adiom.v1.Str" +
-      "eamLSNResponse0\0012\274\001\n\020TransformService\022Y\n" +
+      "eamLSNResponse0\0012\235\002\n\020TransformService\022Y\n" +
       "\020GetTransformInfo\022!.adiom.v1.GetTransfor" +
       "mInfoRequest\032\".adiom.v1.GetTransformInfo" +
       "Response\022M\n\014GetTransform\022\035.adiom.v1.GetT" +
       "ransformRequest\032\036.adiom.v1.GetTransformR" +
-      "esponseB2Z0github.com/adiom-data/dsync/g" +
-      "en/adiom/v1;adiomv1b\006proto3"
+      "esponse\022_\n\022GetFanOutTransform\022#.adiom.v1" +
+      ".GetFanOutTransformRequest\032$.adiom.v1.Ge" +
+      "tFanOutTransformResponseB2Z0github.com/a" +
+      "diom-data/dsync/gen/adiom/v1;adiomv1b\006pr" +
+      "oto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,

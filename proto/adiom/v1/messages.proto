@@ -181,3 +181,21 @@ message GetTransformResponse {
     repeated Update updates = 2;
     repeated bytes data = 3;
 }
+
+message GetFanOutTransformRequest {
+    string namespace = 1;
+    repeated Update updates = 2;
+    repeated bytes data = 3;
+    DataType request_type = 4;
+    DataType response_type = 5;
+}
+
+message NamespaceTransformData {
+    repeated Update updates = 1;
+    repeated bytes data = 2;
+}
+
+message GetFanOutTransformResponse {
+    // Map from namespace to its transformed updates and data
+    map<string, NamespaceTransformData> namespaces = 1;
+}

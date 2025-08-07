@@ -398,8 +398,9 @@ var ConnectorService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	TransformService_GetTransformInfo_FullMethodName = "/adiom.v1.TransformService/GetTransformInfo"
-	TransformService_GetTransform_FullMethodName     = "/adiom.v1.TransformService/GetTransform"
+	TransformService_GetTransformInfo_FullMethodName   = "/adiom.v1.TransformService/GetTransformInfo"
+	TransformService_GetTransform_FullMethodName       = "/adiom.v1.TransformService/GetTransform"
+	TransformService_GetFanOutTransform_FullMethodName = "/adiom.v1.TransformService/GetFanOutTransform"
 )
 
 // TransformServiceClient is the client API for TransformService service.
@@ -408,6 +409,7 @@ const (
 type TransformServiceClient interface {
 	GetTransformInfo(ctx context.Context, in *GetTransformInfoRequest, opts ...grpc.CallOption) (*GetTransformInfoResponse, error)
 	GetTransform(ctx context.Context, in *GetTransformRequest, opts ...grpc.CallOption) (*GetTransformResponse, error)
+	GetFanOutTransform(ctx context.Context, in *GetFanOutTransformRequest, opts ...grpc.CallOption) (*GetFanOutTransformResponse, error)
 }
 
 type transformServiceClient struct {
@@ -438,12 +440,23 @@ func (c *transformServiceClient) GetTransform(ctx context.Context, in *GetTransf
 	return out, nil
 }
 
+func (c *transformServiceClient) GetFanOutTransform(ctx context.Context, in *GetFanOutTransformRequest, opts ...grpc.CallOption) (*GetFanOutTransformResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFanOutTransformResponse)
+	err := c.cc.Invoke(ctx, TransformService_GetFanOutTransform_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TransformServiceServer is the server API for TransformService service.
 // All implementations must embed UnimplementedTransformServiceServer
 // for forward compatibility.
 type TransformServiceServer interface {
 	GetTransformInfo(context.Context, *GetTransformInfoRequest) (*GetTransformInfoResponse, error)
 	GetTransform(context.Context, *GetTransformRequest) (*GetTransformResponse, error)
+	GetFanOutTransform(context.Context, *GetFanOutTransformRequest) (*GetFanOutTransformResponse, error)
 	mustEmbedUnimplementedTransformServiceServer()
 }
 
@@ -459,6 +472,9 @@ func (UnimplementedTransformServiceServer) GetTransformInfo(context.Context, *Ge
 }
 func (UnimplementedTransformServiceServer) GetTransform(context.Context, *GetTransformRequest) (*GetTransformResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTransform not implemented")
+}
+func (UnimplementedTransformServiceServer) GetFanOutTransform(context.Context, *GetFanOutTransformRequest) (*GetFanOutTransformResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFanOutTransform not implemented")
 }
 func (UnimplementedTransformServiceServer) mustEmbedUnimplementedTransformServiceServer() {}
 func (UnimplementedTransformServiceServer) testEmbeddedByValue()                          {}
@@ -517,6 +533,24 @@ func _TransformService_GetTransform_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TransformService_GetFanOutTransform_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFanOutTransformRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransformServiceServer).GetFanOutTransform(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TransformService_GetFanOutTransform_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransformServiceServer).GetFanOutTransform(ctx, req.(*GetFanOutTransformRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TransformService_ServiceDesc is the grpc.ServiceDesc for TransformService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -531,6 +565,10 @@ var TransformService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTransform",
 			Handler:    _TransformService_GetTransform_Handler,
+		},
+		{
+			MethodName: "GetFanOutTransform",
+			Handler:    _TransformService_GetFanOutTransform_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

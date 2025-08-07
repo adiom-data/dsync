@@ -33,10 +33,11 @@ const file_adiom_v1_adiom_proto_rawDesc = "" +
 	"\fGeneratePlan\x12\x1d.adiom.v1.GeneratePlanRequest\x1a\x1e.adiom.v1.GeneratePlanResponse\x12A\n" +
 	"\bListData\x12\x19.adiom.v1.ListDataRequest\x1a\x1a.adiom.v1.ListDataResponse\x12R\n" +
 	"\rStreamUpdates\x12\x1e.adiom.v1.StreamUpdatesRequest\x1a\x1f.adiom.v1.StreamUpdatesResponse0\x01\x12F\n" +
-	"\tStreamLSN\x12\x1a.adiom.v1.StreamLSNRequest\x1a\x1b.adiom.v1.StreamLSNResponse0\x012\xbc\x01\n" +
+	"\tStreamLSN\x12\x1a.adiom.v1.StreamLSNRequest\x1a\x1b.adiom.v1.StreamLSNResponse0\x012\x9d\x02\n" +
 	"\x10TransformService\x12Y\n" +
 	"\x10GetTransformInfo\x12!.adiom.v1.GetTransformInfoRequest\x1a\".adiom.v1.GetTransformInfoResponse\x12M\n" +
-	"\fGetTransform\x12\x1d.adiom.v1.GetTransformRequest\x1a\x1e.adiom.v1.GetTransformResponseB2Z0github.com/adiom-data/dsync/gen/adiom/v1;adiomv1b\x06proto3"
+	"\fGetTransform\x12\x1d.adiom.v1.GetTransformRequest\x1a\x1e.adiom.v1.GetTransformResponse\x12_\n" +
+	"\x12GetFanOutTransform\x12#.adiom.v1.GetFanOutTransformRequest\x1a$.adiom.v1.GetFanOutTransformResponseB2Z0github.com/adiom-data/dsync/gen/adiom/v1;adiomv1b\x06proto3"
 
 var file_adiom_v1_adiom_proto_goTypes = []any{
 	(*GetInfoRequest)(nil),               // 0: adiom.v1.GetInfoRequest
@@ -49,16 +50,18 @@ var file_adiom_v1_adiom_proto_goTypes = []any{
 	(*StreamLSNRequest)(nil),             // 7: adiom.v1.StreamLSNRequest
 	(*GetTransformInfoRequest)(nil),      // 8: adiom.v1.GetTransformInfoRequest
 	(*GetTransformRequest)(nil),          // 9: adiom.v1.GetTransformRequest
-	(*GetInfoResponse)(nil),              // 10: adiom.v1.GetInfoResponse
-	(*GetNamespaceMetadataResponse)(nil), // 11: adiom.v1.GetNamespaceMetadataResponse
-	(*WriteDataResponse)(nil),            // 12: adiom.v1.WriteDataResponse
-	(*WriteUpdatesResponse)(nil),         // 13: adiom.v1.WriteUpdatesResponse
-	(*GeneratePlanResponse)(nil),         // 14: adiom.v1.GeneratePlanResponse
-	(*ListDataResponse)(nil),             // 15: adiom.v1.ListDataResponse
-	(*StreamUpdatesResponse)(nil),        // 16: adiom.v1.StreamUpdatesResponse
-	(*StreamLSNResponse)(nil),            // 17: adiom.v1.StreamLSNResponse
-	(*GetTransformInfoResponse)(nil),     // 18: adiom.v1.GetTransformInfoResponse
-	(*GetTransformResponse)(nil),         // 19: adiom.v1.GetTransformResponse
+	(*GetFanOutTransformRequest)(nil),    // 10: adiom.v1.GetFanOutTransformRequest
+	(*GetInfoResponse)(nil),              // 11: adiom.v1.GetInfoResponse
+	(*GetNamespaceMetadataResponse)(nil), // 12: adiom.v1.GetNamespaceMetadataResponse
+	(*WriteDataResponse)(nil),            // 13: adiom.v1.WriteDataResponse
+	(*WriteUpdatesResponse)(nil),         // 14: adiom.v1.WriteUpdatesResponse
+	(*GeneratePlanResponse)(nil),         // 15: adiom.v1.GeneratePlanResponse
+	(*ListDataResponse)(nil),             // 16: adiom.v1.ListDataResponse
+	(*StreamUpdatesResponse)(nil),        // 17: adiom.v1.StreamUpdatesResponse
+	(*StreamLSNResponse)(nil),            // 18: adiom.v1.StreamLSNResponse
+	(*GetTransformInfoResponse)(nil),     // 19: adiom.v1.GetTransformInfoResponse
+	(*GetTransformResponse)(nil),         // 20: adiom.v1.GetTransformResponse
+	(*GetFanOutTransformResponse)(nil),   // 21: adiom.v1.GetFanOutTransformResponse
 }
 var file_adiom_v1_adiom_proto_depIdxs = []int32{
 	0,  // 0: adiom.v1.ConnectorService.GetInfo:input_type -> adiom.v1.GetInfoRequest
@@ -71,18 +74,20 @@ var file_adiom_v1_adiom_proto_depIdxs = []int32{
 	7,  // 7: adiom.v1.ConnectorService.StreamLSN:input_type -> adiom.v1.StreamLSNRequest
 	8,  // 8: adiom.v1.TransformService.GetTransformInfo:input_type -> adiom.v1.GetTransformInfoRequest
 	9,  // 9: adiom.v1.TransformService.GetTransform:input_type -> adiom.v1.GetTransformRequest
-	10, // 10: adiom.v1.ConnectorService.GetInfo:output_type -> adiom.v1.GetInfoResponse
-	11, // 11: adiom.v1.ConnectorService.GetNamespaceMetadata:output_type -> adiom.v1.GetNamespaceMetadataResponse
-	12, // 12: adiom.v1.ConnectorService.WriteData:output_type -> adiom.v1.WriteDataResponse
-	13, // 13: adiom.v1.ConnectorService.WriteUpdates:output_type -> adiom.v1.WriteUpdatesResponse
-	14, // 14: adiom.v1.ConnectorService.GeneratePlan:output_type -> adiom.v1.GeneratePlanResponse
-	15, // 15: adiom.v1.ConnectorService.ListData:output_type -> adiom.v1.ListDataResponse
-	16, // 16: adiom.v1.ConnectorService.StreamUpdates:output_type -> adiom.v1.StreamUpdatesResponse
-	17, // 17: adiom.v1.ConnectorService.StreamLSN:output_type -> adiom.v1.StreamLSNResponse
-	18, // 18: adiom.v1.TransformService.GetTransformInfo:output_type -> adiom.v1.GetTransformInfoResponse
-	19, // 19: adiom.v1.TransformService.GetTransform:output_type -> adiom.v1.GetTransformResponse
-	10, // [10:20] is the sub-list for method output_type
-	0,  // [0:10] is the sub-list for method input_type
+	10, // 10: adiom.v1.TransformService.GetFanOutTransform:input_type -> adiom.v1.GetFanOutTransformRequest
+	11, // 11: adiom.v1.ConnectorService.GetInfo:output_type -> adiom.v1.GetInfoResponse
+	12, // 12: adiom.v1.ConnectorService.GetNamespaceMetadata:output_type -> adiom.v1.GetNamespaceMetadataResponse
+	13, // 13: adiom.v1.ConnectorService.WriteData:output_type -> adiom.v1.WriteDataResponse
+	14, // 14: adiom.v1.ConnectorService.WriteUpdates:output_type -> adiom.v1.WriteUpdatesResponse
+	15, // 15: adiom.v1.ConnectorService.GeneratePlan:output_type -> adiom.v1.GeneratePlanResponse
+	16, // 16: adiom.v1.ConnectorService.ListData:output_type -> adiom.v1.ListDataResponse
+	17, // 17: adiom.v1.ConnectorService.StreamUpdates:output_type -> adiom.v1.StreamUpdatesResponse
+	18, // 18: adiom.v1.ConnectorService.StreamLSN:output_type -> adiom.v1.StreamLSNResponse
+	19, // 19: adiom.v1.TransformService.GetTransformInfo:output_type -> adiom.v1.GetTransformInfoResponse
+	20, // 20: adiom.v1.TransformService.GetTransform:output_type -> adiom.v1.GetTransformResponse
+	21, // 21: adiom.v1.TransformService.GetFanOutTransform:output_type -> adiom.v1.GetFanOutTransformResponse
+	11, // [11:22] is the sub-list for method output_type
+	0,  // [0:11] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
