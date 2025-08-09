@@ -747,7 +747,8 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 					id := doc.(bson.Raw).Lookup("_id") //we know it's there because there was a conflict on _id //XXX: should we check that it's the right type?
 					bulkOverwrite = append(bulkOverwrite, mongo.NewReplaceOneModel().SetFilter(bson.M{"_id": id}).SetReplacement(doc).SetUpsert(true))
 				} else {
-					slog.Error(fmt.Sprintf("Skipping failure to insert document into collection: %v", we.WriteError))
+					slog.Error(fmt.Sprintf("Failure to insert document into collection: %v", we.WriteError))
+					return bwErr
 				}
 			}
 		} else {
