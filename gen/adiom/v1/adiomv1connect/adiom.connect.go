@@ -65,6 +65,9 @@ const (
 	// TransformServiceGetTransformProcedure is the fully-qualified name of the TransformService's
 	// GetTransform RPC.
 	TransformServiceGetTransformProcedure = "/adiom.v1.TransformService/GetTransform"
+	// TransformServiceGetFanOutTransformProcedure is the fully-qualified name of the TransformService's
+	// GetFanOutTransform RPC.
+	TransformServiceGetFanOutTransformProcedure = "/adiom.v1.TransformService/GetFanOutTransform"
 )
 
 // ConnectorServiceClient is a client for the adiom.v1.ConnectorService service.
@@ -327,6 +330,7 @@ func (UnimplementedConnectorServiceHandler) StreamLSN(context.Context, *connect.
 type TransformServiceClient interface {
 	GetTransformInfo(context.Context, *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error)
 	GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error)
+	GetFanOutTransform(context.Context, *connect.Request[v1.GetFanOutTransformRequest]) (*connect.Response[v1.GetFanOutTransformResponse], error)
 }
 
 // NewTransformServiceClient constructs a client for the adiom.v1.TransformService service. By
@@ -352,13 +356,20 @@ func NewTransformServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(transformServiceMethods.ByName("GetTransform")),
 			connect.WithClientOptions(opts...),
 		),
+		getFanOutTransform: connect.NewClient[v1.GetFanOutTransformRequest, v1.GetFanOutTransformResponse](
+			httpClient,
+			baseURL+TransformServiceGetFanOutTransformProcedure,
+			connect.WithSchema(transformServiceMethods.ByName("GetFanOutTransform")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // transformServiceClient implements TransformServiceClient.
 type transformServiceClient struct {
-	getTransformInfo *connect.Client[v1.GetTransformInfoRequest, v1.GetTransformInfoResponse]
-	getTransform     *connect.Client[v1.GetTransformRequest, v1.GetTransformResponse]
+	getTransformInfo   *connect.Client[v1.GetTransformInfoRequest, v1.GetTransformInfoResponse]
+	getTransform       *connect.Client[v1.GetTransformRequest, v1.GetTransformResponse]
+	getFanOutTransform *connect.Client[v1.GetFanOutTransformRequest, v1.GetFanOutTransformResponse]
 }
 
 // GetTransformInfo calls adiom.v1.TransformService.GetTransformInfo.
@@ -371,10 +382,16 @@ func (c *transformServiceClient) GetTransform(ctx context.Context, req *connect.
 	return c.getTransform.CallUnary(ctx, req)
 }
 
+// GetFanOutTransform calls adiom.v1.TransformService.GetFanOutTransform.
+func (c *transformServiceClient) GetFanOutTransform(ctx context.Context, req *connect.Request[v1.GetFanOutTransformRequest]) (*connect.Response[v1.GetFanOutTransformResponse], error) {
+	return c.getFanOutTransform.CallUnary(ctx, req)
+}
+
 // TransformServiceHandler is an implementation of the adiom.v1.TransformService service.
 type TransformServiceHandler interface {
 	GetTransformInfo(context.Context, *connect.Request[v1.GetTransformInfoRequest]) (*connect.Response[v1.GetTransformInfoResponse], error)
 	GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error)
+	GetFanOutTransform(context.Context, *connect.Request[v1.GetFanOutTransformRequest]) (*connect.Response[v1.GetFanOutTransformResponse], error)
 }
 
 // NewTransformServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -396,12 +413,20 @@ func NewTransformServiceHandler(svc TransformServiceHandler, opts ...connect.Han
 		connect.WithSchema(transformServiceMethods.ByName("GetTransform")),
 		connect.WithHandlerOptions(opts...),
 	)
+	transformServiceGetFanOutTransformHandler := connect.NewUnaryHandler(
+		TransformServiceGetFanOutTransformProcedure,
+		svc.GetFanOutTransform,
+		connect.WithSchema(transformServiceMethods.ByName("GetFanOutTransform")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/adiom.v1.TransformService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TransformServiceGetTransformInfoProcedure:
 			transformServiceGetTransformInfoHandler.ServeHTTP(w, r)
 		case TransformServiceGetTransformProcedure:
 			transformServiceGetTransformHandler.ServeHTTP(w, r)
+		case TransformServiceGetFanOutTransformProcedure:
+			transformServiceGetFanOutTransformHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -417,4 +442,8 @@ func (UnimplementedTransformServiceHandler) GetTransformInfo(context.Context, *c
 
 func (UnimplementedTransformServiceHandler) GetTransform(context.Context, *connect.Request[v1.GetTransformRequest]) (*connect.Response[v1.GetTransformResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.TransformService.GetTransform is not implemented"))
+}
+
+func (UnimplementedTransformServiceHandler) GetFanOutTransform(context.Context, *connect.Request[v1.GetFanOutTransformRequest]) (*connect.Response[v1.GetFanOutTransformResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.TransformService.GetFanOutTransform is not implemented"))
 }

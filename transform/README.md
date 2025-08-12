@@ -20,3 +20,21 @@ export DST="mongodb://localhost:27017"
 ./dsync --namespace "public.store" --verbosity DEBUG $SRC $DST grpc://localhost:8086 --insecure
 ./dsync --namespace "public.customer,public.staff,public.inventory" --verbosity DEBUG $SRC $DST grpc://localhost:8086 --insecure
 ```
+
+tpch dataset:
+
+```
+export SRC="postgresql://postgres:123456@localhost:5433/tpch?sslmode=disable"
+
+mongod --dbpath data_d --logpath mongo_d.log --fork --port 27017
+
+export DST="mongodb://localhost:27017"
+
+./dsync --namespace "public.part,public.partsupp,public.supplier,public.orders,public.lineitem" $SRC $DST grpc://localhost:8086 --insecure
+
+./dsync --namespace "public.customer, public.nation" $SRC $DST grpc://localhost:8086 --insecure
+
+./dsync --namespace "public.region" --verbosity DEBUG $SRC $DST grpc://localhost:8086 --insecure
+```
+
+

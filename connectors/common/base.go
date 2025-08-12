@@ -394,7 +394,10 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 
 	// Declare two channels to wait for the change stream reader and the initial sync to finish
 	initialSyncDone := make(chan struct{})
-	changeStreamDone := make(chan struct{})
+	var changeStreamDone chan struct{}
+	if options.Mode != iface.SyncModeSnapshot {
+		changeStreamDone = make(chan struct{})
+	}
 
 	type ReaderProgress struct {
 		initialSyncDocs    atomic.Uint64
@@ -530,7 +533,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							data := res.Msg.Data
 							var updates []*adiomv1.Update
 							if c.settings.TransformClient != nil {
-								transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+								transformed, err := c.settings.TransformClient.GetFanOutTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetFanOutTransformRequest{
 									Namespace:    sourceNamespace,
 									Data:         data,
 									RequestType:  c.settings.SourceDataType,
@@ -548,26 +551,78 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									}
 								}
 
-								if transformed.Msg.GetNamespace() != sourceNamespace {
-									destinationNamespace = transformed.Msg.GetNamespace()
-								}
-								data = transformed.Msg.GetData()
-								updates = transformed.Msg.GetUpdates()
-
-							}
-							if c.settings.TransformClient == nil {
-								slog.Info(fmt.Sprintf("No transform client set, passing data as is for namespace %s", destinationNamespace))
-							}
-							if len(updates) > 0 {
-								slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
-								for _, update := range updates {
-									dataMessage := iface.DataMessage{
-										Data:         &update.Data,
-										MutationType: iface.MutationType_Apply,
-										Loc:          destinationNamespace,
+								for namespace, nsData := range transformed.Msg.GetNamespaces() {
+									data = nsData.GetData()
+									updates = nsData.GetUpdates()
+									if len(data) > 0 {
+										slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), namespace))
+										dataMessage := iface.DataMessage{
+											DataBatch:    data,
+											MutationType: iface.MutationType_InsertBatch,
+											Loc:          namespace,
+										}
+										dataChannel <- dataMessage
 									}
-									dataChannel <- dataMessage
+									if len(updates) > 0 {
+										slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
+										for _, update := range updates {
+											dataMessage := iface.DataMessage{
+												Data:         &update.Data,
+												MutationType: iface.MutationType_Apply,
+												Loc:          namespace,
+											}
+											dataChannel <- dataMessage
+										}
+									}
+
 								}
+								// } else {
+								// 	transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+								// 		Namespace:    sourceNamespace,
+								// 		Data:         data,
+								// 		RequestType:  c.settings.SourceDataType,
+								// 		ResponseType: c.settings.DestinationDataType,
+								// 	}))
+								// 	if err != nil {
+								// 		if isRetryable(err) {
+								// 			slog.Debug("Retryable error encountered during transform- retrying", "task", task.Id)
+								// 			return err
+								// 		} else {
+								// 			if !errors.Is(err, context.Canceled) {
+								// 				slog.Error("err trying to transform data", "task", task.Id)
+								// 			}
+								// 			return backoff.Permanent(err)
+								// 		}
+								// 	}
+
+								// 	if transformed.Msg.GetNamespace() != sourceNamespace {
+								// 		destinationNamespace = transformed.Msg.GetNamespace()
+								// 	}
+								// 	data = transformed.Msg.GetData()
+								// 	updates = transformed.Msg.GetUpdates()
+
+								// 	if len(updates) > 0 {
+								// 		slog.Debug(fmt.Sprintf("Task %d: applying %d updates to namespace %s", task.Id, len(updates), destinationNamespace))
+								// 		for _, update := range updates {
+								// 			dataMessage := iface.DataMessage{
+								// 				Data:         &update.Data,
+								// 				MutationType: iface.MutationType_Apply,
+								// 				Loc:          destinationNamespace,
+								// 			}
+								// 			dataChannel <- dataMessage
+								// 		}
+								// 	} else {
+								// 		slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), destinationNamespace))
+								// 		dataMessage := iface.DataMessage{
+								// 			DataBatch:    data,
+								// 			MutationType: iface.MutationType_InsertBatch,
+								// 			Loc:          destinationNamespace,
+								// 		}
+								// 		dataChannel <- dataMessage
+								// 	}
+
+								// }
+
 							} else {
 								slog.Debug(fmt.Sprintf("Task %d: inserting %d documents to namespace %s", task.Id, len(data), destinationNamespace))
 								dataMessage := iface.DataMessage{
@@ -634,119 +689,124 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	}()
 
 	// kick off the change stream reader
-	go func() {
-		//wait for the initial sync to finish
-		<-initialSyncDone
-		defer close(changeStreamDone)
-		if initialSyncFailed.Load() {
-			slog.Error("Some initial sync tasks failed. Canceling flow.")
-			c.flowCancelFunc()
-			return
-		}
-		c.progressTracker.UpdateSyncState(iface.ChangeStreamSyncState)
+	if changeStreamDone != nil {
 
 		go func() {
-			ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-c.flowCtx.Done():
-					return
-				case <-changeStreamDone:
-					return
-				case <-ticker.C:
-					c.resumeTokenMutex.RLock()
-					resumeToken := c.resumeToken
-					c.resumeTokenMutex.RUnlock()
-					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: resumeToken}
+			//wait for the initial sync to finish
+			<-initialSyncDone
+			defer close(changeStreamDone)
+			if initialSyncFailed.Load() {
+				slog.Error("Some initial sync tasks failed. Canceling flow.")
+				c.flowCancelFunc()
+				return
+			}
+			c.progressTracker.UpdateSyncState(iface.ChangeStreamSyncState)
+
+			go func() {
+				ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-c.flowCtx.Done():
+						return
+					case <-changeStreamDone:
+						return
+					case <-ticker.C:
+						c.resumeTokenMutex.RLock()
+						resumeToken := c.resumeToken
+						c.resumeTokenMutex.RUnlock()
+						// send a barrier message with the updated resume token
+						dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: resumeToken}
+					}
+				}
+			}()
+
+			var lsn int64
+
+			slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", c.id, flowId))
+			slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", c.id, initialResumeToken))
+
+			res, err := c.impl.StreamUpdates(c.flowCtx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
+				Namespaces: streamUpdatesNamespaces,
+				Type:       c.settings.SourceDataType,
+				Cursor:     initialResumeToken,
+			}))
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to stream updates: %v", err))
+				}
+				return
+			}
+			c.progressTracker.CDCActive()
+
+			for res.Receive() {
+				msg := res.Msg()
+				destinationNamespace := c.mapNamespace(msg.GetNamespace())
+
+				updates := msg.GetUpdates()
+
+				if c.settings.TransformClient != nil {
+					transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
+						Namespace:    msg.GetNamespace(),
+						Updates:      updates,
+						RequestType:  c.settings.SourceDataType,
+						ResponseType: c.settings.DestinationDataType,
+					}))
+					if err != nil {
+						slog.Error("err trying to transform updates")
+						continue
+					}
+
+					updates = transformed.Msg.GetUpdates()
+					if transformed.Msg.GetNamespace() != msg.GetNamespace() {
+						destinationNamespace = transformed.Msg.GetNamespace()
+					}
+				}
+
+				for _, d := range updates {
+					var mutationType uint = iface.MutationType_Reserved
+					switch d.Type {
+					case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
+						mutationType = iface.MutationType_Insert
+					case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+						mutationType = iface.MutationType_Update
+					case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+						mutationType = iface.MutationType_Delete
+					}
+					c.progressTracker.UpdateChangeStreamProgressTracking()
+					readerProgress.changeStreamEvents.Add(1)
+					lsn++
+
+					dataChannel <- iface.DataMessage{
+						Data:         &d.Data,
+						MutationType: mutationType,
+						Loc:          destinationNamespace,
+						Id:           d.GetId(),
+						SeqNum:       lsn,
+					}
+				}
+
+				if msg.GetNextCursor() != nil {
+					// update the last seen resume token
+					c.resumeTokenMutex.Lock()
+					c.resumeToken = msg.GetNextCursor()
+					c.resumeTokenMutex.Unlock()
+				}
+			}
+			if res.Err() != nil {
+				if !errors.Is(res.Err(), context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed during stream updates: %v", res.Err()))
 				}
 			}
 		}()
-
-		var lsn int64
-
-		slog.Info(fmt.Sprintf("Connector %s is starting to read change stream for flow %s", c.id, flowId))
-		slog.Debug(fmt.Sprintf("Connector %s change stream start@ %v", c.id, initialResumeToken))
-
-		res, err := c.impl.StreamUpdates(c.flowCtx, connect.NewRequest(&adiomv1.StreamUpdatesRequest{
-			Namespaces: streamUpdatesNamespaces,
-			Type:       c.settings.SourceDataType,
-			Cursor:     initialResumeToken,
-		}))
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to stream updates: %v", err))
-			}
-			return
-		}
-		c.progressTracker.CDCActive()
-
-		for res.Receive() {
-			msg := res.Msg()
-			destinationNamespace := c.mapNamespace(msg.GetNamespace())
-
-			updates := msg.GetUpdates()
-
-			if c.settings.TransformClient != nil {
-				transformed, err := c.settings.TransformClient.GetTransform(c.flowCtx, connect.NewRequest(&adiomv1.GetTransformRequest{
-					Namespace:    msg.GetNamespace(),
-					Updates:      updates,
-					RequestType:  c.settings.SourceDataType,
-					ResponseType: c.settings.DestinationDataType,
-				}))
-				if err != nil {
-					slog.Error("err trying to transform updates")
-					continue
-				}
-
-				updates = transformed.Msg.GetUpdates()
-				if transformed.Msg.GetNamespace() != msg.GetNamespace() {
-					destinationNamespace = transformed.Msg.GetNamespace()
-				}
-			}
-
-			for _, d := range updates {
-				var mutationType uint = iface.MutationType_Reserved
-				switch d.Type {
-				case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
-					mutationType = iface.MutationType_Insert
-				case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-					mutationType = iface.MutationType_Update
-				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-					mutationType = iface.MutationType_Delete
-				}
-				c.progressTracker.UpdateChangeStreamProgressTracking()
-				readerProgress.changeStreamEvents.Add(1)
-				lsn++
-
-				dataChannel <- iface.DataMessage{
-					Data:         &d.Data,
-					MutationType: mutationType,
-					Loc:          destinationNamespace,
-					Id:           d.GetId(),
-					SeqNum:       lsn,
-				}
-			}
-
-			if msg.GetNextCursor() != nil {
-				// update the last seen resume token
-				c.resumeTokenMutex.Lock()
-				c.resumeToken = msg.GetNextCursor()
-				c.resumeTokenMutex.Unlock()
-			}
-		}
-		if res.Err() != nil {
-			if !errors.Is(res.Err(), context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed during stream updates: %v", res.Err()))
-			}
-		}
-	}()
+	}
 
 	// wait for both the change stream reader and the initial sync to finish
 	go func() {
 		<-initialSyncDone
-		<-changeStreamDone
+		if changeStreamDone != nil {
+			<-changeStreamDone
+		}
 		<-lsnDone
 
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
