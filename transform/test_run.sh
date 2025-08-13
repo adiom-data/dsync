@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Function to format duration in HH:MM:SS (works on both macOS and Ubuntu)
+format_duration() {
+    local duration=$1
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    printf "%02d:%02d:%02d" $hours $minutes $seconds
+}
+
 # Record overall start time
 OVERALL_START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 OVERALL_START_TIMESTAMP=$(date +%s)
@@ -52,7 +61,7 @@ console.log('Index creation completed.');
 "
 INDEX_END=$(date +%s)
 INDEX_DURATION=$((INDEX_END - INDEX_START))
-echo "✅ Index creation completed! Duration: $INDEX_DURATION seconds ($(date -u -r $INDEX_DURATION '+%H:%M:%S'))"
+echo "✅ Index creation completed! Duration $INDEX_DURATION seconds ($(format_duration $INDEX_DURATION))"
 echo ""
 
 #Task 1: Large tables group (part, partsupp, supplier, orders, lineitem)
@@ -62,7 +71,7 @@ TASK1_START=$(date +%s)
 
 TASK1_END=$(date +%s)
 TASK1_DURATION=$((TASK1_END - TASK1_START))
-echo "✅ Task 1 completed! Duration: $TASK1_DURATION seconds ($(date -u -r $TASK1_DURATION '+%H:%M:%S'))"
+echo "✅ Task 1 completed! Duration: $TASK1_DURATION seconds ($(format_duration $TASK1_DURATION))"
 echo ""
 
 # Task 2: Customer/Nation tables
@@ -72,7 +81,7 @@ TASK2_START=$(date +%s)
 
 TASK2_END=$(date +%s)
 TASK2_DURATION=$((TASK2_END - TASK2_START))
-echo "✅ Task 2 completed! Duration: $TASK2_DURATION seconds ($(date -u -r $TASK2_DURATION '+%H:%M:%S'))"
+echo "✅ Task 2 completed! Duration: $TASK2_DURATION seconds ($(format_duration $TASK2_DURATION))"
 echo ""
 
 # Task 3: Region table
@@ -82,7 +91,7 @@ TASK3_START=$(date +%s)
 
 TASK3_END=$(date +%s)
 TASK3_DURATION=$((TASK3_END - TASK3_START))
-echo "✅ Task 3 completed! Duration: $TASK3_DURATION seconds ($(date -u -r $TASK3_DURATION '+%H:%M:%S'))"
+echo "✅ Task 3 completed! Duration: $TASK3_DURATION seconds ($(format_duration $TASK3_DURATION))"
 echo ""
 
 # Calculate overall duration
@@ -96,9 +105,9 @@ echo "📊 TIMING SUMMARY:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Overall Start Time:  $OVERALL_START_TIME"
 echo "Overall End Time:    $OVERALL_END_TIME"
-echo "Total Duration:      $OVERALL_DURATION seconds ($(date -u -r $OVERALL_DURATION '+%H:%M:%S'))"
+echo "Total Duration:      $OVERALL_DURATION seconds ($(format_duration $OVERALL_DURATION))"
 echo ""
-echo "Task 1 Duration:     $TASK1_DURATION seconds ($(date -u -r $TASK1_DURATION '+%H:%M:%S')) - Large tables"
-echo "Task 2 Duration:     $TASK2_DURATION seconds ($(date -u -r $TASK2_DURATION '+%H:%M:%S')) - Customer/Nation"
-echo "Task 3 Duration:     $TASK3_DURATION seconds ($(date -u -r $TASK3_DURATION '+%H:%M:%S')) - Region"
+echo "Task 1 Duration:     $TASK1_DURATION seconds ($(format_duration $TASK1_DURATION)) - Large tables"
+echo "Task 2 Duration:     $TASK2_DURATION seconds ($(format_duration $TASK2_DURATION)) - Customer/Nation"
+echo "Task 3 Duration:     $TASK3_DURATION seconds ($(format_duration $TASK3_DURATION)) - Region"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

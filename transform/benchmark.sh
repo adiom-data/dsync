@@ -4,6 +4,23 @@ set -e
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="benchmark_${TIMESTAMP}.log"
 
+# Function to format duration in HH:MM:SS (works on both macOS and Ubuntu)
+format_duration() {
+    local duration=$1
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    printf "%02d:%02d:%02d" $hours $minutes $seconds
+}
+
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+    echo "📁 Loading configuration from .env file..."
+    export $(grep -v '^#' .env | xargs)
+else
+    echo "📁 No .env file found, using environment variables or defaults..."
+fi
+
 # Database Configuration with fallbacks
 DB_HOST=${DB_HOST:-"localhost"}
 DB_PORT=${DB_PORT:-"5433"}
@@ -27,6 +44,10 @@ else
     export DST="mongodb://${MONGO_HOST}:${MONGO_PORT}"
 fi
 
+
+echo "MongoDB connection string: $DST"
+echo "Postgres connection string: $SRC"
+
 echo "🚀 Starting benchmark - Results will be logged to: $LOG_FILE"
 echo "Benchmark started at: $(date)" | tee "$LOG_FILE"
 echo "=========================================" | tee -a "$LOG_FILE"
@@ -39,13 +60,13 @@ for i in {1..10}; do
     END_TIME=$(date +%s)
     RUN_TIME=$((END_TIME - START_TIME))
     TOTAL_TIME=$((TOTAL_TIME + RUN_TIME))
-    echo "Run $i took $RUN_TIME seconds ($(date -u -r $RUN_TIME '+%H:%M:%S'))" | tee -a "$LOG_FILE"
+    echo "Run $i took $RUN_TIME seconds ($(format_duration $RUN_TIME))" | tee -a "$LOG_FILE"
     echo "----------------------------------------" >> "$LOG_FILE"
     mongosh "$DST/public" --eval "db.dropDatabase()"
 
 done
 AVERAGE_TIME=$((TOTAL_TIME / 10))
-MIN_TIME_FORMATTED=$(date -u -r $AVERAGE_TIME '+%H:%M:%S')
+MIN_TIME_FORMATTED=$(format_duration $AVERAGE_TIME)
 
 echo "" | tee -a "$LOG_FILE"
 echo "📊 BENCHMARK SUMMARY:" | tee -a "$LOG_FILE"
