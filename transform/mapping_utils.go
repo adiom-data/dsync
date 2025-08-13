@@ -424,6 +424,14 @@ var TPCHMappingConfig = NamespaceMappingConfig{
 			PrimaryKey:      "_id",
 			UpdateType:      "insert",
 		},
+		{
+			TargetNamespace: "public.part",
+			SourceNamespace: "public.supplier",
+			ForeignKey:      "supplier._id",
+			PrimaryKey:      "_id",
+			FieldName:       "suppliers.$.supplier",
+			UpdateType:      "embeddedDoc",
+		},
 	},
 	"public.nation": {
 		{

@@ -1,8 +1,5 @@
 #!/bin/bash
-
-# Set environment variables
-export SRC="postgresql://postgres:123456@localhost:5433/tpch?sslmode=disable"
-export DST="mongodb://localhost:27018"
+set -e
 
 # Record overall start time
 OVERALL_START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
@@ -14,7 +11,7 @@ echo "🕐 Starting sequential TPCH sync tasks at: $OVERALL_START_TIME"
 echo "🔧 Creating MongoDB indexes for embedding operations..."
 INDEX_START=$(date +%s)
 
-mongosh --host localhost:27018 --eval "
+mongosh ${DST} --eval "
 console.log('Creating indexes for TPCH embedding operations...');
 
 // Switch to your database (adjust database name as needed)
@@ -27,9 +24,9 @@ try {
 } catch(e) { console.log('⚠️  idx_custkey already exists or failed:', e.message); }
 
 try {
-  db.part.createIndex({'_id': 1, 'partsupp._id': 1}, {name: 'idx_partsupp'});
-  console.log('✅ Created idx_partsupp on part collection');
-} catch(e) { console.log('⚠️  idx_partsupp already exists or failed:', e.message); }
+  db.part.createIndex({'_id': 1, 'suppliers._id': 1}, {name: 'idx_part_suppliers'});
+  console.log('✅ Created idx_part_suppliers on part collection');
+} catch(e) { console.log('⚠️  idx_part_suppliers already exists or failed:', e.message); }
 
 try {
   db.orders.createIndex({'lineitems._id': 1}, {sparse: true, name: 'idx_lineitems'});
@@ -46,6 +43,11 @@ try {
     console.log('✅ Created idx_regionkey on supplier collection');
 } catch(e) { console.log('⚠️  idx_regionkey already exists or failed:', e.message); }   
 
+try {
+    db.supplier.createIndex({'_id': 1, 'parts._id': 1}, {name: 'idx_supplier_parts'});
+    console.log('✅ Created idx_supplier_parts on supplier collection');
+} catch(e) { console.log('⚠️  idx_supplier_parts already exists or failed:', e.message); }
+
 console.log('Index creation completed.');
 "
 INDEX_END=$(date +%s)
@@ -56,7 +58,7 @@ echo ""
 #Task 1: Large tables group (part, partsupp, supplier, orders, lineitem)
 echo "🚀 Starting Task 1: Large tables group..."
 TASK1_START=$(date +%s)
-./dsync --namespace "public.part,public.partsupp,public.supplier,public.orders,public.lineitem" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
+../dsync --namespace "public.partsupp,public.orders,public.lineitem" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
 
 TASK1_END=$(date +%s)
 TASK1_DURATION=$((TASK1_END - TASK1_START))
@@ -66,7 +68,7 @@ echo ""
 # Task 2: Customer/Nation tables
 echo "🚀 Starting Task 2: Customer and Nation tables..."
 TASK2_START=$(date +%s)
-./dsync --namespace "public.customer, public.nation" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
+../dsync --namespace "public.customer, public.nation, public.part, public.supplier" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
 
 TASK2_END=$(date +%s)
 TASK2_DURATION=$((TASK2_END - TASK2_START))
@@ -76,7 +78,7 @@ echo ""
 # Task 3: Region table
 echo "🚀 Starting Task 3: Region table..."
 TASK3_START=$(date +%s)
-./dsync --namespace "public.region" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
+../dsync --namespace "public.region" --mode "Snapshot" $SRC $DST grpc://localhost:8086 --insecure
 
 TASK3_END=$(date +%s)
 TASK3_DURATION=$((TASK3_END - TASK3_START))
