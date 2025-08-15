@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"log/slog"
 	"time"
@@ -147,8 +148,11 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
 		}
 		//HACK: replace _id key with id
+		// we are also prepending a hash to ensure random distribution of writes on Spanner
 		if m["_id"] != nil {
-			m["id"] = m["_id"]
+			idValue := m["_id"]
+			hash := md5.Sum([]byte(fmt.Sprintf("%v", idValue)))
+			m["id"] = fmt.Sprintf("%.3x:%v", hash, idValue)
 			delete(m, "_id")
 		}
 
