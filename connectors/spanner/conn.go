@@ -141,8 +141,9 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 	if len(data) == 0 {
 		return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 	}
-	var muts []*spanner.Mutation
-	for _, raw := range data {
+	mutationGroups := make([]*spanner.MutationGroup, len(data))
+
+	for i, raw := range data {
 		var m map[string]interface{}
 		if err := bson.Unmarshal(raw, &m); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to unmarshal BSON: %w", err))
@@ -156,15 +157,32 @@ func (c *conn) WriteData(ctx context.Context, req *connect.Request[adiomv1.Write
 			delete(m, "_id")
 		}
 
-		muts = append(muts, spanner.InsertOrUpdateMap(namespace, m))
+		mg := []*spanner.Mutation{
+			spanner.InsertOrUpdateMap(namespace, m),
+		}
+		mutationGroups[i] = &spanner.MutationGroup{Mutations: mg}
 	}
 	start := time.Now()
-	_, err := c.client.Apply(ctx, muts)
+	batchResponseIter := c.client.BatchWrite(ctx, mutationGroups)
 	duration := time.Since(start)
-	slog.Info("WriteData Apply duration", "namespace", namespace, "count", len(muts), "duration", duration, "avg_per_mutation", duration/time.Duration(len(muts)))
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	slog.Info("WriteData Apply duration", "namespace", namespace, "count", len(mutationGroups), "duration", duration, "avg_per_mutation", duration/time.Duration(len(mutationGroups)))
+
+	//iterate through the batch response to check for errors
+	defer batchResponseIter.Stop()
+	for {
+		batchResponse, err := batchResponseIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		// Check if the individual batch response has an error
+		if batchResponse.Status != nil && batchResponse.Status.Code != 0 {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("batch write failed: %s", batchResponse.Status.Message))
+		}
 	}
+
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
