@@ -570,6 +570,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 												Data:         &update.Data,
 												MutationType: iface.MutationType_Apply,
 												Loc:          namespace,
+												Id:           *&update.Id,
 											}
 											dataChannel <- dataMessage
 										}
@@ -842,8 +843,10 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 	}
 	writerProgress.dataMessages.Store(0)
 
+	namespaces := []string{"public.part", "public.supplier", "public.lineitem", "public.orders"}
+
 	// create a batch assembly
-	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize)
+	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize, namespaces)
 	flowParallelWriter.Start()
 
 	// start printing progress
@@ -1029,7 +1032,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			})
 		case iface.MutationType_Apply:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   dataMsg.Id,
+				Id:   *&dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_APPLY,
 				Data: *dataMsg.Data,
 			})

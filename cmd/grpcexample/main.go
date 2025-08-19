@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/vector"
@@ -20,6 +22,9 @@ import (
 func main() {
 	// Runs 2 servers - one using standard go grpc, and the other using connect
 	// This is for testing purposes only.
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger.Info("Starting servers...")
+
 	go func() {
 		l, err := net.Listen("tcp", "localhost:8086")
 		if err != nil {

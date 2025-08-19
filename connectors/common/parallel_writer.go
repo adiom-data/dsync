@@ -38,8 +38,10 @@ type ParallelWriter struct {
 	numWorkers   int
 	maxBatchSize int
 
-	// Array of workers
-	workers []writerWorker
+	namespaces []string
+
+	// mapping namespaces to worker pools
+	workers map[string][]writerWorker
 
 	// Map of task barriers that were scheduled but haven't been cleared yet
 	// Maps task ID to the number of workers that processed the barrier yet (countdown to 0)
@@ -58,12 +60,13 @@ type ParallelWriter struct {
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int, namespaces []string) *ParallelWriter {
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,
 		numWorkers:     numWorkers,
 		maxBatchSize:   maxBatchSize,
+		namespaces:     namespaces,
 		taskBarrierMap: make(map[uint]uint),
 		blockBarrier:   make(chan struct{}),
 		done:           make(chan struct{}),
@@ -72,22 +75,28 @@ func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, n
 
 func (bwa *ParallelWriter) Start() {
 	// create and start the workers
-	bwa.workers = make([]writerWorker, bwa.numWorkers)
-	for i := 0; i < bwa.numWorkers; i++ {
-		bwa.workers[i] = newWriterWorker(bwa, i, 10) //XXX: should we make the queue size configurable? WARNING: these could be batches and they could be big
-		go func() {
-			bwa.workers[i].run()
-			bwa.done <- struct{}{}
-		}()
+	bwa.workers = make(map[string][]writerWorker)
+	for _, ns := range bwa.namespaces {
+		bwa.workers[ns] = make([]writerWorker, bwa.numWorkers)
+		for i := 0; i < bwa.numWorkers; i++ {
+			bwa.workers[ns][i] = newWriterWorker(bwa, i, 1000) //XXX: should we make the queue size configurable? WARNING: these could be batches and they could be big
+			go func() {
+				bwa.workers[ns][i].run()
+				bwa.done <- struct{}{}
+			}()
+		}
+
 	}
 }
 
 func (bwa *ParallelWriter) StopAndWait() {
-	for _, worker := range bwa.workers {
-		close(worker.queue)
-	}
-	for i := 0; i < bwa.numWorkers; i++ {
-		<-bwa.done
+	for _, ns := range bwa.namespaces {
+		for _, worker := range bwa.workers[ns] {
+			close(worker.queue)
+		}
+		for i := 0; i < bwa.numWorkers; i++ {
+			<-bwa.done
+		}
 	}
 }
 
@@ -114,7 +123,8 @@ func (bwa *ParallelWriter) ScheduleDataMessage(dataMsg iface.DataMessage) error 
 		workerId = hashDataMsgId(dataMsg) % bwa.numWorkers
 	}
 	// add the message to the worker's queue
-	bwa.workers[workerId].addMessage(dataMsg)
+	ns := dataMsg.Loc
+	bwa.workers[ns][workerId].addMessage(dataMsg)
 
 	return nil
 }
@@ -158,8 +168,10 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 
 // Broadcasts message to all workers
 func (bwa *ParallelWriter) BroadcastMessage(dataMsg iface.DataMessage) {
-	for i := 0; i < bwa.numWorkers; i++ {
-		bwa.workers[i].addMessage(dataMsg)
+	for _, ns := range bwa.namespaces {
+		for i := 0; i < bwa.numWorkers; i++ {
+			bwa.workers[ns][i].addMessage(dataMsg)
+		}
 	}
 }
 
