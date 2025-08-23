@@ -24,11 +24,13 @@ require (
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/lmittmann/tint v1.1.2
+	github.com/microsoft/go-mssqldb v1.9.2
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/rivo/tview v0.0.0-20250625164341-a4a78f1e05cb
 	github.com/samber/slog-multi v1.4.1
 	github.com/shopspring/decimal v1.3.1
+	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tryvium-travels/memongo v0.12.0
 	github.com/urfave/cli/v2 v2.27.7
@@ -72,6 +74,8 @@ require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
+	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
+	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -114,5 +118,5 @@ require (
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/sync v0.15.0
 	golang.org/x/text v0.26.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

@@ -20,6 +20,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/random"
 	s3connector "github.com/adiom-data/dsync/connectors/s3"
 	"github.com/adiom-data/dsync/connectors/s3vector"
+	"github.com/adiom-data/dsync/connectors/sqlbatch"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
@@ -355,6 +356,20 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					return nil, fmt.Errorf("invalid connection string %v", args[0])
 				}
 				return testconn.NewConn(connString), nil
+			}),
+		},
+		{
+			Name: "sqlbatch",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "sqlbatch")
+			},
+			Create: CreateHelper("sqlbatch", "sqlbatch", []cli.Flag{
+				&cli.StringFlag{
+					Name:     "config",
+					Required: true,
+					Value:    "config.yml",
+				}}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return sqlbatch.NewConn(c.String("config"))
 			}),
 		},
 		{
