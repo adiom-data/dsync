@@ -181,8 +181,17 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "/dev/null")
 			},
-			Create: CreateHelper("/dev/null", "/dev/null", nil, func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return null.NewConn(), nil
+			Create: CreateHelper("/dev/null", "/dev/null", []cli.Flag{
+				&cli.DurationFlag{
+					Name:  "sleep",
+					Usage: "Sleep time between requests",
+				},
+				&cli.BoolFlag{
+					Name:  "log-json",
+					Usage: "Convert data to json and log INFO",
+				},
+			}, func(c *cli.Context, args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return null.NewConn(c.Bool("log-json"), c.Duration("sleep")), nil
 			}),
 		},
 		{

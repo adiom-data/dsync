@@ -7,14 +7,21 @@ package null
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
 type conn struct {
+	logJson bool
+	sleep   time.Duration
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -44,7 +51,7 @@ func (c *conn) GetNamespaceMetadata(context.Context, *connect.Request[adiomv1.Ge
 }
 
 // ListData implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) ListData(context.Context, *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
+func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.ErrUnsupported)
 }
 
@@ -60,14 +67,72 @@ func (c *conn) StreamUpdates(context.Context, *connect.Request[adiomv1.StreamUpd
 
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
+	if c.sleep > 0 {
+		time.Sleep(c.sleep)
+	}
+	if c.logJson {
+		for i, data := range r.Msg.GetData() {
+			var output = "unknown"
+			switch r.Msg.GetType() {
+			case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+				var m map[string]any
+				if err := bson.Unmarshal(data, &m); err != nil {
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+				jsonOutput, err := json.Marshal(m)
+				if err != nil {
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+				output = string(jsonOutput)
+			case adiomv1.DataType_DATA_TYPE_JSON_ID:
+				output = string(data)
+			}
+			slog.Info("write-data", "i", i, "data", output, "size", len(data))
+		}
+	}
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
+func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
+	if c.sleep > 0 {
+		time.Sleep(c.sleep)
+	}
+	if c.logJson {
+		for i, updates := range r.Msg.GetUpdates() {
+			var output = "unknown"
+			var idOutput []any
+			for _, id := range updates.GetId() {
+				var v any
+				if err := bson.UnmarshalValue(bsontype.Type(id.GetType()), id.GetData(), &v); err != nil {
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+				idOutput = append(idOutput, v)
+			}
+			if updates.Type == adiomv1.UpdateType_UPDATE_TYPE_DELETE {
+				slog.Info("write-updates", "i", i, "type", updates.Type.String(), "id", idOutput)
+				continue
+			}
+			switch r.Msg.GetType() {
+			case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+				var m map[string]any
+				if err := bson.Unmarshal(updates.GetData(), &m); err != nil {
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+				jsonOutput, err := json.Marshal(m)
+				if err != nil {
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+				output = string(jsonOutput)
+			case adiomv1.DataType_DATA_TYPE_JSON_ID:
+				output = string(updates.GetData())
+			}
+			slog.Info("write-updates", "i", i, "type", updates.Type.String(), "id", idOutput, "data", output, "size", len(updates.GetData()))
+		}
+	}
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
-func NewConn() adiomv1connect.ConnectorServiceHandler {
-	return &conn{}
+func NewConn(logJson bool, sleep time.Duration) adiomv1connect.ConnectorServiceHandler {
+	return &conn{logJson, sleep}
 }
