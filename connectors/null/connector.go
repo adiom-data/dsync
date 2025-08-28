@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	"connectrpc.com/connect"
@@ -20,8 +21,9 @@ import (
 )
 
 type conn struct {
-	logJson bool
-	sleep   time.Duration
+	logJson     bool
+	sleep       time.Duration
+	sleepJitter time.Duration
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -68,7 +70,11 @@ func (c *conn) StreamUpdates(context.Context, *connect.Request[adiomv1.StreamUpd
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
 	if c.sleep > 0 {
-		time.Sleep(c.sleep)
+		select {
+		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(c.sleepJitter)))): // #nosec G404
+		case <-ctx.Done():
+			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
+		}
 	}
 	if c.logJson {
 		for i, data := range r.Msg.GetData() {
@@ -96,7 +102,11 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	if c.sleep > 0 {
-		time.Sleep(c.sleep)
+		select {
+		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(c.sleepJitter)))): // #nosec G404
+		case <-ctx.Done():
+			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
+		}
 	}
 	if c.logJson {
 		for i, updates := range r.Msg.GetUpdates() {
@@ -133,6 +143,6 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
-func NewConn(logJson bool, sleep time.Duration) adiomv1connect.ConnectorServiceHandler {
-	return &conn{logJson, sleep}
+func NewConn(logJson bool, sleep time.Duration, sleepJitter time.Duration) adiomv1connect.ConnectorServiceHandler {
+	return &conn{logJson, sleep, sleepJitter}
 }

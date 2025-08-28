@@ -32,7 +32,7 @@ func main() {
 		_ = s.Serve(l)
 	}()
 
-	nullConn := null.NewConn()
+	nullConn := null.NewConn(false, 0, 0)
 	mux := http.NewServeMux()
 	path, handler := adiomv1connect.NewConnectorServiceHandler(nullConn)
 	tpath, thandler := adiomv1connect.NewTransformServiceHandler(transform.NewIdentityTransform())

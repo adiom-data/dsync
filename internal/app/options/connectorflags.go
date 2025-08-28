@@ -186,12 +186,16 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					Name:  "sleep",
 					Usage: "Sleep time between requests",
 				},
+				&cli.DurationFlag{
+					Name:  "sleep-jitter",
+					Usage: "If sleep is set, additional jitter",
+				},
 				&cli.BoolFlag{
 					Name:  "log-json",
 					Usage: "Convert data to json and log INFO",
 				},
 			}, func(c *cli.Context, args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return null.NewConn(c.Bool("log-json"), c.Duration("sleep")), nil
+				return null.NewConn(c.Bool("log-json"), c.Duration("sleep"), c.Duration("sleep-jitter")), nil
 			}),
 		},
 		{
