@@ -71,7 +71,7 @@ func (c *conn) StreamUpdates(context.Context, *connect.Request[adiomv1.StreamUpd
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
 	if c.sleep > 0 {
 		select {
-		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(c.sleepJitter)))): // #nosec G404
+		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(1+c.sleepJitter)))): // #nosec G404
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
@@ -103,7 +103,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	if c.sleep > 0 {
 		select {
-		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(c.sleepJitter)))): // #nosec G404
+		case <-time.After(c.sleep + time.Duration(rand.Int63n(int64(1+c.sleepJitter)))): // #nosec G404
 		case <-ctx.Done():
 			return nil, connect.NewError(connect.CodeCanceled, ctx.Err())
 		}
