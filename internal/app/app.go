@@ -128,7 +128,7 @@ func runDsync(c *cli.Context) error {
 			fmt.Fprintf(c.App.Writer, "Example: `dsync testconn://./fixture mongodb://localhost:27017`\n")
 			fmt.Fprintf(c.App.Writer, "\nThe following connectors are available:\n")
 			for _, rc := range options.GetRegisteredConnectors() {
-				fmt.Fprintf(c.App.Writer, "  `dsync %v help`\n", rc.Name)
+				fmt.Fprintf(c.App.Writer, "  `dsync %v --help`\n", rc.Name)
 			}
 		} else if errors.Is(err, options.ErrHelp) {
 			return nil

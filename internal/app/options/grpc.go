@@ -60,7 +60,7 @@ func ConfigureTransformer(args []string) (adiomv1connect.TransformServiceClient,
 
 func ConfigureGRPCFactory(usage string, missingErr error, f func(connect.HTTPClient, string, ...connect.ClientOption) interface{}) func([]string) (interface{}, []string, error) {
 	return func(args []string) (interface{}, []string, error) {
-		if missingErr != nil && len(args) == 0 || !strings.HasPrefix(args[0], "grpc://") {
+		if missingErr != nil && (len(args) == 0 || !strings.HasPrefix(args[0], "grpc://")) {
 			return nil, nil, missingErr
 		}
 		var conn any

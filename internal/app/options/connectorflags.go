@@ -403,6 +403,9 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 			CreateRemote: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceClient, []string, error) {
 				conn, restArgs, err := GRPCConnector(args)
+				if err != nil {
+					return nil, nil, err
+				}
 				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},

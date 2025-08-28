@@ -10,4 +10,4 @@ COPY . .
 
 RUN go build -o dsync
 
-CMD ["./dsync"]
+ENTRYPOINT ["/app/dsync"]
