@@ -68,7 +68,7 @@ func (suite *ConnectorTestSuite) TestAll() {
 
 			suite.Assert().NotEmpty(capabilities.GetSource().GetSupportedDataTypes())
 
-			planRes, err := c.GeneratePlan(ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{Namespaces: []string{suite.namespace}}))
+			planRes, err := c.GeneratePlan(ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{Namespaces: []string{suite.namespace}, InitialSync: true, Updates: true}))
 
 			suite.Run("TestGeneratePlan", func() {
 				suite.Assert().NoError(err)

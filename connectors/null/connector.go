@@ -93,7 +93,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 			case adiomv1.DataType_DATA_TYPE_JSON_ID:
 				output = string(data)
 			}
-			slog.Info("write-data", "i", i, "data", output, "size", len(data))
+			slog.Info("write-data", "i", i, "namespace", r.Msg.GetNamespace(), "data", output, "size", len(data))
 		}
 	}
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
@@ -120,7 +120,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 				idOutput = append(idOutput, v)
 			}
 			if updates.Type == adiomv1.UpdateType_UPDATE_TYPE_DELETE {
-				slog.Info("write-updates", "i", i, "type", updates.Type.String(), "id", idOutput)
+				slog.Info("write-updates", "i", i, "namespace", r.Msg.GetNamespace(), "type", updates.Type.String(), "id", idOutput)
 				continue
 			}
 			switch r.Msg.GetType() {
@@ -137,7 +137,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			case adiomv1.DataType_DATA_TYPE_JSON_ID:
 				output = string(updates.GetData())
 			}
-			slog.Info("write-updates", "i", i, "type", updates.Type.String(), "id", idOutput, "data", output, "size", len(updates.GetData()))
+			slog.Info("write-updates", "i", i, "namespace", r.Msg.GetNamespace(), "type", updates.Type.String(), "id", idOutput, "data", output, "size", len(updates.GetData()))
 		}
 	}
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil

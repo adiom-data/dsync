@@ -191,7 +191,7 @@ func runDsync(c *cli.Context) error {
 	}
 
 	srcDescription := fmt.Sprintf("%s.%s.%s - %s", infoRes.Msg.GetDbType(), infoRes.Msg.GetVersion(), infoRes.Msg.GetSpec(), infoRes.Msg.GetId())
-	dstDescription := fmt.Sprintf("%s.%s.%s - %s", dstInfoRes.Msg.GetDbType(), dstInfoRes.Msg.GetVersion(), dstInfoRes.Msg.GetSpec(), infoRes.Msg.GetId())
+	dstDescription := fmt.Sprintf("%s.%s.%s - %s", dstInfoRes.Msg.GetDbType(), dstInfoRes.Msg.GetVersion(), dstInfoRes.Msg.GetSpec(), dstInfoRes.Msg.GetId())
 
 	namespaces := o.NamespaceFrom
 	if o.Reverse {
