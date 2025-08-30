@@ -177,6 +177,100 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			}),
 		},
 		{
+			Name: "/dev/fakesource",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "/dev/fakesource")
+			},
+			Create: CreateHelper("/dev/fakesource", "/dev/fakesource", []cli.Flag{
+				&cli.DurationFlag{
+					Name:  "sleep",
+					Usage: "Sleep time between requests",
+				},
+				&cli.DurationFlag{
+					Name:  "jitter",
+					Usage: "Additional jitter to certain durations",
+				},
+				&cli.DurationFlag{
+					Name:  "update-duration",
+					Usage: "Time for each update-batch-size to be produced",
+					Value: time.Millisecond * 400,
+				},
+				&cli.DurationFlag{
+					Name:  "stream-tick",
+					Usage: "Polling time to check for stream updates",
+					Value: time.Second,
+				},
+				&cli.IntFlag{
+					Name:  "num-namespaces",
+					Usage: "Number of namespaces (index starts at 0)",
+					Value: 2,
+				},
+				&cli.IntFlag{
+					Name:  "num-partitions-per-namespace",
+					Usage: "Number of partitions per namespace",
+					Value: 3,
+				},
+				&cli.IntFlag{
+					Name:  "num-update-partitions-per-namespace",
+					Usage: "Number of update partitions per namespace. If set to 0, use a single stream for all.",
+				},
+				&cli.Int64Flag{
+					Name:  "num-docs-per-partition",
+					Usage: "Number of docs per partition",
+					Value: 1000,
+				},
+				&cli.IntFlag{
+					Name:  "batch-size",
+					Usage: "Number of docs per batch",
+					Value: 150,
+				},
+				&cli.IntFlag{
+					Name:  "update-batch-size",
+					Usage: "Number of docs per update",
+					Value: 50,
+				},
+				&cli.IntFlag{
+					Name:  "max-updates-per-tick",
+					Usage: "Number of docs per update",
+					Value: 300,
+				},
+				&cli.StringFlag{
+					Name:  "namespace-prefix",
+					Usage: "Prefix for namespace",
+					Value: "ns",
+				},
+				&cli.StringSliceFlag{
+					Name:  "payload",
+					Usage: "Payload for all items (`key:value`)",
+				},
+			}, func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				var m map[string]any
+				payload := c.StringSlice("payload")
+				if len(payload) > 0 {
+					m = map[string]any{}
+				}
+				for _, p := range payload {
+					k, v, _ := strings.Cut(p, ":")
+					m[k] = v
+				}
+				return random.NewConnV2(random.ConnV2Input{
+					NamespacePrefix:                 c.String("namespace-prefix"),
+					NumNamespaces:                   c.Int("num-namespaces"),
+					NumPartitionsPerNamespace:       c.Int("num-partitions-per-namespace"),
+					NumUpdatePartitionsPerNamespace: c.Int("num-update-partitions-per-namespace"),
+					BatchSize:                       c.Int("batch-size"),
+					UpdateBatchSize:                 c.Int("update-batch-size"),
+					MaxUpdatesPerTick:               c.Int("max-updates-per-tick"),
+					NumDocsPerPartition:             c.Int64("num-docs-per-partition"),
+					Payload:                         m,
+					Sleep:                           c.Duration("sleep"),
+					Jitter:                          c.Duration("jitter"),
+					UpdateDuration:                  c.Duration("update-duration"),
+					StreamTick:                      c.Duration("stream-tick"),
+				}), nil
+			}),
+		},
+		{
 			Name: "/dev/null",
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "/dev/null")
