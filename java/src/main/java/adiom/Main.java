@@ -271,7 +271,14 @@ public class Main {
 
             List<CosmosItemOperation> ops = new ArrayList<CosmosItemOperation>(request.getDataCount());
             for (ByteString data : request.getDataList()) {
-                Document d = new Document(data.toByteArray());
+                // Check if document size exceeds 2MB limit
+                byte[] docBytes = data.toByteArray();
+                if (docBytes.length > 2 * 1000 * 1000) {
+                    byte[] preview = Arrays.copyOf(docBytes, Math.min(100, docBytes.length));
+                    System.err.println("ERROR: Document size " + docBytes.length + " bytes exceeds 2MB limit, skipping document (first 100 bytes): " + new String(preview));
+                    continue;
+                }
+                Document d = new Document(docBytes);
                 PartitionKey k = PartitionKeyHelper.extractPartitionKeyFromDocument(d, helper.pkd);
                 ops.add(CosmosBulkOperations.getUpsertItemOperation(d, k));
             }
