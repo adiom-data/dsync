@@ -1,6 +1,8 @@
 package adiom;
 
+import java.io.InputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -8,13 +10,17 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.yaml.snakeyaml.Yaml;
+
 import com.azure.cosmos.CosmosAsyncClient;
 import com.azure.cosmos.CosmosAsyncContainer;
 import com.azure.cosmos.CosmosClient;
 import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosContainer;
 import com.azure.cosmos.implementation.Document;
+import com.azure.cosmos.implementation.ImplementationBridgeHelpers;
 import com.azure.cosmos.implementation.PartitionKeyHelper;
+import com.azure.cosmos.implementation.ImplementationBridgeHelpers.CosmosAsyncContainerHelper.CosmosAsyncContainerAccessor;
 import com.azure.cosmos.models.CosmosBulkOperationResponse;
 import com.azure.cosmos.models.CosmosBulkOperations;
 import com.azure.cosmos.models.CosmosChangeFeedRequestOptions;
@@ -68,14 +74,32 @@ import reactor.core.publisher.Flux;
 public class Main {
 
     private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
+    private static Config CONFIG;
 
     public static void main(String[] args) {
         if (args.length < 3) {
             System.out.println("3 Required arguments: port url key");
             return;
         }
+        try {
+            if (args.length > 3) {
+                Yaml yaml = new Yaml();
+                InputStream is = new FileInputStream(args[3]);
+                Config cfg = yaml.loadAs(is, Config.class);
+                CONFIG = cfg;
+            } else {
+                CONFIG = new Config();
+                CONFIG.namespaces = new java.util.HashMap<String, NamespaceConfig>();
+            }
+        } catch (Exception e) {
+            System.out.println("Could not read config");
+            e.printStackTrace();
+            return;
+        }
+
         String cert = System.getenv("CERT_FILE");
         String key = System.getenv("KEY_FILE");
+
         ServerCredentials creds = InsecureServerCredentials.create();
         try {
             if (cert != null && key != null) {
@@ -91,10 +115,10 @@ public class Main {
         System.out.println("starting server on port " + args[0]);
         try {
             Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), creds)
-                .addService(new MyConn(args[1], args[2]))
-                .addService(ProtoReflectionServiceV1.newInstance())
-                .maxInboundMessageSize(100000000)
-                .build();
+                    .addService(new MyConn(args[1], args[2]))
+                    .addService(ProtoReflectionServiceV1.newInstance())
+                    .maxInboundMessageSize(100000000)
+                    .build();
             s.start();
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
@@ -135,9 +159,9 @@ public class Main {
                     .key(key)
                     .buildClient();
             this.asyncClient = new CosmosClientBuilder()
-                .endpoint(endpoint)
-                .key(key)
-                .buildAsyncClient();
+                    .endpoint(endpoint)
+                    .key(key)
+                    .buildAsyncClient();
         }
 
         @Override
@@ -170,7 +194,9 @@ public class Main {
                     helper.pkd = helper.container.read().getProperties().getPartitionKeyDefinition();
                 } catch (com.azure.cosmos.CosmosException e) {
                     responseObserver.onError(
-                        Status.INTERNAL.withDescription("Failed to read container properties for '" + namespace + "'. Does it exist?").asException());
+                            Status.INTERNAL.withDescription(
+                                    "Failed to read container properties for '" + namespace + "'. Does it exist?")
+                                    .asException());
                     return null;
                 }
                 this.nsHelpers.put(namespace, helper);
@@ -198,7 +224,7 @@ public class Main {
                     } else {
                         ops = retryOps;
                         try {
-                            int delay = (int)(100 * Math.pow(1.5, i) + Math.random() * 50);
+                            int delay = (int) (100 * Math.pow(1.5, i) + Math.random() * 50);
                             Thread.sleep(delay);
                         } catch (Exception e) {
                         }
@@ -280,19 +306,43 @@ public class Main {
         @Override
         public void generatePlan(GeneratePlanRequest request, StreamObserver<GeneratePlanResponse> responseObserver) {
             GeneratePlanResponse.Builder responseBuilder = GeneratePlanResponse.newBuilder();
+            CosmosAsyncContainerAccessor caca = ImplementationBridgeHelpers.CosmosAsyncContainerHelper
+                    .getCosmosAsyncContainerAccessor();
             for (String namespace : request.getNamespacesList()) {
+                NamespaceConfig cfg = CONFIG.namespaces.get(namespace);
+                int partitionFanout = 0;
+                if (cfg != null) {
+                    partitionFanout = cfg.partitionfanout;
+                }
                 NsHelper helper = getNsHelper(responseObserver, namespace);
                 if (helper == null) {
                     return;
                 }
 
                 for (FeedRange fr : helper.container.getFeedRanges()) {
-                    Integer count = helper.container.queryItems("SELECT VALUE COUNT(1) FROM c", new CosmosQueryRequestOptions().setFeedRange(fr), Integer.class).stream().findFirst().orElse(0);
-                    responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace).setCursor(ByteString.copyFromUtf8(fr.toString())).setEstimatedCount(count));
+                    Integer count = helper.container
+                            .queryItems("SELECT VALUE COUNT(1) FROM c",
+                                    new CosmosQueryRequestOptions().setFeedRange(fr), Integer.class)
+                            .stream().findFirst().orElse(0);
+
+                    if (partitionFanout > 1) {
+                        List<FeedRange> frs = caca.trySplitFeedRange(helper.asyncContainer, fr, partitionFanout)
+                                .block();
+                        for (FeedRange splitFR : frs) {
+                            responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace)
+                                    .setCursor(ByteString.copyFromUtf8(splitFR.toString()))
+                                    .setEstimatedCount(count / frs.size()));
+                        }
+                    } else {
+                        responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace)
+                                .setCursor(ByteString.copyFromUtf8(fr.toString())).setEstimatedCount(count));
+                    }
                 }
 
-                CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions.createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
-                UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder().addNamespaces(namespace);
+                CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions
+                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
+                UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder()
+                        .addNamespaces(namespace);
                 for (FeedResponse<Object> fr : helper.container.queryChangeFeed(ccfro, Object.class).iterableByPage()) {
                     updatesPartitionBuilder.setCursor(ByteString.copyFromUtf8(fr.getContinuationToken()));
                 }
@@ -311,7 +361,7 @@ public class Main {
             if (helper == null) {
                 return;
             }
-            
+
             CosmosQueryRequestOptions queryOptions = new CosmosQueryRequestOptions();
             String query = "SELECT VALUE COUNT(1) FROM c";
             CosmosPagedIterable<Integer> results = helper.container.queryItems(query, queryOptions, Integer.class);
@@ -334,8 +384,15 @@ public class Main {
             }
 
             int pageSize = 1000;
-            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions().setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0).setMaxBufferedItemCount(pageSize);
-            CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);            
+            NamespaceConfig cfg = CONFIG.namespaces.get(namespace);
+            if (cfg != null && cfg.pagesize > 0) {
+                pageSize = cfg.pagesize;
+            }
+
+            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions()
+                    .setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0)
+                    .setMaxBufferedItemCount(pageSize);
+            CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);
             Flux<FeedResponse<JsonNode>> flux = cpi.byPage(continuation, pageSize);
             java.util.Iterator<FeedResponse<JsonNode>> it = flux.take(1).toIterable().iterator();
 
@@ -344,7 +401,7 @@ public class Main {
                 FeedResponse<JsonNode> fr = it.next();
 
                 for (JsonNode node : fr.getResults()) {
-                    ObjectNode objectNode = (ObjectNode)(node);
+                    ObjectNode objectNode = (ObjectNode) (node);
                     objectNode.remove(CosmosInternalKeys);
                     builder.addData(ByteString.copyFromUtf8(node.toString()));
                 }
@@ -373,7 +430,9 @@ public class Main {
         public void streamUpdates(StreamUpdatesRequest request,
                 StreamObserver<StreamUpdatesResponse> responseObserver) {
             if (request.getNamespacesCount() != 1) {
-                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Must have exactly 1 namespace, but has " + request.getNamespacesCount()).asException());
+                responseObserver.onError(Status.INVALID_ARGUMENT
+                        .withDescription("Must have exactly 1 namespace, but has " + request.getNamespacesCount())
+                        .asException());
                 return;
             }
             String namespace = request.getNamespaces(0);
@@ -385,32 +444,38 @@ public class Main {
             String continuation = request.getCursor().toStringUtf8();
 
             while (!Context.current().isCancelled()) {
-                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions.createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class).iterableByPage();
+                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions
+                        .createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class)
+                        .iterableByPage();
                 for (FeedResponse<JsonNode> fr : it) {
                     List<Update> updates = new ArrayList<>();
-                    for (JsonNode node: fr.getResults()) {
+                    for (JsonNode node : fr.getResults()) {
                         JsonNode opType = node.get("metadata").get("operationType");
                         if (opType != null && opType.asText() == "delete") {
                             String id = node.get("metadata").get("id").asText();
-                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE).addId(BsonHelper.toId(id)).build());
+                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE)
+                                    .addId(BsonHelper.toId(id)).build());
                         } else {
                             adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
                             if (opType != null && opType.asText() == "create") {
                                 typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
                             }
                             JsonNode currentNode = node.get("current");
-                            ObjectNode objectNode = (ObjectNode)(currentNode);
+                            ObjectNode objectNode = (ObjectNode) (currentNode);
                             objectNode.remove(CosmosInternalKeys);
                             String id = currentNode.get("id").asText();
-                            updates.add(Update.newBuilder().setType(typ).setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id)).build());
+                            updates.add(Update.newBuilder().setType(typ)
+                                    .setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id))
+                                    .build());
                         }
                     }
-                    
+
                     continuation = fr.getContinuationToken();
 
                     if (updates.size() > 0) {
-                        StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder().setNamespace(namespace).setNextCursor(ByteString.copyFromUtf8(continuation)).addAllUpdates(updates).build();
-                        responseObserver.onNext(item);   
+                        StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder().setNamespace(namespace)
+                                .setNextCursor(ByteString.copyFromUtf8(continuation)).addAllUpdates(updates).build();
+                        responseObserver.onNext(item);
                     }
                 }
                 try {
