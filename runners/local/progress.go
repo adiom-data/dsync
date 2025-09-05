@@ -17,9 +17,10 @@ type RunnerSyncProgress struct {
 	SourceDescription      string
 	DestinationDescription string
 
-	StartTime time.Time // start of the sync process
-	CurrTime  time.Time // current time
-	SyncState string    // current state of the sync process
+	StartTime            time.Time // start of the sync process
+	CurrTime             time.Time // current time
+	ChangeStreamLastTime time.Time
+	SyncState            string // current state of the sync process
 
 	TotalNamespaces        int64 // total number of namespaces to sync
 	NumNamespacesCompleted int64 // number of namespaces completed
@@ -80,6 +81,7 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	r.runnerProgress.AdditionalStateInfo = stateInfo
 
 	r.runnerProgress.CurrTime = time.Now()
+	r.runnerProgress.ChangeStreamLastTime = srcStatus.ProgressMetrics.LastChangeStreamTime
 	r.runnerProgress.TotalNamespaces = srcStatus.ProgressMetrics.NumNamespaces
 	r.runnerProgress.NumDocsSynced = srcStatus.ProgressMetrics.NumDocsSynced
 

@@ -7,6 +7,7 @@ package iface
 
 import (
 	"context"
+	"time"
 )
 
 type ConnectorType struct {
@@ -94,6 +95,8 @@ type ProgressMetrics struct {
 	//progress reporting attributes
 	NamespaceProgress map[Namespace]*NamespaceStatus //map key is namespace: "db.col"
 	Namespaces        []Namespace
+
+	LastChangeStreamTime time.Time
 }
 
 type Namespace struct {

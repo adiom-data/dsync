@@ -716,6 +716,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				c.resumeToken = msg.GetNextCursor()
 				c.resumeTokenMutex.Unlock()
 			}
+
+			c.progressTracker.UpdateChangeStreamLastTime(msg.GetTime().AsTime())
 		}
 		if res.Err() != nil {
 			if !errors.Is(res.Err(), context.Canceled) {

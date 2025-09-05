@@ -26,6 +26,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	moptions "go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ConnectorSettings struct {
@@ -618,6 +619,13 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 	return update, nil
 }
 
+func toTimestampPB(t primitive.Timestamp) *timestamppb.Timestamp {
+	if t.IsZero() {
+		return nil
+	}
+	return timestamppb.New(time.Unix(int64(t.T), 0))
+}
+
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
 	var namespaces []iface.Namespace
@@ -644,6 +652,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	var updates []*adiomv1.Update
 	var currentNamespace string
 	var lastResumeToken bson.Raw
+	var lastTime primitive.Timestamp
 
 	for changeStream.Next(ctx) {
 		var change bson.M
@@ -675,6 +684,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 					Updates:    updates,
 					Namespace:  currentNamespace,
 					NextCursor: lastResumeToken,
+					Time:       toTimestampPB(lastTime),
 				})
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
@@ -689,12 +699,16 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 
 		updates = append(updates, update)
 		lastResumeToken = changeStream.ResumeToken()
+		if lt, ok := change["clusterTime"].(primitive.Timestamp); ok {
+			lastTime = lt
+		}
 
 		if changeStream.RemainingBatchLength() == 0 {
 			err := s.Send(&adiomv1.StreamUpdatesResponse{
 				Updates:    updates,
 				Namespace:  currentNamespace,
 				NextCursor: lastResumeToken,
+				Time:       toTimestampPB(lastTime),
 			})
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
@@ -717,6 +731,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			Updates:    updates,
 			Namespace:  currentNamespace,
 			NextCursor: lastResumeToken,
+			Time:       toTimestampPB(lastTime),
 		})
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
