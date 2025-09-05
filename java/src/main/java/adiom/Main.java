@@ -1,6 +1,8 @@
 package adiom;
 
 import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -34,7 +36,10 @@ import com.azure.cosmos.util.CosmosPagedFlux;
 import com.azure.cosmos.util.CosmosPagedIterable;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.ByteString.Output;
 
 import adiom.v1.ConnectorServiceGrpc;
 import adiom.v1.Messages.Capabilities;
@@ -75,6 +80,9 @@ public class Main {
 
     private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
     private static Config CONFIG;
+    private static Cache<Long, CacheItem> CACHE = Caffeine.newBuilder().expireAfterAccess(150, TimeUnit.SECONDS)
+            .build();
+    private static long currentIndex = 1;
 
     public static void main(String[] args) {
         if (args.length < 3) {
@@ -370,54 +378,93 @@ public class Main {
             responseObserver.onCompleted();
         }
 
+        private synchronized long nextIndex() {
+            return currentIndex++;
+        }
+
         @Override
         public void listData(ListDataRequest request, StreamObserver<ListDataResponse> responseObserver) {
             String namespace = request.getPartition().getNamespace();
-            String feedRange = request.getPartition().getCursor().toStringUtf8();
-            String continuation = null;
+
             if (!request.getCursor().isEmpty()) {
-                continuation = request.getCursor().toStringUtf8();
+                try {
+                    InputStream is = request.getCursor().newInput();
+                    ObjectInputStream ois = new ObjectInputStream(is);
+                    Cursor c = (Cursor) ois.readObject();
+                    ois.close();
+                    is.close();
+                    // System.out.println(c.id + ": " + c.counter);
+                    CacheItem ci = CACHE.getIfPresent(c.id);
+                    if (ci == null) {
+                        responseObserver.onError(Status.INVALID_ARGUMENT
+                                .withDescription("Cursor no longer available: " + c.id).asException());
+                        return;
+                    }
+                    ci.next(c.counter, responseObserver);
+                    return;
+                } catch (Exception e) {
+                    responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+                    return;
+                }
             }
+
+            long idx = nextIndex();
+            String feedRange = request.getPartition().getCursor().toStringUtf8();
             NsHelper helper = getNsHelper(responseObserver, namespace);
             if (helper == null) {
                 return;
             }
 
             int pageSize = 1000;
+            int prefetch = 5;
             NamespaceConfig cfg = CONFIG.namespaces.get(namespace);
-            if (cfg != null && cfg.pagesize > 0) {
-                pageSize = cfg.pagesize;
+            if (cfg != null) {
+                if (cfg.pagesize > 0) {
+                    pageSize = cfg.pagesize;
+                }
+                if (cfg.prefetch > 0) {
+                    prefetch = cfg.prefetch;
+                }
             }
 
             CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions()
                     .setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0)
                     .setMaxBufferedItemCount(pageSize);
             CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);
-            Flux<FeedResponse<JsonNode>> flux = cpi.byPage(continuation, pageSize);
-            java.util.Iterator<FeedResponse<JsonNode>> it = flux.take(1).toIterable().iterator();
-
-            if (it.hasNext()) {
+            Flux<FeedResponse<JsonNode>> flux = cpi.byPage(null, pageSize);
+            Flux<ListDataResponse> ldrFlux = flux.zipWith(Flux.range(1, Integer.MAX_VALUE)).map(tup -> {
+                FeedResponse<JsonNode> fr = tup.getT1();
+                int counter = tup.getT2();
                 ListDataResponse.Builder builder = ListDataResponse.newBuilder();
-                FeedResponse<JsonNode> fr = it.next();
-
                 for (JsonNode node : fr.getResults()) {
                     ObjectNode objectNode = (ObjectNode) (node);
                     objectNode.remove(CosmosInternalKeys);
                     builder.addData(ByteString.copyFromUtf8(node.toString()));
                 }
-
                 if (fr.getContinuationToken() != null) {
-                    builder.setNextCursor(ByteString.copyFromUtf8(fr.getContinuationToken()));
+                    Cursor ci = new Cursor();
+                    ci.id = idx;
+                    ci.counter = counter;
+                    try {
+                        Output o = ByteString.newOutput();
+                        ObjectOutputStream oos = new ObjectOutputStream(o);
+                        oos.writeObject(ci);
+                        builder.setNextCursor(o.toByteString());
+                        // System.out.println("X " + idx + ": " + counter + ": " + ci.id + "-" +
+                        // ci.counter);
+                        oos.close();
+                        o.close();
+                    } catch (Exception e) {
+                        throw new InternalError(e);
+                    }
                 }
-                responseObserver.onNext(builder.build());
-            } else {
-                responseObserver.onNext(ListDataResponse.newBuilder().build());
-            }
-            while (it.hasNext()) {
-                it.next();
-            }
-
-            responseObserver.onCompleted();
+                return builder.build();
+            });
+            // System.out.println(idx + ": " + feedRange);
+            CacheItem ci = new CacheItem(ldrFlux.toIterable(prefetch).iterator());
+            CACHE.put(idx, ci);
+            ci.next(0, responseObserver);
+            return;
         }
 
         @Override
