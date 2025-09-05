@@ -289,54 +289,63 @@ func progressUpdatesHandler(runnerCtx context.Context, runner *runnerLocal.Runne
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	onTick := func() bool {
+		mut.Lock()
+		runner.UpdateRunnerProgress()
+		progress := runner.GetRunnerProgress()
+		elapsed := time.Since(progress.StartTime).Round(time.Second)
+		convertedNamespaceMap := convertNamespaceMapToStringKeys(progress.NsProgressMap)
+
+		// Construct data struct
+		data := struct {
+			RunnerSyncProgress runnerLocal.RunnerSyncProgress
+			Elapsed            string
+			TotalProgress      int64
+			TotalThroughput    float64
+			ErrorLogString     string
+			NsProgressMap      map[string]*iface.NamespaceStatus
+		}{
+			RunnerSyncProgress: progress,
+			Elapsed:            elapsed.String(),
+			TotalProgress:      int64(percentCompleteTotal(progress)),
+			TotalThroughput:    progress.Throughput,
+			ErrorLogString:     errorLog.String(),
+			NsProgressMap:      convertedNamespaceMap,
+		}
+
+		verificationResult := progress.VerificationResult
+
+		// Convert data to JSON and send as event to client
+		jsonData, err := json.Marshal(data)
+		mut.Unlock()
+		if err != nil {
+			slog.Error("Error marshaling JSON:", "err", err)
+			return false
+		}
+		fmt.Fprintf(w, "data: %s\n\n", jsonData)
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+
+		if verificationResult != "" {
+			// Verification is complete, send final update and stop
+			slog.Debug("Verification complete, stopping progress updates.")
+			return true
+		}
+
+		return false
+	}
 	for {
 		select {
 		case <-r.Context().Done():
+			onTick()
 			return
 		case <-runnerCtx.Done():
+			onTick()
 			slog.Debug("Context cancelled, stopping progress updates.")
 			return
 		case <-ticker.C:
-			mut.Lock()
-			runner.UpdateRunnerProgress()
-			progress := runner.GetRunnerProgress()
-			elapsed := time.Since(progress.StartTime).Round(time.Second)
-			convertedNamespaceMap := convertNamespaceMapToStringKeys(progress.NsProgressMap)
-
-			// Construct data struct
-			data := struct {
-				RunnerSyncProgress runnerLocal.RunnerSyncProgress
-				Elapsed            string
-				TotalProgress      int64
-				TotalThroughput    float64
-				ErrorLogString     string
-				NsProgressMap      map[string]*iface.NamespaceStatus
-			}{
-				RunnerSyncProgress: progress,
-				Elapsed:            elapsed.String(),
-				TotalProgress:      int64(percentCompleteTotal(progress)),
-				TotalThroughput:    progress.Throughput,
-				ErrorLogString:     errorLog.String(),
-				NsProgressMap:      convertedNamespaceMap,
-			}
-
-			verificationResult := progress.VerificationResult
-
-			// Convert data to JSON and send as event to client
-			jsonData, err := json.Marshal(data)
-			mut.Unlock()
-			if err != nil {
-				slog.Error("Error marshaling JSON:", "err", err)
-				break
-			}
-			fmt.Fprintf(w, "data: %s\n\n", jsonData)
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
-
-			if verificationResult != "" {
-				// Verification is complete, send final update and stop
-				slog.Debug("Verification complete, stopping progress updates.")
+			if onTick() {
 				return
 			}
 		}
