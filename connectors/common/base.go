@@ -14,6 +14,7 @@ import (
 	"hash"
 	"log/slog"
 	"math"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -249,6 +250,15 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 		}
 
 		if options.Mode != iface.SyncModeInitialSync && len(resp.Msg.GetUpdatesPartitions()) > 0 {
+			if len(resp.Msg.GetUpdatesPartitions()) > 1 {
+				if os.Getenv("DSYNC_DEBUG") == "true" {
+					slog.Error("Multiple stream partitions not currently supported. Proceeding anyway with one of them.", "count", len(resp.Msg.GetUpdatesPartitions()))
+				} else {
+					slog.Error("Multiple stream partitions not currently supported. Set env DSYNC_DEBUG=true to ignore and use the first.", "count", len(resp.Msg.GetUpdatesPartitions()))
+					_ = c.coord.PostReadPlanningResult(flowId, c.id, iface.ConnectorReadPlanResult{Success: false, Error: fmt.Errorf("multiple stream partitions not currently supported")})
+					return
+				}
+			}
 			c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
 		}
 
