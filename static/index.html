@@ -426,19 +426,19 @@
       }
 
       .table-row,
-      .table-row-3 {
+      .table-row-4 {
         display: grid;
         grid-template-columns: repeat(6, minmax(6rem, 1fr));
         justify-content: space-between;
         border-top: 1px solid rgb(var(--separator));
       }
 
-      .table-row-3 {
-        grid-template-columns: repeat(3, minmax(9rem, 1fr));
+      .table-row-4 {
+        grid-template-columns: repeat(4, minmax(9rem, 1fr));
       }
 
       .table-row.table-header,
-      .table-row-3.table-header {
+      .table-row-4.table-header {
         border: none;
       }
 
@@ -707,16 +707,18 @@
           <div class="change-stream row-column col bg-block">
             <h2 class="table-title">progress</h2>
             <div class="per-namespace-progress" role="table">
-              <div class="table-row-3 table-header" role="row">
+              <div class="table-row-4 table-header" role="row">
                 <div class="table-cell" role="columnheader">Change Stream Events</div>
                 <div class="table-cell" role="columnheader">Deletes Caught</div>
                 <div class="table-cell" role="columnheader">Events To Catch Up</div>
+                <div class="table-cell" role="columnheader" id="last-read-time-header">Last Read Event Time</div>
               </div>
 
-              <div class="table-row-3" role="row">
+              <div class="table-row-4" role="row">
                 <div class="table-cell" role="cell" id="change-stream-events"></div>
                 <div class="table-cell" role="cell" id="deletes-caught"></div>
                 <div class="table-cell" role="cell" id="events-to-catch-up"></div>
+                <div class="table-cell" role="cell" id="last-read-time"></div>
               </div>
             </div>
           </div>
@@ -1044,6 +1046,11 @@
             document.getElementById("change-stream-events").textContent = data.RunnerSyncProgress.ChangeStreamEvents;
             document.getElementById("deletes-caught").textContent = data.RunnerSyncProgress.DeletesCaught;
             document.getElementById("events-to-catch-up").textContent = data.RunnerSyncProgress.Lag;
+            if (Date.parse(data.RunnerSyncProgress.ChangeStreamLastTime).valueOf() > 0) {
+              document.getElementById("last-read-time").textContent = data.RunnerSyncProgress.ChangeStreamLastTime;
+            } else {
+              document.getElementById("last-read-time").textContent = "Unavailable";
+            }
           }
 
           // Render verification result

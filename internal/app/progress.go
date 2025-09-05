@@ -131,6 +131,9 @@ func (tv *TViewDetails) GetStatusReport(runnerProgress runnerLocal.RunnerSyncPro
 		if runnerProgress.AdditionalStateInfo != "" {
 			headerString += "\n" + runnerProgress.AdditionalStateInfo
 		}
+		if !runnerProgress.ChangeStreamLastTime.IsZero() {
+			headerString += "\nLast Change Stream Read: " + runnerProgress.ChangeStreamLastTime.String()
+		}
 		header.SetText(headerString)
 
 		//set the indefinite progress bar

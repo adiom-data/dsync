@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 )
@@ -171,6 +172,14 @@ func (pt *ProgressTracker) UpdateChangeStreamProgressTracking() {
 	pt.muProgressMetrics.Lock()
 	defer pt.muProgressMetrics.Unlock()
 	pt.status.ProgressMetrics.ChangeStreamEvents++
+}
+
+func (pt *ProgressTracker) UpdateChangeStreamLastTime(t time.Time) {
+	pt.muProgressMetrics.Lock()
+	defer pt.muProgressMetrics.Unlock()
+	if !t.IsZero() && t.After(pt.status.ProgressMetrics.LastChangeStreamTime) {
+		pt.status.ProgressMetrics.LastChangeStreamTime = t.UTC()
+	}
 }
 
 func (pt *ProgressTracker) UpdateWriteLSN(lsn int64) {
