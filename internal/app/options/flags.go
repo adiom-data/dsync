@@ -33,7 +33,7 @@ const (
 	cosmosDefaultMaxNumNamespaces = 8
 )
 
-var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC}
+var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC, iface.SyncModeInitialSync}
 
 const defaultMode = iface.SyncModeFull
 

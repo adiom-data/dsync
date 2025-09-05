@@ -240,7 +240,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 		resp, err := c.impl.GeneratePlan(c.ctx, connect.NewRequest(&adiomv1.GeneratePlanRequest{
 			Namespaces:  namespaces,
 			InitialSync: options.Mode != iface.SyncModeCDC,
-			Updates:     true,
+			Updates:     options.Mode != iface.SyncModeInitialSync,
 		}))
 		if err != nil {
 			slog.Error(fmt.Sprintf("Failed to generate plan: %v", err))
@@ -248,7 +248,9 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 			return
 		}
 
-		c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
+		if options.Mode != iface.SyncModeInitialSync && len(resp.Msg.GetUpdatesPartitions()) > 0 {
+			c.resumeToken = resp.Msg.GetUpdatesPartitions()[0].GetCursor()
+		}
 
 		curID := 0
 		var tasks []iface.ReadPlanTask
@@ -437,6 +439,9 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 	// TODO (AK, 6/2024): implement this proper - this is a very BAD, bad placeholder.
 	go func() {
 		defer close(lsnDone)
+		if options.Mode == iface.SyncModeInitialSync {
+			return
+		}
 		slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for flow %s", c.id, flowId))
 		res, err := c.impl.StreamLSN(c.flowCtx, connect.NewRequest(&adiomv1.StreamLSNRequest{
 			Namespaces: streamUpdatesNamespaces,
@@ -619,6 +624,9 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		//wait for the initial sync to finish
 		<-initialSyncDone
 		defer close(changeStreamDone)
+		if options.Mode == iface.SyncModeInitialSync {
+			return
+		}
 		if initialSyncFailed.Load() {
 			slog.Error("Some initial sync tasks failed. Canceling flow.")
 			c.flowCancelFunc()
