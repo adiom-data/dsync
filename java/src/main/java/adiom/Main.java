@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import com.azure.cosmos.CosmosAsyncClient;
@@ -72,11 +74,17 @@ import io.grpc.Server;
 import io.grpc.ServerCredentials;
 import io.grpc.Status;
 import io.grpc.TlsServerCredentials;
+import io.grpc.opentelemetry.GrpcOpenTelemetry;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import reactor.core.publisher.Flux;
 
 public class Main {
+
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
     private static Config CONFIG;
@@ -85,6 +93,13 @@ public class Main {
     private static long currentIndex = 1;
 
     public static void main(String[] args) {
+        OpenTelemetry otel = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk();
+        OpenTelemetryAppender.install(otel);
+        logger.atInfo().addKeyValue("type", "cosmos").addKeyValue("lang", "java").log("cosmos connector");
+        GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+                .sdk(otel)
+                .build();
+        grpcOpenTelemetry.registerGlobal();
         if (args.length < 3) {
             System.out.println("3 Required arguments: port url key");
             return;
@@ -95,6 +110,7 @@ public class Main {
                 InputStream is = new FileInputStream(args[3]);
                 Config cfg = yaml.loadAs(is, Config.class);
                 CONFIG = cfg;
+                is.close();
             } else {
                 CONFIG = new Config();
                 CONFIG.namespaces = new java.util.HashMap<String, NamespaceConfig>();
@@ -228,7 +244,9 @@ public class Main {
                 }
                 if (ok && retryOps.size() > 0) {
                     if (i == retries) {
-                        System.out.println("" + retryOps.size() + " items failed after " + retries + " retries.");
+                        logger.atWarn().addKeyValue("size", retryOps.size()).addKeyValue("retries", retries)
+                                .log("Failed after retries.");
+                        return false;
                     } else {
                         ops = retryOps;
                         try {
@@ -336,6 +354,9 @@ public class Main {
                     if (partitionFanout > 1) {
                         List<FeedRange> frs = caca.trySplitFeedRange(helper.asyncContainer, fr, partitionFanout)
                                 .block();
+                        if (frs == null) {
+                            frs = Arrays.asList(fr);
+                        }
                         for (FeedRange splitFR : frs) {
                             responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace)
                                     .setCursor(ByteString.copyFromUtf8(splitFR.toString()))
