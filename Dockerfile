@@ -1,13 +1,14 @@
-FROM golang:latest
+FROM golang:1.24.6 AS build
 
-WORKDIR /app
-
-COPY go.mod go.sum ./
+WORKDIR /go/src/dsync
+COPY . .
 
 RUN go mod download
 
-COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/dsync .
 
-RUN go build -o dsync
+FROM gcr.io/distroless/static-debian12
 
-ENTRYPOINT ["/app/dsync"]
+COPY --from=build /go/bin/dsync /
+
+ENTRYPOINT [ "/dsync" ]
