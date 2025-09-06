@@ -1,6 +1,10 @@
 package adiom;
 
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -8,13 +12,19 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
+
 import com.azure.cosmos.CosmosAsyncClient;
 import com.azure.cosmos.CosmosAsyncContainer;
 import com.azure.cosmos.CosmosClient;
 import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosContainer;
 import com.azure.cosmos.implementation.Document;
+import com.azure.cosmos.implementation.ImplementationBridgeHelpers;
 import com.azure.cosmos.implementation.PartitionKeyHelper;
+import com.azure.cosmos.implementation.ImplementationBridgeHelpers.CosmosAsyncContainerHelper.CosmosAsyncContainerAccessor;
 import com.azure.cosmos.models.CosmosBulkOperationResponse;
 import com.azure.cosmos.models.CosmosBulkOperations;
 import com.azure.cosmos.models.CosmosChangeFeedRequestOptions;
@@ -28,7 +38,10 @@ import com.azure.cosmos.util.CosmosPagedFlux;
 import com.azure.cosmos.util.CosmosPagedIterable;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.ByteString.Output;
 
 import adiom.v1.ConnectorServiceGrpc;
 import adiom.v1.Messages.Capabilities;
@@ -61,21 +74,56 @@ import io.grpc.Server;
 import io.grpc.ServerCredentials;
 import io.grpc.Status;
 import io.grpc.TlsServerCredentials;
+import io.grpc.opentelemetry.GrpcOpenTelemetry;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import reactor.core.publisher.Flux;
 
 public class Main {
 
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
     private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
+    private static Config CONFIG;
+    private static Cache<Long, CacheItem> CACHE = Caffeine.newBuilder().expireAfterAccess(150, TimeUnit.SECONDS)
+            .build();
+    private static long currentIndex = 1;
 
     public static void main(String[] args) {
+        OpenTelemetry otel = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk();
+        OpenTelemetryAppender.install(otel);
+        logger.atInfo().addKeyValue("type", "cosmos").addKeyValue("lang", "java").log("cosmos connector");
+        GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+                .sdk(otel)
+                .build();
+        grpcOpenTelemetry.registerGlobal();
         if (args.length < 3) {
             System.out.println("3 Required arguments: port url key");
             return;
         }
+        try {
+            if (args.length > 3) {
+                Yaml yaml = new Yaml();
+                InputStream is = new FileInputStream(args[3]);
+                Config cfg = yaml.loadAs(is, Config.class);
+                CONFIG = cfg;
+                is.close();
+            } else {
+                CONFIG = new Config();
+                CONFIG.namespaces = new java.util.HashMap<String, NamespaceConfig>();
+            }
+        } catch (Exception e) {
+            System.out.println("Could not read config");
+            e.printStackTrace();
+            return;
+        }
+
         String cert = System.getenv("CERT_FILE");
         String key = System.getenv("KEY_FILE");
+
         ServerCredentials creds = InsecureServerCredentials.create();
         try {
             if (cert != null && key != null) {
@@ -91,10 +139,10 @@ public class Main {
         System.out.println("starting server on port " + args[0]);
         try {
             Server s = Grpc.newServerBuilderForPort(Integer.parseInt(args[0]), creds)
-                .addService(new MyConn(args[1], args[2]))
-                .addService(ProtoReflectionServiceV1.newInstance())
-                .maxInboundMessageSize(100000000)
-                .build();
+                    .addService(new MyConn(args[1], args[2]))
+                    .addService(ProtoReflectionServiceV1.newInstance())
+                    .maxInboundMessageSize(100000000)
+                    .build();
             s.start();
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
@@ -135,9 +183,9 @@ public class Main {
                     .key(key)
                     .buildClient();
             this.asyncClient = new CosmosClientBuilder()
-                .endpoint(endpoint)
-                .key(key)
-                .buildAsyncClient();
+                    .endpoint(endpoint)
+                    .key(key)
+                    .buildAsyncClient();
         }
 
         @Override
@@ -170,7 +218,9 @@ public class Main {
                     helper.pkd = helper.container.read().getProperties().getPartitionKeyDefinition();
                 } catch (com.azure.cosmos.CosmosException e) {
                     responseObserver.onError(
-                        Status.INTERNAL.withDescription("Failed to read container properties for '" + namespace + "'. Does it exist?").asException());
+                            Status.INTERNAL.withDescription(
+                                    "Failed to read container properties for '" + namespace + "'. Does it exist?")
+                                    .asException());
                     return null;
                 }
                 this.nsHelpers.put(namespace, helper);
@@ -194,11 +244,13 @@ public class Main {
                 }
                 if (ok && retryOps.size() > 0) {
                     if (i == retries) {
-                        System.out.println("" + retryOps.size() + " items failed after " + retries + " retries.");
+                        logger.atWarn().addKeyValue("size", retryOps.size()).addKeyValue("retries", retries)
+                                .log("Failed after retries.");
+                        return false;
                     } else {
                         ops = retryOps;
                         try {
-                            int delay = (int)(100 * Math.pow(1.5, i) + Math.random() * 50);
+                            int delay = (int) (100 * Math.pow(1.5, i) + Math.random() * 50);
                             Thread.sleep(delay);
                         } catch (Exception e) {
                         }
@@ -280,19 +332,46 @@ public class Main {
         @Override
         public void generatePlan(GeneratePlanRequest request, StreamObserver<GeneratePlanResponse> responseObserver) {
             GeneratePlanResponse.Builder responseBuilder = GeneratePlanResponse.newBuilder();
+            CosmosAsyncContainerAccessor caca = ImplementationBridgeHelpers.CosmosAsyncContainerHelper
+                    .getCosmosAsyncContainerAccessor();
             for (String namespace : request.getNamespacesList()) {
+                NamespaceConfig cfg = CONFIG.namespaces.get(namespace);
+                int partitionFanout = 0;
+                if (cfg != null) {
+                    partitionFanout = cfg.partitionfanout;
+                }
                 NsHelper helper = getNsHelper(responseObserver, namespace);
                 if (helper == null) {
                     return;
                 }
 
                 for (FeedRange fr : helper.container.getFeedRanges()) {
-                    Integer count = helper.container.queryItems("SELECT VALUE COUNT(1) FROM c", new CosmosQueryRequestOptions().setFeedRange(fr), Integer.class).stream().findFirst().orElse(0);
-                    responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace).setCursor(ByteString.copyFromUtf8(fr.toString())).setEstimatedCount(count));
+                    Integer count = helper.container
+                            .queryItems("SELECT VALUE COUNT(1) FROM c",
+                                    new CosmosQueryRequestOptions().setFeedRange(fr), Integer.class)
+                            .stream().findFirst().orElse(0);
+
+                    if (partitionFanout > 1) {
+                        List<FeedRange> frs = caca.trySplitFeedRange(helper.asyncContainer, fr, partitionFanout)
+                                .block();
+                        if (frs == null) {
+                            frs = Arrays.asList(fr);
+                        }
+                        for (FeedRange splitFR : frs) {
+                            responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace)
+                                    .setCursor(ByteString.copyFromUtf8(splitFR.toString()))
+                                    .setEstimatedCount(count / frs.size()));
+                        }
+                    } else {
+                        responseBuilder.addPartitions(Partition.newBuilder().setNamespace(namespace)
+                                .setCursor(ByteString.copyFromUtf8(fr.toString())).setEstimatedCount(count));
+                    }
                 }
 
-                CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions.createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
-                UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder().addNamespaces(namespace);
+                CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions
+                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
+                UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder()
+                        .addNamespaces(namespace);
                 for (FeedResponse<Object> fr : helper.container.queryChangeFeed(ccfro, Object.class).iterableByPage()) {
                     updatesPartitionBuilder.setCursor(ByteString.copyFromUtf8(fr.getContinuationToken()));
                 }
@@ -311,7 +390,7 @@ public class Main {
             if (helper == null) {
                 return;
             }
-            
+
             CosmosQueryRequestOptions queryOptions = new CosmosQueryRequestOptions();
             String query = "SELECT VALUE COUNT(1) FROM c";
             CosmosPagedIterable<Integer> results = helper.container.queryItems(query, queryOptions, Integer.class);
@@ -320,47 +399,93 @@ public class Main {
             responseObserver.onCompleted();
         }
 
+        private synchronized long nextIndex() {
+            return currentIndex++;
+        }
+
         @Override
         public void listData(ListDataRequest request, StreamObserver<ListDataResponse> responseObserver) {
             String namespace = request.getPartition().getNamespace();
-            String feedRange = request.getPartition().getCursor().toStringUtf8();
-            String continuation = null;
+
             if (!request.getCursor().isEmpty()) {
-                continuation = request.getCursor().toStringUtf8();
+                try {
+                    InputStream is = request.getCursor().newInput();
+                    ObjectInputStream ois = new ObjectInputStream(is);
+                    Cursor c = (Cursor) ois.readObject();
+                    ois.close();
+                    is.close();
+                    // System.out.println(c.id + ": " + c.counter);
+                    CacheItem ci = CACHE.getIfPresent(c.id);
+                    if (ci == null) {
+                        responseObserver.onError(Status.INVALID_ARGUMENT
+                                .withDescription("Cursor no longer available: " + c.id).asException());
+                        return;
+                    }
+                    ci.next(c.counter, responseObserver);
+                    return;
+                } catch (Exception e) {
+                    responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+                    return;
+                }
             }
+
+            long idx = nextIndex();
+            String feedRange = request.getPartition().getCursor().toStringUtf8();
             NsHelper helper = getNsHelper(responseObserver, namespace);
             if (helper == null) {
                 return;
             }
 
             int pageSize = 1000;
-            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions().setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0).setMaxBufferedItemCount(pageSize);
-            CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);            
-            Flux<FeedResponse<JsonNode>> flux = cpi.byPage(continuation, pageSize);
-            java.util.Iterator<FeedResponse<JsonNode>> it = flux.take(1).toIterable().iterator();
+            int prefetch = 5;
+            NamespaceConfig cfg = CONFIG.namespaces.get(namespace);
+            if (cfg != null) {
+                if (cfg.pagesize > 0) {
+                    pageSize = cfg.pagesize;
+                }
+                if (cfg.prefetch > 0) {
+                    prefetch = cfg.prefetch;
+                }
+            }
 
-            if (it.hasNext()) {
+            CosmosQueryRequestOptions opts = new CosmosQueryRequestOptions()
+                    .setFeedRange(FeedRange.fromString(feedRange)).setMaxDegreeOfParallelism(0)
+                    .setMaxBufferedItemCount(pageSize);
+            CosmosPagedFlux<JsonNode> cpi = helper.asyncContainer.queryItems("select * from c", opts, JsonNode.class);
+            Flux<FeedResponse<JsonNode>> flux = cpi.byPage(null, pageSize);
+            Flux<ListDataResponse> ldrFlux = flux.zipWith(Flux.range(1, Integer.MAX_VALUE)).map(tup -> {
+                FeedResponse<JsonNode> fr = tup.getT1();
+                int counter = tup.getT2();
                 ListDataResponse.Builder builder = ListDataResponse.newBuilder();
-                FeedResponse<JsonNode> fr = it.next();
-
                 for (JsonNode node : fr.getResults()) {
-                    ObjectNode objectNode = (ObjectNode)(node);
+                    ObjectNode objectNode = (ObjectNode) (node);
                     objectNode.remove(CosmosInternalKeys);
                     builder.addData(ByteString.copyFromUtf8(node.toString()));
                 }
-
                 if (fr.getContinuationToken() != null) {
-                    builder.setNextCursor(ByteString.copyFromUtf8(fr.getContinuationToken()));
+                    Cursor ci = new Cursor();
+                    ci.id = idx;
+                    ci.counter = counter;
+                    try {
+                        Output o = ByteString.newOutput();
+                        ObjectOutputStream oos = new ObjectOutputStream(o);
+                        oos.writeObject(ci);
+                        builder.setNextCursor(o.toByteString());
+                        // System.out.println("X " + idx + ": " + counter + ": " + ci.id + "-" +
+                        // ci.counter);
+                        oos.close();
+                        o.close();
+                    } catch (Exception e) {
+                        throw new InternalError(e);
+                    }
                 }
-                responseObserver.onNext(builder.build());
-            } else {
-                responseObserver.onNext(ListDataResponse.newBuilder().build());
-            }
-            while (it.hasNext()) {
-                it.next();
-            }
-
-            responseObserver.onCompleted();
+                return builder.build();
+            });
+            // System.out.println(idx + ": " + feedRange);
+            CacheItem ci = new CacheItem(ldrFlux.toIterable(prefetch).iterator());
+            CACHE.put(idx, ci);
+            ci.next(0, responseObserver);
+            return;
         }
 
         @Override
@@ -373,7 +498,9 @@ public class Main {
         public void streamUpdates(StreamUpdatesRequest request,
                 StreamObserver<StreamUpdatesResponse> responseObserver) {
             if (request.getNamespacesCount() != 1) {
-                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Must have exactly 1 namespace, but has " + request.getNamespacesCount()).asException());
+                responseObserver.onError(Status.INVALID_ARGUMENT
+                        .withDescription("Must have exactly 1 namespace, but has " + request.getNamespacesCount())
+                        .asException());
                 return;
             }
             String namespace = request.getNamespaces(0);
@@ -385,32 +512,38 @@ public class Main {
             String continuation = request.getCursor().toStringUtf8();
 
             while (!Context.current().isCancelled()) {
-                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions.createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class).iterableByPage();
+                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions
+                        .createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class)
+                        .iterableByPage();
                 for (FeedResponse<JsonNode> fr : it) {
                     List<Update> updates = new ArrayList<>();
-                    for (JsonNode node: fr.getResults()) {
+                    for (JsonNode node : fr.getResults()) {
                         JsonNode opType = node.get("metadata").get("operationType");
                         if (opType != null && opType.asText() == "delete") {
                             String id = node.get("metadata").get("id").asText();
-                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE).addId(BsonHelper.toId(id)).build());
+                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE)
+                                    .addId(BsonHelper.toId(id)).build());
                         } else {
                             adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
                             if (opType != null && opType.asText() == "create") {
                                 typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
                             }
                             JsonNode currentNode = node.get("current");
-                            ObjectNode objectNode = (ObjectNode)(currentNode);
+                            ObjectNode objectNode = (ObjectNode) (currentNode);
                             objectNode.remove(CosmosInternalKeys);
                             String id = currentNode.get("id").asText();
-                            updates.add(Update.newBuilder().setType(typ).setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id)).build());
+                            updates.add(Update.newBuilder().setType(typ)
+                                    .setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id))
+                                    .build());
                         }
                     }
-                    
+
                     continuation = fr.getContinuationToken();
 
                     if (updates.size() > 0) {
-                        StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder().setNamespace(namespace).setNextCursor(ByteString.copyFromUtf8(continuation)).addAllUpdates(updates).build();
-                        responseObserver.onNext(item);   
+                        StreamUpdatesResponse item = StreamUpdatesResponse.newBuilder().setNamespace(namespace)
+                                .setNextCursor(ByteString.copyFromUtf8(continuation)).addAllUpdates(updates).build();
+                        responseObserver.onNext(item);
                     }
                 }
                 try {

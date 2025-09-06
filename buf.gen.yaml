@@ -10,6 +10,7 @@ plugins:
     out: gen
     opt: paths=source_relative
   - remote: buf.build/grpc/java:v1.69.0
+    opt: "@generated=omit"
     out: java/src/main/java
   - remote: buf.build/protocolbuffers/java:v29.1
     out: java/src/main/java
