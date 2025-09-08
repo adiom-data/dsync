@@ -893,7 +893,7 @@ func MongoClient(ctx context.Context, settings ConnectorSettings) (*mongo.Client
 	// Connect to the MongoDB instance
 	ctxConnect, cancelConnect := context.WithTimeout(ctx, settings.ServerConnectTimeout)
 	defer cancelConnect()
-	clientOptions := moptions.Client().ApplyURI(settings.ConnectionString).SetConnectTimeout(settings.ServerConnectTimeout)
+	clientOptions := moptions.Client().SetAppName("dsync").ApplyURI(settings.ConnectionString).SetConnectTimeout(settings.ServerConnectTimeout)
 	client, err := mongo.Connect(ctxConnect, clientOptions)
 	if err != nil {
 		return nil, err
