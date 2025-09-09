@@ -254,7 +254,7 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 	version := commandResult["version"]
 
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		Id:      string(generateConnectorID(c.settings.ConnectionString)),
+		Id:      string(generateConnectorID(c.settings.ConnectionString + c.settings.Query)),
 		DbType:  connectorDBType,
 		Version: version.(string),
 		Spec:    connectorSpec,
