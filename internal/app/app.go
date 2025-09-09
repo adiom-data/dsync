@@ -243,6 +243,7 @@ func runDsync(c *cli.Context) error {
 		WriterMaxBatchSize:             o.WriterMaxBatchSize,
 		SyncMode:                       o.Mode,
 		ReverseRequestedFlag:           o.Reverse,
+		NamespaceStreamWriter:          o.NamespaceStreamWriter,
 	})
 
 	var wg sync.WaitGroup
