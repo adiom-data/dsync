@@ -41,6 +41,8 @@ type ConnectorSettings struct {
 	PerNamespaceStreams        bool
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
+
+	UniqueIndexNamespaces map[string]struct{}
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -883,7 +885,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 }
 
 // inserts data and overwrites on conflict
-func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}) error {
+func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}, ignoreSecondDuplicateError bool) error {
 	// eagerly attempt an unordered insert
 	_, bwErr := collection.InsertMany(ctx, documents, options.InsertMany().SetOrdered(false))
 
@@ -912,12 +914,12 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 			if isBSONObjectTooLargeError(bwErr) {
 				slog.Debug(fmt.Sprintf("Bulk write failed due to BSON object too large: %v", bwErr))
 				mid := len(documents) / 2
-				err := insertBatchOverwrite(ctx, collection, documents[:mid])
+				err := insertBatchOverwrite(ctx, collection, documents[:mid], ignoreSecondDuplicateError)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Bulk write failed (first half, up to %d): %v", mid, err))
 					return err
 				}
-				err = insertBatchOverwrite(ctx, collection, documents[mid:])
+				err = insertBatchOverwrite(ctx, collection, documents[mid:], ignoreSecondDuplicateError)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Bulk write failed (second half, from %d): %v", mid, err))
 					return err
@@ -933,6 +935,24 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 		if len(bulkOverwrite) > 0 {
 			_, err := collection.BulkWrite(ctx, bulkOverwrite, options.BulkWrite().SetOrdered(false))
 			if err != nil {
+				if ignoreSecondDuplicateError {
+					// if all are duplicate errors again, ignore
+					var bwErrWriteErrors mongo.BulkWriteException
+					if errors.As(err, &bwErrWriteErrors) {
+						var count int
+						for _, we := range bwErrWriteErrors.WriteErrors {
+							if mongo.IsDuplicateKeyError(we.WriteError) {
+								count++
+							}
+						}
+						if count == len(bwErrWriteErrors.WriteErrors) {
+							slog.Debug("Ignoring second duplicate error", "count", count)
+							return nil
+						} else {
+							slog.Debug("Not ignoring second duplicate error", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
+						}
+					}
+				}
 				slog.Error(fmt.Sprintf("Failed to overwrite documents in collection: %v", err))
 				return err
 			}
@@ -947,11 +967,13 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
+	_, ignoreSecondDuplicateError := c.settings.UniqueIndexNamespaces[r.Msg.GetNamespace()]
+
 	var batch []interface{}
 	for _, data := range r.Msg.GetData() {
 		batch = append(batch, bson.Raw(data))
 		if c.settings.WriterMaxBatchSize > 0 && len(batch) >= c.settings.WriterMaxBatchSize {
-			err := insertBatchOverwrite(ctx, col, batch)
+			err := insertBatchOverwrite(ctx, col, batch, ignoreSecondDuplicateError)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
@@ -962,7 +984,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		}
 	}
 	if len(batch) > 0 {
-		err := insertBatchOverwrite(ctx, col, batch)
+		err := insertBatchOverwrite(ctx, col, batch, ignoreSecondDuplicateError)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
@@ -1002,6 +1024,8 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
+	_, hasUniqueIndex := c.settings.UniqueIndexNamespaces[r.Msg.GetNamespace()]
+
 	var models []mongo.WriteModel
 	// keeps track of the index in models for a particular document because we want all ids to be unique in the batch
 	hashToDataIdIndex := map[int][]*dataIdIndex{}
@@ -1033,6 +1057,45 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			} else {
 				models[dii.index] = model
 			}
+		}
+	}
+
+	if hasUniqueIndex {
+		var lastDupCount int
+		tries := 1
+		for {
+			_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				var bwErrWriteErrors mongo.BulkWriteException
+				if errors.As(err, &bwErrWriteErrors) {
+					var newModels []mongo.WriteModel
+					var count int
+					for _, we := range bwErrWriteErrors.WriteErrors {
+						if mongo.IsDuplicateKeyError(we.WriteError) {
+							count++
+							newModels = append(newModels, models[we.Index])
+						}
+					}
+					if count > 0 && count == len(bwErrWriteErrors.WriteErrors) {
+						slog.Debug("duplicate error", "count", count, "last-count", lastDupCount, "attempt", tries)
+						if count == lastDupCount {
+							return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
+						} else {
+							lastDupCount = count
+							models = newModels
+							tries += 1
+							continue
+						}
+					} else {
+						slog.Debug("not all duplicate errors", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
+					}
+				}
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
+				}
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 		}
 	}
 

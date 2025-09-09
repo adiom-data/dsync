@@ -79,6 +79,8 @@ type RunnerLocalSettings struct {
 	WriterMaxBatchSize             int
 	SyncMode                       string
 	MultinamespaceBatcher          bool
+
+	NamespaceStreamWriter []string
 }
 
 const (
@@ -109,6 +111,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		TransformClient:           settings.TransformClient,
 		SourceDataType:            settings.SrcDataType,
 		DestinationDataType:       settings.DstDataType,
+		NamespaceStreamWriter:     settings.NamespaceStreamWriter,
 	}
 	if settings.LoadLevel != "" {
 		btc := GetBaseThreadCount(settings.LoadLevel)
