@@ -169,6 +169,10 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden:   true,
 		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:  "namespace-stream-writer",
+			Usage: "namespaces with dedicated writer",
+		}),
 	}
 
 	before := func(c *cli.Context) error {

@@ -361,7 +361,15 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Usage:       "Each namespace has a separate stream",
 						Destination: &settings.PerNamespaceStreams,
 					}),
-				}...), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				}...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
+					if len(uniqueIndexNamespacesSlice) > 0 {
+						settings.UniqueIndexNamespaces = map[string]struct{}{}
+						for _, ns := range uniqueIndexNamespacesSlice {
+							settings.UniqueIndexNamespaces[ns] = struct{}{}
+						}
+					}
+
 					return mongo.NewConn(settings)
 				})(args, as)
 			},
@@ -617,6 +625,10 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Aliases:     []string{"q"},
 			Required:    false,
 			Destination: &settings.Query,
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:  "unique-index-namespace",
+			Usage: "repeatable unique index namespace",
 		}),
 	}
 }
