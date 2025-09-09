@@ -351,7 +351,15 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", MongoFlags(&settings), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", MongoFlags(&settings), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
+					if len(uniqueIndexNamespacesSlice) > 0 {
+						settings.UniqueIndexNamespaces = map[string]struct{}{}
+						for _, ns := range uniqueIndexNamespacesSlice {
+							settings.UniqueIndexNamespaces[ns] = struct{}{}
+						}
+					}
+
 					return mongo.NewConn(settings)
 				})(args, as)
 			},
@@ -607,6 +615,10 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Aliases:     []string{"q"},
 			Required:    false,
 			Destination: &settings.Query,
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:  "unique-index-namespace",
+			Usage: "repeatable unique index namespace",
 		}),
 	}
 }

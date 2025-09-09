@@ -244,6 +244,7 @@ func runDsync(c *cli.Context) error {
 		MultinamespaceBatcher:          o.MultinamespaceBatcher,
 		SyncMode:                       o.Mode,
 		ReverseRequestedFlag:           o.Reverse,
+		NamespaceStreamWriter:          o.NamespaceStreamWriter,
 	})
 
 	var wg sync.WaitGroup

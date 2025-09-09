@@ -48,6 +48,8 @@ type ConnectorSettings struct {
 	TransformClient           adiomv1connect.TransformServiceClient
 	SourceDataType            adiomv1.DataType
 	DestinationDataType       adiomv1.DataType
+
+	NamespaceStreamWriter []string
 }
 
 type maybeOptimizedConnectorService interface {
@@ -790,7 +792,7 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize, c.settings.MultinamespaceBatcher)
+	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize, c.settings.MultinamespaceBatcher, c.settings.NamespaceStreamWriter)
 	flowParallelWriter.Start()
 
 	// start printing progress

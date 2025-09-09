@@ -39,6 +39,8 @@ type Options struct {
 	WriterMaxBatchSize             int
 	MultinamespaceBatcher          bool
 	Mode                           string
+
+	NamespaceStreamWriter []string
 }
 
 // works with a copy of the struct to avoid modifying the original
@@ -71,6 +73,8 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.MultinamespaceBatcher = c.Bool("namespace-batcher")
 	o.Mode = c.String("mode")
 	o.Reverse = c.Bool("reverse")
+
+	o.NamespaceStreamWriter = c.StringSlice("namespace-stream-writer")
 
 	return o, nil
 }

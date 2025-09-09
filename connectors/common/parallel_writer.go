@@ -58,19 +58,26 @@ type ParallelWriter struct {
 	blockBarrier chan struct{}
 
 	done chan struct{}
+
+	namespaceStreamWriter map[string]int
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int, multinamespace bool) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int, multinamespace bool, namespaceStreamWriter []string) *ParallelWriter {
+	m := map[string]int{}
+	for i, n := range namespaceStreamWriter {
+		m[n] = i
+	}
 	return &ParallelWriter{
-		ctx:            ctx,
-		connector:      connector,
-		numWorkers:     numWorkers,
-		maxBatchSize:   maxBatchSize,
-		multinamespace: multinamespace,
-		taskBarrierMap: make(map[uint]uint),
-		blockBarrier:   make(chan struct{}),
-		done:           make(chan struct{}),
+		ctx:                   ctx,
+		connector:             connector,
+		numWorkers:            numWorkers,
+		maxBatchSize:          maxBatchSize,
+		multinamespace:        multinamespace,
+		taskBarrierMap:        make(map[uint]uint),
+		blockBarrier:          make(chan struct{}),
+		done:                  make(chan struct{}),
+		namespaceStreamWriter: m,
 	}
 }
 
@@ -113,9 +120,20 @@ func (bwa *ParallelWriter) ScheduleDataMessage(dataMsg iface.DataMessage) error 
 
 	if dataMsg.MutationType == iface.MutationType_InsertBatch { // batch inserts don't have ids in the data message
 		workerId = rand.Intn(bwa.numWorkers) // let's just randomly assign them to workers //XXX: how safe is this?
+	} else if bwa.numWorkers > len(bwa.namespaceStreamWriter) {
+		if idx, ok := bwa.namespaceStreamWriter[dataMsg.Loc]; ok {
+			workerId = bwa.numWorkers - idx - 1
+		} else {
+			// hash the _id to determine the correct worker
+			workerId = hashDataMsgId(dataMsg) % (bwa.numWorkers - len(bwa.namespaceStreamWriter))
+		}
 	} else {
-		// hash the _id to determine the correct worker
-		workerId = hashDataMsgId(dataMsg) % bwa.numWorkers
+		if idx, ok := bwa.namespaceStreamWriter[dataMsg.Loc]; ok {
+			workerId = idx * bwa.numWorkers
+		} else {
+			// hash the _id to determine the correct worker
+			workerId = hashDataMsgId(dataMsg) % bwa.numWorkers
+		}
 	}
 	// add the message to the worker's queue
 	bwa.workers[workerId].addMessage(dataMsg)
