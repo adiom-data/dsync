@@ -6,7 +6,7 @@ In this directory (sub $URL and $KEY):
 
 ```
 mvn clean install
-java -jar target/cosmos-connector-1-jar-with-dependencies.jar 8089 $URL $KEY
+OTEL_SDK_DISABLED=true java -jar target/cosmos-connector-1-jar-with-dependencies.jar 8089 $URL $KEY
 ```
 
 Then you can use with dsync in a separate terminal:
