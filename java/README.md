@@ -1,4 +1,4 @@
-Currently this contains a sink connector for CosmosNOSQL
+Source and sink connector for CosmosNOSQL
 
 Ensure you have at least Java 21.
 
