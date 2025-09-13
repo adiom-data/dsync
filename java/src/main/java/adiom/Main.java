@@ -84,6 +84,8 @@ import reactor.core.publisher.Flux;
 
 public class Main {
 
+    private static final int COSMOS_MAX_ITEM_BYTES = 2_000_000; // Azure Cosmos DB per-item max (2MB)
+
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
@@ -272,12 +274,19 @@ public class Main {
             List<CosmosItemOperation> ops = new ArrayList<CosmosItemOperation>(request.getDataCount());
             for (ByteString data : request.getDataList()) {
                 // Check if document size exceeds 2MB limit
-                byte[] docBytes = data.toByteArray();
-                if (docBytes.length > 2 * 1000 * 1000) {
-                    byte[] preview = Arrays.copyOf(docBytes, Math.min(100, docBytes.length));
-                    System.err.println("ERROR: Document size " + docBytes.length + " bytes exceeds 2MB limit, skipping document (first 100 bytes): " + new String(preview));
+                int size = data.size(); // avoid full copy just to measure
+                if (size > COSMOS_MAX_ITEM_BYTES) {
+                    int previewLen = Math.min(100, size);
+                    String previewUtf8 = data.substring(0, previewLen).toStringUtf8();
+                    logger.atWarn()
+                          .addKeyValue("namespace", request.getNamespace())
+                          .addKeyValue("docSizeBytes", size)
+                          .addKeyValue("limitBytes", COSMOS_MAX_ITEM_BYTES)
+                          .addKeyValue("first100Chars", previewUtf8)
+                          .log("Skipping oversized document in writeData.");
                     continue;
                 }
+                byte[] docBytes = data.toByteArray();
                 Document d = new Document(docBytes);
                 PartitionKey k = PartitionKeyHelper.extractPartitionKeyFromDocument(d, helper.pkd);
                 ops.add(CosmosBulkOperations.getUpsertItemOperation(d, k));
@@ -311,6 +320,20 @@ public class Main {
                 switch (u.getType()) {
                     case UPDATE_TYPE_INSERT:
                     case UPDATE_TYPE_UPDATE:
+                        // Check if document size exceeds 2MB limit
+                        int size = u.getData().size(); // avoid full copy just to measure
+                        if (size > COSMOS_MAX_ITEM_BYTES) {
+                            int previewLen = Math.min(100, size);
+                            String previewUtf8 = u.getData().substring(0, previewLen).toStringUtf8();
+                            logger.atWarn()
+                                .addKeyValue("namespace", request.getNamespace())
+                                .addKeyValue("docSizeBytes", size)
+                                .addKeyValue("limitBytes", COSMOS_MAX_ITEM_BYTES)
+                                .addKeyValue("first100Chars", previewUtf8)
+                                .log("Skipping oversized document in writeUpdates.");
+                            continue;
+                        }
+
                         Document d = new Document(u.getData().toByteArray());
                         PartitionKey k = PartitionKeyHelper.extractPartitionKeyFromDocument(d, helper.pkd);
                         ops.add(CosmosBulkOperations.getUpsertItemOperation(d, k));
