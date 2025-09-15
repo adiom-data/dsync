@@ -241,6 +241,7 @@ func runDsync(c *cli.Context) error {
 		NumParallelIntegrityCheckTasks: o.NumParallelIntegrityCheckTasks,
 		CdcResumeTokenUpdateInterval:   o.CdcResumeTokenUpdateInterval,
 		WriterMaxBatchSize:             o.WriterMaxBatchSize,
+		MultinamespaceBatcher:          o.MultinamespaceBatcher,
 		SyncMode:                       o.Mode,
 		ReverseRequestedFlag:           o.Reverse,
 	})
