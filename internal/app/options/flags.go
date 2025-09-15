@@ -144,6 +144,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden:   true,
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:     "namespace-batcher",
+			Required: false,
+			Hidden:   true,
+		}),
 		altsrc.NewIntFlag(&cli.IntFlag{
 			Name:     "parallel-copiers",
 			Required: false,

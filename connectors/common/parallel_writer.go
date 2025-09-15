@@ -16,6 +16,7 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"golang.org/x/exp/rand"
+	"golang.org/x/sync/errgroup"
 )
 
 type ParallelWriterConnector interface {
@@ -38,6 +39,8 @@ type ParallelWriter struct {
 	numWorkers   int
 	maxBatchSize int
 
+	multinamespace bool
+
 	// Array of workers
 	workers []writerWorker
 
@@ -58,12 +61,13 @@ type ParallelWriter struct {
 }
 
 // NewParallelWriter creates a new ParallelWriter
-func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int) *ParallelWriter {
+func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, numWorkers int, maxBatchSize int, multinamespace bool) *ParallelWriter {
 	return &ParallelWriter{
 		ctx:            ctx,
 		connector:      connector,
 		numWorkers:     numWorkers,
 		maxBatchSize:   maxBatchSize,
+		multinamespace: multinamespace,
 		taskBarrierMap: make(map[uint]uint),
 		blockBarrier:   make(chan struct{}),
 		done:           make(chan struct{}),
@@ -74,7 +78,7 @@ func (bwa *ParallelWriter) Start() {
 	// create and start the workers
 	bwa.workers = make([]writerWorker, bwa.numWorkers)
 	for i := 0; i < bwa.numWorkers; i++ {
-		bwa.workers[i] = newWriterWorker(bwa, i, 10) //XXX: should we make the queue size configurable? WARNING: these could be batches and they could be big
+		bwa.workers[i] = newWriterWorker(bwa, i, bwa.maxBatchSize, bwa.multinamespace)
 		go func() {
 			bwa.workers[i].run()
 			bwa.done <- struct{}{}
@@ -174,17 +178,39 @@ type writerWorker struct {
 	// Worker ID
 	id int
 	// Worker's queue
-	queue chan iface.DataMessage
+	queue          chan iface.DataMessage
+	multinamespace bool
+	clogSize       int // Hack to throttle initial sync items in the queue
 }
 
 // newWriterWorker creates a new writerWorker
-func newWriterWorker(parallelWriter *ParallelWriter, id int, queueSize int) writerWorker {
-	return writerWorker{parallelWriter, id, make(chan iface.DataMessage, queueSize)}
+func newWriterWorker(parallelWriter *ParallelWriter, id int, queueSize int, multinamespace bool) writerWorker {
+	if queueSize == 0 {
+		queueSize = 10
+	}
+	return writerWorker{parallelWriter, id, make(chan iface.DataMessage, queueSize), multinamespace, max(0, queueSize/10-1)}
+}
+
+func (ww *writerWorker) sendMultiBatch(mb map[string][]iface.DataMessage) error {
+	if len(mb) == 1 {
+		for _, v := range mb {
+			return ww.parallelWriter.connector.ProcessDataMessages(v)
+		}
+	}
+	var eg errgroup.Group
+	for _, v := range mb {
+		eg.Go(func() error {
+			return ww.parallelWriter.connector.ProcessDataMessages(v)
+		})
+	}
+	return eg.Wait()
 }
 
 // Worker's main loop - processes messages from the queue
 func (ww *writerWorker) run() {
 	var batch []iface.DataMessage
+	multiBatch := map[string][]iface.DataMessage{}
+	multiBatchCount := 0
 	for {
 		select {
 		case <-ww.parallelWriter.ctx.Done():
@@ -192,6 +218,9 @@ func (ww *writerWorker) run() {
 		case msg, ok := <-ww.queue:
 			if !ok {
 				return
+			}
+			if msg.MutationType == iface.MutationType_Ignore {
+				continue
 			}
 			// if it's a barrier message, check that we're the last worker to see it before handling
 			if msg.MutationType == iface.MutationType_Barrier {
@@ -204,6 +233,13 @@ func (ww *writerWorker) run() {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 					}
 					batch = nil
+				}
+				if len(multiBatch) > 0 {
+					if err := ww.sendMultiBatch(multiBatch); err != nil {
+						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+					}
+					multiBatch = map[string][]iface.DataMessage{}
+					multiBatchCount = 0
 				}
 
 				if msg.BarrierType == iface.BarrierType_Block {
@@ -236,6 +272,19 @@ func (ww *writerWorker) run() {
 					}
 				}
 
+				continue
+			}
+
+			if ww.multinamespace {
+				multiBatch[msg.Loc] = append(multiBatch[msg.Loc], msg)
+				multiBatchCount += 1
+				if (ww.parallelWriter.maxBatchSize > 0 && multiBatchCount >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
+					if err := ww.sendMultiBatch(multiBatch); err != nil {
+						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+					}
+					multiBatch = map[string][]iface.DataMessage{}
+					multiBatchCount = 0
+				}
 				continue
 			}
 
@@ -272,4 +321,9 @@ func (ww *writerWorker) run() {
 // Adds a message to the worker's queue
 func (ww *writerWorker) addMessage(msg iface.DataMessage) {
 	ww.queue <- msg
+	if ww.clogSize > 0 && msg.MutationType == iface.MutationType_InsertBatch {
+		for range ww.clogSize {
+			ww.queue <- iface.DataMessage{MutationType: iface.MutationType_Ignore}
+		}
+	}
 }

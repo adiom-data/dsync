@@ -76,6 +76,7 @@ type RunnerLocalSettings struct {
 	CdcResumeTokenUpdateInterval   time.Duration
 	WriterMaxBatchSize             int
 	SyncMode                       string
+	MultinamespaceBatcher          bool
 }
 
 const (
@@ -101,6 +102,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		NumParallelCopiers:        settings.InitialSyncNumParallelCopiers,
 		NumParallelWriters:        settings.NumParallelWriters,
 		MaxWriterBatchSize:        settings.WriterMaxBatchSize,
+		MultinamespaceBatcher:     settings.MultinamespaceBatcher,
 		ResumeTokenUpdateInterval: settings.CdcResumeTokenUpdateInterval,
 		TransformClient:           settings.TransformClient,
 		SourceDataType:            settings.SrcDataType,

@@ -43,6 +43,7 @@ type ConnectorSettings struct {
 	NumParallelCopiers        int
 	NumParallelWriters        int
 	MaxWriterBatchSize        int
+	MultinamespaceBatcher     bool
 	ResumeTokenUpdateInterval time.Duration
 	TransformClient           adiomv1connect.TransformServiceClient
 	SourceDataType            adiomv1.DataType
@@ -784,7 +785,7 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 	writerProgress.dataMessages.Store(0)
 
 	// create a batch assembly
-	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize)
+	flowParallelWriter := NewParallelWriter(c.flowCtx, c, c.settings.NumParallelWriters, c.settings.MaxWriterBatchSize, c.settings.MultinamespaceBatcher)
 	flowParallelWriter.Start()
 
 	// start printing progress
