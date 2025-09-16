@@ -38,6 +38,7 @@ type ConnectorSettings struct {
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	MaxPageSize                int
 	HaltOnIterationError       bool
+	PerNamespaceStreams        bool
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 }
@@ -162,20 +163,44 @@ func NamespacePartitions(ctx context.Context, namespaces []string, client *mongo
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
-	resumeToken, err := getLatestResumeToken(ctx, c.client)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-
 	partitions, err := NamespacePartitions(ctx, r.Msg.GetNamespaces(), c.client)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	var updatesNamespaces []string
-	if len(r.Msg.GetNamespaces()) > 0 {
-		for _, partition := range partitions {
-			updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
+
+	var updatesPartitions []*adiomv1.UpdatesPartition
+
+	if r.Msg.GetUpdates() {
+		if c.settings.PerNamespaceStreams {
+			// TODO: maybe parallelize
+			for _, partition := range partitions {
+				ns, _ := ToNS(partition.Namespace)
+				col := c.client.Database(ns.Db).Collection(ns.Col)
+				resumeToken, err := getLatestResumeToken(ctx, col)
+				if err != nil {
+					slog.Error(fmt.Sprintf("Failed to get latest resume token for ns %v: %v", partition.GetNamespace(), err))
+					return nil, connect.NewError(connect.CodeInternal, err)
+				}
+
+				updatesPartitions = append(updatesPartitions, &adiomv1.UpdatesPartition{
+					Namespaces: []string{partition.GetNamespace()},
+					Cursor:     resumeToken,
+				})
+			}
+		} else {
+			resumeToken, err := getLatestResumeToken(ctx, c.client)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+
+			var updatesNamespaces []string
+			if len(r.Msg.GetNamespaces()) > 0 {
+				for _, partition := range partitions {
+					updatesNamespaces = append(updatesNamespaces, partition.GetNamespace())
+				}
+			}
+			updatesPartitions = []*adiomv1.UpdatesPartition{{Namespaces: updatesNamespaces, Cursor: resumeToken}}
 		}
 	}
 
@@ -239,7 +264,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        finalPartitions,
-		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: updatesNamespaces, Cursor: resumeToken}},
+		UpdatesPartitions: updatesPartitions,
 	}), nil
 }
 
@@ -263,7 +288,7 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
 				LsnStream:          true,
 				MultiNamespacePlan: true,
-				DefaultPlan:        true,
+				DefaultPlan:        !c.settings.PerNamespaceStreams,
 			},
 			Sink: &adiomv1.Capabilities_Sink{
 				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
@@ -500,10 +525,6 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			continue
 		}
 
-		if shouldIgnoreChangeStreamEvent(change) {
-			continue
-		}
-
 		lsn++
 		if changeStream.RemainingBatchLength() == 0 {
 			err := s.Send(&adiomv1.StreamLSNResponse{
@@ -536,8 +557,6 @@ func createChangeStreamNamespaceFilterFromNamespaces(namespaces []iface.Namespac
 	for _, namespace := range namespaces {
 		filters = append(filters, bson.D{{"ns.db", namespace.Db}, {"ns.coll", namespace.Col}})
 	}
-	// add dummyDB and dummyCol to the filter so that we can track the changes in the dummy collection to get the cluster time (otherwise we can't use the resume token)
-	filters = append(filters, bson.D{{"ns.db", dummyDB}, {"ns.coll", dummyCol}})
 	return bson.D{{"$or", filters}}
 }
 
@@ -658,10 +677,6 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		var change bson.M
 		if err := changeStream.Decode(&change); err != nil {
 			slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
-			continue
-		}
-
-		if shouldIgnoreChangeStreamEvent(change) {
 			continue
 		}
 

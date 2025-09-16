@@ -17,6 +17,7 @@ import (
 	"github.com/mitchellh/hashstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
@@ -54,48 +55,25 @@ const (
 	progressReportingIntervalSec        = 10
 )
 
-func insertDummyRecord(ctx context.Context, client *mongo.Client) error {
-	//set id to a string client address (to make it random)
-	id := fmt.Sprintf("%v", client)
-	col := client.Database(dummyDB).Collection(dummyCol)
-	_, err := col.InsertOne(ctx, bson.M{"_id": id})
-	if err != nil {
-		return fmt.Errorf("failed to insert dummy record: %v", err)
-	}
-	//delete the record
-	_, err = col.DeleteOne(ctx, bson.M{"_id": id})
-	if err != nil {
-		return fmt.Errorf("failed to delete dummy record: %v", err)
-	}
-
-	return nil
+type Watchable interface {
+	Watch(ctx context.Context, pipeline interface{}, opts ...*options.ChangeStreamOptions) (*mongo.ChangeStream, error)
 }
 
-func getLatestResumeToken(ctx context.Context, client *mongo.Client) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client Watchable) (bson.Raw, error) {
 	slog.Debug("Getting latest resume token...")
-	changeStream, err := client.Watch(ctx, mongo.Pipeline{}) //TODO (AK, 6/2024): We should limit this to just the dummy collection or we can catch something that we don't want :)
+	changeStream, err := client.Watch(ctx, mongo.Pipeline{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open change stream: %v", err)
 	}
 	defer changeStream.Close(ctx)
-
-	done := make(chan struct{})
-	// we need ANY event to get the resume token that we can use to extract the cluster time
-	go func() {
-		if err := insertDummyRecord(ctx, client); err != nil {
-			slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
-		}
-		close(done)
-	}()
-
-	changeStream.Next(ctx)
-	resumeToken := changeStream.ResumeToken()
-	if resumeToken == nil {
-		return nil, fmt.Errorf("failed to get resume token from change stream")
+	_ = changeStream.TryNext(ctx)
+	if token := changeStream.ResumeToken(); token != nil {
+		return token, nil
 	}
-
-	<-done
-	return resumeToken, nil
+	if changeStream.Err() != nil {
+		return nil, fmt.Errorf("failed to get a resume token: %w", changeStream.Err())
+	}
+	return nil, fmt.Errorf("failed to get a resume token")
 }
 
 // Generates static connector ID based on connection string

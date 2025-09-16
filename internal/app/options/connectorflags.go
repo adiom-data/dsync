@@ -351,7 +351,13 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", MongoFlags(&settings), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(MongoFlags(&settings), []cli.Flag{
+					altsrc.NewBoolFlag(&cli.BoolFlag{
+						Name:        "per-namespace-streams",
+						Usage:       "Each namespace has a separate stream",
+						Destination: &settings.PerNamespaceStreams,
+					}),
+				}...), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					return mongo.NewConn(settings)
 				})(args, as)
 			},
