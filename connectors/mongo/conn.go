@@ -497,6 +497,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamLSNRequest], s *connect.ServerStream[adiomv1.StreamLSNResponse]) error {
+	var watcher Watchable
+	var pipeline mongo.Pipeline
+
 	var namespaces []iface.Namespace
 	for _, namespace := range r.Msg.GetNamespaces() {
 		ns, ok := ToNS(namespace)
@@ -505,12 +508,24 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		}
 		namespaces = append(namespaces, ns)
 	}
-	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
-	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
 
-	changeStream, err := c.client.Watch(ctx, mongo.Pipeline{
-		{{"$match", nsFilter}},
-	}, opts)
+	if c.settings.PerNamespaceStreams {
+		if len(namespaces) != 1 {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("expected exactly 1 namespace"))
+		}
+		watcher = c.client.Database(namespaces[0].Db).Collection(namespaces[0].Col)
+		pipeline = mongo.Pipeline{}
+	} else {
+		watcher = c.client
+		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
+		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
+		pipeline = mongo.Pipeline{
+			{{"$match", nsFilter}},
+		}
+	}
+	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
+
+	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
 		slog.Error(fmt.Sprintf("LSN tracker: Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
@@ -519,12 +534,6 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 
 	lsn := 0
 	for changeStream.Next(ctx) {
-		var change bson.M
-		if err := changeStream.Decode(&change); err != nil {
-			slog.Error(fmt.Sprintf("LSN tracker: Failed to decode change stream event: %v", err))
-			continue
-		}
-
 		lsn++
 		if changeStream.RemainingBatchLength() == 0 {
 			err := s.Send(&adiomv1.StreamLSNResponse{
@@ -647,6 +656,9 @@ func toTimestampPB(t primitive.Timestamp) *timestamppb.Timestamp {
 
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
+	var watcher Watchable
+	var pipeline mongo.Pipeline
+
 	var namespaces []iface.Namespace
 	for _, namespace := range r.Msg.GetNamespaces() {
 		ns, ok := ToNS(namespace)
@@ -655,13 +667,24 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		}
 		namespaces = append(namespaces, ns)
 	}
-	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor())).SetFullDocument("updateLookup")
-	nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
-	slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
 
-	changeStream, err := c.client.Watch(ctx, mongo.Pipeline{
-		{{"$match", nsFilter}},
-	}, opts)
+	if c.settings.PerNamespaceStreams {
+		if len(namespaces) != 1 {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("expected exactly 1 namespace"))
+		}
+		watcher = c.client.Database(namespaces[0].Db).Collection(namespaces[0].Col)
+		pipeline = mongo.Pipeline{}
+	} else {
+		watcher = c.client
+		nsFilter := createChangeStreamNamespaceFilterFromNamespaces(namespaces)
+		slog.Debug(fmt.Sprintf("Change stream namespace filter: %v", nsFilter))
+		pipeline = mongo.Pipeline{
+			{{"$match", nsFilter}},
+		}
+	}
+	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor())).SetFullDocument("updateLookup")
+
+	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to open change stream: %v", err))
 		return connect.NewError(connect.CodeInternal, err)
