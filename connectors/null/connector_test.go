@@ -19,14 +19,14 @@ import (
 // Standard test suite for the connector interface
 func TestNullConnectorSuite(t *testing.T) {
 	tSuite := test.NewConnectorTestSuite(func() iface.Connector {
-		return common.NewLocalConnector("test", NewConn(false, 0, 0), common.ConnectorSettings{})
+		return common.NewLocalConnector("test", NewConn("", false, 0, 0), common.ConnectorSettings{})
 	}, nil)
 	suite.Run(t, tSuite)
 }
 
 func TestNullConnectorSuite2(t *testing.T) {
 	tSuite := test2.NewConnectorTestSuite("test", func() adiomv1connect.ConnectorServiceClient {
-		return test2.ClientFromHandler(NewConn(false, 0, 0))
+		return test2.ClientFromHandler(NewConn("", false, 0, 0))
 	}, nil, nil, 0, 0)
 	suite.Run(t, tSuite)
 }
