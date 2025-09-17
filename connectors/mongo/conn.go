@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.mongodb.org/mongo-driver/bson"
@@ -1064,6 +1065,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		var lastDupCount int
 		tries := 1
 		for {
+			metrics.UpdateAttempts(r.Msg.GetNamespace(), tries, len(models))
 			_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
 			if err != nil {
 				var bwErrWriteErrors mongo.BulkWriteException

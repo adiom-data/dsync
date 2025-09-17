@@ -10,9 +10,11 @@ import (
 	"os"
 
 	dsync "github.com/adiom-data/dsync/internal/app"
+	"github.com/adiom-data/dsync/metrics"
 )
 
 func main() {
+	defer metrics.Done()
 	app := dsync.NewApp()
 	err := app.Run(os.Args)
 	if err != nil {

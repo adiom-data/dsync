@@ -17,6 +17,7 @@ import (
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/logger"
+	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/pkg/verify/ds"
 	"github.com/benbjohnson/clock"
 	"github.com/cespare/xxhash"
@@ -357,6 +358,7 @@ func (m *memVerify) Run(ctx context.Context) error {
 					}
 					totalMismatches += mismatches
 					totalCount += total
+					metrics.Verify(ns, mismatches, total)
 				}
 				mut.RUnlock()
 				slog.Info("Verifying", "ok", !found, "mismatches", totalMismatches, "count", totalCount)
