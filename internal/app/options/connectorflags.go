@@ -288,8 +288,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					Name:  "log-json",
 					Usage: "Convert data to json and log INFO",
 				},
+				&cli.StringFlag{
+					Name:  "id",
+					Usage: "A fixed id for the connector",
+				},
 			}, func(c *cli.Context, args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return null.NewConn(c.Bool("log-json"), c.Duration("sleep"), c.Duration("sleep-jitter")), nil
+				return null.NewConn(c.String("id"), c.Bool("log-json"), c.Duration("sleep"), c.Duration("sleep-jitter")), nil
 			}),
 		},
 		{
