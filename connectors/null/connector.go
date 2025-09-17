@@ -21,6 +21,7 @@ import (
 )
 
 type conn struct {
+	id          string
 	logJson     bool
 	sleep       time.Duration
 	sleepJitter time.Duration
@@ -38,6 +39,7 @@ func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]
 		all = append(all, adiomv1.DataType(d))
 	}
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
+		Id:     c.id,
 		DbType: "/dev/null",
 		Capabilities: &adiomv1.Capabilities{
 			Sink: &adiomv1.Capabilities_Sink{SupportedDataTypes: all},
@@ -143,6 +145,6 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
-func NewConn(logJson bool, sleep time.Duration, sleepJitter time.Duration) adiomv1connect.ConnectorServiceHandler {
-	return &conn{logJson, sleep, sleepJitter}
+func NewConn(id string, logJson bool, sleep time.Duration, sleepJitter time.Duration) adiomv1connect.ConnectorServiceHandler {
+	return &conn{id, logJson, sleep, sleepJitter}
 }

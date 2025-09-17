@@ -625,7 +625,7 @@ func createChangeStreamNamespaceFilterFromNamespaces(namespaces []iface.Namespac
 }
 
 func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
-	slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
+	// slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
 	optype := change["operationType"].(string)
 	var update *adiomv1.Update

@@ -68,7 +68,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
 	o.NumParallelWriters = c.Int("parallel-writers")
 	o.NumParallelIntegrityCheckTasks = c.Int("parallel-integrity-check-workers")
-	o.CdcResumeTokenUpdateInterval = time.Duration(c.Int("cdc-resume-token-interval")) * time.Second
+	o.CdcResumeTokenUpdateInterval = c.Duration("cdc-resume-token-interval")
 	o.WriterMaxBatchSize = c.Int("writer-batch-size")
 	o.MultinamespaceBatcher = c.Bool("namespace-batcher")
 	o.Mode = c.String("mode")

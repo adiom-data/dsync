@@ -144,6 +144,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden:   true,
 		}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:     "cdc-resume-token-interval",
+			Required: false,
+			Hidden:   true,
+		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "namespace-batcher",
 			Required: false,
