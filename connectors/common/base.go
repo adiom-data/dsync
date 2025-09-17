@@ -25,6 +25,7 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/internal/util"
+	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cespare/xxhash"
@@ -938,6 +939,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		switch dataMsg.MutationType {
 		case iface.MutationType_InsertBatch:
 			if len(msgs) > 0 {
+				start := time.Now()
 				ns := dataMsg.Loc
 				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 					Namespace: ns,
@@ -947,9 +949,11 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				if err != nil {
 					return err
 				}
+				metrics.WriteUpdates(ns, time.Since(start), len(msgs))
 				c.progressTracker.UpdateWriteLSN(dataMsgs[i-1].SeqNum)
 				msgs = nil
 			}
+			start := time.Now()
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
 				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
@@ -958,6 +962,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			if err != nil {
 				return err
 			}
+			metrics.WriteData(dataMsg.Loc, time.Since(start), len(dataMsg.DataBatch))
 			c.progressTracker.UpdateWriteLSN(dataMsg.SeqNum)
 		case iface.MutationType_Insert:
 			msgs = append(msgs, &adiomv1.Update{
@@ -982,6 +987,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 	}
 	if len(msgs) > 0 {
 		ns := dataMsgs[0].Loc
+		start := time.Now()
 		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 			Namespace: ns,
 			Updates:   msgs,
@@ -990,6 +996,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		if err != nil {
 			return err
 		}
+		metrics.WriteUpdates(ns, time.Since(start), len(msgs))
 		c.progressTracker.UpdateWriteLSN(dataMsgs[len(dataMsgs)-1].SeqNum)
 	}
 	return nil

@@ -560,6 +560,10 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 		}
 	}
 	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
+	if len(c.query) > 0 {
+		opts = opts.SetFullDocument("updateLookup")
+		pipeline = append(pipeline, bson.D{{"$project", bson.M{"_id": 1}}})
+	}
 
 	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
