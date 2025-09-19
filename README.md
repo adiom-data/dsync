@@ -25,13 +25,21 @@ Given source and destination databases, dsync completes an initial sync transfer
 # Quickstart
 Follow these simple instructions to get dsync up and running and perform a migration from our Cosmos DB demo instance to your MongoDB destination.
 
-## 1. Build dsync
+## 1. Get Dsync
+
+You can build dsync from the source to get all the latest changes or a specific release using tags: 
 ```
 git clone https://github.com/adiom-data/dsync.git
 cd dsync
 go build
 ```
-Alternatively, you can download the latest release from the [GitHub Releases](https://github.com/adiom-data/dsync/releases/latest) page.
+
+Alternatively, you can use docker to run the latest release:
+```
+docker run --rm markadiom/dsync
+```
+
+You can also download the latest release as a binary from the [GitHub Releases](https://github.com/adiom-data/dsync/releases/latest) page.
 
 ## 2. (Optional) Prepare the destination MongoDB instance
 
