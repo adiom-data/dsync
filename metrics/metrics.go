@@ -1,0 +1,43 @@
+package metrics
+
+import (
+	"os"
+	"time"
+
+	"github.com/DataDog/datadog-go/v5/statsd"
+)
+
+var st statsd.ClientInterface
+var prefix string
+
+func init() {
+	var stats statsd.ClientInterface
+	stats, err := statsd.New("")
+	if err != nil {
+		stats = &statsd.NoOpClient{}
+	}
+	st = stats
+
+	p, ok := os.LookupEnv("STATSD_PREFIX")
+	if !ok {
+		prefix = "dsync."
+	} else {
+		prefix = p
+	}
+}
+
+func WriteData(ns string, d time.Duration, numItems int) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Distribution(prefix+"write_data_latency", float64(d.Milliseconds()), tags, 1)
+	_ = st.Distribution(prefix+"write_data_batch_size", float64(numItems), tags, 1)
+}
+
+func WriteUpdates(ns string, d time.Duration, numItems int) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Distribution(prefix+"write_updates_latency", float64(d.Milliseconds()), tags, 1)
+	_ = st.Distribution(prefix+"write_updates_batch_size", float64(numItems), tags, 1)
+}
+
+func Done() {
+	_ = st.Close()
+}
