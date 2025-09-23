@@ -133,6 +133,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage: "specify the port for web server",
 			Value: DefaultWebPort,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "web-host",
+			Usage: "specify the host for web server",
+			Value: "localhost",
+		}),
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},

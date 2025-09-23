@@ -30,6 +30,7 @@ type Options struct {
 
 	PprofPort uint
 	WebPort   uint
+	WebHost   string
 
 	LoadLevel                      string
 	InitialSyncNumParallelCopiers  int
@@ -62,6 +63,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.LoadLevel = c.String("load-level")
 	o.PprofPort = c.Uint("pprof-port")
 	o.WebPort = c.Uint("web-port")
+	o.WebHost = c.String("web-host")
 
 	o.InitialSyncNumParallelCopiers = c.Int("parallel-copiers")
 	o.NumParallelWriters = c.Int("parallel-writers")
