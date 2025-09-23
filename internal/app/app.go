@@ -103,7 +103,7 @@ func runDsync(c *cli.Context) error {
 	if needWebServer {
 		wsErrorLog = new(logger.ReverseBuffer)
 		lo.ErrorView = wsErrorLog
-		host := fmt.Sprintf("localhost:%d", o.WebPort)
+		host := fmt.Sprintf("%v:%d", o.WebHost, o.WebPort)
 		slog.Info("Starting web server to serve progress report on " + host)
 		server = &http.Server{
 			Addr:              host,
