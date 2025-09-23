@@ -563,18 +563,40 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									}
 								}
 
-								data = transformed.Msg.GetData()
-								if transformed.Msg.GetNamespace() != sourceNamespace {
-									destinationNamespace = transformed.Msg.GetNamespace()
+								if len(transformed.Msg.GetResponses()) > 0 {
+									for _, r := range transformed.Msg.GetResponses() {
+										destNs := destinationNamespace
+										if r.GetNamespace() != "" {
+											destNs = r.GetNamespace()
+										}
+										dataMessage := iface.DataMessage{
+											DataBatch:    r.GetData(),
+											MutationType: iface.MutationType_InsertBatch,
+											Loc:          destNs,
+										}
+										dataChannel <- dataMessage
+									}
+								} else {
+									destNs := destinationNamespace
+									if transformed.Msg.GetNamespace() != "" {
+										destNs = transformed.Msg.GetNamespace()
+									}
+									dataMessage := iface.DataMessage{
+										DataBatch:    transformed.Msg.GetData(),
+										MutationType: iface.MutationType_InsertBatch,
+										Loc:          destNs,
+									}
+									dataChannel <- dataMessage
 								}
+							} else {
+								dataMessage := iface.DataMessage{
+									DataBatch:    data,
+									MutationType: iface.MutationType_InsertBatch,
+									Loc:          destinationNamespace,
+								}
+								dataChannel <- dataMessage
 							}
 
-							dataMessage := iface.DataMessage{
-								DataBatch:    data,
-								MutationType: iface.MutationType_InsertBatch,
-								Loc:          destinationNamespace,
-							}
-							dataChannel <- dataMessage
 							nextCursor := res.Msg.GetNextCursor()
 							if len(nextCursor) == 0 {
 								break
@@ -700,32 +722,86 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					continue
 				}
 
-				updates = transformed.Msg.GetUpdates()
-				if transformed.Msg.GetNamespace() != msg.GetNamespace() {
-					destinationNamespace = transformed.Msg.GetNamespace()
+				// Since transforms can change sizes, we'll just batch up the updates based
+				// on the pre-transformed information
+				readerProgress.changeStreamEvents.Add(uint64(len(updates)))
+				lsn += int64(len(updates))
+				for range updates {
+					c.progressTracker.UpdateChangeStreamProgressTracking()
 				}
-			}
 
-			for _, d := range updates {
-				var mutationType uint = iface.MutationType_Reserved
-				switch d.Type {
-				case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
-					mutationType = iface.MutationType_Insert
-				case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-					mutationType = iface.MutationType_Update
-				case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-					mutationType = iface.MutationType_Delete
+				if len(transformed.Msg.GetResponses()) > 0 {
+					for _, r := range transformed.Msg.GetResponses() {
+						destNs := destinationNamespace
+						if r.GetNamespace() != "" {
+							destNs = r.GetNamespace()
+						}
+						for _, d := range r.GetUpdates() {
+							var mutationType uint = iface.MutationType_Reserved
+							switch d.Type {
+							case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
+								mutationType = iface.MutationType_Insert
+							case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+								mutationType = iface.MutationType_Update
+							case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+								mutationType = iface.MutationType_Delete
+							}
+
+							dataChannel <- iface.DataMessage{
+								Data:         &d.Data,
+								MutationType: mutationType,
+								Loc:          destNs,
+								Id:           d.GetId(),
+								SeqNum:       lsn,
+							}
+						}
+					}
+				} else {
+					if transformed.Msg.GetNamespace() != "" {
+						destinationNamespace = transformed.Msg.GetNamespace()
+					}
+					for _, d := range transformed.Msg.GetUpdates() {
+						var mutationType uint = iface.MutationType_Reserved
+						switch d.Type {
+						case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
+							mutationType = iface.MutationType_Insert
+						case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+							mutationType = iface.MutationType_Update
+						case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+							mutationType = iface.MutationType_Delete
+						}
+
+						dataChannel <- iface.DataMessage{
+							Data:         &d.Data,
+							MutationType: mutationType,
+							Loc:          destinationNamespace,
+							Id:           d.GetId(),
+							SeqNum:       lsn,
+						}
+					}
 				}
-				c.progressTracker.UpdateChangeStreamProgressTracking()
-				readerProgress.changeStreamEvents.Add(1)
-				lsn++
+			} else {
+				for _, d := range updates {
+					var mutationType uint = iface.MutationType_Reserved
+					switch d.Type {
+					case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
+						mutationType = iface.MutationType_Insert
+					case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+						mutationType = iface.MutationType_Update
+					case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+						mutationType = iface.MutationType_Delete
+					}
+					c.progressTracker.UpdateChangeStreamProgressTracking()
+					readerProgress.changeStreamEvents.Add(1)
+					lsn++
 
-				dataChannel <- iface.DataMessage{
-					Data:         &d.Data,
-					MutationType: mutationType,
-					Loc:          destinationNamespace,
-					Id:           d.GetId(),
-					SeqNum:       lsn,
+					dataChannel <- iface.DataMessage{
+						Data:         &d.Data,
+						MutationType: mutationType,
+						Loc:          destinationNamespace,
+						Id:           d.GetId(),
+						SeqNum:       lsn,
+					}
 				}
 			}
 

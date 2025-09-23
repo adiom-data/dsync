@@ -175,9 +175,6 @@ func runDsync(c *cli.Context) error {
 			return err
 		}
 		transforms = transformInfo.Msg.GetTransforms()
-		if transformInfo.Msg.GetUseMultipleResponses() {
-			return fmt.Errorf("transformer with multiple responses not supported")
-		}
 	}
 
 	srcType, dstType, err := util.ValidateCompatibility(infoRes.Msg.GetCapabilities(), dstInfoRes.Msg.GetCapabilities(), transforms)
