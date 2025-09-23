@@ -36,7 +36,7 @@ go build
 
 Alternatively, you can use docker to run the latest release:
 ```
-docker run --rm markadiom/dsync
+docker run --network host --rm markadiom/dsync
 ```
 
 You can also download the latest release as a binary from the [GitHub Releases](https://github.com/adiom-data/dsync/releases/latest) page.
