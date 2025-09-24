@@ -62,6 +62,7 @@ type RunnerLocalSettings struct {
 
 	VerifyRequestedFlag  bool
 	VerifyQuickCountFlag bool
+	VerifyMaxTasks       int
 	CleanupRequestedFlag bool
 	ReverseRequestedFlag bool
 
@@ -228,7 +229,7 @@ func (r *RunnerLocal) Run() error {
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
 		r.runnerProgress.SyncState = "Verify"
-		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag})
+		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag, MaxTasks: r.settings.VerifyMaxTasks})
 		if err != nil {
 			r.runnerProgress.VerificationResult = "ERROR"
 			slog.Error("Data integrity check: ERROR")
