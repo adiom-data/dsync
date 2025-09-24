@@ -22,6 +22,7 @@ type Options struct {
 
 	Verify           bool
 	VerifyQuickCount bool
+	VerifyMaxTasks   int
 	Cleanup          bool
 	Progress         bool
 	Reverse          bool
@@ -57,6 +58,7 @@ func NewFromCLIContext(c *cli.Context) (Options, error) {
 	o.NamespaceFrom = c.StringSlice("namespace")
 	o.Verify = c.Bool("verify")
 	o.VerifyQuickCount = c.Bool("verify-quick-count")
+	o.VerifyMaxTasks = c.Int("verify-max-tasks")
 	o.Cleanup = c.Bool("cleanup")
 	o.Progress = c.Bool("progress")
 	o.Pprof = c.Bool("pprof")

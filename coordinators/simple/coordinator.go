@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"sync"
 
@@ -510,9 +511,30 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	c.integrityStatus = []iface.FlowIntegrityStatus{}
 	statusIdx := map[string]int{}
 
+	tasks := flowDet.ReadPlan.Tasks
+	if options.MaxTasks > 0 {
+		if len(tasks) < options.MaxTasks {
+			slog.Info("Checking all tasks since not enough tasks.", "total_tasks", len(tasks), "max_tasks", options.MaxTasks)
+		} else {
+			newTasks := make([]iface.ReadPlanTask, options.MaxTasks)
+			for i, task := range tasks {
+				if i < len(newTasks) {
+					newTasks[i] = task
+				} else {
+					p := rand.IntN(i + 1) // #nosec G404
+					if p < len(newTasks) {
+						newTasks[p] = task
+					}
+				}
+			}
+			slog.Info("Picked a subset of tasks.", "total_tasks", len(tasks), "max_tasks", options.MaxTasks)
+			tasks = newTasks
+		}
+	}
+
 	if options.QuickCount {
 		dedup := map[string]iface.IntegrityCheckQuery{}
-		for _, task := range flowDet.ReadPlan.Tasks {
+		for _, task := range tasks {
 			k := task.Def.Col
 			if task.Def.Db != "" {
 				k = task.Def.Db + "." + task.Def.Col
@@ -534,7 +556,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 			})
 		}
 	} else {
-		for _, task := range flowDet.ReadPlan.Tasks {
+		for _, task := range tasks {
 			k := task.Def.Col
 			if task.Def.Db != "" {
 				k = task.Def.Db + "." + task.Def.Col

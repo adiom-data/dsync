@@ -76,6 +76,11 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Usage:    "perform a data integrity check for an existing flow by doing a quick count by namespace",
 			Category: "Special Commands",
 		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:     "verify-max-tasks",
+			Usage:    "Specify max number of tasks to run verification on. Will randomly select which tasks are included.",
+			Category: "Special Commands",
+		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:     "cleanup",
 			Usage:    "cleanup metadata for an existing flow",
