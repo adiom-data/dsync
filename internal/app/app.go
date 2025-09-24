@@ -229,6 +229,7 @@ func runDsync(c *cli.Context) error {
 		NsFromString:                   namespaces,
 		VerifyRequestedFlag:            o.Verify || o.VerifyQuickCount,
 		VerifyQuickCountFlag:           o.VerifyQuickCount,
+		VerifyMaxTasks:                 o.VerifyMaxTasks,
 		CleanupRequestedFlag:           o.Cleanup,
 		FlowStatusReportingInterval:    10,
 		AdvancedProgressRecalcInterval: throughputUpdateInterval,

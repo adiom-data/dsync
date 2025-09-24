@@ -40,6 +40,7 @@ type FlowIntegrityStatus struct {
 
 type IntegrityCheckOptions struct {
 	QuickCount bool
+	MaxTasks   int
 }
 
 type ConnectorDetails struct {
