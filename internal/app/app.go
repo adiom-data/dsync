@@ -365,6 +365,14 @@ func runDsync(c *cli.Context) error {
 				slog.Warn("Progress Server could not be started so it will not be available.", "err", err)
 			}
 		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := EmitProgressMetrics(runnerCtx, r, &mut); err != nil {
+				slog.Warn("StatsD metrics erred", "err", err)
+			}
+		}()
 	}
 
 	wg.Add(1)

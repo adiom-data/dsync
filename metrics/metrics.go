@@ -38,6 +38,10 @@ func WriteUpdates(ns string, d time.Duration, numItems int) {
 	_ = st.Distribution(prefix+"write_updates_batch_size", float64(numItems), tags, 1)
 }
 
+func PrefixAndClient() (string, statsd.ClientInterface) {
+	return prefix, st
+}
+
 func Done() {
 	_ = st.Close()
 }
