@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cespare/xxhash"
 	"go.mongodb.org/mongo-driver/bson"
@@ -1008,7 +1009,6 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
 	_, hasUniqueIndex := c.settings.UniqueIndexNamespaces[r.Msg.GetNamespace()]
-	ordered := hasUniqueIndex
 
 	var models []mongo.WriteModel
 	// keeps track of the index in models for a particular document because we want all ids to be unique in the batch
@@ -1044,25 +1044,48 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		}
 	}
 
-	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(ordered))
-	if err != nil {
-		if hasUniqueIndex {
-			var bwErrWriteErrors mongo.BulkWriteException
-			if errors.As(err, &bwErrWriteErrors) {
-				var count int
-				for _, we := range bwErrWriteErrors.WriteErrors {
-					if mongo.IsDuplicateKeyError(we.WriteError) {
-						count++
+	if hasUniqueIndex {
+		var lastDupCount int
+		tries := 1
+		for {
+			metrics.UpdateAttempts(r.Msg.GetNamespace(), tries, len(models))
+			_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				var bwErrWriteErrors mongo.BulkWriteException
+				if errors.As(err, &bwErrWriteErrors) {
+					var newModels []mongo.WriteModel
+					var count int
+					for _, we := range bwErrWriteErrors.WriteErrors {
+						if mongo.IsDuplicateKeyError(we.WriteError) {
+							count++
+							newModels = append(newModels, models[we.Index])
+						}
+					}
+					if count > 0 && count == len(bwErrWriteErrors.WriteErrors) {
+						slog.Debug("duplicate error", "count", count, "last-count", lastDupCount, "attempt", tries)
+						if count == lastDupCount {
+							return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
+						} else {
+							lastDupCount = count
+							models = newModels
+							tries += 1
+							continue
+						}
+					} else {
+						slog.Debug("not all duplicate errors", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
 					}
 				}
-				if count == len(bwErrWriteErrors.WriteErrors) {
-					slog.Debug("duplicate error", "count", count)
-					return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
-				} else {
-					slog.Debug("not all duplicate errors", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 				}
+				return nil, connect.NewError(connect.CodeInternal, err)
 			}
+			return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 		}
+	}
+
+	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 		}

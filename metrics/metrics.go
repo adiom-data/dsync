@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -36,6 +37,11 @@ func WriteUpdates(ns string, d time.Duration, numItems int) {
 	tags := []string{"namespace:" + ns}
 	_ = st.Distribution(prefix+"write_updates_latency", float64(d.Milliseconds()), tags, 1)
 	_ = st.Distribution(prefix+"write_updates_batch_size", float64(numItems), tags, 1)
+}
+
+func UpdateAttempts(ns string, tryNum int, numItems int) {
+	tags := []string{"namespace:" + ns, fmt.Sprintf("try:%v", tryNum)}
+	_ = st.Distribution(prefix+"update_attempts", float64(numItems), tags, 1)
 }
 
 func PrefixAndClient() (string, statsd.ClientInterface) {
