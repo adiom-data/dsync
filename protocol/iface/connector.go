@@ -29,6 +29,7 @@ type ConnectorCapabilities struct {
 type IntegrityCheckQuery struct {
 	Namespace string
 	CountOnly bool
+	MemFn     func(string, uint64)
 
 	PartitionKey string
 	Low          interface{}

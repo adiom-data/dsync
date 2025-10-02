@@ -227,8 +227,9 @@ func runDsync(c *cli.Context) error {
 		Dst:                            dst,
 		StateStoreConnString:           o.StateStoreConnString,
 		NsFromString:                   namespaces,
-		VerifyRequestedFlag:            o.Verify || o.VerifyQuickCount,
+		VerifyRequestedFlag:            o.Verify || o.VerifyQuickCount || o.VerifyMem,
 		VerifyQuickCountFlag:           o.VerifyQuickCount,
+		VerifyMemFlag:                  o.VerifyMem,
 		VerifyMaxTasks:                 o.VerifyMaxTasks,
 		CleanupRequestedFlag:           o.Cleanup,
 		FlowStatusReportingInterval:    10,
@@ -372,7 +373,7 @@ func runDsync(c *cli.Context) error {
 		err := r.Setup(runnerCtx)
 		if err == nil {
 			err = r.Run()
-			if !o.Verify && !o.VerifyQuickCount { //if verification was requested, the user should be able to see the results
+			if !o.Verify && !o.VerifyQuickCount && !o.VerifyMem { //if verification was requested, the user should be able to see the results
 				runnerCancelFunc()
 			}
 		} else {
