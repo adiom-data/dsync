@@ -41,6 +41,7 @@ type FlowIntegrityStatus struct {
 type IntegrityCheckOptions struct {
 	QuickCount bool
 	MaxTasks   int
+	MemVerify  bool
 }
 
 type ConnectorDetails struct {

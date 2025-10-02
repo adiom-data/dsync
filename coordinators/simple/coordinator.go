@@ -13,8 +13,11 @@ import (
 	"math/rand/v2"
 	"strings"
 	"sync"
+	"sync/atomic"
 
+	"github.com/adiom-data/dsync/pkg/verify/ds"
 	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/benbjohnson/clock"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -599,6 +602,8 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 		}
 	}()
 
+	var memMismatchTotal atomic.Int64
+	var memTotal atomic.Int64
 	var eg errgroup.Group
 	for i := 0; i < numWorkers; i++ {
 		eg.Go(func() error {
@@ -608,6 +613,16 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 				dstNamespace := mapNamespace(namespaceMap, query.Namespace)
 				dstQuery := query
 				dstQuery.Namespace = dstNamespace
+				var verifier ds.Verifier
+				if options.MemVerify {
+					verifier = ds.NewVerifier(ctx, clock.New(), 0, 0, 0)
+					query.MemFn = func(s string, v uint64) {
+						verifier.Put(s, true, v, true)
+					}
+					dstQuery.MemFn = func(s string, v uint64) {
+						verifier.Put(s, false, v, true)
+					}
+				}
 
 				var srcRes, dstRes iface.ConnectorDataIntegrityCheckResult
 				eg2.Go(func() error {
@@ -643,11 +658,22 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 				}
 
 				matches := srcRes == dstRes
-				if !matches {
-					slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", query, srcRes, dstRes))
-					return mismatchErr
+				if !options.QuickCount && options.MemVerify {
+					mismatches, total := verifier.MismatchCountAndTotal()
+					memTotal.Add(total)
+					memMismatchTotal.Add(mismatches)
+					if mismatches > 0 {
+						slog.Info("Mismatch", "query", query, "mismatches", mismatches, "total", total, "ids", verifier.Find(3))
+						return mismatchErr
+					}
+					slog.Info("Match", "query", query, "total", total)
+				} else {
+					if !matches {
+						slog.Info(fmt.Sprintf("Mismatch %v, src: %v, dest: %v", query, srcRes, dstRes))
+						return mismatchErr
+					}
+					slog.Info(fmt.Sprintf("Matched %v, res: %v", query, srcRes))
 				}
-				slog.Info(fmt.Sprintf("Matched %v, res: %v", query, srcRes))
 				c.integrityStatusMutex.Lock()
 				c.integrityStatus[statusIdx[query.Namespace]].TasksCompleted += 1
 				c.integrityStatusMutex.Unlock()
@@ -659,6 +685,9 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 	err := eg.Wait()
 	if err != nil {
 		if errors.Is(err, mismatchErr) {
+			if !options.QuickCount && options.MemVerify {
+				slog.Info("Memory Verifier Summary", "mismatches", memMismatchTotal.Load(), "total", memTotal.Load())
+			}
 			return res, nil
 		}
 		return res, err

@@ -17,8 +17,9 @@ import (
 	"github.com/adiom-data/dsync/internal/app/options"
 	"github.com/adiom-data/dsync/internal/util"
 	"github.com/adiom-data/dsync/logger"
+	"github.com/adiom-data/dsync/pkg/verify/ds"
+	"github.com/benbjohnson/clock"
 	"github.com/cespare/xxhash"
-	"github.com/jrhy/mast"
 	"github.com/urfave/cli/v2"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,8 +64,8 @@ var verifyCommand *cli.Command = &cli.Command{
 			Usage: "Use a simple verifier that tails both sources",
 		},
 		&cli.DurationFlag{
-			Name:  "simple-latency",
-			Usage: "When using simple mode, the how stale entries are before being eligible to compare",
+			Name:  "latency",
+			Usage: "How stale entries are before being eligible to compare",
 			Value: time.Second * 5,
 		},
 		&cli.StringFlag{
@@ -80,9 +81,10 @@ var verifyCommand *cli.Command = &cli.Command{
 }
 
 type Update struct {
-	Namespace string
-	ID        []bson.RawValue
-	Data      []byte
+	Namespace   string
+	ID          []bson.RawValue
+	Data        []byte
+	InitialSync bool
 }
 
 type NamespacedID struct {
@@ -173,9 +175,10 @@ func (s *source) readPartitions(ctx context.Context, partitions []*adiomv1.Parti
 				for _, d := range res.Msg.GetData() {
 					id := bson.Raw(d).Lookup("_id")
 					ch <- Update{
-						Namespace: partition.GetNamespace(),
-						ID:        []bson.RawValue{id},
-						Data:      d,
+						Namespace:   partition.GetNamespace(),
+						ID:          []bson.RawValue{id},
+						Data:        d,
+						InitialSync: true,
 					}
 				}
 				cursor = res.Msg.GetNextCursor()
@@ -273,47 +276,67 @@ func (s *source) ProcessSource(ctx context.Context, process func(context.Context
 	return eg.Wait()
 }
 
-func processMast(m *mast.Mast, namespaceMap map[string]string, projection map[string]interface{}) func(context.Context, Update) error {
+func processMemVerify(verifier func(string) ds.Verifier, left bool, namespaceMap map[string]string, projection map[string]interface{}) func(context.Context, Update) error {
 	hasher := xxhash.New()
 	return func(ctx context.Context, update Update) error {
-		innerIDCopy := bson.RawValue{
-			Type:  update.ID[0].Type,
-			Value: bytes.Clone(update.ID[0].Value),
+		id, err := common.IDToString(update.ID)
+		if err != nil {
+			return fmt.Errorf("err converting id to str: %w", err)
 		}
-		namespace := util.MapNamespace(namespaceMap, update.Namespace, ".", ":")
-		id := NamespacedID{namespace, innerIDCopy}
+		ns := util.MapNamespace(namespaceMap, update.Namespace, ".", ":")
+
 		if update.Data == nil {
-			return m.Insert(ctx, id, uint64(0))
+			verifier(ns).Put(id, left, 0, update.InitialSync)
+			return nil
 		}
 		hasher.Reset()
-		if err := common.HashBson(hasher, update.Data, false, projection); err != nil {
+		if err := common.HashBson(hasher, bson.Raw(update.Data), false, projection); err != nil {
 			return err
 		}
 		h := hasher.Sum64()
-		return m.Insert(ctx, id, h)
+		verifier(ns).Put(id, left, h, update.InitialSync)
+		return nil
 	}
 }
 
-type mastVerify struct {
+type memVerify struct {
 	leftSource         source
 	rightSource        source
 	leftNamespacesMap  map[string]string
 	rightNamespacesMap map[string]string
 	limit              int
 	cooldown           time.Duration
+	latency            time.Duration
 	projection         map[string]interface{}
 }
 
-func (m *mastVerify) Run(ctx context.Context) error {
-	leftM := mast.NewInMemory()
-	rightM := mast.NewInMemory()
+func (m *memVerify) Run(ctx context.Context) error {
+	verifiers := map[string]ds.Verifier{}
+	var mut sync.RWMutex
+	getVerifier := func(ns string) ds.Verifier {
+		mut.RLock()
+		v, ok := verifiers[ns]
+		if !ok {
+			mut.RUnlock()
+			mut.Lock()
+			v, ok := verifiers[ns]
+			if !ok {
+				v = ds.NewVerifier(ctx, clock.New(), m.latency, time.Second, 0)
+				verifiers[ns] = v
+			}
+			mut.Unlock()
+			return v
+		}
+		mut.RUnlock()
+		return v
+	}
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return m.leftSource.ProcessSource(egCtx, processMast(&leftM, m.leftNamespacesMap, m.projection))
+		return m.leftSource.ProcessSource(egCtx, processMemVerify(getVerifier, true, m.leftNamespacesMap, m.projection))
 	})
 	eg.Go(func() error {
-		return m.rightSource.ProcessSource(egCtx, processMast(&rightM, m.rightNamespacesMap, m.projection))
+		return m.rightSource.ProcessSource(egCtx, processMemVerify(getVerifier, false, m.rightNamespacesMap, m.projection))
 	})
 	eg.Go(func() error {
 		ticker := time.NewTicker(time.Second)
@@ -323,26 +346,20 @@ func (m *mastVerify) Run(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				diffs := 0
-				slog.Info("Verifying", "left_total", leftM.Size(), "right_total", rightM.Size())
-				_ = leftM.DiffIter(egCtx, &rightM, func(added, removed bool, key, addedValue, removedValue interface{}) (bool, error) {
-					if added && removed {
-					} else if added {
-						if h, ok := addedValue.(uint64); h == 0 && ok {
-							return true, nil
-						}
-					} else if removed {
-						if h, ok := removedValue.(uint64); h == 0 && ok {
-							return true, nil
-						}
+				found := false
+				var totalMismatches, totalCount int64
+				mut.RLock()
+				for ns, verifier := range verifiers {
+					mismatches, total := verifier.MismatchCountAndTotal()
+					if mismatches > 0 {
+						found = true
+						slog.Info("Verifying", "namespace", ns, "mismatches", mismatches, "count", total, "ids", verifier.Find(m.limit))
 					}
-					if diffs < m.limit {
-						slog.Info("diff", "id", key, "left", added, "right", removed, "left_value", addedValue, "right_value", removedValue)
-					}
-					diffs++
-					return true, nil
-				})
-				slog.Info("Total diffs", "diffs", diffs)
+					totalMismatches += mismatches
+					totalCount += total
+				}
+				mut.RUnlock()
+				slog.Info("Verifying", "ok", !found, "mismatches", totalMismatches, "count", totalCount)
 				ticker.Reset(m.cooldown)
 			case <-egCtx.Done():
 				return nil
@@ -452,7 +469,7 @@ func processTail(std *SimpleTailDiffer, namespaceMap map[string]string, projecti
 			return nil
 		}
 		hasher.Reset()
-		if err := common.HashBson(hasher, update.Data, false, projection); err != nil {
+		if err := common.HashBson(hasher, bson.Raw(update.Data), false, projection); err != nil {
 			return err
 		}
 		h := hasher.Sum64()
@@ -534,7 +551,7 @@ func runVerify(c *cli.Context) error {
 	parallelism := c.Int("parallelism")
 	limit := c.Int("limit")
 	simple := c.Bool("simple")
-	simpleLatency := c.Duration("simple-latency")
+	latency := c.Duration("latency")
 	projection := c.String("projection")
 	var projectionMap map[string]interface{}
 	if projection != "" {
@@ -586,7 +603,7 @@ func runVerify(c *cli.Context) error {
 			rightNamespacesMap: rightNamespacesMap,
 			limit:              limit,
 			cooldown:           cooldown,
-			latency:            simpleLatency,
+			latency:            latency,
 			projection:         projectionMap,
 		}
 
@@ -598,13 +615,14 @@ func runVerify(c *cli.Context) error {
 		return nil
 	}
 
-	mv := mastVerify{
+	mv := memVerify{
 		leftSource:         leftSource,
 		rightSource:        rightSource,
 		leftNamespacesMap:  leftNamespacesMap,
 		rightNamespacesMap: rightNamespacesMap,
 		limit:              limit,
 		cooldown:           cooldown,
+		latency:            latency,
 		projection:         projectionMap,
 	}
 
