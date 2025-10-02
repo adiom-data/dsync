@@ -51,6 +51,12 @@ func UpdateAttempts(ns string, tryNum int, numItems int) {
 	_ = st.Distribution(prefix+"update_attempts", float64(numItems), tags, 1)
 }
 
+func Verify(ns string, mismatches int64, total int64) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Gauge(prefix+"mem_verify_mismatches", float64(mismatches), tags, 1)
+	_ = st.Gauge(prefix+"mem_verify_total", float64(total), tags, 1)
+}
+
 func PrefixAndClient() (string, statsd.ClientInterface) {
 	return prefix, st
 }

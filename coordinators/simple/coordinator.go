@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/pkg/verify/ds"
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/benbjohnson/clock"
@@ -604,6 +605,16 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 
 	var memMismatchTotal atomic.Int64
 	var memTotal atomic.Int64
+	var metricMut sync.Mutex
+	mismatchMap := map[string]int64{}
+	totalMap := map[string]int64{}
+	updateMetric := func(ns string, mismatches int64, total int64) {
+		metricMut.Lock()
+		defer metricMut.Unlock()
+		totalMap[ns] += total
+		mismatchMap[ns] += mismatchMap[ns]
+		metrics.Verify(ns, mismatches, total)
+	}
 	var eg errgroup.Group
 	for i := 0; i < numWorkers; i++ {
 		eg.Go(func() error {
@@ -662,6 +673,7 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 					mismatches, total := verifier.MismatchCountAndTotal()
 					memTotal.Add(total)
 					memMismatchTotal.Add(mismatches)
+					updateMetric(query.Namespace, mismatches, total)
 					if mismatches > 0 {
 						slog.Info("Mismatch", "query", query, "mismatches", mismatches, "total", total, "ids", verifier.Find(3))
 						return mismatchErr
