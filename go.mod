@@ -13,12 +13,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.19.3
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.4
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.25.6
+	github.com/benbjohnson/clock v1.3.5
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cespare/xxhash v1.1.0
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
 	github.com/jackc/pgx/v5 v5.7.5
-	github.com/jrhy/mast v1.2.33
 	github.com/lmittmann/tint v1.1.2
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/rivo/tview v0.0.0-20250625164341-a4a78f1e05cb
@@ -65,7 +65,6 @@ require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
-	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -74,7 +73,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

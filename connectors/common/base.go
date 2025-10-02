@@ -9,6 +9,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"hash"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
@@ -29,6 +31,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cespare/xxhash"
+	"github.com/google/uuid"
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -94,6 +97,43 @@ func isRetryable(err error) bool {
 // GetConnectorStatus implements iface.Connector.
 func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatus {
 	return c.progressTracker.CopyStatus()
+}
+
+func IDPartToString(a any) string {
+	switch t := a.(type) {
+	case primitive.ObjectID:
+		return t.Hex()
+	case string:
+		return t
+	case primitive.Binary:
+		if t.Subtype == bson.TypeBinaryUUID {
+			id, err := uuid.FromBytes(t.Data)
+			if err == nil {
+				return id.String()
+			}
+		}
+		if utf8.Valid(t.Data) {
+			return string(t.Data)
+		}
+		return base64.StdEncoding.EncodeToString(t.Data)
+	default:
+		return fmt.Sprintf("%v", a)
+	}
+}
+
+func IDToString(id []bson.RawValue) (string, error) {
+	var sb strings.Builder
+	for i, part := range id {
+		var a any
+		if err := bson.UnmarshalValue(part.Type, part.Value, &a); err != nil {
+			return "", fmt.Errorf("err in unmarshal value %w", err)
+		}
+		if i != 0 {
+			sb.WriteByte('|')
+		}
+		sb.WriteString(IDPartToString(a))
+	}
+	return sb.String(), nil
 }
 
 func HashBson(hasher hash.Hash64, b bson.Raw, arr bool, projection map[string]interface{}) error {
@@ -192,12 +232,22 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 		for _, data := range res.Msg.Data {
 			hasher.Reset()
-			err = HashBson(hasher, bson.Raw(data), false, nil)
-			if err != nil {
+			d := bson.Raw(data)
+			if err := HashBson(hasher, d, false, nil); err != nil {
 				slog.Error(fmt.Sprintf("Error hashing during integrity check: %v", err))
 				return iface.ConnectorDataIntegrityCheckResult{}, err
 			}
-			hash ^= hasher.Sum64()
+			h := hasher.Sum64()
+			if task.MemFn != nil {
+				id := d.Lookup("_id")
+				var a any
+				if err := bson.UnmarshalValue(id.Type, id.Value, &a); err != nil {
+					slog.Error("Error getting id during integrity check", "err", err)
+					return iface.ConnectorDataIntegrityCheckResult{}, err
+				}
+				task.MemFn(IDPartToString(a), h)
+			}
+			hash ^= h
 			count += 1
 		}
 
