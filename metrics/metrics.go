@@ -57,6 +57,12 @@ func Verify(ns string, mismatches int64, total int64) {
 	_ = st.Gauge(prefix+"mem_verify_total", float64(total), tags, 1)
 }
 
+func VerifyCount(ns string, left int64, right int64) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Gauge(prefix+"verify_count_left", float64(left), tags, 1)
+	_ = st.Gauge(prefix+"verify_count_right", float64(right), tags, 1)
+}
+
 func PrefixAndClient() (string, statsd.ClientInterface) {
 	return prefix, st
 }
