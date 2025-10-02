@@ -669,7 +669,9 @@ func (c *Simple) PerformFlowIntegrityCheck(ctx context.Context, fid iface.FlowID
 				}
 
 				matches := srcRes == dstRes
-				metrics.VerifyCount(query.Namespace, srcRes.Count, dstRes.Count)
+				if options.QuickCount {
+					metrics.VerifyCount(query.Namespace, srcRes.Count, dstRes.Count)
+				}
 				if !options.QuickCount && options.MemVerify {
 					mismatches, total := verifier.MismatchCountAndTotal()
 					memTotal.Add(total)
