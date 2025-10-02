@@ -30,9 +30,9 @@ func EmitProgressMetrics(ctx context.Context, r *runnerLocal.RunnerLocal, mut *s
 		client.Gauge(prefix+"change_stream_events_count", float64(p.ChangeStreamEvents), nil, 1)
 		client.Gauge(prefix+"deletes_caught", float64(p.DeletesCaught), nil, 1)
 		client.Gauge(prefix+"total_progress", float64(percentCompleteTotal(p)), nil, 1)
-		client.Gauge(prefix+"elapsed", float64(time.Since(p.StartTime).Round(time.Second)), nil, 1)
+		client.Gauge(prefix+"elapsed", time.Since(p.StartTime).Round(time.Second).Seconds(), nil, 1)
 		if !p.ChangeStreamLastTime.IsZero() {
-			client.Gauge(prefix+"change_stream_lag_seconds", float64(time.Since(p.ChangeStreamLastTime).Round(time.Second)), nil, 1)
+			client.Gauge(prefix+"change_stream_lag_seconds", time.Since(p.ChangeStreamLastTime).Round(time.Second).Seconds(), nil, 1)
 		}
 		for ns, s := range p.NsProgressMap {
 			tags := []string{"namespace:" + ns.Db + "." + ns.Col}
