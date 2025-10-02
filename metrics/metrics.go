@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-go/v5/statsd"
@@ -13,7 +14,13 @@ var prefix string
 
 func init() {
 	var stats statsd.ClientInterface
-	stats, err := statsd.New("")
+	var opts []statsd.Option
+	if tagsStr, ok := os.LookupEnv("STATSD_TAGS"); ok && len(tagsStr) > 0 {
+		tags := strings.Split(tagsStr, ",")
+		opts = append(opts, statsd.WithTags(tags))
+	}
+
+	stats, err := statsd.New("", opts...)
 	if err != nil {
 		stats = &statsd.NoOpClient{}
 	}

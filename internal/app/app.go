@@ -368,7 +368,7 @@ func runDsync(c *cli.Context) error {
 			}
 		}()
 
-		if !o.Verify && !o.VerifyQuickCount {
+		if !o.Verify && !o.VerifyQuickCount && !o.VerifyMem {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
