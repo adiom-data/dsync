@@ -13,6 +13,7 @@ func EmitProgressMetrics(ctx context.Context, r *runnerLocal.RunnerLocal, mut *s
 	ticker := time.NewTicker(time.Second)
 	prefix, client := metrics.PrefixAndClient()
 	state := r.GetRunnerProgress().SyncState
+	var lastChangeStreamTime time.Time
 
 	onTick := func() {
 		mut.Lock()
@@ -32,7 +33,13 @@ func EmitProgressMetrics(ctx context.Context, r *runnerLocal.RunnerLocal, mut *s
 		client.Gauge(prefix+"total_progress", float64(percentCompleteTotal(p)), nil, 1)
 		client.Gauge(prefix+"elapsed", time.Since(p.StartTime).Round(time.Second).Seconds(), nil, 1)
 		if !p.ChangeStreamLastTime.IsZero() {
-			client.Gauge(prefix+"change_stream_lag_seconds", time.Since(p.ChangeStreamLastTime).Round(time.Second).Seconds(), nil, 1)
+			client.Gauge(prefix+"change_stream_last_event_ts", float64(p.ChangeStreamLastTime.Unix()), nil, 1)
+			t := time.Since(p.ChangeStreamLastTime).Round(time.Second).Seconds()
+			client.Gauge(prefix+"change_stream_lag_seconds", t, nil, 1)
+			if !p.ChangeStreamLastTime.Equal(lastChangeStreamTime) {
+				lastChangeStreamTime = p.ChangeStreamLastTime
+				client.Gauge(prefix+"change_stream_new_lag_seconds", t, nil, 1)
+			}
 		}
 		for ns, s := range p.NsProgressMap {
 			tags := []string{"namespace:" + ns.Db + "." + ns.Col}
