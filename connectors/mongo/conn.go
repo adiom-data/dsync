@@ -37,7 +37,6 @@ type ConnectorSettings struct {
 	WriterMaxBatchSize         int   // applies to batch inserts only; 0 means no limit
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	MaxPageSize                int
-	HaltOnIterationError       bool
 	PerNamespaceStreams        bool
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
@@ -418,6 +417,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 					case ch <- bufferData{data: dataBatch}:
 						dataBatch = nil
 					case <-ctx.Done():
+						ch <- bufferData{err: ctx.Err()}
 						return
 					}
 				}
@@ -425,10 +425,8 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			if cursor.Err() != nil {
 				if !errors.Is(cursor.Err(), context.Canceled) {
 					slog.Error(fmt.Sprintf("Failed to iterate through documents: %v", cursor.Err()))
-					if c.settings.HaltOnIterationError {
-						ch <- bufferData{err: cursor.Err()}
-					}
 				}
+				ch <- bufferData{err: cursor.Err()}
 			}
 		}(c.ctx)
 	} else {
