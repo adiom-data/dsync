@@ -97,6 +97,7 @@ type CoordinatorIConnectorSignal interface {
 
 	// Done event for a flow (for a connector to announce that they finished the flow)
 	NotifyDone(flowId FlowID, conn ConnectorID) error
+	NotifyError(err error)
 
 	// Done event for a task (for a connector to announce that they finished a task)
 	// Accepts the optional taskData parameter which is a connector-specific task data to be persisted along the task

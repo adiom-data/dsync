@@ -23,9 +23,10 @@ import (
 
 type Simple struct {
 	// Implement the necessary fields here
-	ctx context.Context
-	t   iface.Transport
-	s   iface.Statestore
+	ctx        context.Context
+	flowCancel context.CancelFunc
+	t          iface.Transport
+	s          iface.Statestore
 
 	flowMutex sync.Mutex
 
@@ -140,7 +141,7 @@ func (c *Simple) delFlow(fid iface.FlowID) {
 
 func (c *Simple) Setup(ctx context.Context, t iface.Transport, s iface.Statestore) {
 	// Implement the Setup method
-	c.ctx = ctx
+	c.ctx, c.flowCancel = context.WithCancel(ctx)
 	c.t = t
 	c.s = s
 }
@@ -378,6 +379,10 @@ func (c *Simple) FlowDestroy(fid iface.FlowID) {
 	if err != nil {
 		slog.Error("Failed to delete flow state", "err", err)
 	}
+}
+
+func (c *Simple) NotifyError(err error) {
+	c.flowCancel()
 }
 
 func (c *Simple) NotifyDone(flowId iface.FlowID, conn iface.ConnectorID) error {

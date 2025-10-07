@@ -22,6 +22,7 @@ import (
 type ParallelWriterConnector interface {
 	HandleBarrierMessage(iface.DataMessage) error
 	ProcessDataMessages([]iface.DataMessage) error
+	HandlerError(err error) error
 }
 
 // A parallelized writes processor
@@ -57,7 +58,7 @@ type ParallelWriter struct {
 
 	blockBarrier chan struct{}
 
-	done chan struct{}
+	done chan error
 }
 
 // NewParallelWriter creates a new ParallelWriter
@@ -70,7 +71,7 @@ func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, n
 		multinamespace: multinamespace,
 		taskBarrierMap: make(map[uint]uint),
 		blockBarrier:   make(chan struct{}),
-		done:           make(chan struct{}),
+		done:           make(chan error),
 	}
 }
 
@@ -80,19 +81,24 @@ func (bwa *ParallelWriter) Start() {
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i] = newWriterWorker(bwa, i, bwa.maxBatchSize, bwa.multinamespace)
 		go func() {
-			bwa.workers[i].run()
-			bwa.done <- struct{}{}
+			res := bwa.workers[i].run()
+			bwa.done <- res
 		}()
 	}
 }
 
-func (bwa *ParallelWriter) StopAndWait() {
+func (bwa *ParallelWriter) StopAndWait() error {
 	for _, worker := range bwa.workers {
 		close(worker.queue)
 	}
+	var err error
 	for i := 0; i < bwa.numWorkers; i++ {
-		<-bwa.done
+		res := <-bwa.done
+		if err == nil && res != nil {
+			err = res
+		}
 	}
+	return err
 }
 
 func hashDataMsgId(dataMsg iface.DataMessage) int {
@@ -207,17 +213,17 @@ func (ww *writerWorker) sendMultiBatch(mb map[string][]iface.DataMessage) error 
 }
 
 // Worker's main loop - processes messages from the queue
-func (ww *writerWorker) run() {
+func (ww *writerWorker) run() error {
 	var batch []iface.DataMessage
 	multiBatch := map[string][]iface.DataMessage{}
 	multiBatchCount := 0
 	for {
 		select {
 		case <-ww.parallelWriter.ctx.Done():
-			return
+			return nil
 		case msg, ok := <-ww.queue:
 			if !ok {
-				return
+				return nil
 			}
 			if msg.MutationType == iface.MutationType_Ignore {
 				continue
@@ -231,12 +237,18 @@ func (ww *writerWorker) run() {
 					err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+							return err2
+						}
 					}
 					batch = nil
 				}
 				if len(multiBatch) > 0 {
 					if err := ww.sendMultiBatch(multiBatch); err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+							return err2
+						}
 					}
 					multiBatch = map[string][]iface.DataMessage{}
 					multiBatchCount = 0
@@ -269,6 +281,9 @@ func (ww *writerWorker) run() {
 					err := ww.parallelWriter.connector.HandleBarrierMessage(msg)
 					if err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to handle barrier message: %v", ww.id, err))
+						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+							return err2
+						}
 					}
 				}
 
@@ -281,6 +296,9 @@ func (ww *writerWorker) run() {
 				if (ww.parallelWriter.maxBatchSize > 0 && multiBatchCount >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
 					if err := ww.sendMultiBatch(multiBatch); err != nil {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+							return err2
+						}
 					}
 					multiBatch = map[string][]iface.DataMessage{}
 					multiBatchCount = 0
@@ -293,6 +311,9 @@ func (ww *writerWorker) run() {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
+					if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+						return err2
+					}
 				}
 				batch = nil
 			}
@@ -310,6 +331,9 @@ func (ww *writerWorker) run() {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err), "insertbatch", d)
 					} else {
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err), "batch", len(batch), "first", batch[0])
+					}
+					if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
+						return err2
 					}
 				}
 				batch = nil
