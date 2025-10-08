@@ -7,6 +7,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -149,4 +150,24 @@ func stringToQuery(queryStr string) (bson.D, error) {
 		return bson.D{}, fmt.Errorf("error parsing query as Extended JSON: %v", err)
 	}
 	return query, nil
+}
+
+func isServerErrorWithCode(err error, errorCode int) bool {
+	if err == nil {
+		return false
+	}
+
+	var serverError mongo.ServerError
+
+	if !errors.As(err, &serverError) {
+		return false
+	}
+
+	return serverError.HasErrorCode(errorCode)
+}
+
+// isBSONObjectTooLargeError checks if the error is due to a BSON document being too large
+func isBSONObjectTooLargeError(err error) bool {
+	const BSONObjectTooLarge = 10334
+	return isServerErrorWithCode(err, BSONObjectTooLarge)
 }
