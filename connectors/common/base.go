@@ -957,7 +957,9 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 			}
 		}
 
-		flowParallelWriter.StopAndWait()
+		if err := flowParallelWriter.StopAndWait(); err != nil {
+			c.coord.NotifyError(err)
+		}
 		slog.Info(fmt.Sprintf("Connector %s is done writing for flow %s", c.id, flowId))
 		err := c.coord.NotifyDone(flowId, c.id)
 		if err != nil {
@@ -966,6 +968,11 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 	}()
 
 	return nil
+}
+
+func (c *connector) HandlerError(err error) error {
+	c.flowCancelFunc()
+	return err
 }
 
 func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
