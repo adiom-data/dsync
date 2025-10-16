@@ -36,6 +36,7 @@ type ConnectorSettings struct {
 	PingTimeout                time.Duration
 	WriterMaxBatchSize         int   // applies to batch inserts only; 0 means no limit
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
+	SampleFactor               int   // a factor to determine how many extra samples per partition are used
 	MaxPageSize                int
 	PerNamespaceStreams        bool
 
@@ -230,13 +231,23 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				}
 				return nil
 			}
-			numSamples := count / c.settings.TargetDocCountPerPartition
+			numSamples := (count / c.settings.TargetDocCountPerPartition) * int64(c.settings.SampleFactor)
+			if numSamples*20 >= count {
+				slog.Warn("Too many samples requested, adjusting...", "original", numSamples, "new", count/20)
+				numSamples = count / 20
+			}
 			res, err := col.Aggregate(ctx, mongo.Pipeline{{{"$sample", bson.D{{"size", numSamples}}}}, {{"$sort", bson.D{{"_id", 1}}}}})
 			if err != nil {
 				return err
 			}
+			var factorCount = c.settings.SampleFactor / 2
 			var low bson.RawValue
 			for res.Next(ctx) {
+				if factorCount > 0 {
+					factorCount -= 1
+					continue
+				}
+				factorCount = c.settings.SampleFactor - 1
 				high := res.Current.Lookup("_id")
 				ch <- &adiomv1.Partition{
 					Namespace:      partition.GetNamespace(),
@@ -972,6 +983,7 @@ func (c *conn) Teardown() {
 
 func NewConn(connSettings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 	setDefault(&connSettings.TargetDocCountPerPartition, 512*1000)
+	setDefault(&connSettings.SampleFactor, 1)
 	client, err := MongoClient(context.Background(), connSettings)
 	if err != nil {
 		slog.Error(fmt.Sprintf("unable to connect to mongo client: %v", err))
