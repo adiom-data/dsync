@@ -356,6 +356,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
 				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(MongoFlags(&settings), []cli.Flag{
+					altsrc.NewIntFlag(&cli.IntFlag{
+						Name:        "sample-factor",
+						Destination: &settings.SampleFactor,
+						Usage:       "Number of extra samples per partition",
+						Value:       10,
+					}),
 					altsrc.NewBoolFlag(&cli.BoolFlag{
 						Name:        "per-namespace-streams",
 						Usage:       "Each namespace has a separate stream",
