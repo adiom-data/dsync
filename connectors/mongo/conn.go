@@ -45,6 +45,7 @@ type ConnectorSettings struct {
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 
 	UniqueIndexNamespaces map[string]struct{}
+	InitialSyncIndexHint  string
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -441,7 +442,11 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		}
 		slog.Debug("query filter", "filter", filter)
 
-		cursor, err := collection.Find(ctx, filter)
+		opts := options.Find()
+		if c.settings.InitialSyncIndexHint != "" {
+			opts.SetHint(c.settings.InitialSyncIndexHint)
+		}
+		cursor, err := collection.Find(ctx, filter, opts)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Debug("Find Error", "filter", filter)

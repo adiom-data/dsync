@@ -367,6 +367,11 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Usage:       "Each namespace has a separate stream",
 						Destination: &settings.PerNamespaceStreams,
 					}),
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "initial-sync-index",
+						Usage:       "name of index for initial sync to pass as a hint",
+						Destination: &settings.InitialSyncIndexHint,
+					}),
 				}...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
 					if len(uniqueIndexNamespacesSlice) > 0 {
