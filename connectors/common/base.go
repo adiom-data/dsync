@@ -783,6 +783,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 				for range updates {
 					c.progressTracker.UpdateChangeStreamProgressTracking()
 				}
+				// TODO: make work with deletes caught if needed
 
 				if len(transformed.Msg.GetResponses()) > 0 {
 					for _, r := range transformed.Msg.GetResponses() {
@@ -840,15 +841,17 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 					switch d.Type {
 					case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
 						mutationType = iface.MutationType_Insert
+						c.progressTracker.UpdateChangeStreamProgressTracking()
 						readerProgress.changeStreamEvents.Add(1)
 					case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
 						mutationType = iface.MutationType_Update
+						c.progressTracker.UpdateChangeStreamProgressTracking()
 						readerProgress.changeStreamEvents.Add(1)
 					case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 						mutationType = iface.MutationType_Delete
+						c.progressTracker.UpdateChangeStreamProgressTrackingDeletes()
 						readerProgress.deleteEvents.Add(1)
 					}
-					c.progressTracker.UpdateChangeStreamProgressTracking()
 					lsn++
 
 					dataChannel <- iface.DataMessage{
