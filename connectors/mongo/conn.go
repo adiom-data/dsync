@@ -253,13 +253,15 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				return nil
 			}
 			numSamples := (count / c.settings.TargetDocCountPerPartition) * int64(c.settings.SampleFactor)
-			if numSamples*20 >= count {
-				slog.Warn("Too many samples requested, adjusting...", "original", numSamples, "new", count/20)
-				numSamples = count / 20
+			if numSamples*21 >= count {
+				return fmt.Errorf("too many samples requested (%v of %v)- adjust sample factor or target documents per partition", numSamples, count)
 			}
-			res, err := col.Aggregate(ctx, mongo.Pipeline{{{"$sample", bson.D{{"size", numSamples}}}}, {{"$sort", bson.D{{"_id", 1}}}}})
+			if numSamples > 1000000 {
+				slog.Warn("More than 1000000 samples requested", "samples", numSamples)
+			}
+			res, err := col.Aggregate(ctx, mongo.Pipeline{{{"$sample", bson.D{{"size", numSamples}}}}, {{"$project", bson.D{{"_id", 1}}}}, {{"$sort", bson.D{{"_id", 1}}}}})
 			if err != nil {
-				return err
+				return fmt.Errorf("error getting %v samples for partition: %w", numSamples, err)
 			}
 			var factorCount = c.settings.SampleFactor / 2
 			var low bson.RawValue
