@@ -188,6 +188,10 @@ public final class Messages {
      * <code>UPDATE_TYPE_DELETE = 3;</code>
      */
     UPDATE_TYPE_DELETE(3),
+    /**
+     * <code>UPDATE_TYPE_PARTIAL_UPDATE = 4;</code>
+     */
+    UPDATE_TYPE_PARTIAL_UPDATE(4),
     UNRECOGNIZED(-1),
     ;
 
@@ -216,6 +220,10 @@ public final class Messages {
      * <code>UPDATE_TYPE_DELETE = 3;</code>
      */
     public static final int UPDATE_TYPE_DELETE_VALUE = 3;
+    /**
+     * <code>UPDATE_TYPE_PARTIAL_UPDATE = 4;</code>
+     */
+    public static final int UPDATE_TYPE_PARTIAL_UPDATE_VALUE = 4;
 
 
     public final int getNumber() {
@@ -246,6 +254,7 @@ public final class Messages {
         case 1: return UPDATE_TYPE_INSERT;
         case 2: return UPDATE_TYPE_UPDATE;
         case 3: return UPDATE_TYPE_DELETE;
+        case 4: return UPDATE_TYPE_PARTIAL_UPDATE;
         default: return null;
       }
     }
@@ -9744,6 +9753,31 @@ public final class Messages {
      * @return The data.
      */
     com.google.protobuf.ByteString getData();
+
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @return A list containing the partialUpdateUnset.
+     */
+    java.util.List<java.lang.String>
+        getPartialUpdateUnsetList();
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @return The count of partialUpdateUnset.
+     */
+    int getPartialUpdateUnsetCount();
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @param index The index of the element to return.
+     * @return The partialUpdateUnset at the given index.
+     */
+    java.lang.String getPartialUpdateUnset(int index);
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the partialUpdateUnset at the given index.
+     */
+    com.google.protobuf.ByteString
+        getPartialUpdateUnsetBytes(int index);
   }
   /**
    * Protobuf type {@code adiom.v1.Update}
@@ -9770,6 +9804,8 @@ public final class Messages {
       id_ = java.util.Collections.emptyList();
       type_ = 0;
       data_ = com.google.protobuf.ByteString.EMPTY;
+      partialUpdateUnset_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
     }
 
     public static final com.google.protobuf.Descriptors.Descriptor
@@ -9855,6 +9891,43 @@ public final class Messages {
       return data_;
     }
 
+    public static final int PARTIAL_UPDATE_UNSET_FIELD_NUMBER = 4;
+    @SuppressWarnings("serial")
+    private com.google.protobuf.LazyStringArrayList partialUpdateUnset_ =
+        com.google.protobuf.LazyStringArrayList.emptyList();
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @return A list containing the partialUpdateUnset.
+     */
+    public com.google.protobuf.ProtocolStringList
+        getPartialUpdateUnsetList() {
+      return partialUpdateUnset_;
+    }
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @return The count of partialUpdateUnset.
+     */
+    public int getPartialUpdateUnsetCount() {
+      return partialUpdateUnset_.size();
+    }
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @param index The index of the element to return.
+     * @return The partialUpdateUnset at the given index.
+     */
+    public java.lang.String getPartialUpdateUnset(int index) {
+      return partialUpdateUnset_.get(index);
+    }
+    /**
+     * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the partialUpdateUnset at the given index.
+     */
+    public com.google.protobuf.ByteString
+        getPartialUpdateUnsetBytes(int index) {
+      return partialUpdateUnset_.getByteString(index);
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -9878,6 +9951,9 @@ public final class Messages {
       if (!data_.isEmpty()) {
         output.writeBytes(3, data_);
       }
+      for (int i = 0; i < partialUpdateUnset_.size(); i++) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 4, partialUpdateUnset_.getRaw(i));
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -9899,6 +9975,14 @@ public final class Messages {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(3, data_);
       }
+      {
+        int dataSize = 0;
+        for (int i = 0; i < partialUpdateUnset_.size(); i++) {
+          dataSize += computeStringSizeNoTag(partialUpdateUnset_.getRaw(i));
+        }
+        size += dataSize;
+        size += 1 * getPartialUpdateUnsetList().size();
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -9919,6 +10003,8 @@ public final class Messages {
       if (type_ != other.type_) return false;
       if (!getData()
           .equals(other.getData())) return false;
+      if (!getPartialUpdateUnsetList()
+          .equals(other.getPartialUpdateUnsetList())) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -9938,6 +10024,10 @@ public final class Messages {
       hash = (53 * hash) + type_;
       hash = (37 * hash) + DATA_FIELD_NUMBER;
       hash = (53 * hash) + getData().hashCode();
+      if (getPartialUpdateUnsetCount() > 0) {
+        hash = (37 * hash) + PARTIAL_UPDATE_UNSET_FIELD_NUMBER;
+        hash = (53 * hash) + getPartialUpdateUnsetList().hashCode();
+      }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -10078,6 +10168,8 @@ public final class Messages {
         bitField0_ = (bitField0_ & ~0x00000001);
         type_ = 0;
         data_ = com.google.protobuf.ByteString.EMPTY;
+        partialUpdateUnset_ =
+            com.google.protobuf.LazyStringArrayList.emptyList();
         return this;
       }
 
@@ -10130,6 +10222,10 @@ public final class Messages {
         if (((from_bitField0_ & 0x00000004) != 0)) {
           result.data_ = data_;
         }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          partialUpdateUnset_.makeImmutable();
+          result.partialUpdateUnset_ = partialUpdateUnset_;
+        }
       }
 
       @java.lang.Override
@@ -10175,6 +10271,16 @@ public final class Messages {
         }
         if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
           setData(other.getData());
+        }
+        if (!other.partialUpdateUnset_.isEmpty()) {
+          if (partialUpdateUnset_.isEmpty()) {
+            partialUpdateUnset_ = other.partialUpdateUnset_;
+            bitField0_ |= 0x00000008;
+          } else {
+            ensurePartialUpdateUnsetIsMutable();
+            partialUpdateUnset_.addAll(other.partialUpdateUnset_);
+          }
+          onChanged();
         }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
@@ -10225,6 +10331,12 @@ public final class Messages {
                 bitField0_ |= 0x00000004;
                 break;
               } // case 26
+              case 34: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensurePartialUpdateUnsetIsMutable();
+                partialUpdateUnset_.add(s);
+                break;
+              } // case 34
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -10563,6 +10675,117 @@ public final class Messages {
       public Builder clearData() {
         bitField0_ = (bitField0_ & ~0x00000004);
         data_ = getDefaultInstance().getData();
+        onChanged();
+        return this;
+      }
+
+      private com.google.protobuf.LazyStringArrayList partialUpdateUnset_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
+      private void ensurePartialUpdateUnsetIsMutable() {
+        if (!partialUpdateUnset_.isModifiable()) {
+          partialUpdateUnset_ = new com.google.protobuf.LazyStringArrayList(partialUpdateUnset_);
+        }
+        bitField0_ |= 0x00000008;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @return A list containing the partialUpdateUnset.
+       */
+      public com.google.protobuf.ProtocolStringList
+          getPartialUpdateUnsetList() {
+        partialUpdateUnset_.makeImmutable();
+        return partialUpdateUnset_;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @return The count of partialUpdateUnset.
+       */
+      public int getPartialUpdateUnsetCount() {
+        return partialUpdateUnset_.size();
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param index The index of the element to return.
+       * @return The partialUpdateUnset at the given index.
+       */
+      public java.lang.String getPartialUpdateUnset(int index) {
+        return partialUpdateUnset_.get(index);
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the partialUpdateUnset at the given index.
+       */
+      public com.google.protobuf.ByteString
+          getPartialUpdateUnsetBytes(int index) {
+        return partialUpdateUnset_.getByteString(index);
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param index The index to set the value at.
+       * @param value The partialUpdateUnset to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartialUpdateUnset(
+          int index, java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensurePartialUpdateUnsetIsMutable();
+        partialUpdateUnset_.set(index, value);
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param value The partialUpdateUnset to add.
+       * @return This builder for chaining.
+       */
+      public Builder addPartialUpdateUnset(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensurePartialUpdateUnsetIsMutable();
+        partialUpdateUnset_.add(value);
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param values The partialUpdateUnset to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllPartialUpdateUnset(
+          java.lang.Iterable<java.lang.String> values) {
+        ensurePartialUpdateUnsetIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, partialUpdateUnset_);
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPartialUpdateUnset() {
+        partialUpdateUnset_ =
+          com.google.protobuf.LazyStringArrayList.emptyList();
+        bitField0_ = (bitField0_ & ~0x00000008);;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string partial_update_unset = 4 [json_name = "partialUpdateUnset"];</code>
+       * @param value The bytes of the partialUpdateUnset to add.
+       * @return This builder for chaining.
+       */
+      public Builder addPartialUpdateUnsetBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        ensurePartialUpdateUnsetIsMutable();
+        partialUpdateUnset_.add(value);
+        bitField0_ |= 0x00000008;
         onChanged();
         return this;
       }
@@ -23691,61 +23914,63 @@ public final class Messages {
       "PlanResponse\0223\n\npartitions\030\001 \003(\0132\023.adiom" +
       ".v1.PartitionR\npartitions\022I\n\022updates_par" +
       "titions\030\002 \003(\0132\032.adiom.v1.UpdatesPartitio" +
-      "nR\021updatesPartitions\"k\n\006Update\022#\n\002id\030\001 \003" +
-      "(\0132\023.adiom.v1.BsonValueR\002id\022(\n\004type\030\002 \001(" +
-      "\0162\024.adiom.v1.UpdateTypeR\004type\022\022\n\004data\030\003 " +
-      "\001(\014R\004data\"\204\001\n\017ListDataRequest\0221\n\tpartiti" +
-      "on\030\001 \001(\0132\023.adiom.v1.PartitionR\tpartition" +
-      "\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004type" +
-      "\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020ListDataResp" +
-      "onse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013next_cursor\030" +
-      "\002 \001(\014R\nnextCursor\"l\n\020WriteDataRequest\022\034\n" +
-      "\tnamespace\030\001 \001(\tR\tnamespace\022\022\n\004data\030\002 \003(" +
-      "\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTyp" +
-      "eR\004type\"\023\n\021WriteDataResponse\"\207\001\n\023WriteUp" +
-      "datesRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespa" +
-      "ce\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007u" +
-      "pdates\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataType" +
-      "R\004type\"\026\n\024WriteUpdatesResponse\"v\n\024Stream" +
-      "UpdatesRequest\022\036\n\nnamespaces\030\001 \003(\tR\nname" +
-      "spaces\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataType" +
-      "R\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025Strea" +
-      "mUpdatesResponse\022*\n\007updates\030\001 \003(\0132\020.adio" +
-      "m.v1.UpdateR\007updates\022\034\n\tnamespace\030\002 \001(\tR" +
-      "\tnamespace\022\037\n\013next_cursor\030\003 \001(\014R\nnextCur" +
-      "sor\022.\n\004time\030\004 \001(\0132\032.google.protobuf.Time" +
-      "stampR\004time\"J\n\020StreamLSNRequest\022\036\n\nnames" +
-      "paces\030\001 \003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014R" +
-      "\006cursor\"F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001(" +
-      "\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\nnextCursor\"" +
-      "\031\n\027GetTransformInfoRequest\"\246\002\n\030GetTransf" +
-      "ormInfoResponse\022P\n\ntransforms\030\001 \003(\01320.ad" +
-      "iom.v1.GetTransformInfoResponse.Transfor" +
-      "mInfoR\ntransforms\0224\n\026use_multiple_respon" +
-      "ses\030\002 \001(\010R\024useMultipleResponses\032\201\001\n\rTran" +
-      "sformInfo\0225\n\014request_type\030\001 \001(\0162\022.adiom." +
-      "v1.DataTypeR\013requestType\0229\n\016response_typ" +
-      "es\030\002 \003(\0162\022.adiom.v1.DataTypeR\rresponseTy" +
-      "pes\"\343\001\n\023GetTransformRequest\022\034\n\tnamespace" +
-      "\030\001 \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adi" +
-      "om.v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004dat" +
-      "a\0225\n\014request_type\030\004 \001(\0162\022.adiom.v1.DataT" +
-      "ypeR\013requestType\0227\n\rresponse_type\030\005 \001(\0162" +
-      "\022.adiom.v1.DataTypeR\014responseType\"q\n\021Tra" +
-      "nsformResponse\022\034\n\tnamespace\030\001 \001(\tR\tnames" +
-      "pace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR" +
-      "\007updates\022\022\n\004data\030\003 \003(\014R\004data\"\257\001\n\024GetTran" +
-      "sformResponse\022\034\n\tnamespace\030\001 \001(\tR\tnamesp" +
-      "ace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007" +
-      "updates\022\022\n\004data\030\003 \003(\014R\004data\0229\n\tresponses" +
-      "\030\004 \003(\0132\033.adiom.v1.TransformResponseR\tres" +
-      "ponses*R\n\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020" +
-      "\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE" +
-      "_JSON_ID\020\002*m\n\nUpdateType\022\027\n\023UPDATE_TYPE_" +
-      "UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPD" +
-      "ATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020" +
-      "\003B2Z0github.com/adiom-data/dsync/gen/adi" +
-      "om/v1;adiomv1b\006proto3"
+      "nR\021updatesPartitions\"\235\001\n\006Update\022#\n\002id\030\001 " +
+      "\003(\0132\023.adiom.v1.BsonValueR\002id\022(\n\004type\030\002 \001" +
+      "(\0162\024.adiom.v1.UpdateTypeR\004type\022\022\n\004data\030\003" +
+      " \001(\014R\004data\0220\n\024partial_update_unset\030\004 \003(\t" +
+      "R\022partialUpdateUnset\"\204\001\n\017ListDataRequest" +
+      "\0221\n\tpartition\030\001 \001(\0132\023.adiom.v1.Partition" +
+      "R\tpartition\022&\n\004type\030\002 \001(\0162\022.adiom.v1.Dat" +
+      "aTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020L" +
+      "istDataResponse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013n" +
+      "ext_cursor\030\002 \001(\014R\nnextCursor\"l\n\020WriteDat" +
+      "aRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022\022" +
+      "\n\004data\030\002 \003(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom" +
+      ".v1.DataTypeR\004type\"\023\n\021WriteDataResponse\"" +
+      "\207\001\n\023WriteUpdatesRequest\022\034\n\tnamespace\030\001 \001" +
+      "(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom.v" +
+      "1.UpdateR\007updates\022&\n\004type\030\003 \001(\0162\022.adiom." +
+      "v1.DataTypeR\004type\"\026\n\024WriteUpdatesRespons" +
+      "e\"v\n\024StreamUpdatesRequest\022\036\n\nnamespaces\030" +
+      "\001 \003(\tR\nnamespaces\022&\n\004type\030\002 \001(\0162\022.adiom." +
+      "v1.DataTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006curso" +
+      "r\"\262\001\n\025StreamUpdatesResponse\022*\n\007updates\030\001" +
+      " \003(\0132\020.adiom.v1.UpdateR\007updates\022\034\n\tnames" +
+      "pace\030\002 \001(\tR\tnamespace\022\037\n\013next_cursor\030\003 \001" +
+      "(\014R\nnextCursor\022.\n\004time\030\004 \001(\0132\032.google.pr" +
+      "otobuf.TimestampR\004time\"J\n\020StreamLSNReque" +
+      "st\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022\026\n\006cu" +
+      "rsor\030\002 \001(\014R\006cursor\"F\n\021StreamLSNResponse\022" +
+      "\020\n\003lsn\030\001 \001(\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\n" +
+      "nextCursor\"\031\n\027GetTransformInfoRequest\"\246\002" +
+      "\n\030GetTransformInfoResponse\022P\n\ntransforms" +
+      "\030\001 \003(\01320.adiom.v1.GetTransformInfoRespon" +
+      "se.TransformInfoR\ntransforms\0224\n\026use_mult" +
+      "iple_responses\030\002 \001(\010R\024useMultipleRespons" +
+      "es\032\201\001\n\rTransformInfo\0225\n\014request_type\030\001 \001" +
+      "(\0162\022.adiom.v1.DataTypeR\013requestType\0229\n\016r" +
+      "esponse_types\030\002 \003(\0162\022.adiom.v1.DataTypeR" +
+      "\rresponseTypes\"\343\001\n\023GetTransformRequest\022\034" +
+      "\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007updates\030" +
+      "\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n\004data" +
+      "\030\003 \003(\014R\004data\0225\n\014request_type\030\004 \001(\0162\022.adi" +
+      "om.v1.DataTypeR\013requestType\0227\n\rresponse_" +
+      "type\030\005 \001(\0162\022.adiom.v1.DataTypeR\014response" +
+      "Type\"q\n\021TransformResponse\022\034\n\tnamespace\030\001" +
+      " \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom" +
+      ".v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\"" +
+      "\257\001\n\024GetTransformResponse\022\034\n\tnamespace\030\001 " +
+      "\001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom." +
+      "v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\0229" +
+      "\n\tresponses\030\004 \003(\0132\033.adiom.v1.TransformRe" +
+      "sponseR\tresponses*R\n\010DataType\022\025\n\021DATA_TY" +
+      "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
+      "\n\021DATA_TYPE_JSON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023" +
+      "UPDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INS" +
+      "ERT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_" +
+      "TYPE_DELETE\020\003\022\036\n\032UPDATE_TYPE_PARTIAL_UPD" +
+      "ATE\020\004B2Z0github.com/adiom-data/dsync/gen" +
+      "/adiom/v1;adiomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -23829,7 +24054,7 @@ public final class Messages {
     internal_static_adiom_v1_Update_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Update_descriptor,
-        new java.lang.String[] { "Id", "Type", "Data", });
+        new java.lang.String[] { "Id", "Type", "Data", "PartialUpdateUnset", });
     internal_static_adiom_v1_ListDataRequest_descriptor =
       getDescriptor().getMessageTypes().get(11);
     internal_static_adiom_v1_ListDataRequest_fieldAccessorTable = new

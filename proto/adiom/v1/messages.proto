@@ -99,12 +99,14 @@ enum UpdateType {
     UPDATE_TYPE_INSERT = 1;
     UPDATE_TYPE_UPDATE = 2;
     UPDATE_TYPE_DELETE = 3;
+    UPDATE_TYPE_PARTIAL_UPDATE = 4;
 }
 
 message Update {
     repeated BsonValue id = 1;
     UpdateType type = 2;
     bytes data = 3;
+    repeated string partial_update_unset = 4;
 }
 
 message ListDataRequest {
