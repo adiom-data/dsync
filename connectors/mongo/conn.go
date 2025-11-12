@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"regexp"
 	"slices"
 	"strings"
@@ -866,7 +867,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 				if !errors.Is(err, context.Canceled) {
 					slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
 				}
-				return nil, connect.NewError(connect.CodeInternal, err)
+				return nil, maybeUnavailableError(err)
 			}
 			batch = nil
 		}
@@ -877,7 +878,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
 			}
-			return nil, connect.NewError(connect.CodeInternal, err)
+			return nil, maybeUnavailableError(err)
 		}
 	}
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
@@ -948,7 +949,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, maybeUnavailableError(err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
@@ -1009,4 +1010,15 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 		cleanupInterval: 5 * time.Minute,
 		query:           query,
 	}
+}
+
+func maybeUnavailableError(err error) error {
+	if mongo.IsNetworkError(err) {
+		return connect.NewError(connect.CodeUnavailable, err)
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return connect.NewError(connect.CodeUnavailable, err)
+	}
+	return connect.NewError(connect.CodeInternal, err)
 }
