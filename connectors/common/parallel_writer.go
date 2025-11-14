@@ -85,27 +85,24 @@ func NewParallelWriter(ctx context.Context, connector ParallelWriterConnector, n
 func (bwa *ParallelWriter) Start() {
 	// create and start the workers
 	bwa.workers = make([]writerWorker, bwa.numWorkers)
+
+	var eg errgroup.Group
+	go func() {
+		err := eg.Wait()
+		close(bwa.blockBarrier)
+		bwa.done <- err
+	}()
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i] = newWriterWorker(bwa, i, bwa.maxBatchSize, bwa.multinamespace)
-		go func() {
-			res := bwa.workers[i].run()
-			bwa.done <- res
-		}()
+		eg.Go(func() error {
+			defer close(bwa.workers[i].queue)
+			return bwa.workers[i].run()
+		})
 	}
 }
 
 func (bwa *ParallelWriter) StopAndWait() error {
-	for _, worker := range bwa.workers {
-		close(worker.queue)
-	}
-	var err error
-	for i := 0; i < bwa.numWorkers; i++ {
-		res := <-bwa.done
-		if err == nil && res != nil {
-			err = res
-		}
-	}
-	return err
+	return <-bwa.done
 }
 
 func hashDataMsgId(dataMsg iface.DataMessage) int {
