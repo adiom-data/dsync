@@ -20,6 +20,7 @@ import (
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/metrics"
 	"github.com/adiom-data/dsync/protocol/iface"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cespare/xxhash"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
@@ -47,6 +48,7 @@ type ConnectorSettings struct {
 
 	UniqueIndexNamespaces map[string]struct{}
 	InitialSyncIndexHint  string
+	IsolateOnWriteError   []string
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -904,6 +906,46 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	return nil
 }
 
+func maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isolateOnWriteError []string, models []mongo.WriteModel, originalErr error) error {
+	if len(isolateOnWriteError) > 0 {
+		key := time.Now().UnixNano()
+		var isolatedRetry []mongo.WriteModel
+		var bwErrWriteErrors mongo.BulkWriteException
+		if errors.As(originalErr, &bwErrWriteErrors) {
+			for _, we := range bwErrWriteErrors.WriteErrors {
+				for _, possibleError := range isolateOnWriteError {
+					if strings.Contains(we.Message, possibleError) {
+						slog.Warn("Detected isolatable retry", "msg", we.Message, "key", key)
+						metrics.IsolatedRetry(collection.Database().Name() + "." + collection.Name())
+						isolatedRetry = append(isolatedRetry, models[we.Index])
+					}
+				}
+			}
+		}
+		// Only attempt retries if there are no unaccounted errors
+		if len(isolatedRetry) > 0 {
+			if len(isolatedRetry) == len(bwErrWriteErrors.WriteErrors) {
+				slog.Warn("Retrying isolatable retries.", "count", len(isolatedRetry), "key", key)
+				for _, writeModel := range isolatedRetry {
+					backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+					if retryErr := backoff.Retry(func() error {
+						_, err := collection.BulkWrite(ctx, []mongo.WriteModel{writeModel})
+						return err
+					}, backoffConfig); retryErr != nil {
+						slog.Error("Isolated retry still failed", "retryErr", retryErr, "err", originalErr, "key", key)
+						metrics.IsolatedRetryError(collection.Database().Name() + "." + collection.Name())
+						return originalErr
+					}
+				}
+				return nil
+			} else {
+				slog.Warn("There are other erros other than isolatable retries, not retrying.", "count", len(isolatedRetry), "total", len(bwErrWriteErrors.WriteErrors), "key", key)
+			}
+		}
+	}
+	return originalErr
+}
+
 // inserts data and overwrites on conflict
 func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}, ignoreSecondDuplicateError bool) error {
 	// eagerly attempt an unordered insert
@@ -1111,10 +1153,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 						slog.Debug("not all duplicate errors", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
 					}
 				}
-				if !errors.Is(err, context.Canceled) {
-					slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
+				if err := maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
+					}
+					return nil, maybeUnavailableError(err)
 				}
-				return nil, maybeUnavailableError(err)
 			}
 			return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 		}
@@ -1122,10 +1166,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 
 	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
 	if err != nil {
-		if !errors.Is(err, context.Canceled) {
-			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
+		if err := maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
+			}
+			return nil, maybeUnavailableError(err)
 		}
-		return nil, maybeUnavailableError(err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil

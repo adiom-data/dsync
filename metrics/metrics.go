@@ -63,6 +63,16 @@ func VerifyCount(ns string, left int64, right int64) {
 	_ = st.Gauge(prefix+"verify_count_right", float64(right), tags, 1)
 }
 
+func IsolatedRetry(ns string) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Count(prefix+"isolated_retry", 1, tags, 1)
+}
+
+func IsolatedRetryError(ns string) {
+	tags := []string{"namespace:" + ns}
+	_ = st.Count(prefix+"isolated_retry_error", 1, tags, 1)
+}
+
 func PrefixAndClient() (string, statsd.ClientInterface) {
 	return prefix, st
 }

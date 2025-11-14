@@ -372,6 +372,10 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Usage:       "name of index for initial sync to pass as a hint",
 						Destination: &settings.InitialSyncIndexHint,
 					}),
+					altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+						Name:  "isolate-update-errors",
+						Usage: "if error contains this text when we try to update a document, retry it by itself",
+					}),
 				}...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
 					if len(uniqueIndexNamespacesSlice) > 0 {
@@ -380,6 +384,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 							settings.UniqueIndexNamespaces[ns] = struct{}{}
 						}
 					}
+					settings.IsolateOnWriteError = c.StringSlice("isolate-update-errors")
 
 					return mongo.NewConn(settings)
 				})(args, as)
