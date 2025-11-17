@@ -89,15 +89,13 @@ func (bwa *ParallelWriter) Start() {
 	var eg errgroup.Group
 	go func() {
 		err := eg.Wait()
-		for i := 0; i < bwa.numWorkers; i++ {
-			close(bwa.workers[i].queue)
-		}
 		close(bwa.blockBarrier)
 		bwa.done <- err
 	}()
 	for i := 0; i < bwa.numWorkers; i++ {
 		bwa.workers[i] = newWriterWorker(bwa, i, bwa.maxBatchSize, bwa.multinamespace)
 		eg.Go(func() error {
+			defer close(bwa.workers[i].queue)
 			return bwa.workers[i].run()
 		})
 	}
