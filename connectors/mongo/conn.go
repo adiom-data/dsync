@@ -909,19 +909,25 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 func maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isolateOnWriteError []string, models []mongo.WriteModel, originalErr error) error {
 	if len(isolateOnWriteError) > 0 {
 		key := time.Now().UnixNano()
+		slog.Warn("try isolate1", "key", key)
 		var isolatedRetry []mongo.WriteModel
 		var bwErrWriteErrors mongo.BulkWriteException
 		if errors.As(originalErr, &bwErrWriteErrors) {
+			slog.Warn("try isolate2", "key", key)
 			for _, we := range bwErrWriteErrors.WriteErrors {
 				for _, possibleError := range isolateOnWriteError {
+					slog.Warn("try isolate3", "key", key, "msg", we.Message, "possible", isolateOnWriteError)
 					if strings.Contains(we.Message, possibleError) {
 						slog.Warn("Detected isolatable retry", "msg", we.Message, "key", key)
 						metrics.IsolatedRetry(collection.Database().Name() + "." + collection.Name())
 						isolatedRetry = append(isolatedRetry, models[we.Index])
+					} else {
+						slog.Warn("try isolate4", "key", key, "msg", we.Message, "possible", isolateOnWriteError, "match", false)
 					}
 				}
 			}
 		}
+		slog.Warn("try isolate5", "key", key, "numfound", len(isolatedRetry), "total", len(bwErrWriteErrors.WriteErrors))
 		// Only attempt retries if there are no unaccounted errors
 		if len(isolatedRetry) > 0 {
 			if len(isolatedRetry) == len(bwErrWriteErrors.WriteErrors) {
