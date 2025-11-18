@@ -46,9 +46,11 @@ type ConnectorSettings struct {
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 
-	UniqueIndexNamespaces map[string]struct{}
-	InitialSyncIndexHint  string
-	IsolateOnWriteError   []string
+	UniqueIndexNamespaces              map[string]struct{}
+	SkipInitialSyncDuplicateNamespaces map[string]struct{}
+	InitialSyncIndexHint               string
+	IsolateOnWriteError                []string
+	DebugChangeStream                  bool
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -833,8 +835,21 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			slog.Error(fmt.Sprintf("Failed to convert change stream event to data message: %v", err))
 			continue
 		}
+		var id any
+		if documentKey, ok := change["documentKey"]; ok {
+			if documentKeyBsonM, ok2 := documentKey.(bson.M); ok2 {
+				id = documentKeyBsonM["_id"]
+			}
+		}
 		if update == nil {
+			if c.settings.DebugChangeStream {
+				slog.Warn("skipping event", "event", change, "id", id)
+			}
 			continue
+		} else {
+			if c.settings.DebugChangeStream {
+				slog.Warn("got event", "event", change, "id", id)
+			}
 		}
 
 		db := change["ns"].(bson.M)["db"].(string)
@@ -1029,7 +1044,9 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
-	_, ignoreSecondDuplicateError := c.settings.UniqueIndexNamespaces[r.Msg.GetNamespace()]
+	_, uniqueIndexNamespace := c.settings.UniqueIndexNamespaces[r.Msg.GetNamespace()]
+	_, skipInitialSyncDuplicateNamespace := c.settings.SkipInitialSyncDuplicateNamespaces[r.Msg.GetNamespace()]
+	ignoreSecondDuplicateError := uniqueIndexNamespace || skipInitialSyncDuplicateNamespace
 
 	var batch []interface{}
 	for _, data := range r.Msg.GetData() {

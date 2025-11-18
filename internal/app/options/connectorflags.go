@@ -376,12 +376,28 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Name:  "isolate-update-errors",
 						Usage: "if error contains this text when we try to update a document, retry it by itself",
 					}),
+					altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+						Name:  "skip-initial-sync-duplicate-namespace",
+						Usage: "repeatable unique index namespace",
+					}),
+					altsrc.NewBoolFlag(&cli.BoolFlag{
+						Name:        "debug-change-stream",
+						Usage:       "debugging only",
+						Destination: &settings.DebugChangeStream,
+					}),
 				}...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
 					if len(uniqueIndexNamespacesSlice) > 0 {
 						settings.UniqueIndexNamespaces = map[string]struct{}{}
 						for _, ns := range uniqueIndexNamespacesSlice {
 							settings.UniqueIndexNamespaces[ns] = struct{}{}
+						}
+					}
+					skipDuplicateNamespaceSlice := c.StringSlice("skip-initial-sync-duplicate-namespace")
+					if len(skipDuplicateNamespaceSlice) > 0 {
+						settings.SkipInitialSyncDuplicateNamespaces = map[string]struct{}{}
+						for _, ns := range skipDuplicateNamespaceSlice {
+							settings.SkipInitialSyncDuplicateNamespaces[ns] = struct{}{}
 						}
 					}
 					settings.IsolateOnWriteError = c.StringSlice("isolate-update-errors")
