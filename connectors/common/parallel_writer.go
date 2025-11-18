@@ -142,9 +142,7 @@ func (bwa *ParallelWriter) ScheduleDataMessage(dataMsg iface.DataMessage) error 
 		}
 	}
 	// add the message to the worker's queue
-	bwa.workers[workerId].addMessage(dataMsg)
-
-	return nil
+	return bwa.workers[workerId].addMessage(dataMsg)
 }
 
 // Processes a barrier
@@ -171,12 +169,18 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 		bwa.resumeTokenBarrierWorkersCountdown.Store(int32(bwa.numWorkers))
 	}
 
-	bwa.BroadcastMessage(barrierMsg)
+	if err := bwa.BroadcastMessage(barrierMsg); err != nil {
+		return err
+	}
 
 	if barrierMsg.BarrierType == iface.BarrierType_Block {
 		slog.Debug("Blocking barrier encountered.")
 		for i := 0; i < bwa.numWorkers; i++ {
-			<-bwa.blockBarrier
+			select {
+			case <-bwa.blockBarrier:
+			case <-bwa.ctx.Done():
+				return fmt.Errorf("writer closed")
+			}
 		}
 		slog.Debug("Blocking barrier unblocked.")
 	}
@@ -185,10 +189,14 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 }
 
 // Broadcasts message to all workers
-func (bwa *ParallelWriter) BroadcastMessage(dataMsg iface.DataMessage) {
+func (bwa *ParallelWriter) BroadcastMessage(dataMsg iface.DataMessage) error {
 	for i := 0; i < bwa.numWorkers; i++ {
-		bwa.workers[i].addMessage(dataMsg)
+		err := bwa.workers[i].addMessage(dataMsg)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // ----------------
@@ -361,11 +369,20 @@ func (ww *writerWorker) run() error {
 }
 
 // Adds a message to the worker's queue
-func (ww *writerWorker) addMessage(msg iface.DataMessage) {
-	ww.queue <- msg
+func (ww *writerWorker) addMessage(msg iface.DataMessage) error {
+	select {
+	case ww.queue <- msg:
+	case <-ww.parallelWriter.ctx.Done():
+		return fmt.Errorf("writer closed")
+	}
 	if ww.clogSize > 0 && msg.MutationType == iface.MutationType_InsertBatch {
 		for range ww.clogSize {
-			ww.queue <- iface.DataMessage{MutationType: iface.MutationType_Ignore}
+			select {
+			case ww.queue <- iface.DataMessage{MutationType: iface.MutationType_Ignore}:
+			case <-ww.parallelWriter.ctx.Done():
+				return fmt.Errorf("writer closed")
+			}
 		}
 	}
+	return nil
 }
