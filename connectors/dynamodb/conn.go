@@ -52,6 +52,21 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	stateMap := map[string]stream.StreamState{}
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(c.options.PlanParallelism)
+
+	go func() {
+		defer close(gatheringPartitions)
+		for partition := range partitionsCh {
+			partitions = append(partitions, partition)
+		}
+	}()
+
+	go func() {
+		defer close(gatheringStates)
+		for state := range statesCh {
+			stateMap[state.StreamARN] = state
+		}
+	}()
+
 	for _, name := range tableNames {
 		eg.Go(func() error {
 			tableDetails, err := c.client.TableDetails(egCtx, name)
@@ -110,20 +125,6 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			return nil
 		})
 	}
-
-	go func() {
-		defer close(gatheringPartitions)
-		for partition := range partitionsCh {
-			partitions = append(partitions, partition)
-		}
-	}()
-
-	go func() {
-		defer close(gatheringStates)
-		for state := range statesCh {
-			stateMap[state.StreamARN] = state
-		}
-	}()
 
 	err := eg.Wait()
 	close(partitionsCh)
