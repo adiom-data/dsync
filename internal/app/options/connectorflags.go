@@ -706,6 +706,12 @@ func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
 			Value:       postgresSettingsDefault.TargetDocCountPerPartition,
 			Destination: &settings.TargetDocCountPerPartition,
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "enable-replica-mode",
+			Usage:       "Enable replica mode (SET session_replication_role = 'replica') for sink operations. This disables triggers and rules.",
+			Value:       postgresSettingsDefault.EnableReplicaMode,
+			Destination: &settings.EnableReplicaMode,
+		}),
 	}
 }
 

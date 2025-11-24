@@ -45,6 +45,10 @@ type PostgresSettings struct {
 
 	EstimatedCountThreshold    int64
 	TargetDocCountPerPartition int64
+
+	// When true, sets session_replication_role = 'replica' for sink operations
+	// This disables triggers and rules, useful when replicating data
+	EnableReplicaMode bool
 }
 
 type conn struct {
@@ -169,6 +173,14 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 
 	afterConnect := func(ctx context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
+
+		// Enable replica mode for sink operations if requested
+		if settings.EnableReplicaMode {
+			if _, err := conn.Exec(ctx, "SET session_replication_role = 'replica'"); err != nil {
+				return fmt.Errorf("failed to set session_replication_role: %w", err)
+			}
+		}
+
 		return nil
 	}
 	config, err := pgxpool.ParseConfig(url)
