@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,6 +18,8 @@ var (
 	tDecimal128    = reflect.TypeOf(primitive.Decimal128{})
 	tPtrDecimal    = reflect.TypeOf((*decimal.Decimal)(nil))
 	tPtrDecimal128 = reflect.TypeOf((*primitive.Decimal128)(nil))
+	tTime          = reflect.TypeOf(time.Time{})
+	tDateTime      = reflect.TypeOf(primitive.DateTime(0))
 )
 
 // decimalCodec handles encoding/decoding between decimal.Decimal and primitive.Decimal128
@@ -90,6 +93,66 @@ func (dc *decimalCodec) DecodeValue(dc2 bsoncodec.DecodeContext, vr bsonrw.Value
 	return nil
 }
 
+// dateTimeCodec handles encoding/decoding between time.Time and primitive.DateTime
+type dateTimeCodec struct{}
+
+var _ bsoncodec.ValueCodec = &dateTimeCodec{}
+
+// EncodeValue encodes a time.Time to a BSON DateTime
+func (dtc *dateTimeCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != tTime {
+		return bsoncodec.ValueEncoderError{
+			Name:     "DateTimeEncodeValue",
+			Types:    []reflect.Type{tTime},
+			Received: val,
+		}
+	}
+
+	t := val.Interface().(time.Time)
+	dt := primitive.NewDateTimeFromTime(t)
+	return vw.WriteDateTime(int64(dt))
+}
+
+// DecodeValue decodes a BSON DateTime to a time.Time
+func (dtc *dateTimeCodec) DecodeValue(dc bsoncodec.DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+	if !val.CanSet() || val.Type() != tTime {
+		return bsoncodec.ValueDecoderError{
+			Name:     "DateTimeDecodeValue",
+			Types:    []reflect.Type{tTime},
+			Received: val,
+		}
+	}
+
+	var dt int64
+	switch vr.Type() {
+	case bsontype.DateTime:
+		var err error
+		dt, err = vr.ReadDateTime()
+		if err != nil {
+			return err
+		}
+	case bsontype.Null:
+		if err := vr.ReadNull(); err != nil {
+			return err
+		}
+		val.Set(reflect.Zero(tTime))
+		return nil
+	case bsontype.Undefined:
+		if err := vr.ReadUndefined(); err != nil {
+			return err
+		}
+		val.Set(reflect.Zero(tTime))
+		return nil
+	default:
+		return fmt.Errorf("cannot decode %v into a time.Time", vr.Type())
+	}
+
+	// Convert primitive.DateTime to time.Time
+	t := primitive.DateTime(dt).Time()
+	val.Set(reflect.ValueOf(t))
+	return nil
+}
+
 // NewBSONRegistry creates a new BSON registry with decimal.Decimal support
 func NewBSONRegistry() *bsoncodec.Registry {
 	rb := bson.NewRegistryBuilder()
@@ -98,6 +161,11 @@ func NewBSONRegistry() *bsoncodec.Registry {
 	codec := &decimalCodec{}
 	rb.RegisterTypeEncoder(tDecimal, codec)
 	rb.RegisterTypeDecoder(tDecimal, codec)
+
+	// Register the dateTime codec for time.Time type
+	dtCodec := &dateTimeCodec{}
+	//rb.RegisterTypeEncoder(tTime, dtCodec) //we don't need custom encoder for time.Time
+	rb.RegisterTypeDecoder(tTime, dtCodec)
 
 	return rb.Build()
 }
