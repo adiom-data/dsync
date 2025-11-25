@@ -656,17 +656,6 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 	return nil
 }
 
-// bsonToMap converts BSON data to a map[string]interface{} excluding the _id field
-func bsonToMap(reg *bsoncodec.Registry, data []byte) (map[string]interface{}, error) {
-	var m map[string]interface{}
-	if err := bson.UnmarshalWithRegistry(reg, data, &m); err != nil {
-		return nil, err
-	}
-	// Remove _id as it's a synthetic field for postgres
-	delete(m, "_id")
-	return m, nil
-}
-
 // buildUpsertQuery creates an INSERT ... ON CONFLICT ... DO UPDATE query for postgres
 func buildUpsertQuery(namespace string, pkeys []string, columns []string) string {
 	sanitizedNamespace := SanitizeNamespace(namespace)
@@ -782,6 +771,9 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to insert document %d: %v", i, err))
+				for key, value := range documents[i] {
+					slog.Debug("Document field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
+				}
 			}
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}

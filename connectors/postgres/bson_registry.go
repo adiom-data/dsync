@@ -149,7 +149,7 @@ func (dtc *dateTimeCodec) DecodeValue(dc bsoncodec.DecodeContext, vr bsonrw.Valu
 
 	// Convert primitive.DateTime to time.Time
 	t := primitive.DateTime(dt).Time()
-	val.Set(reflect.ValueOf(t))
+	val.Set(reflect.ValueOf(t.UTC()))
 	return nil
 }
 
@@ -166,6 +166,9 @@ func NewBSONRegistry() *bsoncodec.Registry {
 	dtCodec := &dateTimeCodec{}
 	//rb.RegisterTypeEncoder(tTime, dtCodec) //we don't need custom encoder for time.Time
 	rb.RegisterTypeDecoder(tTime, dtCodec)
+
+	rb.RegisterTypeMapEntry(bsontype.DateTime, tTime)
+	rb.RegisterTypeMapEntry(bsontype.Decimal128, tDecimal)
 
 	return rb.Build()
 }
