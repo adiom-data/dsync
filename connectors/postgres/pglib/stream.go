@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 )
 
 type UpdateType int
@@ -160,6 +162,8 @@ func (c *ChangeStream) Run(ctx context.Context, ch chan<- []Update) error {
 		relations:              map[uint32]*pglogrepl.RelationMessageV2{},
 		typeMap:                pgtype.NewMap(),
 	}
+
+	pgxdecimal.Register(state.typeMap)
 
 	fh := flushHelper{
 		items:       []flushLSNDeadline{},

@@ -949,6 +949,14 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to execute update %d: %v", i, err))
+				if operations[i].isDelete {
+					slog.Debug("Failed delete operation", "pkValues", operations[i].pkValues)
+				} else {
+					slog.Debug("Failed insert/update operation")
+					for key, value := range operations[i].data {
+						slog.Debug("Operation field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
+					}
+				}
 			}
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
