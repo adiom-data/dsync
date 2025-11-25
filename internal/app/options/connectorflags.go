@@ -652,6 +652,7 @@ var postgresSettingsDefault = postgres.PostgresSettings{
 	StreamFlushDelay:           time.Minute * 3,
 	EstimatedCountThreshold:    1000000,
 	TargetDocCountPerPartition: 100000,
+	EnableReplicaMode:          true,
 }
 
 func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
