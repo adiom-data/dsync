@@ -14,12 +14,8 @@ import (
 )
 
 var (
-	tDecimal       = reflect.TypeOf(decimal.Decimal{})
-	tDecimal128    = reflect.TypeOf(primitive.Decimal128{})
-	tPtrDecimal    = reflect.TypeOf((*decimal.Decimal)(nil))
-	tPtrDecimal128 = reflect.TypeOf((*primitive.Decimal128)(nil))
-	tTime          = reflect.TypeOf(time.Time{})
-	tDateTime      = reflect.TypeOf(primitive.DateTime(0))
+	tDecimal = reflect.TypeOf(decimal.Decimal{})
+	tTime    = reflect.TypeOf(time.Time{})
 )
 
 // decimalCodec handles encoding/decoding between decimal.Decimal and primitive.Decimal128
