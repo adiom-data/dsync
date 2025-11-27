@@ -42,6 +42,10 @@ type Teardownable interface {
 	Teardown()
 }
 
+type OnTaskCompletionBarrierHandlerServicable interface {
+	OnTaskCompletionBarrierHandler(string, uint)
+}
+
 type ConnectorSettings struct {
 	NumParallelCopiers        int
 	NumParallelWriters        int
@@ -984,6 +988,10 @@ func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 		// notify the coordinator that the task is done from our side
 		if err := c.coord.NotifyTaskDone(c.flowID, c.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
+		}
+		// Call the optional OnTaskCompletionBarrier hook if implemented
+		if onTaskCompletionBarrierHandlerServicable, ok := c.impl.(OnTaskCompletionBarrierHandlerServicable); ok {
+			onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.Loc, barrierMsg.BarrierTaskId)
 		}
 		return nil
 	case iface.BarrierType_CdcResumeTokenUpdate:
