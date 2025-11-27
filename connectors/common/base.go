@@ -623,6 +623,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 											DataBatch:    r.GetData(),
 											MutationType: iface.MutationType_InsertBatch,
 											Loc:          destNs,
+											TaskId:       uint(task.Id),
 										}
 										dataChannel <- dataMessage
 									}
@@ -635,6 +636,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 										DataBatch:    transformed.Msg.GetData(),
 										MutationType: iface.MutationType_InsertBatch,
 										Loc:          destNs,
+										TaskId:       uint(task.Id),
 									}
 									dataChannel <- dataMessage
 								}
@@ -643,6 +645,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									DataBatch:    data,
 									MutationType: iface.MutationType_InsertBatch,
 									Loc:          destinationNamespace,
+									TaskId:       uint(task.Id),
 								}
 								dataChannel <- dataMessage
 							}
@@ -1080,6 +1083,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
 				Type:      c.settings.DestinationDataType,
+				TaskId:    uint32(dataMsg.TaskId),
 			}))
 			if err != nil {
 				return err
