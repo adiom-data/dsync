@@ -49,16 +49,6 @@ const (
 	EmbeddingServiceGetEmbeddingProcedure = "/adiom.v1.EmbeddingService/GetEmbedding"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	chunkingServiceServiceDescriptor                      = v1.File_adiom_v1_vector_proto.Services().ByName("ChunkingService")
-	chunkingServiceGetSupportedDataTypesMethodDescriptor  = chunkingServiceServiceDescriptor.Methods().ByName("GetSupportedDataTypes")
-	chunkingServiceGetChunkedMethodDescriptor             = chunkingServiceServiceDescriptor.Methods().ByName("GetChunked")
-	embeddingServiceServiceDescriptor                     = v1.File_adiom_v1_vector_proto.Services().ByName("EmbeddingService")
-	embeddingServiceGetSupportedDataTypesMethodDescriptor = embeddingServiceServiceDescriptor.Methods().ByName("GetSupportedDataTypes")
-	embeddingServiceGetEmbeddingMethodDescriptor          = embeddingServiceServiceDescriptor.Methods().ByName("GetEmbedding")
-)
-
 // ChunkingServiceClient is a client for the adiom.v1.ChunkingService service.
 type ChunkingServiceClient interface {
 	GetSupportedDataTypes(context.Context, *connect.Request[v1.GetSupportedDataTypesRequest]) (*connect.Response[v1.GetSupportedDataTypesResponse], error)
@@ -74,17 +64,18 @@ type ChunkingServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewChunkingServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ChunkingServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	chunkingServiceMethods := v1.File_adiom_v1_vector_proto.Services().ByName("ChunkingService").Methods()
 	return &chunkingServiceClient{
 		getSupportedDataTypes: connect.NewClient[v1.GetSupportedDataTypesRequest, v1.GetSupportedDataTypesResponse](
 			httpClient,
 			baseURL+ChunkingServiceGetSupportedDataTypesProcedure,
-			connect.WithSchema(chunkingServiceGetSupportedDataTypesMethodDescriptor),
+			connect.WithSchema(chunkingServiceMethods.ByName("GetSupportedDataTypes")),
 			connect.WithClientOptions(opts...),
 		),
 		getChunked: connect.NewClient[v1.GetChunkedRequest, v1.GetChunkedResponse](
 			httpClient,
 			baseURL+ChunkingServiceGetChunkedProcedure,
-			connect.WithSchema(chunkingServiceGetChunkedMethodDescriptor),
+			connect.WithSchema(chunkingServiceMethods.ByName("GetChunked")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -118,16 +109,17 @@ type ChunkingServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewChunkingServiceHandler(svc ChunkingServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	chunkingServiceMethods := v1.File_adiom_v1_vector_proto.Services().ByName("ChunkingService").Methods()
 	chunkingServiceGetSupportedDataTypesHandler := connect.NewUnaryHandler(
 		ChunkingServiceGetSupportedDataTypesProcedure,
 		svc.GetSupportedDataTypes,
-		connect.WithSchema(chunkingServiceGetSupportedDataTypesMethodDescriptor),
+		connect.WithSchema(chunkingServiceMethods.ByName("GetSupportedDataTypes")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chunkingServiceGetChunkedHandler := connect.NewUnaryHandler(
 		ChunkingServiceGetChunkedProcedure,
 		svc.GetChunked,
-		connect.WithSchema(chunkingServiceGetChunkedMethodDescriptor),
+		connect.WithSchema(chunkingServiceMethods.ByName("GetChunked")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/adiom.v1.ChunkingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -168,17 +160,18 @@ type EmbeddingServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewEmbeddingServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EmbeddingServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	embeddingServiceMethods := v1.File_adiom_v1_vector_proto.Services().ByName("EmbeddingService").Methods()
 	return &embeddingServiceClient{
 		getSupportedDataTypes: connect.NewClient[v1.GetSupportedDataTypesRequest, v1.GetSupportedDataTypesResponse](
 			httpClient,
 			baseURL+EmbeddingServiceGetSupportedDataTypesProcedure,
-			connect.WithSchema(embeddingServiceGetSupportedDataTypesMethodDescriptor),
+			connect.WithSchema(embeddingServiceMethods.ByName("GetSupportedDataTypes")),
 			connect.WithClientOptions(opts...),
 		),
 		getEmbedding: connect.NewClient[v1.GetEmbeddingRequest, v1.GetEmbeddingResponse](
 			httpClient,
 			baseURL+EmbeddingServiceGetEmbeddingProcedure,
-			connect.WithSchema(embeddingServiceGetEmbeddingMethodDescriptor),
+			connect.WithSchema(embeddingServiceMethods.ByName("GetEmbedding")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -212,16 +205,17 @@ type EmbeddingServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewEmbeddingServiceHandler(svc EmbeddingServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	embeddingServiceMethods := v1.File_adiom_v1_vector_proto.Services().ByName("EmbeddingService").Methods()
 	embeddingServiceGetSupportedDataTypesHandler := connect.NewUnaryHandler(
 		EmbeddingServiceGetSupportedDataTypesProcedure,
 		svc.GetSupportedDataTypes,
-		connect.WithSchema(embeddingServiceGetSupportedDataTypesMethodDescriptor),
+		connect.WithSchema(embeddingServiceMethods.ByName("GetSupportedDataTypes")),
 		connect.WithHandlerOptions(opts...),
 	)
 	embeddingServiceGetEmbeddingHandler := connect.NewUnaryHandler(
 		EmbeddingServiceGetEmbeddingProcedure,
 		svc.GetEmbedding,
-		connect.WithSchema(embeddingServiceGetEmbeddingMethodDescriptor),
+		connect.WithSchema(embeddingServiceMethods.ByName("GetEmbedding")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/adiom.v1.EmbeddingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
