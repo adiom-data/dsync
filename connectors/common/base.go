@@ -989,8 +989,9 @@ func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 		if err := c.coord.NotifyTaskDone(c.flowID, c.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
 		}
+
 		// Call the optional OnTaskCompletionBarrier hook if implemented
-		if onTaskCompletionBarrierHandlerServicable, ok := c.impl.(OnTaskCompletionBarrierHandlerServicable); ok {
+		if onTaskCompletionBarrierHandlerServicable, ok := c.maybeOptimizedImpl.(OnTaskCompletionBarrierHandlerServicable); ok {
 			onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.Loc, barrierMsg.BarrierTaskId)
 		}
 		return nil
