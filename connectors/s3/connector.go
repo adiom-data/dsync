@@ -24,6 +24,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -165,6 +166,8 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 	filterByNamespace := len(requestedNamespaces) > 0
 
 	var partitions []*adiomv1.Partition
+	// Track which namespaces we've seen to load metadata once per namespace
+	namespaceMetadataCache := make(map[string]map[string]uint64)
 
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
@@ -174,8 +177,12 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 
 		for _, obj := range page.Contents {
 			key := aws.ToString(obj.Key)
-			// Only treat JSON files as tasks
+			// Only treat JSON files as tasks (skip metadata files)
 			if !strings.HasSuffix(strings.ToLower(key), ".json") {
+				continue
+			}
+			// Skip metadata files
+			if strings.HasSuffix(key, ".metadata.json") {
 				continue
 			}
 
@@ -203,10 +210,31 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 				}
 			}
 
+			// Load metadata for this namespace if not already cached
+			if _, ok := namespaceMetadataCache[namespace]; !ok {
+				metadata, err := c.readMetadata(ctx, namespace)
+				if err != nil {
+					slog.Warn("failed to read metadata file for namespace, using default count", "namespace", namespace, "err", err)
+				}
+				if metadata == nil {
+					slog.Warn("metadata file not found for namespace, using default count", "namespace", namespace)
+				}
+				namespaceMetadataCache[namespace] = metadata
+			}
+
+			// Get estimated count from metadata
+			estimatedCount := uint64(0)
+			if namespaceMetadataCache[namespace] != nil {
+				fileName := path.Base(key)
+				if count, ok := namespaceMetadataCache[namespace][fileName]; ok {
+					estimatedCount = count
+				}
+			}
+
 			partitions = append(partitions, &adiomv1.Partition{
 				Namespace:      namespace,
 				Cursor:         []byte(key), // Use the S3 object key as the partition cursor
-				EstimatedCount: 0,           // Unknown; can be filled in later if needed
+				EstimatedCount: estimatedCount,
 			})
 		}
 	}
@@ -219,10 +247,38 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 }
 
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
-func (c *connector) GetNamespaceMetadata(context.Context, *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
-	// For now, return a stubbed count of 0 for all namespaces.
+func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
+	namespace := req.Msg.GetNamespace()
+	if namespace == "" {
+		return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
+			Count: 0,
+		}), nil
+	}
+
+	// Read metadata file for the namespace
+	metadata, err := c.readMetadata(ctx, namespace)
+	if err != nil {
+		slog.Warn("failed to read metadata file for namespace, using default count", "namespace", namespace, "err", err)
+		return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
+			Count: 0,
+		}), nil
+	}
+
+	if metadata == nil {
+		slog.Warn("metadata file not found for namespace, using default count", "namespace", namespace)
+		return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
+			Count: 0,
+		}), nil
+	}
+
+	// Sum up all record counts from the metadata
+	var totalCount uint64
+	for _, count := range metadata {
+		totalCount += count
+	}
+
 	return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
-		Count: 0,
+		Count: totalCount,
 	}), nil
 }
 
@@ -314,7 +370,7 @@ func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.Write
 	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("updates not supported by S3 connector"))
 }
 
-// OnTaskCompletionBarrierHandler flushes buffered data to S3.
+// OnTaskCompletionBarrierHandler flushes buffered data to S3 and updates metadata.
 func (c *connector) OnTaskCompletionBarrierHandler(taskID uint) error {
 	batch := c.detachBatch(taskID)
 	if batch == nil {
@@ -326,6 +382,15 @@ func (c *connector) OnTaskCompletionBarrierHandler(taskID uint) error {
 		c.setError(err)
 		return err
 	}
+
+	// Update metadata file atomically after successful flush
+	if len(batch.docs) > 0 {
+		if err := c.updateMetadataAfterFlush(context.Background(), batch.namespace, taskID, uint64(len(batch.docs))); err != nil {
+			slog.Error("failed to update metadata", "namespace", batch.namespace, "taskId", taskID, "err", err)
+			// Log error but don't fail the barrier - the data was successfully flushed
+		}
+	}
+
 	return nil
 }
 
@@ -428,4 +493,95 @@ func convertToJSON(data []byte, dataType adiomv1.DataType) ([]byte, error) {
 	default:
 		return nil, ErrUnsupportedType
 	}
+}
+
+// metadataKey returns the S3 key for the metadata file for a given namespace.
+func (c *connector) metadataKey(namespace string) string {
+	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
+	if nsPath == "" {
+		nsPath = "default"
+	}
+
+	prefix := strings.Trim(c.settings.Prefix, "/")
+	if prefix == "" {
+		return path.Join(nsPath, ".metadata.json")
+	}
+	return path.Join(prefix, nsPath, ".metadata.json")
+}
+
+// readMetadata reads the metadata.json file for a namespace from S3.
+// Returns nil, nil if the file doesn't exist.
+func (c *connector) readMetadata(ctx context.Context, namespace string) (map[string]uint64, error) {
+	key := c.metadataKey(namespace)
+	getOut, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.settings.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		// Check if it's a "NoSuchKey" error - this is expected if metadata file doesn't exist yet
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			// Check for NoSuchKey error code (used by S3)
+			if apiErr.ErrorCode() == "NoSuchKey" {
+				return nil, nil
+			}
+		}
+		return nil, fmt.Errorf("get metadata object %s: %w", key, err)
+	}
+	defer getOut.Body.Close()
+
+	var metadata map[string]uint64
+	if err := json.NewDecoder(getOut.Body).Decode(&metadata); err != nil {
+		return nil, fmt.Errorf("decode metadata json from %s: %w", key, err)
+	}
+	return metadata, nil
+}
+
+// writeMetadata atomically writes the metadata.json file for a namespace to S3.
+func (c *connector) writeMetadata(ctx context.Context, namespace string, metadata map[string]uint64) error {
+	key := c.metadataKey(namespace)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("marshal metadata json: %w", err)
+	}
+
+	_, err = c.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(c.settings.Bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(metadataJSON),
+		ContentType: aws.String("application/json"),
+	})
+	if err != nil {
+		return fmt.Errorf("put metadata object %s: %w", key, err)
+	}
+	return nil
+}
+
+// updateMetadataAfterFlush updates the metadata file after a batch has been flushed.
+// It reads the current metadata, adds/updates the file entry, and writes it back atomically.
+func (c *connector) updateMetadataAfterFlush(ctx context.Context, namespace string, taskID uint, recordCount uint64) error {
+	// Read current metadata (or create empty map if doesn't exist)
+	metadata, err := c.readMetadata(ctx, namespace)
+	if err != nil {
+		return fmt.Errorf("read metadata: %w", err)
+	}
+	if metadata == nil {
+		metadata = make(map[string]uint64)
+	}
+
+	// Get the file key that was just written
+	fileKey := c.objectKey(namespace, taskID)
+	// Extract just the filename for the metadata map
+	// The metadata should map filename -> record count
+	fileName := path.Base(fileKey)
+
+	// Update the metadata with the new file and record count
+	metadata[fileName] = recordCount
+
+	// Write back atomically
+	if err := c.writeMetadata(ctx, namespace, metadata); err != nil {
+		return fmt.Errorf("write metadata: %w", err)
+	}
+
+	return nil
 }
