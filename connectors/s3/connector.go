@@ -119,6 +119,14 @@ func (c *connector) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoReq
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
 		DbType: "s3",
 		Capabilities: &adiomv1.Capabilities{
+			Source: &adiomv1.Capabilities_Source{
+				SupportedDataTypes: []adiomv1.DataType{
+					adiomv1.DataType_DATA_TYPE_JSON_ID,
+				},
+				LsnStream:          false,
+				MultiNamespacePlan: true,
+				DefaultPlan:        true,
+			},
 			Sink: &adiomv1.Capabilities_Sink{
 				SupportedDataTypes: []adiomv1.DataType{
 					adiomv1.DataType_DATA_TYPE_MONGO_BSON,
@@ -130,18 +138,136 @@ func (c *connector) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoReq
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
-func (c *connector) GeneratePlan(context.Context, *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.ErrUnsupported)
+func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(c.settings.Bucket),
+	}
+
+	basePrefix := strings.Trim(c.settings.Prefix, "/")
+	if basePrefix != "" {
+		// Ensure we only list under the configured prefix
+		basePrefix = basePrefix + "/"
+		input.Prefix = aws.String(basePrefix)
+	}
+
+	paginator := s3.NewListObjectsV2Paginator(c.client, input)
+
+	// If namespaces are specified, only include tasks for those namespaces.
+	// If none are specified, include all discovered namespaces.
+	requestedNamespaces := map[string]struct{}{}
+	for _, ns := range req.Msg.GetNamespaces() {
+		ns = strings.TrimSpace(ns)
+		if ns == "" {
+			continue
+		}
+		requestedNamespaces[ns] = struct{}{}
+	}
+	filterByNamespace := len(requestedNamespaces) > 0
+
+	var partitions []*adiomv1.Partition
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list objects: %w", err))
+		}
+
+		for _, obj := range page.Contents {
+			key := aws.ToString(obj.Key)
+			// Only treat JSON files as tasks
+			if !strings.HasSuffix(strings.ToLower(key), ".json") {
+				continue
+			}
+
+			relKey := key
+			if basePrefix != "" {
+				relKey = strings.TrimPrefix(relKey, basePrefix)
+			}
+			relKey = strings.TrimPrefix(relKey, "/")
+			if relKey == "" {
+				continue
+			}
+
+			parts := strings.SplitN(relKey, "/", 2)
+			namespace := ""
+			if len(parts) > 1 {
+				namespace = parts[0]
+			}
+			if namespace == "" {
+				namespace = "default"
+			}
+
+			if filterByNamespace {
+				if _, ok := requestedNamespaces[namespace]; !ok {
+					continue
+				}
+			}
+
+			partitions = append(partitions, &adiomv1.Partition{
+				Namespace:      namespace,
+				Cursor:         []byte(key), // Use the S3 object key as the partition cursor
+				EstimatedCount: 0,           // Unknown; can be filled in later if needed
+			})
+		}
+	}
+
+	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
+		Partitions: partitions,
+		// Updates are not supported for S3 JSON source
+		UpdatesPartitions: nil,
+	}), nil
 }
 
 // GetNamespaceMetadata implements adiomv1connect.ConnectorServiceHandler.
 func (c *connector) GetNamespaceMetadata(context.Context, *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
-	return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{}), nil
+	// For now, return a stubbed count of 0 for all namespaces.
+	return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
+		Count: 0,
+	}), nil
 }
 
 // ListData implements adiomv1connect.ConnectorServiceHandler.
-func (c *connector) ListData(context.Context, *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.ErrUnsupported)
+func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
+	if req.Msg.GetType() != adiomv1.DataType_DATA_TYPE_JSON_ID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, ErrUnsupportedType)
+	}
+
+	part := req.Msg.GetPartition()
+	if part == nil || len(part.GetCursor()) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partition cursor (S3 object key) is required"))
+	}
+
+	// We ignore req.Msg.Cursor for now and return the full contents of the JSON file
+	key := string(part.GetCursor())
+
+	getOut, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.settings.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get object %s: %w", key, err))
+	}
+	defer getOut.Body.Close()
+
+	var rawDocs []json.RawMessage
+	if err := json.NewDecoder(getOut.Body).Decode(&rawDocs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("decode json array from %s: %w", key, err))
+	}
+
+	data := make([][]byte, 0, len(rawDocs))
+	for _, d := range rawDocs {
+		// Ensure each element is valid JSON
+		if !json.Valid(d) {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("invalid json element in %s", key))
+		}
+		// Copy bytes to avoid retaining backing array
+		data = append(data, append([]byte(nil), d...))
+	}
+
+	return connect.NewResponse(&adiomv1.ListDataResponse{
+		Data:       data,
+		NextCursor: nil, // Entire file is returned in a single call
+	}), nil
 }
 
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
