@@ -43,7 +43,7 @@ type Teardownable interface {
 }
 
 type OnTaskCompletionBarrierHandlerServicable interface {
-	OnTaskCompletionBarrierHandler(string, uint) error
+	OnTaskCompletionBarrierHandler(uint) error
 }
 
 type ConnectorSettings struct {
@@ -987,7 +987,7 @@ func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 	case iface.BarrierType_TaskComplete:
 		// Call the optional OnTaskCompletionBarrier hook if implemented
 		if onTaskCompletionBarrierHandlerServicable, ok := c.maybeOptimizedImpl.(OnTaskCompletionBarrierHandlerServicable); ok {
-			err := onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.Loc, barrierMsg.BarrierTaskId)
+			err := onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.BarrierTaskId)
 			if err != nil {
 				return err
 			}

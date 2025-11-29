@@ -47,13 +47,13 @@ type ConnectorSettings struct {
 	UsePathStyle    bool
 }
 
-type namespaceTaskKey struct {
-	namespace string
-	taskID    uint
+type taskKey struct {
+	taskID uint
 }
 
 type storedBatch struct {
-	docs [][]byte
+	namespace string
+	docs      [][]byte
 }
 
 type connector struct {
@@ -62,7 +62,7 @@ type connector struct {
 	client       *s3.Client
 	settings     ConnectorSettings
 	batchesMutex sync.Mutex
-	batches      map[namespaceTaskKey]*storedBatch
+	batches      map[taskKey]*storedBatch
 
 	errMutex sync.RWMutex
 	err      error
@@ -110,7 +110,7 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 	return &connector{
 		client:   client,
 		settings: settings,
-		batches:  make(map[namespaceTaskKey]*storedBatch),
+		batches:  make(map[taskKey]*storedBatch),
 	}, nil
 }
 
@@ -159,6 +159,7 @@ func (c *connector) WriteData(ctx context.Context, req *connect.Request[adiomv1.
 	if err := c.currentError(); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
+	slog.Debug("received write data request", "namespace", req.Msg.GetNamespace(), "taskId", req.Msg.GetTaskId(), "numDocs", len(req.Msg.GetData()))
 
 	taskID := uint(req.Msg.GetTaskId())
 	if taskID == 0 {
@@ -188,14 +189,14 @@ func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.Write
 }
 
 // OnTaskCompletionBarrierHandler flushes buffered data to S3.
-func (c *connector) OnTaskCompletionBarrierHandler(namespace string, taskID uint) error {
-	batch := c.detachBatch(namespace, taskID)
+func (c *connector) OnTaskCompletionBarrierHandler(taskID uint) error {
+	batch := c.detachBatch(taskID)
 	if batch == nil {
-		slog.Debug("s3 connector received barrier with no data", "namespace", namespace, "taskId", taskID)
+		slog.Debug("s3 connector received barrier with no data", "taskId", taskID)
 		batch = &storedBatch{}
 	}
-	if err := c.flushBatch(namespace, taskID, batch.docs); err != nil {
-		slog.Error("failed to flush s3 batch", "namespace", namespace, "taskId", taskID, "err", err)
+	if err := c.flushBatch(batch.namespace, taskID, batch.docs); err != nil {
+		slog.Error("failed to flush s3 batch", "namespace", batch.namespace, "taskId", taskID, "err", err)
 		c.setError(err)
 		return err
 	}
@@ -205,19 +206,19 @@ func (c *connector) OnTaskCompletionBarrierHandler(namespace string, taskID uint
 func (c *connector) appendBatch(namespace string, taskID uint, docs [][]byte) {
 	c.batchesMutex.Lock()
 	defer c.batchesMutex.Unlock()
-	key := namespaceTaskKey{namespace: namespace, taskID: taskID}
+	key := taskKey{taskID}
 	batch, ok := c.batches[key]
 	if !ok {
-		batch = &storedBatch{}
+		batch = &storedBatch{namespace: namespace}
 		c.batches[key] = batch
 	}
 	batch.docs = append(batch.docs, docs...)
 }
 
-func (c *connector) detachBatch(namespace string, taskID uint) *storedBatch {
+func (c *connector) detachBatch(taskID uint) *storedBatch {
 	c.batchesMutex.Lock()
 	defer c.batchesMutex.Unlock()
-	key := namespaceTaskKey{namespace: namespace, taskID: taskID}
+	key := taskKey{taskID}
 	batch := c.batches[key]
 	delete(c.batches, key)
 	return batch
