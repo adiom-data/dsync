@@ -188,7 +188,7 @@ func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.Write
 }
 
 // OnTaskCompletionBarrierHandler flushes buffered data to S3.
-func (c *connector) OnTaskCompletionBarrierHandler(namespace string, taskID uint) {
+func (c *connector) OnTaskCompletionBarrierHandler(namespace string, taskID uint) error {
 	batch := c.detachBatch(namespace, taskID)
 	if batch == nil {
 		slog.Debug("s3 connector received barrier with no data", "namespace", namespace, "taskId", taskID)
@@ -197,7 +197,9 @@ func (c *connector) OnTaskCompletionBarrierHandler(namespace string, taskID uint
 	if err := c.flushBatch(namespace, taskID, batch.docs); err != nil {
 		slog.Error("failed to flush s3 batch", "namespace", namespace, "taskId", taskID, "err", err)
 		c.setError(err)
+		return err
 	}
+	return nil
 }
 
 func (c *connector) appendBatch(namespace string, taskID uint, docs [][]byte) {

@@ -43,7 +43,7 @@ type Teardownable interface {
 }
 
 type OnTaskCompletionBarrierHandlerServicable interface {
-	OnTaskCompletionBarrierHandler(string, uint)
+	OnTaskCompletionBarrierHandler(string, uint) error
 }
 
 type ConnectorSettings struct {
@@ -985,14 +985,17 @@ func (c *connector) HandlerError(err error) error {
 func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 	switch barrierMsg.BarrierType {
 	case iface.BarrierType_TaskComplete:
+		// Call the optional OnTaskCompletionBarrier hook if implemented
+		if onTaskCompletionBarrierHandlerServicable, ok := c.maybeOptimizedImpl.(OnTaskCompletionBarrierHandlerServicable); ok {
+			err := onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.Loc, barrierMsg.BarrierTaskId)
+			if err != nil {
+				return err
+			}
+		}
+
 		// notify the coordinator that the task is done from our side
 		if err := c.coord.NotifyTaskDone(c.flowID, c.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
-		}
-
-		// Call the optional OnTaskCompletionBarrier hook if implemented
-		if onTaskCompletionBarrierHandlerServicable, ok := c.maybeOptimizedImpl.(OnTaskCompletionBarrierHandlerServicable); ok {
-			onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.Loc, barrierMsg.BarrierTaskId)
 		}
 		return nil
 	case iface.BarrierType_CdcResumeTokenUpdate:
