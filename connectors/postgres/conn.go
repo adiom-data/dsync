@@ -262,8 +262,9 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 					return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("unable to set initial cursor"))
 				}
 				partitions = append(partitions, &adiomv1.Partition{
-					Namespace: namespace,
-					Cursor:    encodedCursor,
+					Namespace:      namespace,
+					Cursor:         encodedCursor,
+					EstimatedCount: uint64(c.settings.TargetDocCountPerPartition),
 				})
 				last = k
 			}
