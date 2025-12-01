@@ -652,6 +652,7 @@ var postgresSettingsDefault = postgres.PostgresSettings{
 	StreamFlushDelay:           time.Minute * 3,
 	EstimatedCountThreshold:    1000000,
 	TargetDocCountPerPartition: 100000,
+	EnableReplicaMode:          true,
 }
 
 func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
@@ -705,6 +706,12 @@ func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
 			Name:        "doc-partition",
 			Value:       postgresSettingsDefault.TargetDocCountPerPartition,
 			Destination: &settings.TargetDocCountPerPartition,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "enable-replica-mode",
+			Usage:       "Enable replica mode (SET session_replication_role = 'replica') for sink operations. This disables triggers and rules.",
+			Value:       postgresSettingsDefault.EnableReplicaMode,
+			Destination: &settings.EnableReplicaMode,
 		}),
 	}
 }

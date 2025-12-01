@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -19,8 +22,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/sync/errgroup"
+
+	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 )
 
 type PostgresSettings struct {
@@ -38,6 +45,10 @@ type PostgresSettings struct {
 
 	EstimatedCountThreshold    int64
 	TargetDocCountPerPartition int64
+
+	// When true, sets session_replication_role = 'replica' for sink operations
+	// This disables triggers and rules, useful when replicating data
+	EnableReplicaMode bool
 }
 
 type conn struct {
@@ -45,8 +56,9 @@ type conn struct {
 	id             uint64
 	c              *pgxpool.Pool
 
-	pkeys    map[string][]string
-	settings PostgresSettings
+	pkeys        map[string][]string
+	settings     PostgresSettings
+	bsonRegistry *bsoncodec.Registry
 }
 
 func (c *conn) Teardown() {
@@ -158,14 +170,36 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 		return nil, err
 	}
 	id := hasher.Sum64()
-	c, err := pgxpool.New(ctx, url)
+
+	afterConnect := func(ctx context.Context, conn *pgx.Conn) error {
+		pgxdecimal.Register(conn.TypeMap())
+
+		// Enable replica mode for sink operations if requested
+		if settings.EnableReplicaMode {
+			if _, err := conn.Exec(ctx, "SET session_replication_role = 'replica'"); err != nil {
+				return fmt.Errorf("failed to set session_replication_role: %w", err)
+			}
+		}
+
+		return nil
+	}
+	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, err
 	}
+	config.AfterConnect = afterConnect
+	c, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+
 	pkeys, err := getTablePrimaryKeySchema(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+
+	// Create BSON registry with decimal support
+	bsonRegistry := NewBSONRegistry()
 
 	return &conn{
 		id:             id,
@@ -173,6 +207,7 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 		c:              c,
 		pkeys:          pkeys,
 		settings:       settings,
+		bsonRegistry:   bsonRegistry,
 	}, nil
 }
 
@@ -300,6 +335,9 @@ func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]
 				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
 				MultiNamespacePlan: true,
 			},
+			Sink: &adiomv1.Capabilities_Sink{
+				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
+			},
 		},
 	}), nil
 }
@@ -396,12 +434,12 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			break
 		}
 		keys := getPrimaryKey(c.pkeys[namespace], m)
-		_, b, err := toMongoID(keys)
+		_, b, err := toMongoID(c.bsonRegistry, keys)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
 		m["_id"] = b
-		marshalled, err := bson.Marshal(m)
+		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, m)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
@@ -434,9 +472,9 @@ func (c *conn) StreamLSN(context.Context, *connect.Request[adiomv1.StreamLSNRequ
 	return nil
 }
 
-func toMongoID(in []interface{}) ([]*adiomv1.BsonValue, interface{}, error) {
+func toMongoID(reg *bsoncodec.Registry, in []interface{}) ([]*adiomv1.BsonValue, interface{}, error) {
 	if len(in) == 1 {
-		typ, data, err := bson.MarshalValue(in[0])
+		typ, data, err := bson.MarshalValueWithRegistry(reg, in[0])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -455,7 +493,7 @@ func toMongoID(in []interface{}) ([]*adiomv1.BsonValue, interface{}, error) {
 		Subtype: bson.TypeBinaryGeneric,
 		Data:    buf.Bytes(),
 	}
-	typ, data, err := bson.MarshalValue(b)
+	typ, data, err := bson.MarshalValueWithRegistry(reg, b)
 	if err != nil {
 		return nil, primitive.Binary{}, err
 	}
@@ -471,12 +509,12 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 	primaryKeys := c.pkeys[ns]
 	switch update.Type {
 	case pglib.UpdateTypeInsert:
-		keys, b, err := toMongoID(getPrimaryKey(primaryKeys, update.New))
+		keys, b, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.New))
 		if err != nil {
 			return nil, err
 		}
 		update.New["_id"] = b
-		marshalled, err := bson.Marshal(update.New)
+		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
 		}
@@ -488,12 +526,12 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 	case pglib.UpdateTypeUpdate:
 		// Actually we'll ignore "old" and just accept breaking behavior
 		// since in the mongo format you can't edit the _id
-		keys, b, err := toMongoID(getPrimaryKey(primaryKeys, update.New))
+		keys, b, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.New))
 		if err != nil {
 			return nil, err
 		}
 		update.New["_id"] = b
-		marshalled, err := bson.Marshal(update.New)
+		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
 		}
@@ -503,7 +541,7 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 			Data: marshalled,
 		}, nil
 	case pglib.UpdateTypeDelete:
-		keys, _, err := toMongoID(getPrimaryKey(primaryKeys, update.Old))
+		keys, _, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.Old))
 		if err != nil {
 			return nil, err
 		}
@@ -618,14 +656,314 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 	return nil
 }
 
+// buildUpsertQuery creates an INSERT ... ON CONFLICT ... DO UPDATE query for postgres
+func buildUpsertQuery(namespace string, pkeys []string, columns []string) string {
+	sanitizedNamespace := SanitizeNamespace(namespace)
+
+	// Build column list
+	var sanitizedColumns []string
+	for _, col := range columns {
+		sanitizedColumns = append(sanitizedColumns, pgx.Identifier([]string{col}).Sanitize())
+	}
+	columnList := strings.Join(sanitizedColumns, ", ")
+
+	// Build placeholders for VALUES
+	var placeholders []string
+	for i := range columns {
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+	}
+	valuesPlaceholder := fmt.Sprintf("(%s)", strings.Join(placeholders, ", "))
+
+	// Build conflict target (primary keys)
+	var sanitizedPKeys []string
+	for _, pk := range pkeys {
+		sanitizedPKeys = append(sanitizedPKeys, pgx.Identifier([]string{pk}).Sanitize())
+	}
+	conflictTarget := strings.Join(sanitizedPKeys, ", ")
+
+	// Build UPDATE SET clause (exclude primary keys)
+	var updateSet []string
+	for _, col := range columns {
+		// Skip primary key columns in the UPDATE clause
+		if !slices.Contains(pkeys, col) {
+			sanitizedCol := pgx.Identifier([]string{col}).Sanitize()
+			updateSet = append(updateSet, fmt.Sprintf("%s = EXCLUDED.%s", sanitizedCol, sanitizedCol))
+		}
+	}
+
+	// If all columns are primary keys, just use DO NOTHING
+	if len(updateSet) == 0 {
+		return fmt.Sprintf(
+			"INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO NOTHING",
+			sanitizedNamespace, columnList, valuesPlaceholder, conflictTarget,
+		)
+	}
+
+	return fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s",
+		sanitizedNamespace, columnList, valuesPlaceholder, conflictTarget, strings.Join(updateSet, ", "),
+	)
+}
+
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteData(context.Context, *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
-	panic("unimplemented")
+func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
+	namespace := r.Msg.GetNamespace()
+	pkeys := c.pkeys[namespace]
+	if len(pkeys) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+	}
+
+	// Convert BSON documents to maps and collect all column names
+	var documents []map[string]interface{}
+	columnSet := make(map[string]bool)
+
+	for _, data := range r.Msg.GetData() {
+		m, err := bsonToMap(c.bsonRegistry, data)
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				slog.Error(fmt.Sprintf("Failed to unmarshal BSON document: %v", err))
+			}
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		documents = append(documents, m)
+		for col := range m {
+			columnSet[col] = true
+		}
+	}
+
+	// Build ordered column list (primary keys first for consistency)
+	//NOTE: for efficiency, we assume that all documents have the same set of columns
+	var columns []string
+	for _, pk := range pkeys {
+		if columnSet[pk] {
+			columns = append(columns, pk)
+		}
+	}
+	for col := range columnSet {
+		if !slices.Contains(pkeys, col) {
+			columns = append(columns, col)
+		}
+	}
+
+	if len(columns) == 0 {
+		return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
+	}
+
+	// Build upsert query
+	query := buildUpsertQuery(namespace, pkeys, columns)
+
+	// Use pgx batch for efficient bulk inserts
+	batch := &pgx.Batch{}
+	for _, doc := range documents {
+		var values []interface{}
+		for _, col := range columns {
+			values = append(values, doc[col])
+		}
+		batch.Queue(query, values...)
+	}
+
+	// Execute batch
+	br := c.c.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// Process results
+	for i := 0; i < len(documents); i++ {
+		_, err := br.Exec()
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				slog.Error(fmt.Sprintf("Failed to insert document %d: %v", i, err))
+				for key, value := range documents[i] {
+					slog.Debug("Document field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
+				}
+			}
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
+}
+
+// dataIdIndex tracks the index of an update for deduplication
+type dataIdIndex struct {
+	dataId []byte
+	index  int
+}
+
+// addToIdIndexMap adds or updates an entry in the deduplication map
+func addToIdIndexMap(m map[int][]*dataIdIndex, update *adiomv1.Update) (*dataIdIndex, bool) {
+	hasher := xxhash.New()
+	_, _ = hasher.Write(update.GetId()[0].GetData())
+	h := int(hasher.Sum64())
+	items, found := m[h]
+	if found {
+		for _, item := range items {
+			if slices.Equal(item.dataId, update.GetId()[0].GetData()) {
+				return item, false
+			}
+		}
+	}
+	item := &dataIdIndex{update.GetId()[0].GetData(), -1}
+	m[h] = append(items, item)
+	return item, true
+}
+
+// fromMongoID extracts the original primary key values from BSON ID
+func fromMongoID(id []*adiomv1.BsonValue) ([]interface{}, error) {
+	if len(id) != 1 {
+		return nil, fmt.Errorf("expected exactly one ID value")
+	}
+
+	var value interface{}
+	if err := bson.UnmarshalValue(bsontype.Type(id[0].GetType()), id[0].GetData(), &value); err != nil {
+		return nil, err
+	}
+
+	// If it's a binary (composite key), decode it
+	if b, ok := value.(primitive.Binary); ok && b.Subtype == bson.TypeBinaryGeneric {
+		var compositeKey []interface{}
+		br := bytes.NewReader(b.Data)
+		dec := gob.NewDecoder(br)
+		if err := dec.Decode(&compositeKey); err != nil {
+			return nil, err
+		}
+		return compositeKey, nil
+	}
+
+	// Single key
+	return []interface{}{value}, nil
 }
 
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
-func (c *conn) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
-	panic("unimplemented")
+func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
+	namespace := r.Msg.GetNamespace()
+	pkeys := c.pkeys[namespace]
+	if len(pkeys) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+	}
+
+	// Deduplication map to ensure each document is only updated once
+	hashToDataIdIndex := map[int][]*dataIdIndex{}
+
+	// We'll store operations as either insert/update or delete
+	type operation struct {
+		isDelete bool
+		pkValues []interface{}
+		data     map[string]interface{}
+	}
+	var operations []operation
+
+	// Process updates with deduplication
+	for _, update := range r.Msg.GetUpdates() {
+		dii, isNew := addToIdIndexMap(hashToDataIdIndex, update)
+
+		pkValues, err := fromMongoID(update.GetId())
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to extract primary key: %w", err))
+		}
+
+		if len(pkValues) != len(pkeys) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("primary key length mismatch: expected %d, got %d", len(pkeys), len(pkValues)))
+		}
+
+		var op operation
+		switch update.GetType() {
+		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+			data, err := bsonToMap(c.bsonRegistry, update.GetData())
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					slog.Error(fmt.Sprintf("Failed to unmarshal BSON document: %v", err))
+				}
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			op = operation{
+				isDelete: false,
+				pkValues: pkValues,
+				data:     data,
+			}
+		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+			op = operation{
+				isDelete: true,
+				pkValues: pkValues,
+			}
+		default:
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unsupported update type: %v", update.GetType()))
+		}
+
+		if isNew {
+			dii.index = len(operations)
+			operations = append(operations, op)
+		} else {
+			// Replace the existing operation
+			operations[dii.index] = op
+		}
+	}
+
+	// Build and execute batched operations
+	batch := &pgx.Batch{}
+	sanitizedNamespace := SanitizeNamespace(namespace)
+
+	for _, op := range operations {
+		if op.isDelete {
+			// Build DELETE query
+			var whereClauses []string
+			for i, pk := range pkeys {
+				sanitizedPk := pgx.Identifier([]string{pk}).Sanitize()
+				whereClauses = append(whereClauses, fmt.Sprintf("%s = $%d", sanitizedPk, i+1))
+			}
+			deleteQuery := fmt.Sprintf(
+				"DELETE FROM %s WHERE %s",
+				sanitizedNamespace, strings.Join(whereClauses, " AND "),
+			)
+			batch.Queue(deleteQuery, op.pkValues...)
+		} else {
+			// Build column list and values for INSERT/UPDATE
+			var columns []string
+			var values []interface{}
+
+			// Add primary keys first
+			for i, pk := range pkeys {
+				columns = append(columns, pk)
+				values = append(values, op.pkValues[i])
+			}
+
+			// Add other columns
+			for col, val := range op.data {
+				if !slices.Contains(pkeys, col) {
+					columns = append(columns, col)
+					values = append(values, val)
+				}
+			}
+
+			// Build upsert query
+			upsertQuery := buildUpsertQuery(namespace, pkeys, columns)
+			batch.Queue(upsertQuery, values...)
+		}
+	}
+
+	// Execute batch
+	br := c.c.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// Process results
+	for i := 0; i < len(operations); i++ {
+		_, err := br.Exec()
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				slog.Error(fmt.Sprintf("Failed to execute update %d: %v", i, err))
+				if operations[i].isDelete {
+					slog.Debug("Failed delete operation", "pkValues", operations[i].pkValues)
+				} else {
+					slog.Debug("Failed insert/update operation")
+					for key, value := range operations[i].data {
+						slog.Debug("Operation field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
+					}
+				}
+			}
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+
+	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
 func createReplicationUrl(urlString string) (string, error) {
