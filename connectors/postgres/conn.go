@@ -732,6 +732,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	}
 
 	// Build ordered column list (primary keys first for consistency)
+	//NOTE: for efficiency, we assume that all documents have the same set of columns
 	var columns []string
 	for _, pk := range pkeys {
 		if columnSet[pk] {
