@@ -8,6 +8,12 @@ dsync:
 clean:
 	go clean -modcache
 
+docker:
+	echo 'Building Dsync'
+	SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) docker buildx build --push --platform linux/amd64,linux/arm64 -t markadiom/dsync .
+	echo 'Building Cosmos Connector'
+	SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) docker buildx build --push --platform linux/amd64,linux/arm64 -t markadiom/cosmosnosqlconnector java/
+
 clean-dbs:
 	PORT=27017 ./scripts/clean-mongo.sh
 	PORT=27018 ./scripts/clean-mongo.sh
