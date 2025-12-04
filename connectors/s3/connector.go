@@ -65,6 +65,8 @@ type connector struct {
 	batchesMutex sync.Mutex
 	batches      map[taskKey]*storedBatch
 
+	metadataMutex sync.Mutex // Serialize metadata updates
+
 	errMutex sync.RWMutex
 	err      error
 }
@@ -375,7 +377,11 @@ func (c *connector) OnTaskCompletionBarrierHandler(taskID uint) error {
 	batch := c.detachBatch(taskID)
 	if batch == nil {
 		slog.Debug("s3 connector received barrier with no data", "taskId", taskID)
-		batch = &storedBatch{}
+		return nil
+	}
+	if len(batch.docs) == 0 {
+		slog.Debug("s3 connector received barrier with empty batch", "taskId", taskID)
+		return nil
 	}
 	if err := c.flushBatch(batch.namespace, taskID, batch.docs); err != nil {
 		slog.Error("failed to flush s3 batch", "namespace", batch.namespace, "taskId", taskID, "err", err)
@@ -560,6 +566,9 @@ func (c *connector) writeMetadata(ctx context.Context, namespace string, metadat
 // updateMetadataAfterFlush updates the metadata file after a batch has been flushed.
 // It reads the current metadata, adds/updates the file entry, and writes it back atomically.
 func (c *connector) updateMetadataAfterFlush(ctx context.Context, namespace string, taskID uint, recordCount uint64) error {
+	c.metadataMutex.Lock()
+	defer c.metadataMutex.Unlock()
+
 	// Read current metadata (or create empty map if doesn't exist)
 	metadata, err := c.readMetadata(ctx, namespace)
 	if err != nil {
