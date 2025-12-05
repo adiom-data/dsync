@@ -42,6 +42,10 @@ type Teardownable interface {
 	Teardown()
 }
 
+type OnTaskCompletionBarrierHandlerServicable interface {
+	OnTaskCompletionBarrierHandler(uint) error
+}
+
 type ConnectorSettings struct {
 	NumParallelCopiers        int
 	NumParallelWriters        int
@@ -623,6 +627,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 											DataBatch:    r.GetData(),
 											MutationType: iface.MutationType_InsertBatch,
 											Loc:          destNs,
+											TaskId:       uint(task.Id),
 										}
 										dataChannel <- dataMessage
 									}
@@ -635,6 +640,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 										DataBatch:    transformed.Msg.GetData(),
 										MutationType: iface.MutationType_InsertBatch,
 										Loc:          destNs,
+										TaskId:       uint(task.Id),
 									}
 									dataChannel <- dataMessage
 								}
@@ -643,6 +649,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 									DataBatch:    data,
 									MutationType: iface.MutationType_InsertBatch,
 									Loc:          destinationNamespace,
+									TaskId:       uint(task.Id),
 								}
 								dataChannel <- dataMessage
 							}
@@ -978,6 +985,14 @@ func (c *connector) HandlerError(err error) error {
 func (c *connector) HandleBarrierMessage(barrierMsg iface.DataMessage) error {
 	switch barrierMsg.BarrierType {
 	case iface.BarrierType_TaskComplete:
+		// Call the optional OnTaskCompletionBarrier hook if implemented
+		if onTaskCompletionBarrierHandlerServicable, ok := c.maybeOptimizedImpl.(OnTaskCompletionBarrierHandlerServicable); ok {
+			err := onTaskCompletionBarrierHandlerServicable.OnTaskCompletionBarrierHandler(barrierMsg.BarrierTaskId)
+			if err != nil {
+				return err
+			}
+		}
+
 		// notify the coordinator that the task is done from our side
 		if err := c.coord.NotifyTaskDone(c.flowID, c.id, (iface.ReadPlanTaskID)(barrierMsg.BarrierTaskId), nil); err != nil {
 			return err
@@ -1080,6 +1095,7 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				Namespace: dataMsg.Loc,
 				Data:      dataMsg.DataBatch,
 				Type:      c.settings.DestinationDataType,
+				TaskId:    uint32(dataMsg.TaskId),
 			}))
 			if err != nil {
 				return err

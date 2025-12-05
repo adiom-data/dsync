@@ -12318,6 +12318,12 @@ public final class Messages {
      * @return The type.
      */
     adiom.v1.Messages.DataType getType();
+
+    /**
+     * <code>uint32 task_id = 4 [json_name = "taskId"];</code>
+     * @return The taskId.
+     */
+    int getTaskId();
   }
   /**
    * Protobuf type {@code adiom.v1.WriteDataRequest}
@@ -12445,6 +12451,17 @@ public final class Messages {
       return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
     }
 
+    public static final int TASK_ID_FIELD_NUMBER = 4;
+    private int taskId_ = 0;
+    /**
+     * <code>uint32 task_id = 4 [json_name = "taskId"];</code>
+     * @return The taskId.
+     */
+    @java.lang.Override
+    public int getTaskId() {
+      return taskId_;
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -12467,6 +12484,9 @@ public final class Messages {
       }
       if (type_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
         output.writeEnum(3, type_);
+      }
+      if (taskId_ != 0) {
+        output.writeUInt32(4, taskId_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -12493,6 +12513,10 @@ public final class Messages {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(3, type_);
       }
+      if (taskId_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeUInt32Size(4, taskId_);
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -12513,6 +12537,8 @@ public final class Messages {
       if (!getDataList()
           .equals(other.getDataList())) return false;
       if (type_ != other.type_) return false;
+      if (getTaskId()
+          != other.getTaskId()) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -12532,6 +12558,8 @@ public final class Messages {
       }
       hash = (37 * hash) + TYPE_FIELD_NUMBER;
       hash = (53 * hash) + type_;
+      hash = (37 * hash) + TASK_ID_FIELD_NUMBER;
+      hash = (53 * hash) + getTaskId();
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -12666,6 +12694,7 @@ public final class Messages {
         namespace_ = "";
         data_ = emptyList(com.google.protobuf.ByteString.class);
         type_ = 0;
+        taskId_ = 0;
         return this;
       }
 
@@ -12709,6 +12738,9 @@ public final class Messages {
         if (((from_bitField0_ & 0x00000004) != 0)) {
           result.type_ = type_;
         }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          result.taskId_ = taskId_;
+        }
       }
 
       @java.lang.Override
@@ -12741,6 +12773,9 @@ public final class Messages {
         }
         if (other.type_ != 0) {
           setTypeValue(other.getTypeValue());
+        }
+        if (other.getTaskId() != 0) {
+          setTaskId(other.getTaskId());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
@@ -12784,6 +12819,11 @@ public final class Messages {
                 bitField0_ |= 0x00000004;
                 break;
               } // case 24
+              case 32: {
+                taskId_ = input.readUInt32();
+                bitField0_ |= 0x00000008;
+                break;
+              } // case 32
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -13006,6 +13046,38 @@ public final class Messages {
       public Builder clearType() {
         bitField0_ = (bitField0_ & ~0x00000004);
         type_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private int taskId_ ;
+      /**
+       * <code>uint32 task_id = 4 [json_name = "taskId"];</code>
+       * @return The taskId.
+       */
+      @java.lang.Override
+      public int getTaskId() {
+        return taskId_;
+      }
+      /**
+       * <code>uint32 task_id = 4 [json_name = "taskId"];</code>
+       * @param value The taskId to set.
+       * @return This builder for chaining.
+       */
+      public Builder setTaskId(int value) {
+
+        taskId_ = value;
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>uint32 task_id = 4 [json_name = "taskId"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearTaskId() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        taskId_ = 0;
         onChanged();
         return this;
       }
@@ -23923,54 +23995,55 @@ public final class Messages {
       "R\tpartition\022&\n\004type\030\002 \001(\0162\022.adiom.v1.Dat" +
       "aTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020L" +
       "istDataResponse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013n" +
-      "ext_cursor\030\002 \001(\014R\nnextCursor\"l\n\020WriteDat" +
-      "aRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022\022" +
-      "\n\004data\030\002 \003(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom" +
-      ".v1.DataTypeR\004type\"\023\n\021WriteDataResponse\"" +
-      "\207\001\n\023WriteUpdatesRequest\022\034\n\tnamespace\030\001 \001" +
-      "(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom.v" +
-      "1.UpdateR\007updates\022&\n\004type\030\003 \001(\0162\022.adiom." +
-      "v1.DataTypeR\004type\"\026\n\024WriteUpdatesRespons" +
-      "e\"v\n\024StreamUpdatesRequest\022\036\n\nnamespaces\030" +
-      "\001 \003(\tR\nnamespaces\022&\n\004type\030\002 \001(\0162\022.adiom." +
-      "v1.DataTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006curso" +
-      "r\"\262\001\n\025StreamUpdatesResponse\022*\n\007updates\030\001" +
-      " \003(\0132\020.adiom.v1.UpdateR\007updates\022\034\n\tnames" +
-      "pace\030\002 \001(\tR\tnamespace\022\037\n\013next_cursor\030\003 \001" +
-      "(\014R\nnextCursor\022.\n\004time\030\004 \001(\0132\032.google.pr" +
-      "otobuf.TimestampR\004time\"J\n\020StreamLSNReque" +
-      "st\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022\026\n\006cu" +
-      "rsor\030\002 \001(\014R\006cursor\"F\n\021StreamLSNResponse\022" +
-      "\020\n\003lsn\030\001 \001(\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\n" +
-      "nextCursor\"\031\n\027GetTransformInfoRequest\"\246\002" +
-      "\n\030GetTransformInfoResponse\022P\n\ntransforms" +
-      "\030\001 \003(\01320.adiom.v1.GetTransformInfoRespon" +
-      "se.TransformInfoR\ntransforms\0224\n\026use_mult" +
-      "iple_responses\030\002 \001(\010R\024useMultipleRespons" +
-      "es\032\201\001\n\rTransformInfo\0225\n\014request_type\030\001 \001" +
-      "(\0162\022.adiom.v1.DataTypeR\013requestType\0229\n\016r" +
-      "esponse_types\030\002 \003(\0162\022.adiom.v1.DataTypeR" +
-      "\rresponseTypes\"\343\001\n\023GetTransformRequest\022\034" +
-      "\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007updates\030" +
-      "\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n\004data" +
-      "\030\003 \003(\014R\004data\0225\n\014request_type\030\004 \001(\0162\022.adi" +
-      "om.v1.DataTypeR\013requestType\0227\n\rresponse_" +
-      "type\030\005 \001(\0162\022.adiom.v1.DataTypeR\014response" +
-      "Type\"q\n\021TransformResponse\022\034\n\tnamespace\030\001" +
-      " \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom" +
-      ".v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\"" +
-      "\257\001\n\024GetTransformResponse\022\034\n\tnamespace\030\001 " +
+      "ext_cursor\030\002 \001(\014R\nnextCursor\"\205\001\n\020WriteDa" +
+      "taRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022" +
+      "\022\n\004data\030\002 \003(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adio" +
+      "m.v1.DataTypeR\004type\022\027\n\007task_id\030\004 \001(\rR\006ta" +
+      "skId\"\023\n\021WriteDataResponse\"\207\001\n\023WriteUpdat" +
+      "esRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022" +
+      "*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007upda" +
+      "tes\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTypeR\004t" +
+      "ype\"\026\n\024WriteUpdatesResponse\"v\n\024StreamUpd" +
+      "atesRequest\022\036\n\nnamespaces\030\001 \003(\tR\nnamespa" +
+      "ces\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004t" +
+      "ype\022\026\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025StreamUp" +
+      "datesResponse\022*\n\007updates\030\001 \003(\0132\020.adiom.v" +
+      "1.UpdateR\007updates\022\034\n\tnamespace\030\002 \001(\tR\tna" +
+      "mespace\022\037\n\013next_cursor\030\003 \001(\014R\nnextCursor" +
+      "\022.\n\004time\030\004 \001(\0132\032.google.protobuf.Timesta" +
+      "mpR\004time\"J\n\020StreamLSNRequest\022\036\n\nnamespac" +
+      "es\030\001 \003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014R\006cu" +
+      "rsor\"F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001(\004R\003" +
+      "lsn\022\037\n\013next_cursor\030\002 \001(\014R\nnextCursor\"\031\n\027" +
+      "GetTransformInfoRequest\"\246\002\n\030GetTransform" +
+      "InfoResponse\022P\n\ntransforms\030\001 \003(\01320.adiom" +
+      ".v1.GetTransformInfoResponse.TransformIn" +
+      "foR\ntransforms\0224\n\026use_multiple_responses" +
+      "\030\002 \001(\010R\024useMultipleResponses\032\201\001\n\rTransfo" +
+      "rmInfo\0225\n\014request_type\030\001 \001(\0162\022.adiom.v1." +
+      "DataTypeR\013requestType\0229\n\016response_types\030" +
+      "\002 \003(\0162\022.adiom.v1.DataTypeR\rresponseTypes" +
+      "\"\343\001\n\023GetTransformRequest\022\034\n\tnamespace\030\001 " +
       "\001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom." +
-      "v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\0229" +
-      "\n\tresponses\030\004 \003(\0132\033.adiom.v1.TransformRe" +
-      "sponseR\tresponses*R\n\010DataType\022\025\n\021DATA_TY" +
-      "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
-      "\n\021DATA_TYPE_JSON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023" +
-      "UPDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INS" +
-      "ERT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_" +
-      "TYPE_DELETE\020\003\022\036\n\032UPDATE_TYPE_PARTIAL_UPD" +
-      "ATE\020\004B2Z0github.com/adiom-data/dsync/gen" +
-      "/adiom/v1;adiomv1b\006proto3"
+      "v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\0225" +
+      "\n\014request_type\030\004 \001(\0162\022.adiom.v1.DataType" +
+      "R\013requestType\0227\n\rresponse_type\030\005 \001(\0162\022.a" +
+      "diom.v1.DataTypeR\014responseType\"q\n\021Transf" +
+      "ormResponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespac" +
+      "e\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007up" +
+      "dates\022\022\n\004data\030\003 \003(\014R\004data\"\257\001\n\024GetTransfo" +
+      "rmResponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespace" +
+      "\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007upd" +
+      "ates\022\022\n\004data\030\003 \003(\014R\004data\0229\n\tresponses\030\004 " +
+      "\003(\0132\033.adiom.v1.TransformResponseR\trespon" +
+      "ses*R\n\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020\000\022\030" +
+      "\n\024DATA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE_JS" +
+      "ON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023UPDATE_TYPE_UN" +
+      "KNOWN\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPDAT" +
+      "E_TYPE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020\003\022" +
+      "\036\n\032UPDATE_TYPE_PARTIAL_UPDATE\020\004B2Z0githu" +
+      "b.com/adiom-data/dsync/gen/adiom/v1;adio" +
+      "mv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -24072,7 +24145,7 @@ public final class Messages {
     internal_static_adiom_v1_WriteDataRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteDataRequest_descriptor,
-        new java.lang.String[] { "Namespace", "Data", "Type", });
+        new java.lang.String[] { "Namespace", "Data", "Type", "TaskId", });
     internal_static_adiom_v1_WriteDataResponse_descriptor =
       getDescriptor().getMessageTypes().get(14);
     internal_static_adiom_v1_WriteDataResponse_fieldAccessorTable = new

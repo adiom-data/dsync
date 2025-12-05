@@ -67,22 +67,6 @@ const (
 	TransformServiceGetTransformProcedure = "/adiom.v1.TransformService/GetTransform"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	connectorServiceServiceDescriptor                    = v1.File_adiom_v1_adiom_proto.Services().ByName("ConnectorService")
-	connectorServiceGetInfoMethodDescriptor              = connectorServiceServiceDescriptor.Methods().ByName("GetInfo")
-	connectorServiceGetNamespaceMetadataMethodDescriptor = connectorServiceServiceDescriptor.Methods().ByName("GetNamespaceMetadata")
-	connectorServiceWriteDataMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("WriteData")
-	connectorServiceWriteUpdatesMethodDescriptor         = connectorServiceServiceDescriptor.Methods().ByName("WriteUpdates")
-	connectorServiceGeneratePlanMethodDescriptor         = connectorServiceServiceDescriptor.Methods().ByName("GeneratePlan")
-	connectorServiceListDataMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListData")
-	connectorServiceStreamUpdatesMethodDescriptor        = connectorServiceServiceDescriptor.Methods().ByName("StreamUpdates")
-	connectorServiceStreamLSNMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("StreamLSN")
-	transformServiceServiceDescriptor                    = v1.File_adiom_v1_adiom_proto.Services().ByName("TransformService")
-	transformServiceGetTransformInfoMethodDescriptor     = transformServiceServiceDescriptor.Methods().ByName("GetTransformInfo")
-	transformServiceGetTransformMethodDescriptor         = transformServiceServiceDescriptor.Methods().ByName("GetTransform")
-)
-
 // ConnectorServiceClient is a client for the adiom.v1.ConnectorService service.
 type ConnectorServiceClient interface {
 	GetInfo(context.Context, *connect.Request[v1.GetInfoRequest]) (*connect.Response[v1.GetInfoResponse], error)
@@ -106,53 +90,54 @@ type ConnectorServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectorServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectorServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	connectorServiceMethods := v1.File_adiom_v1_adiom_proto.Services().ByName("ConnectorService").Methods()
 	return &connectorServiceClient{
 		getInfo: connect.NewClient[v1.GetInfoRequest, v1.GetInfoResponse](
 			httpClient,
 			baseURL+ConnectorServiceGetInfoProcedure,
-			connect.WithSchema(connectorServiceGetInfoMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("GetInfo")),
 			connect.WithClientOptions(opts...),
 		),
 		getNamespaceMetadata: connect.NewClient[v1.GetNamespaceMetadataRequest, v1.GetNamespaceMetadataResponse](
 			httpClient,
 			baseURL+ConnectorServiceGetNamespaceMetadataProcedure,
-			connect.WithSchema(connectorServiceGetNamespaceMetadataMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("GetNamespaceMetadata")),
 			connect.WithClientOptions(opts...),
 		),
 		writeData: connect.NewClient[v1.WriteDataRequest, v1.WriteDataResponse](
 			httpClient,
 			baseURL+ConnectorServiceWriteDataProcedure,
-			connect.WithSchema(connectorServiceWriteDataMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("WriteData")),
 			connect.WithClientOptions(opts...),
 		),
 		writeUpdates: connect.NewClient[v1.WriteUpdatesRequest, v1.WriteUpdatesResponse](
 			httpClient,
 			baseURL+ConnectorServiceWriteUpdatesProcedure,
-			connect.WithSchema(connectorServiceWriteUpdatesMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("WriteUpdates")),
 			connect.WithClientOptions(opts...),
 		),
 		generatePlan: connect.NewClient[v1.GeneratePlanRequest, v1.GeneratePlanResponse](
 			httpClient,
 			baseURL+ConnectorServiceGeneratePlanProcedure,
-			connect.WithSchema(connectorServiceGeneratePlanMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("GeneratePlan")),
 			connect.WithClientOptions(opts...),
 		),
 		listData: connect.NewClient[v1.ListDataRequest, v1.ListDataResponse](
 			httpClient,
 			baseURL+ConnectorServiceListDataProcedure,
-			connect.WithSchema(connectorServiceListDataMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("ListData")),
 			connect.WithClientOptions(opts...),
 		),
 		streamUpdates: connect.NewClient[v1.StreamUpdatesRequest, v1.StreamUpdatesResponse](
 			httpClient,
 			baseURL+ConnectorServiceStreamUpdatesProcedure,
-			connect.WithSchema(connectorServiceStreamUpdatesMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("StreamUpdates")),
 			connect.WithClientOptions(opts...),
 		),
 		streamLSN: connect.NewClient[v1.StreamLSNRequest, v1.StreamLSNResponse](
 			httpClient,
 			baseURL+ConnectorServiceStreamLSNProcedure,
-			connect.WithSchema(connectorServiceStreamLSNMethodDescriptor),
+			connect.WithSchema(connectorServiceMethods.ByName("StreamLSN")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -230,52 +215,53 @@ type ConnectorServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectorServiceMethods := v1.File_adiom_v1_adiom_proto.Services().ByName("ConnectorService").Methods()
 	connectorServiceGetInfoHandler := connect.NewUnaryHandler(
 		ConnectorServiceGetInfoProcedure,
 		svc.GetInfo,
-		connect.WithSchema(connectorServiceGetInfoMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("GetInfo")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceGetNamespaceMetadataHandler := connect.NewUnaryHandler(
 		ConnectorServiceGetNamespaceMetadataProcedure,
 		svc.GetNamespaceMetadata,
-		connect.WithSchema(connectorServiceGetNamespaceMetadataMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("GetNamespaceMetadata")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceWriteDataHandler := connect.NewUnaryHandler(
 		ConnectorServiceWriteDataProcedure,
 		svc.WriteData,
-		connect.WithSchema(connectorServiceWriteDataMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("WriteData")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceWriteUpdatesHandler := connect.NewUnaryHandler(
 		ConnectorServiceWriteUpdatesProcedure,
 		svc.WriteUpdates,
-		connect.WithSchema(connectorServiceWriteUpdatesMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("WriteUpdates")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceGeneratePlanHandler := connect.NewUnaryHandler(
 		ConnectorServiceGeneratePlanProcedure,
 		svc.GeneratePlan,
-		connect.WithSchema(connectorServiceGeneratePlanMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("GeneratePlan")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceListDataHandler := connect.NewUnaryHandler(
 		ConnectorServiceListDataProcedure,
 		svc.ListData,
-		connect.WithSchema(connectorServiceListDataMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("ListData")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceStreamUpdatesHandler := connect.NewServerStreamHandler(
 		ConnectorServiceStreamUpdatesProcedure,
 		svc.StreamUpdates,
-		connect.WithSchema(connectorServiceStreamUpdatesMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("StreamUpdates")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectorServiceStreamLSNHandler := connect.NewServerStreamHandler(
 		ConnectorServiceStreamLSNProcedure,
 		svc.StreamLSN,
-		connect.WithSchema(connectorServiceStreamLSNMethodDescriptor),
+		connect.WithSchema(connectorServiceMethods.ByName("StreamLSN")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/adiom.v1.ConnectorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -352,17 +338,18 @@ type TransformServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewTransformServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) TransformServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	transformServiceMethods := v1.File_adiom_v1_adiom_proto.Services().ByName("TransformService").Methods()
 	return &transformServiceClient{
 		getTransformInfo: connect.NewClient[v1.GetTransformInfoRequest, v1.GetTransformInfoResponse](
 			httpClient,
 			baseURL+TransformServiceGetTransformInfoProcedure,
-			connect.WithSchema(transformServiceGetTransformInfoMethodDescriptor),
+			connect.WithSchema(transformServiceMethods.ByName("GetTransformInfo")),
 			connect.WithClientOptions(opts...),
 		),
 		getTransform: connect.NewClient[v1.GetTransformRequest, v1.GetTransformResponse](
 			httpClient,
 			baseURL+TransformServiceGetTransformProcedure,
-			connect.WithSchema(transformServiceGetTransformMethodDescriptor),
+			connect.WithSchema(transformServiceMethods.ByName("GetTransform")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -396,16 +383,17 @@ type TransformServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewTransformServiceHandler(svc TransformServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	transformServiceMethods := v1.File_adiom_v1_adiom_proto.Services().ByName("TransformService").Methods()
 	transformServiceGetTransformInfoHandler := connect.NewUnaryHandler(
 		TransformServiceGetTransformInfoProcedure,
 		svc.GetTransformInfo,
-		connect.WithSchema(transformServiceGetTransformInfoMethodDescriptor),
+		connect.WithSchema(transformServiceMethods.ByName("GetTransformInfo")),
 		connect.WithHandlerOptions(opts...),
 	)
 	transformServiceGetTransformHandler := connect.NewUnaryHandler(
 		TransformServiceGetTransformProcedure,
 		svc.GetTransform,
-		connect.WithSchema(transformServiceGetTransformMethodDescriptor),
+		connect.WithSchema(transformServiceMethods.ByName("GetTransform")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/adiom.v1.TransformService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -25,6 +25,7 @@ type DataMessage struct {
 	Id           []*adiomv1.BsonValue //required except for batch inserts (for efficiency)
 	SeqNum       int64                //optional field to provide a global ordering of messages
 
+	TaskId uint // Task ID for associating data messages with tasks
 	// header for barriers (task completion signals)
 	// combining them in a single struct to allow for a single channel for both data and barriers
 	// for barriers MutationType will be set to MutationType_Barrier

@@ -124,6 +124,7 @@ message WriteDataRequest {
     string namespace = 1;
     repeated bytes data = 2;
     DataType type = 3;
+    uint32 task_id = 4;
 }
 
 message WriteDataResponse {}
