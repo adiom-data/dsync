@@ -127,6 +127,7 @@ func (c *connector) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoReq
 			Source: &adiomv1.Capabilities_Source{
 				SupportedDataTypes: []adiomv1.DataType{
 					adiomv1.DataType_DATA_TYPE_JSON_ID,
+					adiomv1.DataType_DATA_TYPE_MONGO_BSON,
 				},
 				LsnStream:          false,
 				MultiNamespacePlan: true,
@@ -288,18 +289,12 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
-	if req.Msg.GetType() != adiomv1.DataType_DATA_TYPE_JSON_ID {
-		return nil, connect.NewError(connect.CodeInvalidArgument, ErrUnsupportedType)
-	}
-
 	part := req.Msg.GetPartition()
 	if part == nil || len(part.GetCursor()) == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partition cursor (S3 object key) is required"))
 	}
 
-	// We ignore req.Msg.Cursor for now and return the full contents of the JSON file
 	key := string(part.GetCursor())
-
 	getOut, err := c.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(c.settings.Bucket),
 		Key:    aws.String(key),
@@ -309,24 +304,43 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	}
 	defer getOut.Body.Close()
 
-	var rawDocs []json.RawMessage
-	if err := json.NewDecoder(getOut.Body).Decode(&rawDocs); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("decode json array from %s: %w", key, err))
-	}
-
-	data := make([][]byte, 0, len(rawDocs))
-	for _, d := range rawDocs {
-		// Ensure each element is valid JSON
-		if !json.Valid(d) {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("invalid json element in %s", key))
+	var data [][]byte
+	switch req.Msg.GetType() {
+	case adiomv1.DataType_DATA_TYPE_JSON_ID:
+		var rawDocs []json.RawMessage
+		if err := json.NewDecoder(getOut.Body).Decode(&rawDocs); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("decode json array from %s: %w", key, err))
 		}
-		// Copy bytes to avoid retaining backing array
-		data = append(data, append([]byte(nil), d...))
+		for _, d := range rawDocs {
+			if !json.Valid(d) {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("invalid json element in %s", key))
+			}
+			data = append(data, append([]byte(nil), d...))
+		}
+	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+		var rawDocs []json.RawMessage
+		if err := json.NewDecoder(getOut.Body).Decode(&rawDocs); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("decode json array from %s: %w", key, err))
+		}
+		for _, d := range rawDocs {
+			// Convert JSON to BSON
+			var doc map[string]interface{}
+			if err := json.Unmarshal(d, &doc); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("unmarshal json to map in %s: %w", key, err))
+			}
+			bsonDoc, err := bson.Marshal(doc)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal map to bson in %s: %w", key, err))
+			}
+			data = append(data, bsonDoc)
+		}
+	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, ErrUnsupportedType)
 	}
 
 	return connect.NewResponse(&adiomv1.ListDataResponse{
 		Data:       data,
-		NextCursor: nil, // Entire file is returned in a single call
+		NextCursor: nil,
 	}), nil
 }
 
