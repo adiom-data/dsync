@@ -46,6 +46,7 @@ type ConnectorSettings struct {
 	SecretAccessKey string
 	SessionToken    string
 	UsePathStyle    bool
+	PrettyJSON      bool
 }
 
 type taskKey struct {
@@ -82,6 +83,7 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 	if settings.OutputFormat == "" {
 		settings.OutputFormat = "json"
 	}
+
 	if !strings.EqualFold(settings.OutputFormat, "json") {
 		return nil, fmt.Errorf("unsupported output format %q", settings.OutputFormat)
 	}
@@ -422,7 +424,7 @@ func (c *connector) detachBatch(taskID uint) *storedBatch {
 }
 
 func (c *connector) flushBatch(namespace string, taskID uint, docs [][]byte) error {
-	payload := buildJSONArray(docs)
+	payload := buildJSONArray(docs, c.settings.PrettyJSON)
 	key := c.objectKey(namespace, taskID)
 	_, err := c.client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      aws.String(c.settings.Bucket),
@@ -465,7 +467,7 @@ func (c *connector) setError(err error) {
 	}
 }
 
-func buildJSONArray(docs [][]byte) []byte {
+func buildJSONArray(docs [][]byte, prettyJSON bool) []byte {
 	var buf bytes.Buffer
 	buf.Grow(len(docs) * 2)
 	buf.WriteByte('[')
@@ -473,7 +475,21 @@ func buildJSONArray(docs [][]byte) []byte {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
+		if prettyJSON {
+			var prettyBuf bytes.Buffer
+			prettyBuf.Grow(len(doc) + len(doc)/10) // rough estimate
+			if err := json.Indent(&prettyBuf, doc, "", "  "); err == nil {
+				buf.WriteByte('\n')
+				doc = prettyBuf.Bytes()
+			} else {
+				// If indenting fails, fall back to original
+				slog.Warn("Failed JSON indentation. Falling back to no-indent")
+			}
+		}
 		buf.Write(doc)
+	}
+	if prettyJSON {
+		buf.WriteByte('\n')
 	}
 	buf.WriteByte(']')
 	return buf.Bytes()

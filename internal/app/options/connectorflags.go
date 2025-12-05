@@ -595,6 +595,12 @@ func WeaviateFlags() []cli.Flag {
 
 func S3Flags(settings *s3connector.ConnectorSettings) []cli.Flag {
 	return []cli.Flag{
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "pretty-json",
+			Usage:       "Pretty-print JSON output data",
+			Value:       true,
+			Destination: &settings.PrettyJSON,
+		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "region",
 			Usage:       "AWS region for the target bucket",
