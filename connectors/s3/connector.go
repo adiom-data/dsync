@@ -98,7 +98,14 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 		return nil, fmt.Errorf("bad uri format %v", settings.Uri)
 	}
 	settings.Bucket = bucket
-	settings.Prefix = prefix
+	// Combine URI prefix with flag-provided prefix
+	if settings.Prefix == "" {
+		settings.Prefix = prefix
+	} else if prefix != "" {
+		// Append flag prefix to URI prefix
+		settings.Prefix = path.Join(prefix, settings.Prefix)
+	}
+	// If flag is set and URI has no prefix, use flag value (already set)
 
 	if settings.Bucket == "" {
 		return nil, ErrBucketRequired
@@ -281,9 +288,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
 	namespace := req.Msg.GetNamespace()
 	if namespace == "" {
-		return connect.NewResponse(&adiomv1.GetNamespaceMetadataResponse{
-			Count: 0,
-		}), nil
+		namespace = "default"
 	}
 
 	// Read metadata file for the namespace
