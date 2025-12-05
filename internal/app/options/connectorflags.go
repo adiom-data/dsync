@@ -306,13 +306,8 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				if len(args) == 0 {
 					return nil, nil, fmt.Errorf("missing s3 connection string: %w", ErrMissingConnector)
 				}
-				bucket, prefix, err := parseS3ConnectionString(args[0])
-				if err != nil {
-					return nil, nil, err
-				}
 				settings := s3connector.ConnectorSettings{
-					Bucket: bucket,
-					Prefix: prefix,
+					Uri: args[0],
 				}
 				return CreateHelper("s3", "s3://bucket[/prefix] [options]", S3Flags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					return s3connector.NewConn(settings)
@@ -543,24 +538,6 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 		},
 	}
-}
-
-func parseS3ConnectionString(raw string) (string, string, error) {
-	const prefix = "s3://"
-	if !strings.HasPrefix(strings.ToLower(raw), prefix) {
-		return "", "", fmt.Errorf("invalid s3 connection string %q", raw)
-	}
-	path := raw[len(prefix):]
-	if path == "" {
-		return "", "", fmt.Errorf("missing bucket in %q", raw)
-	}
-	parts := strings.SplitN(path, "/", 2)
-	bucket := parts[0]
-	var keyPrefix string
-	if len(parts) == 2 {
-		keyPrefix = parts[1]
-	}
-	return bucket, keyPrefix, nil
 }
 
 func WeaviateFlags() []cli.Flag {

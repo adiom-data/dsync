@@ -36,6 +36,7 @@ var (
 
 // ConnectorSettings configures the S3 connector.
 type ConnectorSettings struct {
+	Uri             string
 	Bucket          string
 	Region          string
 	OutputFormat    string
@@ -72,8 +73,33 @@ type connector struct {
 	err      error
 }
 
+func parseS3ConnectionString(raw string) (string, string, error) {
+	const prefix = "s3://"
+	if !strings.HasPrefix(strings.ToLower(raw), prefix) {
+		return "", "", fmt.Errorf("invalid s3 connection string %q", raw)
+	}
+	path := raw[len(prefix):]
+	if path == "" {
+		return "", "", fmt.Errorf("missing bucket in %q", raw)
+	}
+	parts := strings.SplitN(path, "/", 2)
+	bucket := parts[0]
+	var keyPrefix string
+	if len(parts) == 2 {
+		keyPrefix = parts[1]
+	}
+	return bucket, keyPrefix, nil
+}
+
 // NewConn creates a new S3 sink connector.
 func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+	bucket, prefix, err := parseS3ConnectionString(settings.Uri)
+	if err != nil {
+		return nil, fmt.Errorf("bad uri format %v", settings.Uri)
+	}
+	settings.Bucket = bucket
+	settings.Prefix = prefix
+
 	if settings.Bucket == "" {
 		return nil, ErrBucketRequired
 	}
