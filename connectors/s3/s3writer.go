@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"path"
 	"strings"
@@ -193,12 +192,20 @@ func (bp *BatchProcessor) flushBuffer(namespace string) {
 		})
 
 		if err != nil {
-			log.Printf("Error uploading %s: %v", key, err)
+			slog.Error("Upload failed",
+				"namespace", ns,
+				"key", key,
+				"error", err,
+			)
 			// In a real system, you might implement a retry mechanism or Dead Letter Queue here.
 		} else {
 			// Update metadata on successful upload
 			if err := bp.updateMetadata(context.TODO(), ns, key, uint64(numDocs)); err != nil {
-				log.Printf("Error updating metadata for %s: %v", key, err)
+				slog.Error("Failed to update metadata",
+					"namespace", ns,
+					"key", key,
+					"error", err,
+				)
 			}
 		}
 
@@ -229,6 +236,7 @@ func (bp *BatchProcessor) Close() {
 
 	// Wait for all uploads to finish
 	bp.wg.Wait()
+	slog.Warn("Finished final S3 flush")
 }
 
 func (bp *BatchProcessor) objectKey(namespace string) string {
