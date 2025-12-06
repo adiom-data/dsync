@@ -16,6 +16,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/postgres"
 	"github.com/adiom-data/dsync/connectors/random"
+	s3connector "github.com/adiom-data/dsync/connectors/s3"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
@@ -297,6 +298,23 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			}),
 		},
 		{
+			Name: "S3",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(strings.ToLower(s), "s3://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				if len(args) == 0 {
+					return nil, nil, fmt.Errorf("missing s3 connection string: %w", ErrMissingConnector)
+				}
+				settings := s3connector.ConnectorSettings{
+					Uri: args[0],
+				}
+				return CreateHelper("s3", "s3://bucket[/prefix] [options]", S3Flags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					return s3connector.NewConn(settings)
+				})(args, as)
+			},
+		},
+		{
 			Name: "testconn",
 			IsConnector: func(s string) bool {
 				return strings.HasPrefix(s, "testconn://")
@@ -548,6 +566,76 @@ func WeaviateFlags() []cli.Flag {
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:   "use-identity-mapper",
 			Hidden: true,
+		}),
+	}
+}
+
+func S3Flags(settings *s3connector.ConnectorSettings) []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "pretty-json",
+			Usage:       "Pretty-print JSON output data",
+			Value:       true,
+			Destination: &settings.PrettyJSON,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "region",
+			Usage:       "AWS region for the target bucket",
+			Required:    true,
+			Destination: &settings.Region,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "prefix",
+			Usage:       "Override or append to the key prefix derived from the connection string",
+			Destination: &settings.Prefix,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "output-format",
+			Usage:       "Output format for stored objects (only 'json' supported)",
+			Value:       "json",
+			Destination: &settings.OutputFormat,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "profile",
+			Usage:       "Shared config profile",
+			Destination: &settings.Profile,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "endpoint",
+			Usage:       "Custom S3 endpoint (for Localstack or S3-compatible services)",
+			Destination: &settings.Endpoint,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "access-key-id",
+			Usage:       "Static AWS access key ID",
+			Destination: &settings.AccessKeyID,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "secret-access-key",
+			Usage:       "Static AWS secret access key",
+			Destination: &settings.SecretAccessKey,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "session-token",
+			Usage:       "Static AWS session token",
+			Destination: &settings.SessionToken,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "use-path-style",
+			Usage:       "Use path-style addressing (useful for Localstack/minio)",
+			Destination: &settings.UsePathStyle,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "max-file-size",
+			Usage:       "Maximum size of a single file in S3 (in MB)",
+			Value:       10,
+			Destination: &settings.MaxFileSizeMB,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "max-total-memory",
+			Usage:       "Maximum total memory for batching before flushing to S3 (in MB)",
+			Value:       100,
+			Destination: &settings.MaxTotalMemoryMB,
 		}),
 	}
 }
