@@ -7,7 +7,6 @@
 package s3
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -50,24 +49,12 @@ type ConnectorSettings struct {
 	PrettyJSON      bool
 }
 
-type taskKey struct {
-	taskID uint
-}
-
-type storedBatch struct {
-	namespace string
-	docs      [][]byte
-}
-
 type connector struct {
 	adiomv1connect.UnimplementedConnectorServiceHandler
 
-	client       *s3.Client
-	settings     ConnectorSettings
-	batchesMutex sync.Mutex
-	batches      map[taskKey]*storedBatch
-
-	metadataMutex sync.Mutex // Serialize metadata updates
+	client         *s3.Client
+	settings       ConnectorSettings
+	batchProcessor *BatchProcessor
 
 	errMutex sync.RWMutex
 	err      error
@@ -145,10 +132,18 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 		}
 	})
 
+	bp := NewBatchProcessor(client, Config{
+		Bucket:         settings.Bucket,
+		Prefix:         settings.Prefix,
+		MaxFileSize:    10 * 1024 * 1024,  // 10MB
+		MaxTotalMemory: 100 * 1024 * 1024, // 100MB
+		PrettyJSON:     settings.PrettyJSON,
+	})
+
 	return &connector{
-		client:   client,
-		settings: settings,
-		batches:  make(map[taskKey]*storedBatch),
+		client:         client,
+		settings:       settings,
+		batchProcessor: bp,
 	}, nil
 }
 
@@ -390,26 +385,25 @@ func (c *connector) WriteData(ctx context.Context, req *connect.Request[adiomv1.
 	if err := c.currentError(); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	slog.Warn("received write data request", "namespace", req.Msg.GetNamespace(), "numDocs", len(req.Msg.GetData()))
+	slog.Debug("received write data request", "namespace", req.Msg.GetNamespace(), "numDocs", len(req.Msg.GetData()))
 
-	// taskID := uint(req.Msg.GetTaskId())
-	// if taskID == 0 {
-	// 	return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("task id is required"))
-	// }
+	if len(req.Msg.GetData()) == 0 {
+		return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
+	}
 
-	// if len(req.Msg.GetData()) == 0 {
-	// 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
-	// }
+	jsonDocs := make([][]byte, 0, len(req.Msg.GetData()))
+	for _, doc := range req.Msg.GetData() {
+		converted, err := convertToJSON(doc, req.Msg.GetType())
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		jsonDocs = append(jsonDocs, converted)
+	}
 
-	// jsonDocs := make([][]byte, 0, len(req.Msg.GetData()))
-	// for _, doc := range req.Msg.GetData() {
-	// 	converted, err := convertToJSON(doc, req.Msg.GetType())
-	// 	if err != nil {
-	// 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	// 	}
-	// 	jsonDocs = append(jsonDocs, converted)
-	// }
-	// c.appendBatch(req.Msg.GetNamespace(), taskID, jsonDocs)
+	if err := c.batchProcessor.Add(req.Msg.GetNamespace(), jsonDocs); err != nil {
+		c.setError(err)
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
@@ -419,87 +413,8 @@ func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.Write
 	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("updates not supported by S3 connector"))
 }
 
-// // OnTaskCompletionBarrierHandler flushes buffered data to S3 and updates metadata.
-// func (c *connector) OnTaskCompletionBarrierHandler(taskID uint) error {
-// 	batch := c.detachBatch(taskID)
-// 	if batch == nil {
-// 		slog.Debug("s3 connector received barrier with no data", "taskId", taskID)
-// 		return nil
-// 	}
-// 	if len(batch.docs) == 0 {
-// 		slog.Debug("s3 connector received barrier with empty batch", "taskId", taskID)
-// 		return nil
-// 	}
-// 	if err := c.flushBatch(batch.namespace, taskID, batch.docs); err != nil {
-// 		slog.Error("failed to flush s3 batch", "namespace", batch.namespace, "taskId", taskID, "err", err)
-// 		c.setError(err)
-// 		return err
-// 	}
-
-// 	// Update metadata file atomically after successful flush
-// 	if len(batch.docs) > 0 {
-// 		if err := c.updateMetadataAfterFlush(context.Background(), batch.namespace, taskID, uint64(len(batch.docs))); err != nil {
-// 			slog.Error("failed to update metadata", "namespace", batch.namespace, "taskId", taskID, "err", err)
-// 			// Log error but don't fail the barrier - the data was successfully flushed
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func (c *connector) Teardown() {
-	slog.Warn("Teardown")
-}
-
-func (c *connector) appendBatch(namespace string, taskID uint, docs [][]byte) {
-	c.batchesMutex.Lock()
-	defer c.batchesMutex.Unlock()
-	key := taskKey{taskID}
-	batch, ok := c.batches[key]
-	if !ok {
-		batch = &storedBatch{namespace: namespace}
-		c.batches[key] = batch
-	}
-	batch.docs = append(batch.docs, docs...)
-}
-
-func (c *connector) detachBatch(taskID uint) *storedBatch {
-	c.batchesMutex.Lock()
-	defer c.batchesMutex.Unlock()
-	key := taskKey{taskID}
-	batch := c.batches[key]
-	delete(c.batches, key)
-	return batch
-}
-
-func (c *connector) flushBatch(namespace string, taskID uint, docs [][]byte) error {
-	payload := buildJSONArray(docs, c.settings.PrettyJSON)
-	key := c.objectKey(namespace, taskID)
-	_, err := c.client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:      aws.String(c.settings.Bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(payload),
-		ContentType: aws.String("application/json"),
-	})
-	if err != nil {
-		return fmt.Errorf("put object %s: %w", key, err)
-	}
-	slog.Debug("flushed s3 batch", "namespace", namespace, "taskId", taskID, "key", key, "numDocs", len(docs))
-	return nil
-}
-
-func (c *connector) objectKey(namespace string, taskID uint) string {
-	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
-	if nsPath == "" {
-		nsPath = "default"
-	}
-	fileName := fmt.Sprintf("task-%d.json", taskID)
-
-	prefix := strings.Trim(c.settings.Prefix, "/")
-	if prefix == "" {
-		return path.Join(nsPath, fileName)
-	}
-	return path.Join(prefix, nsPath, fileName)
+	c.batchProcessor.Close()
 }
 
 func (c *connector) currentError() error {
@@ -514,34 +429,6 @@ func (c *connector) setError(err error) {
 	if c.err == nil {
 		c.err = err
 	}
-}
-
-func buildJSONArray(docs [][]byte, prettyJSON bool) []byte {
-	var buf bytes.Buffer
-	buf.Grow(len(docs) * 2)
-	buf.WriteByte('[')
-	for i, doc := range docs {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		if prettyJSON {
-			var prettyBuf bytes.Buffer
-			prettyBuf.Grow(len(doc) + len(doc)/10) // rough estimate
-			if err := json.Indent(&prettyBuf, doc, "", "  "); err == nil {
-				buf.WriteByte('\n')
-				doc = prettyBuf.Bytes()
-			} else {
-				// If indenting fails, fall back to original
-				slog.Warn("Failed JSON indentation. Falling back to no-indent")
-			}
-		}
-		buf.Write(doc)
-	}
-	if prettyJSON {
-		buf.WriteByte('\n')
-	}
-	buf.WriteByte(']')
-	return buf.Bytes()
 }
 
 func convertToJSON(data []byte, dataType adiomv1.DataType) ([]byte, error) {
@@ -606,56 +493,4 @@ func (c *connector) readMetadata(ctx context.Context, namespace string) (map[str
 		return nil, fmt.Errorf("decode metadata json from %s: %w", key, err)
 	}
 	return metadata, nil
-}
-
-// writeMetadata atomically writes the metadata.json file for a namespace to S3.
-func (c *connector) writeMetadata(ctx context.Context, namespace string, metadata map[string]uint64) error {
-	key := c.metadataKey(namespace)
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		return fmt.Errorf("marshal metadata json: %w", err)
-	}
-
-	_, err = c.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(c.settings.Bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(metadataJSON),
-		ContentType: aws.String("application/json"),
-	})
-	if err != nil {
-		return fmt.Errorf("put metadata object %s: %w", key, err)
-	}
-	return nil
-}
-
-// updateMetadataAfterFlush updates the metadata file after a batch has been flushed.
-// It reads the current metadata, adds/updates the file entry, and writes it back atomically.
-func (c *connector) updateMetadataAfterFlush(ctx context.Context, namespace string, taskID uint, recordCount uint64) error {
-	c.metadataMutex.Lock()
-	defer c.metadataMutex.Unlock()
-
-	// Read current metadata (or create empty map if doesn't exist)
-	metadata, err := c.readMetadata(ctx, namespace)
-	if err != nil {
-		return fmt.Errorf("read metadata: %w", err)
-	}
-	if metadata == nil {
-		metadata = make(map[string]uint64)
-	}
-
-	// Get the file key that was just written
-	fileKey := c.objectKey(namespace, taskID)
-	// Extract just the filename for the metadata map
-	// The metadata should map filename -> record count
-	fileName := path.Base(fileKey)
-
-	// Update the metadata with the new file and record count
-	metadata[fileName] = recordCount
-
-	// Write back atomically
-	if err := c.writeMetadata(ctx, namespace, metadata); err != nil {
-		return fmt.Errorf("write metadata: %w", err)
-	}
-
-	return nil
 }

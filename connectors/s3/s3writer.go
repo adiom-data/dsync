@@ -3,20 +3,34 @@ package s3
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"log/slog"
+	"path"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 )
 
 // Config holds our limits
 type Config struct {
 	Bucket         string
+	Prefix         string
 	MaxFileSize    int64 // X MB in bytes
 	MaxTotalMemory int64 // Y MB in bytes
+	PrettyJSON     bool
+}
+
+type bufferInfo struct {
+	buffer    *bytes.Buffer
+	docCount  int
+	namespace string
 }
 
 // BatchProcessor manages the ingestion and buffering
@@ -27,19 +41,22 @@ type BatchProcessor struct {
 	// State
 	mu           sync.Mutex
 	cond         *sync.Cond
-	buffers      map[string]*bytes.Buffer // Namespace -> Data
-	currentUsage int64                    // Total bytes in RAM (Buffered + In-Flight)
+	buffers      map[string]*bufferInfo // Namespace -> buffer
+	currentUsage int64                  // Total bytes in RAM (Buffered + In-Flight)
 
 	// Lifecycle
 	wg       sync.WaitGroup // To wait for pending uploads on shutdown
 	shutdown bool
+
+	// Metadata
+	metadataMutex sync.Mutex
 }
 
 func NewBatchProcessor(client *s3.Client, cfg Config) *BatchProcessor {
 	bp := &BatchProcessor{
 		s3Client: client,
 		config:   cfg,
-		buffers:  make(map[string]*bytes.Buffer),
+		buffers:  make(map[string]*bufferInfo),
 	}
 	// Initialize the condition variable with the mutex
 	bp.cond = sync.NewCond(&bp.mu)
@@ -47,11 +64,14 @@ func NewBatchProcessor(client *s3.Client, cfg Config) *BatchProcessor {
 }
 
 // Add safely handles multi-threaded ingestion
-func (bp *BatchProcessor) Add(namespace string, data []byte) error {
+func (bp *BatchProcessor) Add(namespace string, data [][]byte) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 
-	dataLen := int64(len(data))
+	dataLen := int64(0)
+	for _, d := range data {
+		dataLen += int64(len(d))
+	}
 
 	// 1. BACKPRESSURE MECHANISM
 	// If adding this data exceeds global memory, we must wait (block)
@@ -76,12 +96,33 @@ func (bp *BatchProcessor) Add(namespace string, data []byte) error {
 
 	// 3. Append to Buffer
 	if _, exists := bp.buffers[namespace]; !exists {
-		bp.buffers[namespace] = new(bytes.Buffer)
+		bp.buffers[namespace] = &bufferInfo{
+			buffer:    new(bytes.Buffer),
+			namespace: namespace,
+		}
+		bp.buffers[namespace].buffer.WriteByte('[')
 	}
-	bp.buffers[namespace].Write(data)
+
+	for i, doc := range data {
+		if bp.buffers[namespace].docCount > 0 || i > 0 {
+			bp.buffers[namespace].buffer.WriteByte(',')
+		}
+		if bp.config.PrettyJSON {
+			var prettyBuf bytes.Buffer
+			prettyBuf.Grow(len(doc) + len(doc)/10)
+			if err := json.Indent(&prettyBuf, doc, "", "  "); err == nil {
+				bp.buffers[namespace].buffer.WriteByte('\n')
+				doc = prettyBuf.Bytes()
+			} else {
+				slog.Warn("Failed JSON indentation. Falling back to no-indent")
+			}
+		}
+		bp.buffers[namespace].buffer.Write(doc)
+		bp.buffers[namespace].docCount++
+	}
 
 	// 4. Check Individual File Size Limit (X MB)
-	if int64(bp.buffers[namespace].Len()) >= bp.config.MaxFileSize {
+	if int64(bp.buffers[namespace].buffer.Len()) >= bp.config.MaxFileSize {
 		bp.flushBuffer(namespace)
 	}
 
@@ -94,15 +135,18 @@ func (bp *BatchProcessor) evictLargestBuffer() {
 	var largestNS string
 	var largestSize int
 
-	for ns, buf := range bp.buffers {
-		if buf.Len() > largestSize {
-			largestSize = buf.Len()
+	for ns, bufInfo := range bp.buffers {
+		if bufInfo.buffer.Len() > largestSize {
+			largestSize = bufInfo.buffer.Len()
 			largestNS = ns
 		}
 	}
 
 	if largestNS != "" {
-		// log.Printf("Memory Pressure! Evicting %s (%d bytes)", largestNS, largestSize)
+		slog.Debug("Memory Pressure! Evicting buffer",
+			"namespace", largestNS,
+			"size_bytes", largestSize,
+		)
 		bp.flushBuffer(largestNS)
 	}
 }
@@ -110,15 +154,21 @@ func (bp *BatchProcessor) evictLargestBuffer() {
 // flushBuffer moves data from the map to the async uploader.
 // Caller must hold the lock.
 func (bp *BatchProcessor) flushBuffer(namespace string) {
-	buf, exists := bp.buffers[namespace]
-	if !exists || buf.Len() == 0 {
+	bufInfo, exists := bp.buffers[namespace]
+	if !exists || bufInfo.buffer.Len() == 0 {
 		return
 	}
 
+	if bp.config.PrettyJSON {
+		bufInfo.buffer.WriteByte('\n')
+	}
+	bufInfo.buffer.WriteByte(']')
+
 	// Snapshot data for upload
-	payload := make([]byte, buf.Len())
-	copy(payload, buf.Bytes())
+	payload := make([]byte, bufInfo.buffer.Len())
+	copy(payload, bufInfo.buffer.Bytes())
 	payloadSize := int64(len(payload))
+	docCount := bufInfo.docCount
 
 	// Clear the buffer entry from the map immediately so new writes can start a fresh buffer
 	delete(bp.buffers, namespace)
@@ -129,11 +179,11 @@ func (bp *BatchProcessor) flushBuffer(namespace string) {
 	bp.wg.Add(1)
 
 	// Launch Async Upload
-	go func(ns string, data []byte, size int64) {
+	go func(ns string, data []byte, size int64, numDocs int) {
 		defer bp.wg.Done()
 
 		// Generate Key
-		key := fmt.Sprintf("%s/%d.json", ns, time.Now().UnixNano())
+		key := bp.objectKey(ns)
 
 		// Perform Upload
 		_, err := bp.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
@@ -145,6 +195,11 @@ func (bp *BatchProcessor) flushBuffer(namespace string) {
 		if err != nil {
 			log.Printf("Error uploading %s: %v", key, err)
 			// In a real system, you might implement a retry mechanism or Dead Letter Queue here.
+		} else {
+			// Update metadata on successful upload
+			if err := bp.updateMetadata(context.TODO(), ns, key, uint64(numDocs)); err != nil {
+				log.Printf("Error updating metadata for %s: %v", key, err)
+			}
 		}
 
 		// MEMORY RECLAMATION
@@ -154,7 +209,7 @@ func (bp *BatchProcessor) flushBuffer(namespace string) {
 		bp.cond.Broadcast()
 		bp.mu.Unlock()
 
-	}(namespace, payload, payloadSize)
+	}(namespace, payload, payloadSize, docCount)
 }
 
 // Close ensures all remaining buffers are flushed
@@ -174,4 +229,96 @@ func (bp *BatchProcessor) Close() {
 
 	// Wait for all uploads to finish
 	bp.wg.Wait()
+}
+
+func (bp *BatchProcessor) objectKey(namespace string) string {
+	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
+	if nsPath == "" {
+		nsPath = "default"
+	}
+	fileName := fmt.Sprintf("%d.json", time.Now().UnixNano())
+
+	prefix := strings.Trim(bp.config.Prefix, "/")
+	if prefix == "" {
+		return path.Join(nsPath, fileName)
+	}
+	return path.Join(prefix, nsPath, fileName)
+}
+
+func (bp *BatchProcessor) metadataKey(namespace string) string {
+	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
+	if nsPath == "" {
+		nsPath = "default"
+	}
+
+	prefix := strings.Trim(bp.config.Prefix, "/")
+	if prefix == "" {
+		return path.Join(nsPath, ".metadata.json")
+	}
+	return path.Join(prefix, nsPath, ".metadata.json")
+}
+
+func (bp *BatchProcessor) readMetadata(ctx context.Context, namespace string) (map[string]uint64, error) {
+	key := bp.metadataKey(namespace)
+	getOut, err := bp.s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bp.config.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.ErrorCode() == "NoSuchKey" {
+				return nil, nil
+			}
+		}
+		return nil, fmt.Errorf("get metadata object %s: %w", key, err)
+	}
+	defer getOut.Body.Close()
+
+	var metadata map[string]uint64
+	if err := json.NewDecoder(getOut.Body).Decode(&metadata); err != nil {
+		return nil, fmt.Errorf("decode metadata json from %s: %w", key, err)
+	}
+	return metadata, nil
+}
+
+func (bp *BatchProcessor) writeMetadata(ctx context.Context, namespace string, metadata map[string]uint64) error {
+	key := bp.metadataKey(namespace)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("marshal metadata json: %w", err)
+	}
+
+	_, err = bp.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bp.config.Bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(metadataJSON),
+		ContentType: aws.String("application/json"),
+	})
+	if err != nil {
+		return fmt.Errorf("put metadata object %s: %w", key, err)
+	}
+	return nil
+}
+
+func (bp *BatchProcessor) updateMetadata(ctx context.Context, namespace string, fileKey string, recordCount uint64) error {
+	bp.metadataMutex.Lock()
+	defer bp.metadataMutex.Unlock()
+
+	metadata, err := bp.readMetadata(ctx, namespace)
+	if err != nil {
+		return fmt.Errorf("read metadata: %w", err)
+	}
+	if metadata == nil {
+		metadata = make(map[string]uint64)
+	}
+
+	fileName := path.Base(fileKey)
+	metadata[fileName] = recordCount
+
+	if err := bp.writeMetadata(ctx, namespace, metadata); err != nil {
+		return fmt.Errorf("write metadata: %w", err)
+	}
+
+	return nil
 }
