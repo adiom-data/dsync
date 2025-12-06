@@ -236,7 +236,7 @@ func (bp *BatchProcessor) Close() {
 
 	// Wait for all uploads to finish
 	bp.wg.Wait()
-	slog.Warn("Finished final S3 flush")
+	slog.Debug("Finished final S3 flush")
 }
 
 func (bp *BatchProcessor) objectKey(namespace string) string {
