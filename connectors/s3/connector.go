@@ -35,18 +35,20 @@ var (
 
 // ConnectorSettings configures the S3 connector.
 type ConnectorSettings struct {
-	Uri             string
-	Bucket          string
-	Region          string
-	OutputFormat    string
-	Prefix          string
-	Endpoint        string
-	Profile         string
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-	UsePathStyle    bool
-	PrettyJSON      bool
+	Uri              string
+	Bucket           string
+	Region           string
+	OutputFormat     string
+	Prefix           string
+	Endpoint         string
+	Profile          string
+	AccessKeyID      string
+	SecretAccessKey  string
+	SessionToken     string
+	UsePathStyle     bool
+	PrettyJSON       bool
+	MaxFileSizeMB    int64
+	MaxTotalMemoryMB int64
 }
 
 type connector struct {
@@ -108,6 +110,13 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 		return nil, fmt.Errorf("unsupported output format %q", settings.OutputFormat)
 	}
 
+	if settings.MaxFileSizeMB == 0 {
+		settings.MaxFileSizeMB = 10 // 10MB
+	}
+	if settings.MaxTotalMemoryMB == 0 {
+		settings.MaxTotalMemoryMB = 100 // 100MB
+	}
+
 	cfgOpts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(settings.Region),
 	}
@@ -135,8 +144,8 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 	bp := NewBatchProcessor(client, Config{
 		Bucket:         settings.Bucket,
 		Prefix:         settings.Prefix,
-		MaxFileSize:    10 * 1024 * 1024,  // 10MB
-		MaxTotalMemory: 100 * 1024 * 1024, // 100MB
+		MaxFileSize:    settings.MaxFileSizeMB * 1024 * 1024,
+		MaxTotalMemory: settings.MaxTotalMemoryMB * 1024 * 1024,
 		PrettyJSON:     settings.PrettyJSON,
 	})
 

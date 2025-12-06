@@ -625,6 +625,18 @@ func S3Flags(settings *s3connector.ConnectorSettings) []cli.Flag {
 			Usage:       "Use path-style addressing (useful for Localstack/minio)",
 			Destination: &settings.UsePathStyle,
 		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "max-file-size",
+			Usage:       "Maximum size of a single file in S3 (in MB)",
+			Value:       10,
+			Destination: &settings.MaxFileSizeMB,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "max-total-memory",
+			Usage:       "Maximum total memory for batching before flushing to S3 (in MB)",
+			Value:       100,
+			Destination: &settings.MaxTotalMemoryMB,
+		}),
 	}
 }
 

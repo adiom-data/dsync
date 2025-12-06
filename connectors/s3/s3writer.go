@@ -122,7 +122,7 @@ func (bp *BatchProcessor) Add(namespace string, data [][]byte) error {
 
 	// 4. Check Individual File Size Limit (X MB)
 	if int64(bp.buffers[namespace].buffer.Len()) >= bp.config.MaxFileSize {
-		bp.flushBuffer(namespace)
+		bp.asyncFlushBuffer(namespace)
 	}
 
 	return nil
@@ -146,13 +146,13 @@ func (bp *BatchProcessor) evictLargestBuffer() {
 			"namespace", largestNS,
 			"size_bytes", largestSize,
 		)
-		bp.flushBuffer(largestNS)
+		bp.asyncFlushBuffer(largestNS)
 	}
 }
 
-// flushBuffer moves data from the map to the async uploader.
+// asyncFlushBuffer moves data from the map to the async uploader.
 // Caller must hold the lock.
-func (bp *BatchProcessor) flushBuffer(namespace string) {
+func (bp *BatchProcessor) asyncFlushBuffer(namespace string) {
 	bufInfo, exists := bp.buffers[namespace]
 	if !exists || bufInfo.buffer.Len() == 0 {
 		return
@@ -230,7 +230,7 @@ func (bp *BatchProcessor) Close() {
 		names = append(names, ns)
 	}
 	for _, ns := range names {
-		bp.flushBuffer(ns)
+		bp.asyncFlushBuffer(ns)
 	}
 	bp.mu.Unlock()
 
