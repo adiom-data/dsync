@@ -75,6 +75,11 @@ func (bp *BatchProcessor) Add(namespace string, data [][]byte) error {
 	// 1. BACKPRESSURE MECHANISM
 	// If adding this data exceeds global memory, we must wait (block)
 	// until space is freed by finished uploads.
+	// We error in earnest if the data itself exceeds the max total memory.
+	if dataLen > bp.config.MaxTotalMemory {
+		return fmt.Errorf("data size %d exceeds max total memory %d", dataLen, bp.config.MaxTotalMemory)
+	}
+
 	for (bp.currentUsage + dataLen) > bp.config.MaxTotalMemory {
 		if bp.shutdown {
 			return fmt.Errorf("processor is shutting down")
