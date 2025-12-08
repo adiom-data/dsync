@@ -254,16 +254,7 @@ func (bp *BatchProcessor) objectKey(namespace string) string {
 }
 
 func (bp *BatchProcessor) metadataKey(namespace string) string {
-	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
-	if nsPath == "" {
-		nsPath = "default"
-	}
-
-	prefix := strings.Trim(bp.config.Prefix, "/")
-	if prefix == "" {
-		return path.Join(nsPath, ".metadata.json")
-	}
-	return path.Join(prefix, nsPath, ".metadata.json")
+	return MetadataKey(bp.config.Prefix, namespace)
 }
 
 func (bp *BatchProcessor) readMetadata(ctx context.Context, namespace string) (map[string]uint64, error) {

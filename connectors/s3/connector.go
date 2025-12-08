@@ -464,16 +464,7 @@ func convertToJSON(data []byte, dataType adiomv1.DataType) ([]byte, error) {
 
 // metadataKey returns the S3 key for the metadata file for a given namespace.
 func (c *connector) metadataKey(namespace string) string {
-	nsPath := strings.ReplaceAll(strings.Trim(namespace, "/"), ".", "/")
-	if nsPath == "" {
-		nsPath = "default"
-	}
-
-	prefix := strings.Trim(c.settings.Prefix, "/")
-	if prefix == "" {
-		return path.Join(nsPath, ".metadata.json")
-	}
-	return path.Join(prefix, nsPath, ".metadata.json")
+	return MetadataKey(c.settings.Prefix, namespace)
 }
 
 // readMetadata reads the metadata.json file for a namespace from S3.
