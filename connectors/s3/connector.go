@@ -36,6 +36,7 @@ var (
 const (
 	DEFAULT_MAX_FILE_SIZE_MB    = 10  // 10MB
 	DEFAULT_MAX_TOTAL_MEMORY_MB = 100 // 100MB
+	MAX_S3_WRITE_TIMEOUT_SEC    = 300 // 5 minutes
 )
 
 // ConnectorSettings configures the S3 connector.

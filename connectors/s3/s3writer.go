@@ -186,11 +186,14 @@ func (bp *BatchProcessor) asyncFlushBuffer(namespace string) {
 	go func(ns string, data []byte, size int64, numDocs int) {
 		defer bp.wg.Done()
 
+		ctx, cancel := context.WithTimeout(context.Background(), MAX_S3_WRITE_TIMEOUT_SEC*time.Second)
+		defer cancel()
+
 		// Generate Key
 		key := bp.objectKey(ns)
 
 		// Perform Upload
-		_, err := bp.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		_, err := bp.s3Client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(bp.config.Bucket),
 			Key:    aws.String(key),
 			Body:   bytes.NewReader(data),
@@ -205,7 +208,7 @@ func (bp *BatchProcessor) asyncFlushBuffer(namespace string) {
 			// In a real system, you might implement a retry mechanism or Dead Letter Queue here.
 		} else {
 			// Update metadata on successful upload
-			if err := bp.updateMetadata(context.TODO(), ns, key, uint64(numDocs)); err != nil {
+			if err := bp.updateMetadata(ctx, ns, key, uint64(numDocs)); err != nil {
 				slog.Error("Failed to update metadata",
 					"namespace", ns,
 					"key", key,
