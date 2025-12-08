@@ -206,7 +206,7 @@ func (bp *BatchProcessor) asyncFlushBuffer(namespace string) {
 				"key", key,
 				"error", err,
 			)
-			// In a real system, you might implement a retry mechanism or Dead Letter Queue here.
+			//XXX: might want to implement a retry mechanism or Dead Letter Queue here.
 		} else {
 			// Update metadata on successful upload
 			if err := bp.updateMetadataWithRetries(ctx, ns, key, uint64(numDocs)); err != nil {
@@ -339,8 +339,7 @@ func (bp *BatchProcessor) updateMetadataWithRetries(ctx context.Context, namespa
 
 		// Exponential backoff with jitter
 		delay := time.Duration(50*(1<<i)) * time.Millisecond
-		//nolint:gosec
-		jitter := time.Duration(rand.N(25)) * time.Millisecond
+		jitter := time.Duration(rand.N(25)) * time.Millisecond //nolint:gosec
 		time.Sleep(delay + jitter)
 	}
 	return fmt.Errorf("failed to update metadata after 3 attempts: %w", lastErr)
