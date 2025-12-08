@@ -208,8 +208,8 @@ func (bp *BatchProcessor) asyncFlushBuffer(namespace string) {
 			// In a real system, you might implement a retry mechanism or Dead Letter Queue here.
 		} else {
 			// Update metadata on successful upload
-			if err := bp.updateMetadata(ctx, ns, key, uint64(numDocs)); err != nil {
-				slog.Error("Failed to update metadata",
+			if err := bp.updateMetadataWithRetries(ctx, ns, key, uint64(numDocs)); err != nil {
+				slog.Error("Failed to update metadata after retries",
 					"namespace", ns,
 					"key", key,
 					"error", err,
@@ -265,7 +265,7 @@ func (bp *BatchProcessor) metadataKey(namespace string) string {
 	return MetadataKey(bp.config.Prefix, namespace)
 }
 
-func (bp *BatchProcessor) readMetadata(ctx context.Context, namespace string) (map[string]uint64, error) {
+func (bp *BatchProcessor) readMetadata(ctx context.Context, namespace string) (map[string]uint64, *string, error) {
 	key := bp.metadataKey(namespace)
 	getOut, err := bp.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bp.config.Bucket),
@@ -275,21 +275,21 @@ func (bp *BatchProcessor) readMetadata(ctx context.Context, namespace string) (m
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.ErrorCode() == "NoSuchKey" {
-				return nil, nil
+				return nil, nil, nil
 			}
 		}
-		return nil, fmt.Errorf("get metadata object %s: %w", key, err)
+		return nil, nil, fmt.Errorf("get metadata object %s: %w", key, err)
 	}
 	defer getOut.Body.Close()
 
 	var metadata map[string]uint64
 	if err := json.NewDecoder(getOut.Body).Decode(&metadata); err != nil {
-		return nil, fmt.Errorf("decode metadata json from %s: %w", key, err)
+		return nil, nil, fmt.Errorf("decode metadata json from %s: %w", key, err)
 	}
-	return metadata, nil
+	return metadata, getOut.ETag, nil
 }
 
-func (bp *BatchProcessor) writeMetadata(ctx context.Context, namespace string, metadata map[string]uint64) error {
+func (bp *BatchProcessor) writeMetadata(ctx context.Context, namespace string, metadata map[string]uint64, etag *string) error {
 	key := bp.metadataKey(namespace)
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
@@ -301,18 +301,53 @@ func (bp *BatchProcessor) writeMetadata(ctx context.Context, namespace string, m
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(metadataJSON),
 		ContentType: aws.String("application/json"),
+		IfMatch:     etag,
 	})
 	if err != nil {
+		var ae smithy.APIError
+		if errors.As(err, &ae) && IsS3OptimisticLockFailedError(ae) {
+			return &ErrS3OptimisticLockFailed{err: err}
+		}
 		return fmt.Errorf("put metadata object %s: %w", key, err)
 	}
 	return nil
+}
+
+func (bp *BatchProcessor) updateMetadataWithRetries(ctx context.Context, namespace string, fileKey string, recordCount uint64) error {
+	var lastErr error
+	for i := 0; i < S3_METADATA_UPDATES_RETRY; i++ { // 1 initial attempt + 2 retries
+		err := bp.updateMetadata(ctx, namespace, fileKey, recordCount)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Only retry on precondition failed errors
+		var preconditionErr *ErrS3OptimisticLockFailed
+		if !errors.As(err, &preconditionErr) {
+			return err // Not a retryable error
+		}
+
+		slog.Warn("Optimistic lock failed on metadata update, retrying...",
+			"attempt", i+1,
+			"namespace", namespace,
+			"fileKey", fileKey,
+			"error", err,
+		)
+
+		// Exponential backoff with jitter
+		delay := time.Duration(50*i) * time.Millisecond
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("failed to update metadata after 3 attempts: %w", lastErr)
 }
 
 func (bp *BatchProcessor) updateMetadata(ctx context.Context, namespace string, fileKey string, recordCount uint64) error {
 	bp.metadataMutex.Lock()
 	defer bp.metadataMutex.Unlock()
 
-	metadata, err := bp.readMetadata(ctx, namespace)
+	metadata, etag, err := bp.readMetadata(ctx, namespace)
 	if err != nil {
 		return fmt.Errorf("read metadata: %w", err)
 	}
@@ -323,7 +358,7 @@ func (bp *BatchProcessor) updateMetadata(ctx context.Context, namespace string, 
 	fileName := path.Base(fileKey)
 	metadata[fileName] = recordCount
 
-	if err := bp.writeMetadata(ctx, namespace, metadata); err != nil {
+	if err := bp.writeMetadata(ctx, namespace, metadata, etag); err != nil {
 		return fmt.Errorf("write metadata: %w", err)
 	}
 

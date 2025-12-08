@@ -37,6 +37,7 @@ const (
 	DEFAULT_MAX_FILE_SIZE_MB    = 10  // 10MB
 	DEFAULT_MAX_TOTAL_MEMORY_MB = 100 // 100MB
 	MAX_S3_WRITE_TIMEOUT_SEC    = 300 // 5 minutes
+	S3_METADATA_UPDATES_RETRY   = 3   // Number of retries for metadata updates
 )
 
 // ConnectorSettings configures the S3 connector.
