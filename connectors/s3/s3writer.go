@@ -1,3 +1,4 @@
+//gosec:disable G404 -- This is a false positive
 package s3
 
 import (
@@ -339,7 +340,7 @@ func (bp *BatchProcessor) updateMetadataWithRetries(ctx context.Context, namespa
 
 		// Exponential backoff with jitter
 		delay := time.Duration(50*(1<<i)) * time.Millisecond
-		jitter := time.Duration(rand.N(25)) * time.Millisecond //nolint:gosec
+		jitter := time.Duration(rand.N(25)) * time.Millisecond
 		time.Sleep(delay + jitter)
 	}
 	return fmt.Errorf("failed to update metadata after 3 attempts: %w", lastErr)
