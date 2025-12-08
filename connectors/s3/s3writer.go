@@ -298,13 +298,18 @@ func (bp *BatchProcessor) writeMetadata(ctx context.Context, namespace string, m
 		return fmt.Errorf("marshal metadata json: %w", err)
 	}
 
-	_, err = bp.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket:      aws.String(bp.config.Bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(metadataJSON),
 		ContentType: aws.String("application/json"),
-		IfMatch:     etag,
-	})
+	}
+	if etag != nil {
+		input.IfMatch = etag
+	} else { // New object, ensure it doesn't exist
+		input.IfNoneMatch = aws.String("*")
+	}
+	_, err = bp.s3Client.PutObject(ctx, input)
 	if err != nil {
 		var ae smithy.APIError
 		if errors.As(err, &ae) && IsS3OptimisticLockFailedError(ae) {
