@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"path"
 	"strings"
 	"sync"
@@ -340,7 +340,7 @@ func (bp *BatchProcessor) updateMetadataWithRetries(ctx context.Context, namespa
 		// Exponential backoff with jitter
 		delay := time.Duration(50*(1<<i)) * time.Millisecond
 		//nolint:gosec
-		jitter := time.Duration(rand.Intn(25)) * time.Millisecond
+		jitter := time.Duration(rand.N(25)) * time.Millisecond
 		time.Sleep(delay + jitter)
 	}
 	return fmt.Errorf("failed to update metadata after 3 attempts: %w", lastErr)
