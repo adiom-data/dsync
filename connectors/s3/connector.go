@@ -33,6 +33,11 @@ var (
 	ErrUnsupportedType = errors.New("unsupported data type for S3 connector")
 )
 
+const (
+	DEFAULT_MAX_FILE_SIZE_MB    = 10  // 10MB
+	DEFAULT_MAX_TOTAL_MEMORY_MB = 100 // 100MB
+)
+
 // ConnectorSettings configures the S3 connector.
 type ConnectorSettings struct {
 	Uri              string
@@ -111,10 +116,10 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 	}
 
 	if settings.MaxFileSizeMB == 0 {
-		settings.MaxFileSizeMB = 10 // 10MB
+		settings.MaxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB
 	}
 	if settings.MaxTotalMemoryMB == 0 {
-		settings.MaxTotalMemoryMB = 100 // 100MB
+		settings.MaxTotalMemoryMB = DEFAULT_MAX_TOTAL_MEMORY_MB
 	}
 
 	cfgOpts := []func(*awsconfig.LoadOptions) error{
