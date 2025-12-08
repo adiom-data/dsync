@@ -339,6 +339,7 @@ func (bp *BatchProcessor) updateMetadataWithRetries(ctx context.Context, namespa
 
 		// Exponential backoff with jitter
 		delay := time.Duration(50*(1<<i)) * time.Millisecond
+		//nolint:gosec
 		jitter := time.Duration(rand.Intn(25)) * time.Millisecond
 		time.Sleep(delay + jitter)
 	}
