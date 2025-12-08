@@ -242,13 +242,12 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 				continue
 			}
 
-			parts := strings.SplitN(relKey, "/", 2)
-			namespace := ""
-			if len(parts) > 1 {
-				namespace = parts[0]
-			}
-			if namespace == "" {
+			var namespace string
+			dir := path.Dir(relKey)
+			if dir == "." { //current directory
 				namespace = "default"
+			} else { //convert path to namespace
+				namespace = strings.ReplaceAll(dir, "/", ".")
 			}
 
 			if filterByNamespace {
