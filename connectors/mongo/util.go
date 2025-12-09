@@ -88,8 +88,9 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-// COSMOS_DB_REGEX Checks if the MongoDB is genuine based on the connection string
-var COSMOS_DB_REGEX = regexp.MustCompile(`(?i)\.cosmos\.azure\.com$`)
+// COSMOS_DB_*_REGEX Checks if the MongoDB is genuine based on the connection string
+var COSMOS_DB_RU_REGEX = regexp.MustCompile(`(?i)\.mongo\.cosmos\.azure\.com$`)
+var COSMOS_DB_VCORE_REGEX = regexp.MustCompile(`(?i)\.mongocluster\.cosmos\.azure\.com$`)
 var DOCUMENT_DB_REGEX = regexp.MustCompile(`(?i)docdb(-elastic)?\.amazonaws\.com$`)
 
 func getHostnameFromHost(host string) string {
@@ -117,9 +118,10 @@ func getHostnameFromUrl(url string) string {
 type MongoFlavor string
 
 const (
-	FlavorCosmosDB   MongoFlavor = "COSMOS"
-	FlavorDocumentDB MongoFlavor = "DOCDB"
-	FlavorMongoDB    MongoFlavor = "MONGODB"
+	FlavorCosmosDB_RU    MongoFlavor = "COSMOS_RU"
+	FlavorCosmosDB_VCORE MongoFlavor = "COSMOS_VCORE"
+	FlavorDocumentDB     MongoFlavor = "DOCDB"
+	FlavorMongoDB        MongoFlavor = "MONGODB"
 )
 
 // GetMongoFlavor returns the flavor of the MongoDB instance based on the connection string
@@ -127,13 +129,20 @@ func GetMongoFlavor(connectionString string) MongoFlavor {
 	hostname := getHostnameFromUrl(connectionString)
 
 	//check if the connection string matches the regex for Cosmos DB
-	if COSMOS_DB_REGEX.MatchString(hostname) {
-		return FlavorCosmosDB
+	if COSMOS_DB_RU_REGEX.MatchString(hostname) {
+		return FlavorCosmosDB_RU
 	}
+
+	if COSMOS_DB_VCORE_REGEX.MatchString(hostname) {
+		return FlavorCosmosDB_VCORE
+	}
+
 	//check if the connection string matches the regex for Document DB
 	if DOCUMENT_DB_REGEX.MatchString(hostname) {
 		return FlavorDocumentDB
 	}
+
+	//default to MongoDB
 	return FlavorMongoDB
 }
 
