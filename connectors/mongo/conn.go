@@ -50,6 +50,8 @@ type ConnectorSettings struct {
 	SkipInitialSyncDuplicateNamespaces map[string]struct{}
 	InitialSyncIndexHint               string
 	IsolateOnWriteError                []string
+	IsolatedRetryAmount                int
+	IsolatedRetrySkipFailed            bool
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -907,7 +909,15 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	return nil
 }
 
-func maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isolateOnWriteError []string, models []mongo.WriteModel, originalErr error) error {
+func getIdFromModel(wm mongo.WriteModel) any {
+	if rom, ok := wm.(*mongo.ReplaceOneModel); ok {
+		return rom.Filter.(bson.D)[0].Value
+	} else {
+		return nil
+	}
+}
+
+func (c *conn) maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isolateOnWriteError []string, models []mongo.WriteModel, originalErr error) error {
 	if len(isolateOnWriteError) > 0 {
 		key := time.Now().UnixNano()
 		var isolatedRetry []mongo.WriteModel
@@ -916,7 +926,7 @@ func maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isola
 			for _, we := range bwErrWriteErrors.WriteErrors {
 				for _, possibleError := range isolateOnWriteError {
 					if strings.Contains(we.Message, possibleError) {
-						slog.Warn("Detected isolatable retry", "msg", we.Message, "key", key)
+						slog.Warn("Detected isolatable retry", "msg", we.Message, "key", key, "id", getIdFromModel(models[we.Index]))
 						metrics.IsolatedRetry(collection.Database().Name() + "." + collection.Name())
 						isolatedRetry = append(isolatedRetry, models[we.Index])
 					}
@@ -927,18 +937,34 @@ func maybeIsolateErrors(ctx context.Context, collection *mongo.Collection, isola
 		if len(isolatedRetry) > 0 {
 			if len(isolatedRetry) == len(bwErrWriteErrors.WriteErrors) {
 				slog.Warn("Retrying isolatable retries.", "count", len(isolatedRetry), "key", key)
-				for _, writeModel := range isolatedRetry {
-					backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+				failed := false
+				for i, writeModel := range isolatedRetry {
+					backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), uint64(c.settings.IsolatedRetryAmount))
+					attempt := 0
 					if retryErr := backoff.Retry(func() error {
+						attempt += 1
+						slog.Warn("Isolated retry attempt.", "index", i, "attempt", attempt, "key", key)
 						_, err := collection.BulkWrite(ctx, []mongo.WriteModel{writeModel})
 						return err
 					}, backoffConfig); retryErr != nil {
-						slog.Error("Isolated retry still failed", "retryErr", retryErr, "err", originalErr, "key", key)
-						metrics.IsolatedRetryError(collection.Database().Name() + "." + collection.Name())
-						return originalErr
+						failed = true
+						slog.Error("Isolated retry still failed", "retryErr", retryErr, "err", originalErr, "index", i, "id", getIdFromModel(writeModel), "key", key)
+						if c.settings.IsolatedRetrySkipFailed {
+							continue
+						}
+						break
 					}
 				}
-				return nil
+				if failed {
+					metrics.IsolatedRetryError(collection.Database().Name() + "." + collection.Name())
+					if c.settings.IsolatedRetrySkipFailed {
+						return nil
+					}
+					return originalErr
+				} else {
+					slog.Warn("Isolated retry success.", "key", key)
+					return nil
+				}
 			} else {
 				slog.Warn("There are other erros other than isolatable retries, not retrying.", "count", len(isolatedRetry), "total", len(bwErrWriteErrors.WriteErrors), "key", key)
 			}
@@ -1156,7 +1182,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 						slog.Debug("not all duplicate errors", "count", count, "errs", len(bwErrWriteErrors.WriteErrors))
 					}
 				}
-				if err := maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
+				if err := c.maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
 					if !errors.Is(err, context.Canceled) {
 						slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 					}
@@ -1169,7 +1195,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 
 	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
 	if err != nil {
-		if err := maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
+		if err := c.maybeIsolateErrors(ctx, col, c.settings.IsolateOnWriteError, models, err); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 			}

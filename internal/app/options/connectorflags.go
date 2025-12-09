@@ -376,6 +376,17 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Name:  "isolate-update-errors",
 						Usage: "if error contains this text when we try to update a document, retry it by itself",
 					}),
+					altsrc.NewBoolFlag(&cli.BoolFlag{
+						Name:        "isolated-retry-skip-failed",
+						Usage:       "If isolated retry runs out skip instead of failing.",
+						Destination: &settings.IsolatedRetrySkipFailed,
+					}),
+					altsrc.NewIntFlag(&cli.IntFlag{
+						Name:        "isolated-retry-amount",
+						Usage:       "Number of retries for isolate retry",
+						Value:       3,
+						Destination: &settings.IsolatedRetryAmount,
+					}),
 					altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
 						Name:  "skip-initial-sync-duplicate-namespace",
 						Usage: "repeatable unique index namespace",
