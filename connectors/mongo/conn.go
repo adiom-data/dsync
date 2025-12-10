@@ -161,6 +161,21 @@ func NamespacePartitions(ctx context.Context, namespaces []string, client *mongo
 	return partitions, nil
 }
 
+func findLargestID(ctx context.Context, col *mongo.Collection) (bson.RawValue, error) {
+	res, err := col.Find(ctx, bson.M{}, options.Find().SetSort(bson.M{"_id": -1}).SetLimit(1).SetProjection(bson.D{{"_id", 1}}))
+	if err != nil {
+		return bson.RawValue{}, fmt.Errorf("err in find: %w", err)
+	}
+	defer res.Close(ctx)
+	for res.Next(ctx) {
+		return res.Current.Lookup("_id"), nil
+	}
+	if res.Err() != nil {
+		return bson.RawValue{}, fmt.Errorf("err in iterating: %w", res.Err())
+	}
+	return bson.RawValue{}, nil
+}
+
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
 	partitions, err := NamespacePartitions(ctx, r.Msg.GetNamespaces(), c.client)
@@ -225,9 +240,14 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				return err
 			}
 			if count < c.settings.TargetDocCountPerPartition*2 {
+				high, err := findLargestID(ctx, col)
+				if err != nil {
+					return fmt.Errorf("err finding largest id: %w", err)
+				}
 				ch <- &adiomv1.Partition{
 					Namespace:      partition.GetNamespace(),
 					EstimatedCount: uint64(count),
+					Cursor:         EncodeCursor(bson.RawValue{}, high),
 				}
 				return nil
 			}
@@ -258,10 +278,14 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				}
 				low = high
 			}
+			high, err := findLargestID(ctx, col)
+			if err != nil {
+				return fmt.Errorf("err finding largest id: %w", err)
+			}
 			ch <- &adiomv1.Partition{
 				Namespace:      partition.GetNamespace(),
 				EstimatedCount: uint64(c.settings.TargetDocCountPerPartition),
-				Cursor:         EncodeCursor(low, bson.RawValue{}),
+				Cursor:         EncodeCursor(low, high),
 			}
 			return nil
 		})
