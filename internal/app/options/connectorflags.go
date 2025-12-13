@@ -2,6 +2,7 @@ package options
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -246,6 +247,10 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					Name:  "payload",
 					Usage: "Payload for all items (`key:value`)",
 				},
+				&cli.StringFlag{
+					Name:  "payload-json",
+					Usage: "Payload for all items as a json (overrides payload)",
+				},
 			}, func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 				var m map[string]any
 				payload := c.StringSlice("payload")
@@ -255,6 +260,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				for _, p := range payload {
 					k, v, _ := strings.Cut(p, ":")
 					m[k] = v
+				}
+				payloadJSON := c.String("payload-json")
+				if payloadJSON != "" {
+					if err := json.Unmarshal([]byte(payloadJSON), &m); err != nil {
+						return nil, fmt.Errorf("err unmarshalling payload-json: %w", err)
+					}
 				}
 				return random.NewConnV2(random.ConnV2Input{
 					NamespacePrefix:                 c.String("namespace-prefix"),
