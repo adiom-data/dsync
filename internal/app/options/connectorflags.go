@@ -17,12 +17,14 @@ import (
 	"github.com/adiom-data/dsync/connectors/postgres"
 	"github.com/adiom-data/dsync/connectors/random"
 	s3connector "github.com/adiom-data/dsync/connectors/s3"
+	"github.com/adiom-data/dsync/connectors/s3vector"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"golang.org/x/net/http2"
+	"golang.org/x/time/rate"
 )
 
 var ErrMissingConnector = errors.New("missing or unsupported connector")
@@ -342,6 +344,53 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				} else {
 					return dynamodb.NewConn(""), nil
 				}
+			}),
+		},
+		{
+			Name: "s3vectors",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "s3vector") || strings.EqualFold(s, "s3vectors")
+			},
+			Create: CreateHelper("s3vectors", "s3vector or s3vectors", []cli.Flag{
+				&cli.StringFlag{
+					Name:     "bucket",
+					Usage:    "the s3 vector bucket to use",
+					Required: true,
+				},
+				&cli.StringFlag{
+					Name:  "vector-key",
+					Value: "data",
+					Usage: "The field containing the vector",
+				},
+				&cli.IntFlag{
+					Name:  "max-parallelism",
+					Value: 1,
+					Usage: "Limits how many concurrent requests are made to s3vectors per worker.",
+				},
+				&cli.IntFlag{
+					Name:  "rate-limit",
+					Value: 500,
+					Usage: "Max vectors per second across workers on this process.",
+				},
+				&cli.IntFlag{
+					Name:  "rate-limit-burst",
+					Value: 700,
+					Usage: "Max vectors per second across workers on this process (burst). Will be set to at least `rate-limit`.",
+				},
+				&cli.IntFlag{
+					Name:  "batch-size",
+					Value: 200,
+					Usage: "Max size of each PutVector requests (aws hard limit is 500).",
+				},
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				bucket := c.String("bucket")
+				vectorKey := c.String("vector-key")
+				maxParallelism := c.Int("max-parallelism")
+				rateLimit := c.Int("rate-limit")
+				rateLimitBurst := max(c.Int("rate-limit-burst"), rateLimit)
+				batchSize := c.Int("batch-size")
+				limiter := rate.NewLimiter(rate.Limit(rateLimit), rateLimitBurst)
+				return s3vector.NewConn(bucket, vectorKey, maxParallelism, batchSize, limiter)
 			}),
 		},
 		{
