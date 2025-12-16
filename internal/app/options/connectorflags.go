@@ -25,7 +25,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"golang.org/x/net/http2"
-	"golang.org/x/time/rate"
 )
 
 var ErrMissingConnector = errors.New("missing or unsupported connector")
@@ -380,17 +379,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				},
 				&cli.IntFlag{
 					Name:  "rate-limit",
-					Value: 500,
-					Usage: "Max vectors per second across workers on this process.",
-				},
-				&cli.IntFlag{
-					Name:  "rate-limit-burst",
-					Value: 700,
-					Usage: "Max vectors per second across workers on this process (burst). Will be set to at least `rate-limit`.",
+					Value: 2500,
+					Usage: "Max vectors per second across workers on this process per namespace (vector index).",
 				},
 				&cli.IntFlag{
 					Name:  "batch-size",
-					Value: 200,
+					Value: 500,
 					Usage: "Max size of each PutVector requests (aws hard limit is 500).",
 				},
 			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
@@ -398,10 +392,8 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				vectorKey := c.String("vector-key")
 				maxParallelism := c.Int("max-parallelism")
 				rateLimit := c.Int("rate-limit")
-				rateLimitBurst := max(c.Int("rate-limit-burst"), rateLimit)
 				batchSize := c.Int("batch-size")
-				limiter := rate.NewLimiter(rate.Limit(rateLimit), rateLimitBurst)
-				return s3vector.NewConn(bucket, vectorKey, maxParallelism, batchSize, limiter)
+				return s3vector.NewConn(bucket, vectorKey, maxParallelism, batchSize, rateLimit)
 			}),
 		},
 		{
