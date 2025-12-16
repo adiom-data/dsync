@@ -1085,12 +1085,18 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 					}
 				}
 				ns := dataMsg.Loc
-				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-					Namespace: ns,
-					Updates:   msgs,
-					Type:      c.settings.DestinationDataType,
-				}))
-				if err != nil {
+				backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+				if err := backoff.Retry(func() error {
+					_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+						Namespace: ns,
+						Updates:   msgs,
+						Type:      c.settings.DestinationDataType,
+					}))
+					if err != nil && !isRetryable(err) {
+						return backoff.Permanent(err)
+					}
+					return err
+				}, backoffConfig); err != nil {
 					return err
 				}
 				c.progressTracker.UpdateWriteLSN(dataMsgs[i-1].SeqNum)
@@ -1101,12 +1107,18 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 					return err
 				}
 			}
-			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
-				Namespace: dataMsg.Loc,
-				Data:      dataMsg.DataBatch,
-				Type:      c.settings.DestinationDataType,
-			}))
-			if err != nil {
+			backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+			if err := backoff.Retry(func() error {
+				_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
+					Namespace: dataMsg.Loc,
+					Data:      dataMsg.DataBatch,
+					Type:      c.settings.DestinationDataType,
+				}))
+				if err != nil && !isRetryable(err) {
+					return backoff.Permanent(err)
+				}
+				return err
+			}, backoffConfig); err != nil {
 				return err
 			}
 			c.progressTracker.UpdateWriteLSN(dataMsg.SeqNum)
@@ -1138,12 +1150,18 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			}
 		}
 		ns := dataMsgs[0].Loc
-		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-			Namespace: ns,
-			Updates:   msgs,
-			Type:      c.settings.DestinationDataType,
-		}))
-		if err != nil {
+		backoffConfig := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
+		if err := backoff.Retry(func() error {
+			_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+				Namespace: ns,
+				Updates:   msgs,
+				Type:      c.settings.DestinationDataType,
+			}))
+			if err != nil && !isRetryable(err) {
+				return backoff.Permanent(err)
+			}
+			return err
+		}, backoffConfig); err != nil {
 			return err
 		}
 		c.progressTracker.UpdateWriteLSN(dataMsgs[len(dataMsgs)-1].SeqNum)
