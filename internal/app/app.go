@@ -243,6 +243,7 @@ func runDsync(c *cli.Context) error {
 		MultinamespaceBatcher:          o.MultinamespaceBatcher,
 		SyncMode:                       o.Mode,
 		ReverseRequestedFlag:           o.Reverse,
+		WriteRateLimit:                 o.WriteRateLimit,
 	})
 
 	var wg sync.WaitGroup

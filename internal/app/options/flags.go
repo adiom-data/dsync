@@ -184,6 +184,10 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 			Required: false,
 			Hidden:   true,
 		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:  "write-rate-limit",
+			Usage: "If set, overall per second rate limit on the destination. If set, must be larger than any batch sizes.",
+		}),
 	}
 
 	before := func(c *cli.Context) error {
