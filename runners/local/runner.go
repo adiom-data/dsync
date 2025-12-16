@@ -79,6 +79,7 @@ type RunnerLocalSettings struct {
 	WriterMaxBatchSize             int
 	SyncMode                       string
 	MultinamespaceBatcher          bool
+	WriteRateLimit                 int
 
 	NamespaceStreamWriter []string
 }
@@ -111,6 +112,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		TransformClient:           settings.TransformClient,
 		SourceDataType:            settings.SrcDataType,
 		DestinationDataType:       settings.DstDataType,
+		WriteRateLimit:            settings.WriteRateLimit,
 		NamespaceStreamWriter:     settings.NamespaceStreamWriter,
 	}
 	if settings.LoadLevel != "" {
@@ -310,6 +312,7 @@ func (r *RunnerLocal) GracefulShutdown() {
 	if r.cancelIntegrityCtx != nil {
 		r.cancelIntegrityCtx()
 	}
+	_ = r.dst.Interrupt(r.activeFlowID)
 }
 
 func (r *RunnerLocal) Teardown() {

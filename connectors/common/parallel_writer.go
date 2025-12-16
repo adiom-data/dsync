@@ -8,6 +8,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -18,6 +19,8 @@ import (
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 )
+
+var WriterClosedErr = errors.New("writer closed")
 
 type ParallelWriterConnector interface {
 	HandleBarrierMessage(iface.DataMessage) error
@@ -179,7 +182,7 @@ func (bwa *ParallelWriter) ScheduleBarrier(barrierMsg iface.DataMessage) error {
 			select {
 			case <-bwa.blockBarrier:
 			case <-bwa.ctx.Done():
-				return fmt.Errorf("writer closed")
+				return WriterClosedErr
 			}
 		}
 		slog.Debug("Blocking barrier unblocked.")
@@ -262,6 +265,9 @@ func (ww *writerWorker) run() error {
 				if len(batch) > 0 {
 					err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							return err
+						}
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
 							return err2
@@ -271,6 +277,9 @@ func (ww *writerWorker) run() error {
 				}
 				if len(multiBatch) > 0 {
 					if err := ww.sendMultiBatch(multiBatch); err != nil {
+						if errors.Is(err, context.Canceled) {
+							return err
+						}
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
 							return err2
@@ -306,6 +315,9 @@ func (ww *writerWorker) run() error {
 				if isLastWorker {
 					err := ww.parallelWriter.connector.HandleBarrierMessage(msg)
 					if err != nil {
+						if errors.Is(err, context.Canceled) {
+							return err
+						}
 						slog.Error(fmt.Sprintf("Worker %v failed to handle barrier message: %v", ww.id, err))
 						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
 							return err2
@@ -321,6 +333,9 @@ func (ww *writerWorker) run() error {
 				multiBatchCount += 1
 				if (ww.parallelWriter.maxBatchSize > 0 && multiBatchCount >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
 					if err := ww.sendMultiBatch(multiBatch); err != nil {
+						if errors.Is(err, context.Canceled) {
+							return err
+						}
 						slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 						if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
 							return err2
@@ -336,6 +351,9 @@ func (ww *writerWorker) run() error {
 			if len(batch) > 0 && msg.Loc != batch[0].Loc {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
+					if errors.Is(err, context.Canceled) {
+						return err
+					}
 					slog.Error(fmt.Sprintf("Worker %v failed to process data messages: %v", ww.id, err))
 					if err2 := ww.parallelWriter.connector.HandlerError(err); err2 != nil {
 						return err2
@@ -349,6 +367,9 @@ func (ww *writerWorker) run() error {
 			if (ww.parallelWriter.maxBatchSize > 0 && len(batch) >= ww.parallelWriter.maxBatchSize) || msg.MutationType == iface.MutationType_InsertBatch || len(ww.queue) == 0 {
 				err := ww.parallelWriter.connector.ProcessDataMessages(batch)
 				if err != nil {
+					if errors.Is(err, context.Canceled) {
+						return err
+					}
 					if msg.MutationType == iface.MutationType_InsertBatch {
 						d := 0
 						if batch[0].Data != nil {
@@ -373,14 +394,14 @@ func (ww *writerWorker) addMessage(msg iface.DataMessage) error {
 	select {
 	case ww.queue <- msg:
 	case <-ww.parallelWriter.ctx.Done():
-		return fmt.Errorf("writer closed")
+		return WriterClosedErr
 	}
 	if ww.clogSize > 0 && msg.MutationType == iface.MutationType_InsertBatch {
 		for range ww.clogSize {
 			select {
 			case ww.queue <- iface.DataMessage{MutationType: iface.MutationType_Ignore}:
 			case <-ww.parallelWriter.ctx.Done():
-				return fmt.Errorf("writer closed")
+				return WriterClosedErr
 			}
 		}
 	}
