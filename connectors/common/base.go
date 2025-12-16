@@ -34,6 +34,7 @@ import (
 	"go.akshayshah.org/memhttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/time/rate"
 )
 
 const progressReportingIntervalSec = 10
@@ -51,6 +52,7 @@ type ConnectorSettings struct {
 	TransformClient           adiomv1connect.TransformServiceClient
 	SourceDataType            adiomv1.DataType
 	DestinationDataType       adiomv1.DataType
+	WriteRateLimit            int
 }
 
 type maybeOptimizedConnectorService interface {
@@ -81,6 +83,8 @@ type connector struct {
 	progressTracker *ProgressTracker
 
 	namespaceMappings map[string]string
+
+	limiter *rate.Limiter
 }
 
 func isRetryable(err error) bool {
@@ -944,6 +948,9 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 				if dataMsg.MutationType == iface.MutationType_Barrier {
 					err := flowParallelWriter.ScheduleBarrier(dataMsg)
 					if err != nil {
+						if errors.Is(err, WriterClosedErr) {
+							break
+						}
 						slog.Error(fmt.Sprintf("Failed to schedule barrier message: %v", err))
 					}
 				} else {
@@ -951,6 +958,9 @@ func (c *connector) StartWriteFromChannel(flowId iface.FlowID, dataChannelID ifa
 					writerProgress.dataMessages.Add(1)
 					err := flowParallelWriter.ScheduleDataMessage(dataMsg)
 					if err != nil {
+						if errors.Is(err, WriterClosedErr) {
+							break
+						}
 						slog.Error(fmt.Sprintf("Failed to schedule data message: %v", err))
 					}
 				}
@@ -1048,12 +1058,17 @@ func NewConnector(desc string, impl adiomv1connect.ConnectorServiceClient, under
 	if maybeOptimizedConnectorService == nil {
 		underlying = impl
 	}
+	var limiter *rate.Limiter
+	if settings.WriteRateLimit > 0 {
+		limiter = rate.NewLimiter(rate.Limit(settings.WriteRateLimit), settings.WriteRateLimit)
+	}
 	return &connector{
 		desc:               desc,
 		impl:               impl,
 		maybeOptimizedImpl: maybeOptimizedConnectorService,
 		settings:           settings,
 		namespaceMappings:  map[string]string{},
+		limiter:            limiter,
 	}
 }
 
@@ -1064,6 +1079,11 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		switch dataMsg.MutationType {
 		case iface.MutationType_InsertBatch:
 			if len(msgs) > 0 {
+				if c.limiter != nil {
+					if err := c.limiter.WaitN(c.flowCtx, len(msgs)); err != nil {
+						return err
+					}
+				}
 				ns := dataMsg.Loc
 				_, err := c.maybeOptimizedImpl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 					Namespace: ns,
@@ -1075,6 +1095,11 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 				}
 				c.progressTracker.UpdateWriteLSN(dataMsgs[i-1].SeqNum)
 				msgs = nil
+			}
+			if c.limiter != nil {
+				if err := c.limiter.WaitN(c.flowCtx, len(dataMsg.DataBatch)); err != nil {
+					return err
+				}
 			}
 			_, err := c.maybeOptimizedImpl.WriteData(c.flowCtx, connect.NewRequest(&adiomv1.WriteDataRequest{
 				Namespace: dataMsg.Loc,
@@ -1107,6 +1132,11 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 		}
 	}
 	if len(msgs) > 0 {
+		if c.limiter != nil {
+			if err := c.limiter.WaitN(c.flowCtx, len(msgs)); err != nil {
+				return err
+			}
+		}
 		ns := dataMsgs[0].Loc
 		_, err := c.impl.WriteUpdates(c.flowCtx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 			Namespace: ns,

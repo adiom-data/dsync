@@ -79,6 +79,8 @@ type RunnerLocalSettings struct {
 	WriterMaxBatchSize             int
 	SyncMode                       string
 	MultinamespaceBatcher          bool
+
+	WriteRateLimit int
 }
 
 const (
@@ -109,6 +111,7 @@ func NewRunnerLocal(settings RunnerLocalSettings) *RunnerLocal {
 		TransformClient:           settings.TransformClient,
 		SourceDataType:            settings.SrcDataType,
 		DestinationDataType:       settings.DstDataType,
+		WriteRateLimit:            settings.WriteRateLimit,
 	}
 	if settings.LoadLevel != "" {
 		btc := GetBaseThreadCount(settings.LoadLevel)
@@ -307,6 +310,7 @@ func (r *RunnerLocal) GracefulShutdown() {
 	if r.cancelIntegrityCtx != nil {
 		r.cancelIntegrityCtx()
 	}
+	_ = r.dst.Interrupt(r.activeFlowID)
 }
 
 func (r *RunnerLocal) Teardown() {
