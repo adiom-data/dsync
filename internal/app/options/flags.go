@@ -55,14 +55,14 @@ func GetFlagsAndBeforeFunc() ([]cli.Flag, cli.BeforeFunc) {
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:     "metadata",
-			Usage:    "metadata store connection string. Will default to the destination if not provided",
+			Usage:    "metadata store connection string",
 			Aliases:  []string{"m"},
 			Category: "Endpoint Configuration",
 			Required: false,
 		}),
 		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
 			Name:     "namespace",
-			Usage:    "list of namespaces 'db1,db2.collection,db3.collection:otherdb.othercollection' (comma-separated) to sync from on the source and a colon to map names.",
+			Usage:    "list of namespaces 'db1,db2.collection,db3.collection:otherdb.othercollection' (comma-separated) to sync from on the source and a colon to map names",
 			Aliases:  []string{"ns", "nsFrom"},
 			Category: "Flow Options",
 		}),
