@@ -19,7 +19,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 )
 
 type conn struct {
@@ -28,7 +27,7 @@ type conn struct {
 	vectorKey      string
 	maxParallelism int
 	batchSize      int
-	limiter        *rate.Limiter
+	limiter        util.NamespaceLimiter
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -87,9 +86,10 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(c.maxParallelism)
+	limiter := c.limiter.Get(r.Msg.GetNamespace())
 	for batch := range slices.Chunk(vectors, c.batchSize) {
 		eg.Go(func() error {
-			if err := c.limiter.WaitN(ctx, len(batch)); err != nil {
+			if err := limiter.WaitN(ctx, len(batch)); err != nil {
 				return fmt.Errorf("err in limiter: %w", err)
 			}
 			if _, err := c.client.PutVectors(ctx, &s3vectors.PutVectorsInput{
@@ -220,11 +220,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		}
 	}
 	if len(updates) > 0 {
+		limiter := c.limiter.Get(r.Msg.GetNamespace())
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(c.maxParallelism)
 		for batch := range slices.Chunk(toDelete, c.batchSize) {
 			eg.Go(func() error {
-				if err := c.limiter.WaitN(ctx, len(batch)); err != nil {
+				if err := limiter.WaitN(ctx, len(batch)); err != nil {
 					return fmt.Errorf("err in limiter: %w", err)
 				}
 				if _, err := c.client.DeleteVectors(ctx, &s3vectors.DeleteVectorsInput{
@@ -239,7 +240,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		}
 		for batch := range slices.Chunk(vectors, c.batchSize) {
 			eg.Go(func() error {
-				if err := c.limiter.WaitN(ctx, len(batch)); err != nil {
+				if err := limiter.WaitN(ctx, len(batch)); err != nil {
 					return fmt.Errorf("err in limiter: %w", err)
 				}
 				if _, err := c.client.PutVectors(ctx, &s3vectors.PutVectorsInput{
@@ -259,7 +260,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 }
 
-func NewConn(bucketName string, vectorKey string, maxParallelism int, batchSize int, limiter *rate.Limiter) (*conn, error) {
+func NewConn(bucketName string, vectorKey string, maxParallelism int, batchSize int, rateLimit int) (*conn, error) {
 	awsConfig, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		return nil, err
@@ -271,7 +272,7 @@ func NewConn(bucketName string, vectorKey string, maxParallelism int, batchSize 
 		vectorKey:      vectorKey,
 		maxParallelism: maxParallelism,
 		batchSize:      batchSize,
-		limiter:        limiter,
+		limiter:        util.NewNamespaceLimiter(nil, rateLimit),
 	}, nil
 }
 
