@@ -6,7 +6,11 @@ We solve data migration and replication between databases. We focus on challenge
 
 # Introduction to Dsync
 
-Dsync is an open-source command line tool developed by [Adiom](https://adiom.io). Dsync is designed for seamless, fast, secure data migration and synchronization between databases, ensuring resiliency, ease of use, and production-grade performance. Dsync features first-class support for Cosmos DB (MongoDB RU, vCore, NoSQL), DynamoDB, MongoDB, FerretDB. Several connectors are in development: PostgreSQL, HBase, Qdrant, Weaviate. 
+Dsync is an open-source command line tool developed by [Adiom](https://adiom.io). Dsync is designed for seamless, fast, secure data migration and synchronization between databases and data stores, ensuring resiliency, ease of use, and production-grade performance. Technically speaking, Dsync is a **parallelized** in-memory **streaming engine** with **dynamic typing**. 
+
+Dsync features first-class support for **NoSQL and SQL databases**, such as MongoDB, DocumentDB, Cosmos DB NoSQL, HBase, DynamoDB, PostgreSQL, SQL Server, Oracle, as well as **vector stores** such as Qdrant, Weaviate, S3 Vector store. 
+
+Data copy and database migration jobs that previously took weeks, can now **be done in one afternoon** with a single command.
 
 Common use cases for dsync:
 * Live database migration
@@ -20,6 +24,28 @@ Dsync is lightweight, flexible, and supports external connectors and transformer
 Given source and destination databases, dsync completes an initial sync transferring all data from the source database to the destination database. After the initial sync, it continuously monitors the source database for any changes and updates the destination database accordingly.
 
 ![Dsync progress reporting sample](/img/screenshot.png?width=20&raw=true)
+
+## Supported Connectors
+
+### System
+
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>/dev/null</td><td>-</td><td>Available</td><td>Source</td><td>Does exactly what you'd expect it to do</td></tr><tr><td>/dev/random</td><td>-</td><td>Available</td><td>Sink</td><td>Generates a stream of random operations</td></tr></tbody></table>
+
+### NoSQL Databases
+
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>MongoDB</td><td>4.2+</td><td>Available</td><td>Source, Sink</td><td>Supports Atlas dedicated, Atlas serverless and self-managed installations </td></tr><tr><td>Cosmos DB RU (MongoDB API)</td><td>4.2, 6.0+</td><td>Available</td><td>Source, Sink</td><td>Supports Azure Cosmos with Mongo API with Provisioned RUs (not serverless)</td></tr><tr><td>Azure Document DB (Cosmos DB vCore)</td><td>current</td><td>Available</td><td>Source, Sink</td><td>Both managed and Open Source versions are supported</td></tr><tr><td>Cosmos DB NoSQL</td><td>current</td><td>Public Preview</td><td>Source, Sink</td><td></td></tr><tr><td>DynamoDB</td><td>current</td><td>Public Preview</td><td>Source, Sink</td><td></td></tr><tr><td>HBase</td><td>1.x, 2.x</td><td><em>Private Preview</em></td><td>Source, Sink</td><td>Includes CDC support<br>See <a href="https://www.adiom.io/post/hbase-to-mongodb-migration">blog</a> for details</td></tr><tr><td>AWS DocumentDB</td><td>4.0, 5.0</td><td>Available</td><td>Source, Sink</td><td>Support via generic MongoDB connector</td></tr></tbody></table>
+
+### SQL Databases / RDBMS
+
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>PostgreSQL</td><td>15+</td><td>Available</td><td>Source, Sink</td><td>Direct connectivity for 1:1 migrations with transformations</td></tr><tr><td>SQL Server / PostgreSQL / Oracle</td><td>-</td><td><em>Private Preview</em></td><td>Source</td><td>Custom query-based via our "SQL batch" connector<br>See <a href="https://www.adiom.io/post/migrate-rdbms-to-mongodb">blog</a> for details</td></tr></tbody></table>
+
+### Vector Databases
+
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>Weaviate</td><td><em>latest</em></td><td>Public Preview</td><td>Sink</td><td></td></tr><tr><td>Qdrant</td><td><em>latest</em></td><td><em>In Development</em></td><td>Sink</td><td></td></tr><tr><td>S3 Vector Index</td><td>-</td><td><em>In Development</em></td><td>Sink</td><td></td></tr></tbody></table>
+
+### Other
+
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>S3 Storage</td><td><em>-</em></td><td>Available</td><td>Source, Sink</td><td>Export into and from S3 in JSON format. CDC isn't supported: use "--mode InitialSync"</td></tr></tbody></table>
 
 
 # Quickstart
