@@ -41,7 +41,7 @@ Given source and destination databases, dsync completes an initial sync transfer
 
 ### Vector Databases
 
-<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>Weaviate</td><td><em>latest</em></td><td>Public Preview</td><td>Sink</td><td></td></tr><tr><td>Qdrant</td><td><em>latest</em></td><td><em>In Development</em></td><td>Sink</td><td></td></tr><tr><td>S3 Vector Index</td><td>-</td><td><em>In Development</em></td><td>Sink</td><td></td></tr></tbody></table>
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>Weaviate</td><td><em>latest</em></td><td>Public Preview</td><td>Sink</td><td></td></tr><tr><td>Qdrant</td><td><em>latest</em></td><td><em>In Development</em></td><td>Sink</td><td></td></tr><tr><td>S3 Vector Index</td><td>-</td><td><em>Public Preview</em></td><td>Sink</td><td></td></tr></tbody></table>
 
 ### Other
 
