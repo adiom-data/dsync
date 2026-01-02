@@ -460,6 +460,44 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 		},
 		{
+			Name: "qdrant",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "qdrant")
+			},
+			Create: CreateHelperWithRestArgs("qdrant", "qdrant --host localhost --port 6334 --has-chunker [grpc://embedder-host:port] [grpc://chunker-host:port]", QdrantFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				host := c.String("host")
+				port := c.Int("port")
+				chunker := c.Bool("has-chunker")
+				restArgs := c.Args().Slice()
+				var chunkerClient adiomv1connect.ChunkingServiceClient = vector.NewSimple()
+				var embedderClient adiomv1connect.EmbeddingServiceClient = vector.NewSimple()
+				var err error
+
+				if len(restArgs) == 0 {
+					return nil, nil, ErrMissingEmbedder
+				}
+				embedderClient, restArgs, err = ConfigureEmbedder(restArgs)
+				if err != nil {
+					return nil, nil, err
+				}
+				if chunker {
+					if len(restArgs) == 0 {
+						return nil, nil, ErrMissingChunker
+					}
+					chunkerClient, restArgs, err = ConfigureChunker(restArgs)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+
+				conn, err := vector.NewQdrantConn(chunkerClient, embedderClient, host, port)
+				if err != nil {
+					return nil, nil, err
+				}
+				return conn, restArgs, err
+			}),
+		},
+		{
 			Name: "weaviate",
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "weaviate")
@@ -590,6 +628,29 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},
+	}
+}
+
+func QdrantFlags() []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     "host",
+			Usage:    "e.g. localhost",
+			Required: true,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:     "port",
+			Usage:    "e.g. 6334",
+			Required: true,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "has-chunker",
+			Usage: "Specifies that there will be grpc chunker specified (grpc://chunker-host:port). If embedder also specified, first arg is chunker.",
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:  "has-embedder",
+			Usage: "Specifies that there will be grpc embedder specified (grpc://embedder-host:port). If chunker also specified, last arg is embedder.",
+		}),
 	}
 }
 
