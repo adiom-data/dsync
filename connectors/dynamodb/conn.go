@@ -74,33 +74,39 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				return err
 			}
 
-			if tableDetails.StreamARN == "" {
-				if c.spec == "localstack" {
-					slog.Debug("No stream found, starting stream", "table", name)
-					_, err := c.client.StartStream(egCtx, name, false)
-					if err != nil {
-						return err
+			if r.Msg.GetUpdates() {
+				if tableDetails.StreamARN == "" {
+					if c.spec == "localstack" {
+						slog.Debug("No stream found, starting stream", "table", name)
+						_, err := c.client.StartStream(egCtx, name, false)
+						if err != nil {
+							return err
+						}
+					} else {
+						return fmt.Errorf("no stream found")
 					}
-				} else {
-					return fmt.Errorf("no stream found")
-				}
-			} else if tableDetails.IncompatibleStream {
-				if c.spec == "localstack" {
-					slog.Debug("Incompatible stream found, restarting stream", "table", name)
-					_, err := c.client.StartStream(egCtx, name, true)
-					if err != nil {
-						return err
+				} else if tableDetails.IncompatibleStream {
+					if c.spec == "localstack" {
+						slog.Debug("Incompatible stream found, restarting stream", "table", name)
+						_, err := c.client.StartStream(egCtx, name, true)
+						if err != nil {
+							return err
+						}
+					} else {
+						return fmt.Errorf("incompatible stream found")
 					}
-				} else {
-					return fmt.Errorf("incompatible stream found")
 				}
+
+				state, err := c.client.GetStreamState(ctx, tableDetails.StreamARN)
+				if err != nil {
+					return err
+				}
+				statesCh <- state
 			}
 
-			state, err := c.client.GetStreamState(ctx, tableDetails.StreamARN)
-			if err != nil {
-				return err
+			if !r.Msg.GetInitialSync() {
+				return nil
 			}
-			statesCh <- state
 
 			// TODO: reconsider how to map namespaces properly
 			ns := name
@@ -139,16 +145,20 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err = enc.Encode(stateMap)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	var updates []*adiomv1.UpdatesPartition
+	if r.Msg.GetUpdates() {
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		err = enc.Encode(stateMap)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		updates = append(updates, &adiomv1.UpdatesPartition{Namespaces: namespaces, Cursor: buf.Bytes()})
 	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
-		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: namespaces, Cursor: buf.Bytes()}},
+		UpdatesPartitions: updates,
 	}), nil
 }
 
