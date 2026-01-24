@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"sync"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
 	"golang.org/x/sync/errgroup"
 )
@@ -163,6 +165,13 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		updates = append(updates, &adiomv1.UpdatesPartition{Namespaces: namespaces, Cursor: buf.Bytes()})
 	}
 
+	if len(partitions) > 0 {
+		slog.Debug("shuffling partitions")
+		rand.Shuffle(len(partitions), func(i, j int) {
+			partitions[i], partitions[j] = partitions[j], partitions[i]
+		})
+	}
+
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
 		UpdatesPartitions: updates,
@@ -203,6 +212,23 @@ func (c *conn) GetNamespaceMetadata(ctx context.Context, r *connect.Request[adio
 	}), nil
 }
 
+func isThrottled(err error) bool {
+	var provisionedThroughputExceededException *types.ProvisionedThroughputExceededException
+	var throttlingException *types.ThrottlingException
+	var requestLimitExceeded *types.RequestLimitExceeded
+
+	if errors.As(err, &provisionedThroughputExceededException) {
+		return true
+	}
+	if errors.As(err, &throttlingException) {
+		return true
+	}
+	if errors.As(err, &requestLimitExceeded) {
+		return true
+	}
+	return false
+}
+
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	cursor := r.Msg.GetCursor()
@@ -214,6 +240,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		if isThrottled(err) {
+			return nil, connect.NewError(connect.CodeResourceExhausted, err)
 		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
