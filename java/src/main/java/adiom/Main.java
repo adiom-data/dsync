@@ -88,7 +88,8 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    private static List<String> CosmosInternalKeys = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
+    private static final List<String> DEFAULT_COSMOS_INTERNAL_KEYS = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
+    private static List<String> CosmosInternalKeys;
     private static Config CONFIG;
     private static Cache<Long, CacheItem> CACHE = Caffeine.newBuilder().expireAfterAccess(150, TimeUnit.SECONDS)
             .build();
@@ -121,6 +122,12 @@ public class Main {
             System.out.println("Could not read config");
             e.printStackTrace();
             return;
+        }
+
+        if (CONFIG.cosmosInternalKeys != null && !CONFIG.cosmosInternalKeys.isEmpty()) {
+            CosmosInternalKeys = CONFIG.cosmosInternalKeys;
+        } else {
+            CosmosInternalKeys = DEFAULT_COSMOS_INTERNAL_KEYS;
         }
 
         String cert = System.getenv("CERT_FILE");
