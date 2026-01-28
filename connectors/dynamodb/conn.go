@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
+	"os"
 	"sync"
 
 	"connectrpc.com/connect"
@@ -16,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
 	"golang.org/x/sync/errgroup"
 )
@@ -71,36 +74,48 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		eg.Go(func() error {
 			tableDetails, err := c.client.TableDetails(egCtx, name)
 			if err != nil {
+				if errors.Is(err, ErrNotFound) {
+					slog.Warn("Table not found. Ignoring.", "name", name)
+					return nil
+				}
 				return err
 			}
 
-			if tableDetails.StreamARN == "" {
-				if c.spec == "localstack" {
-					slog.Debug("No stream found, starting stream", "table", name)
-					_, err := c.client.StartStream(egCtx, name, false)
-					if err != nil {
-						return err
+			if r.Msg.GetUpdates() {
+				if tableDetails.StreamARN == "" {
+					if c.spec == "localstack" {
+						slog.Debug("No stream found, starting stream", "table", name)
+						streamARN, err := c.client.StartStream(egCtx, name, false)
+						if err != nil {
+							return err
+						}
+						tableDetails.StreamARN = streamARN
+					} else {
+						return fmt.Errorf("no stream found")
 					}
-				} else {
-					return fmt.Errorf("no stream found")
-				}
-			} else if tableDetails.IncompatibleStream {
-				if c.spec == "localstack" {
-					slog.Debug("Incompatible stream found, restarting stream", "table", name)
-					_, err := c.client.StartStream(egCtx, name, true)
-					if err != nil {
-						return err
+				} else if tableDetails.IncompatibleStream {
+					if c.spec == "localstack" {
+						slog.Debug("Incompatible stream found, restarting stream", "table", name)
+						streamARN, err := c.client.StartStream(egCtx, name, true)
+						if err != nil {
+							return err
+						}
+						tableDetails.StreamARN = streamARN
+					} else {
+						return fmt.Errorf("incompatible stream found")
 					}
-				} else {
-					return fmt.Errorf("incompatible stream found")
 				}
+
+				state, err := c.client.GetStreamState(egCtx, tableDetails.StreamARN)
+				if err != nil {
+					return err
+				}
+				statesCh <- state
 			}
 
-			state, err := c.client.GetStreamState(ctx, tableDetails.StreamARN)
-			if err != nil {
-				return err
+			if !r.Msg.GetInitialSync() {
+				return nil
 			}
-			statesCh <- state
 
 			// TODO: reconsider how to map namespaces properly
 			ns := name
@@ -139,22 +154,34 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err = enc.Encode(stateMap)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	var updates []*adiomv1.UpdatesPartition
+	if r.Msg.GetUpdates() {
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		err = enc.Encode(stateMap)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		updates = append(updates, &adiomv1.UpdatesPartition{Namespaces: namespaces, Cursor: buf.Bytes()})
+	}
+
+	if len(partitions) > 0 {
+		slog.Debug("shuffling partitions")
+		rand.Shuffle(len(partitions), func(i, j int) {
+			partitions[i], partitions[j] = partitions[j], partitions[i]
+		})
 	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
-		UpdatesPartitions: []*adiomv1.UpdatesPartition{{Namespaces: namespaces, Cursor: buf.Bytes()}},
+		UpdatesPartitions: updates,
 	}), nil
 }
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetInfo(context.Context, *connect.Request[adiomv1.GetInfoRequest]) (*connect.Response[adiomv1.GetInfoResponse], error) {
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
+		Id:      c.options.ID,
 		DbType:  "dynamodb",
 		Version: "",
 		Spec:    c.spec,
@@ -185,6 +212,23 @@ func (c *conn) GetNamespaceMetadata(ctx context.Context, r *connect.Request[adio
 	}), nil
 }
 
+func isThrottled(err error) bool {
+	var provisionedThroughputExceededException *types.ProvisionedThroughputExceededException
+	var throttlingException *types.ThrottlingException
+	var requestLimitExceeded *types.RequestLimitExceeded
+
+	if errors.As(err, &provisionedThroughputExceededException) {
+		return true
+	}
+	if errors.As(err, &throttlingException) {
+		return true
+	}
+	if errors.As(err, &requestLimitExceeded) {
+		return true
+	}
+	return false
+}
+
 // ListData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	cursor := r.Msg.GetCursor()
@@ -196,6 +240,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		if isThrottled(err) {
+			return nil, connect.NewError(connect.CodeResourceExhausted, err)
 		}
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -355,7 +402,10 @@ func (c *conn) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdat
 func AWSClientHelper(connStr string) (*dynamodb.Client, *dynamodbstreams.Client) {
 	var endpoint string
 	if connStr == "localstack" {
-		endpoint = "http://localhost:4566"
+		endpoint = os.Getenv("AWS_ENDPOINT_URL")
+		if endpoint == "" {
+			endpoint = "http://localhost:4566"
+		}
 	}
 	awsConfig, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -375,8 +425,27 @@ func AWSClientHelper(connStr string) (*dynamodb.Client, *dynamodbstreams.Client)
 }
 
 type Options struct {
+	ID              string
 	DocsPerSegment  int
 	PlanParallelism int
+}
+
+func WithID(s string) func(*Options) {
+	return func(o *Options) {
+		o.ID = s
+	}
+}
+
+func WithPlanParallelism(n int) func(*Options) {
+	return func(o *Options) {
+		o.PlanParallelism = n
+	}
+}
+
+func WithDocsPerSegment(n int) func(*Options) {
+	return func(o *Options) {
+		o.DocsPerSegment = n
+	}
 }
 
 func NewConn(connStr string, optFns ...func(*Options)) adiomv1connect.ConnectorServiceHandler {

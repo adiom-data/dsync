@@ -344,15 +344,38 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "dynamodb") || strings.EqualFold(s, "dynamodb://localstack")
 			},
-			Create: CreateHelper("DynamoDB", "dynamodb OR dynamodb://localstack", nil, func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+			Create: CreateHelper("DynamoDB", "dynamodb OR dynamodb://localstack", []cli.Flag{
+				&cli.IntFlag{
+					Name:  "doc-partition",
+					Usage: "Target number of documents per partition",
+					Value: 50000,
+				},
+				&cli.IntFlag{
+					Name:  "plan-parallelism",
+					Usage: "Parallelism during planning",
+					Value: 4,
+				},
+				&cli.StringFlag{
+					Name:  "id",
+					Usage: "A fixed id for the connector",
+				},
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 				if strings.EqualFold(args[0], "dynamodb://localstack") {
 					_, connString, ok := strings.Cut(args[0], "://")
 					if !ok {
 						return nil, fmt.Errorf("invalid connection string %v", args[0])
 					}
-					return dynamodb.NewConn(connString), nil
+					return dynamodb.NewConn(connString,
+						dynamodb.WithDocsPerSegment(c.Int("doc-partition")),
+						dynamodb.WithPlanParallelism(c.Int("plan-parallelism")),
+						dynamodb.WithID(c.String("id")),
+					), nil
 				} else {
-					return dynamodb.NewConn(""), nil
+					return dynamodb.NewConn("",
+						dynamodb.WithDocsPerSegment(c.Int("doc-partition")),
+						dynamodb.WithPlanParallelism(c.Int("plan-parallelism")),
+						dynamodb.WithID(c.String("id")),
+					), nil
 				}
 			}),
 		},

@@ -71,6 +71,8 @@ func fromBson(bs interface{}) (types.AttributeValue, error) {
 		return &types.AttributeValueMemberB{Value: b.Data}, nil
 	case primitive.Decimal128:
 		return &types.AttributeValueMemberN{Value: b.String()}, nil
+	case nil:
+		return &types.AttributeValueMemberNULL{Value: true}, nil
 	default:
 		return &types.AttributeValueMemberS{Value: "XUnsupportedX"}, nil
 	}
@@ -167,6 +169,9 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 		}
 		return arr, nil
 
+	case *types.AttributeValueMemberNULL:
+		return nil, nil
+
 	default:
 		return nil, fmt.Errorf("unknown attribute %T", av)
 	}
@@ -203,11 +208,11 @@ func itemsToBson(items []map[string]types.AttributeValue, keySchema []string) ([
 	for i, m := range items {
 		id, err := dynamoKeyToIdBson(m, keySchema)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("err in key to bson: %w", err)
 		}
 		b, err := toBson(&types.AttributeValueMemberM{Value: m})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("err in to bson: %w", err)
 		}
 
 		// TODO: We currently clobber any existing _id
@@ -262,6 +267,8 @@ func streamTypeToDynamoType(st streamtypes.AttributeValue) (types.AttributeValue
 		return &types.AttributeValueMemberS{Value: tv.Value}, nil
 	case *streamtypes.AttributeValueMemberSS:
 		return &types.AttributeValueMemberSS{Value: tv.Value}, nil
+	case *streamtypes.AttributeValueMemberNULL:
+		return &types.AttributeValueMemberNULL{Value: tv.Value}, nil
 	default:
 		return nil, fmt.Errorf("unknown attribute %T", st)
 	}
@@ -270,21 +277,21 @@ func streamTypeToDynamoType(st streamtypes.AttributeValue) (types.AttributeValue
 func dynamoWriteKeyValue(w io.Writer, av types.AttributeValue) error {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
-		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+		if err := binary.Write(w, binary.BigEndian, int32(len(tv.Value))); err != nil {
 			return err
 		}
 		if _, err := w.Write(tv.Value); err != nil {
 			return err
 		}
 	case *types.AttributeValueMemberN:
-		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+		if err := binary.Write(w, binary.BigEndian, int32(len(tv.Value))); err != nil {
 			return err
 		}
 		if _, err := w.Write([]byte(tv.Value)); err != nil {
 			return err
 		}
 	case *types.AttributeValueMemberS:
-		if err := binary.Write(w, binary.BigEndian, len(tv.Value)); err != nil {
+		if err := binary.Write(w, binary.BigEndian, int32(len(tv.Value))); err != nil {
 			return err
 		}
 		if _, err := w.Write([]byte(tv.Value)); err != nil {
