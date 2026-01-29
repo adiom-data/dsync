@@ -452,7 +452,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(MongoFlags(&settings), []cli.Flag{
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(append(MongoFlags(&settings), []cli.Flag{
 					altsrc.NewIntFlag(&cli.IntFlag{
 						Name:        "sample-factor",
 						Destination: &settings.SampleFactor,
@@ -464,7 +464,18 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Usage:       "Each namespace has a separate stream",
 						Destination: &settings.PerNamespaceStreams,
 					}),
-				}...), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					altsrc.NewBoolFlag(&cli.BoolFlag{
+						Name:  "kafka",
+						Usage: "(Advanced), if set, will use kafka-* flags",
+					}),
+				}...), KafkaSrcFlags("kafka")...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					if c.Bool("kafka") {
+						kafkaConn, err := ParseKafkaSrcFlags("kafka", c)
+						if err != nil {
+							return nil, fmt.Errorf("err setting up kafka: %w", err)
+						}
+						settings.KafkaConn = kafkaConn
+					}
 					return mongo.NewConn(settings)
 				})(args, as)
 			},

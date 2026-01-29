@@ -41,6 +41,8 @@ type ConnectorSettings struct {
 	MaxPageSize                int
 	PerNamespaceStreams        bool
 
+	KafkaConn adiomv1connect.ConnectorServiceHandler
+
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 }
 
@@ -187,7 +189,13 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	var updatesPartitions []*adiomv1.UpdatesPartition
 
 	if r.Msg.GetUpdates() {
-		if c.settings.PerNamespaceStreams {
+		if c.settings.KafkaConn != nil {
+			kafkaPlanResp, err := c.settings.KafkaConn.GeneratePlan(ctx, r)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			updatesPartitions = kafkaPlanResp.Msg.GetUpdatesPartitions()
+		} else if c.settings.PerNamespaceStreams {
 			// TODO: maybe parallelize
 			for _, partition := range partitions {
 				ns, _ := ToNS(partition.Namespace)
@@ -533,6 +541,10 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamLSNRequest], s *connect.ServerStream[adiomv1.StreamLSNResponse]) error {
+	if c.settings.KafkaConn != nil {
+		slog.Debug("Using Kafka for LSN Stream")
+		return c.settings.KafkaConn.StreamLSN(ctx, r, s)
+	}
 	var watcher Watchable
 	var pipeline mongo.Pipeline
 
@@ -692,6 +704,10 @@ func toTimestampPB(t primitive.Timestamp) *timestamppb.Timestamp {
 
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
+	if c.settings.KafkaConn != nil {
+		slog.Debug("Using Kafka for Stream")
+		return c.settings.KafkaConn.StreamUpdates(ctx, r, s)
+	}
 	var watcher Watchable
 	var pipeline mongo.Pipeline
 
