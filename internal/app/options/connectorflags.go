@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/IBM/sarama"
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
+	"github.com/adiom-data/dsync/connectors/kafka"
 	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/postgres"
@@ -21,6 +23,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/s3vector"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -449,7 +452,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
 				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(MongoFlags(&settings), []cli.Flag{
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(append(MongoFlags(&settings), []cli.Flag{
 					altsrc.NewIntFlag(&cli.IntFlag{
 						Name:        "sample-factor",
 						Destination: &settings.SampleFactor,
@@ -461,7 +464,18 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Usage:       "Each namespace has a separate stream",
 						Destination: &settings.PerNamespaceStreams,
 					}),
-				}...), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					altsrc.NewBoolFlag(&cli.BoolFlag{
+						Name:  "kafka",
+						Usage: "(Advanced), if set, will use kafka-* flags",
+					}),
+				}...), KafkaSrcFlags("kafka")...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					if c.Bool("kafka") {
+						kafkaConn, err := ParseKafkaSrcFlags("kafka", c)
+						if err != nil {
+							return nil, fmt.Errorf("err setting up kafka: %w", err)
+						}
+						settings.KafkaConn = kafkaConn
+					}
 					return mongo.NewConn(settings)
 				})(args, as)
 			},
@@ -601,6 +615,59 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			}),
 		},
 		{
+			Name: "kafka-dst",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "kafka-dst")
+			},
+			Create: CreateHelper("kafka-dst", "kafka-dst", []cli.Flag{
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name: "brokers",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "default-topic",
+				}),
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name: "namespace-topic",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "sasl-user",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "sasl-password",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:  "data-type",
+					Value: adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
+				}),
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				brokers := c.StringSlice("brokers")
+				defaultTopic := c.String("default-topic")
+				namespaceTopic := c.StringSlice("namespace-topic")
+				user := c.String("sasl-user")
+				password := c.String("sasl-password")
+				dataType := adiomv1.DataType(adiomv1.DataType_value[c.String("data-type")])
+
+				tm := map[string]string{}
+				for _, m := range namespaceTopic {
+					ns, topic, ok := strings.Cut(m, ":")
+					if !ok {
+						return nil, fmt.Errorf("invalid topic mapping %v", m)
+					}
+					tm[ns] = topic
+				}
+				return kafka.NewDestKafka(brokers, defaultTopic, tm, user, password, dataType)
+			}),
+		},
+		{
+			Name: "kafka-src",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "kafka-src")
+			},
+			Create: CreateHelper("kafka-src", "kafka-src", KafkaSrcFlags(""), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return ParseKafkaSrcFlags("", c)
+			}),
+		},
+		{
 			Name: "grpc",
 			IsConnector: func(s string) bool {
 				return strings.HasPrefix(s, "grpc://")
@@ -613,6 +680,74 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},
+	}
+}
+
+func ParseKafkaSrcFlags(prefix string, c *cli.Context) (adiomv1connect.ConnectorServiceHandler, error) {
+	prefixDash := prefix
+	if prefix != "" {
+		prefixDash = prefix + "-"
+	}
+
+	brokers := c.StringSlice(prefixDash + "brokers")
+	topics := c.StringSlice(prefixDash + "topics")
+	topicMappings := c.StringSlice(prefixDash + "topic-mappings")
+	user := c.String(prefixDash + "sasl-user")
+	password := c.String(prefixDash + "sasl-password")
+	kafkaOffset := c.Int64(prefixDash + "offset")
+	dataType := adiomv1.DataType(adiomv1.DataType_value[c.String(prefixDash+"data-type")])
+
+	tm := map[string][]string{}
+	for _, topic := range topics {
+		tm[topic] = nil
+	}
+	for _, m := range topicMappings {
+		topic, ns, ok := strings.Cut(m, ":")
+		if !ok {
+			return nil, fmt.Errorf("invalid topic mapping %v", m)
+		}
+		tm[topic] = append(tm[topic], ns)
+	}
+	return kafka.NewKafkaConn(brokers, tm, kafka.DsyncMessageToUpdate, kafka.DsyncMessageToNamespace, user, password, kafkaOffset, dataType), nil
+}
+
+func KafkaSrcFlags(prefix string) []cli.Flag {
+	prefixDash := prefix
+	if prefix != "" {
+		prefixDash = prefix + "-"
+	}
+	return []cli.Flag{
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:     prefixDash + "brokers",
+			Category: prefix,
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:     prefixDash + "topics",
+			Category: prefix,
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name:     prefixDash + "topic-mappings",
+			Category: prefix,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     prefixDash + "sasl-user",
+			Category: prefix,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     prefixDash + "sasl-password",
+			Category: prefix,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:     prefixDash + "offset",
+			Usage:    "Custom offset for kafka (a time, or -2 for oldest)",
+			Value:    sarama.OffsetNewest,
+			Category: prefix,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:     prefixDash + "data-type",
+			Value:    adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
+			Category: prefix,
+		}),
 	}
 }
 
