@@ -64,6 +64,7 @@ type buffer struct {
 }
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	client *mongo.Client
 
 	settings ConnectorSettings

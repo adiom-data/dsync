@@ -22,6 +22,7 @@ import (
 )
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	client         *s3vectors.Client
 	bucketName     *string
 	vectorKey      string

@@ -18,6 +18,7 @@ service ConnectorService {
     rpc ListData(ListDataRequest) returns (ListDataResponse);
     rpc StreamUpdates(StreamUpdatesRequest) returns (stream StreamUpdatesResponse);
     rpc StreamLSN(StreamLSNRequest) returns (stream StreamLSNResponse);
+    rpc GetByIds(GetByIdsRequest) returns (GetByIdsResponse);
 }
 
 service TransformService {
