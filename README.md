@@ -37,7 +37,7 @@ Given source and destination databases, dsync completes an initial sync transfer
 
 ### SQL Databases / RDBMS
 
-<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>PostgreSQL</td><td>15+</td><td>Available</td><td>Source, Sink</td><td>Direct connectivity for 1:1 migrations with transformations</td></tr><tr><td>SQL Server / PostgreSQL / Oracle</td><td>-</td><td><em>Private Preview</em></td><td>Source</td><td>Custom query-based via our "SQL batch" connector<br>See <a href="https://www.adiom.io/post/migrate-rdbms-to-mongodb">blog</a> for details</td></tr></tbody></table>
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>PostgreSQL</td><td>15+</td><td>Available</td><td>Source, Sink</td><td>Direct connectivity for 1:1 migrations with transformations</td></tr><tr><td>SQL Server / PostgreSQL / Oracle / DB2</td><td>-</td><td><em>Private Preview</em></td><td>Source</td><td>Custom query-based via our "SQL batch" connector<br>See <a href="https://www.adiom.io/post/migrate-rdbms-to-mongodb">blog</a> for details</td></tr></tbody></table>
 
 ### Vector Databases
 
