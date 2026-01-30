@@ -19,6 +19,7 @@ import (
 )
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	settings ConnectorSettings
 
 	docMap      map[string]*IndexMap //map of locations to map of document IDs

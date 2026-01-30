@@ -3109,6 +3109,16 @@ public final class Messages {
        * @return The defaultPlan.
        */
       boolean getDefaultPlan();
+
+      /**
+       * <pre>
+       * whether the ListById endpoint is functional
+       * </pre>
+       *
+       * <code>bool list_by_id = 5 [json_name = "listById"];</code>
+       * @return The listById.
+       */
+      boolean getListById();
     }
     /**
      * Protobuf type {@code adiom.v1.Capabilities.Source}
@@ -3254,6 +3264,21 @@ public final class Messages {
         return defaultPlan_;
       }
 
+      public static final int LIST_BY_ID_FIELD_NUMBER = 5;
+      private boolean listById_ = false;
+      /**
+       * <pre>
+       * whether the ListById endpoint is functional
+       * </pre>
+       *
+       * <code>bool list_by_id = 5 [json_name = "listById"];</code>
+       * @return The listById.
+       */
+      @java.lang.Override
+      public boolean getListById() {
+        return listById_;
+      }
+
       private byte memoizedIsInitialized = -1;
       @java.lang.Override
       public final boolean isInitialized() {
@@ -3284,6 +3309,9 @@ public final class Messages {
         }
         if (defaultPlan_ != false) {
           output.writeBool(4, defaultPlan_);
+        }
+        if (listById_ != false) {
+          output.writeBool(5, listById_);
         }
         getUnknownFields().writeTo(output);
       }
@@ -3318,6 +3346,10 @@ public final class Messages {
           size += com.google.protobuf.CodedOutputStream
             .computeBoolSize(4, defaultPlan_);
         }
+        if (listById_ != false) {
+          size += com.google.protobuf.CodedOutputStream
+            .computeBoolSize(5, listById_);
+        }
         size += getUnknownFields().getSerializedSize();
         memoizedSize = size;
         return size;
@@ -3340,6 +3372,8 @@ public final class Messages {
             != other.getMultiNamespacePlan()) return false;
         if (getDefaultPlan()
             != other.getDefaultPlan()) return false;
+        if (getListById()
+            != other.getListById()) return false;
         if (!getUnknownFields().equals(other.getUnknownFields())) return false;
         return true;
       }
@@ -3364,6 +3398,9 @@ public final class Messages {
         hash = (37 * hash) + DEFAULT_PLAN_FIELD_NUMBER;
         hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
             getDefaultPlan());
+        hash = (37 * hash) + LIST_BY_ID_FIELD_NUMBER;
+        hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
+            getListById());
         hash = (29 * hash) + getUnknownFields().hashCode();
         memoizedHashCode = hash;
         return hash;
@@ -3500,6 +3537,7 @@ public final class Messages {
           lsnStream_ = false;
           multiNamespacePlan_ = false;
           defaultPlan_ = false;
+          listById_ = false;
           return this;
         }
 
@@ -3551,6 +3589,9 @@ public final class Messages {
           if (((from_bitField0_ & 0x00000008) != 0)) {
             result.defaultPlan_ = defaultPlan_;
           }
+          if (((from_bitField0_ & 0x00000010) != 0)) {
+            result.listById_ = listById_;
+          }
         }
 
         @java.lang.Override
@@ -3583,6 +3624,9 @@ public final class Messages {
           }
           if (other.getDefaultPlan() != false) {
             setDefaultPlan(other.getDefaultPlan());
+          }
+          if (other.getListById() != false) {
+            setListById(other.getListById());
           }
           this.mergeUnknownFields(other.getUnknownFields());
           onChanged();
@@ -3642,6 +3686,11 @@ public final class Messages {
                   bitField0_ |= 0x00000008;
                   break;
                 } // case 32
+                case 40: {
+                  listById_ = input.readBool();
+                  bitField0_ |= 0x00000010;
+                  break;
+                } // case 40
                 default: {
                   if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                     done = true; // was an endgroup tag
@@ -3936,6 +3985,50 @@ public final class Messages {
         public Builder clearDefaultPlan() {
           bitField0_ = (bitField0_ & ~0x00000008);
           defaultPlan_ = false;
+          onChanged();
+          return this;
+        }
+
+        private boolean listById_ ;
+        /**
+         * <pre>
+         * whether the ListById endpoint is functional
+         * </pre>
+         *
+         * <code>bool list_by_id = 5 [json_name = "listById"];</code>
+         * @return The listById.
+         */
+        @java.lang.Override
+        public boolean getListById() {
+          return listById_;
+        }
+        /**
+         * <pre>
+         * whether the ListById endpoint is functional
+         * </pre>
+         *
+         * <code>bool list_by_id = 5 [json_name = "listById"];</code>
+         * @param value The listById to set.
+         * @return This builder for chaining.
+         */
+        public Builder setListById(boolean value) {
+
+          listById_ = value;
+          bitField0_ |= 0x00000010;
+          onChanged();
+          return this;
+        }
+        /**
+         * <pre>
+         * whether the ListById endpoint is functional
+         * </pre>
+         *
+         * <code>bool list_by_id = 5 [json_name = "listById"];</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearListById() {
+          bitField0_ = (bitField0_ & ~0x00000010);
+          listById_ = false;
           onChanged();
           return this;
         }
@@ -17925,6 +18018,2272 @@ public final class Messages {
 
   }
 
+  public interface ListByIdRequestOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.ListByIdRequest)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The namespace.
+     */
+    java.lang.String getNamespace();
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The bytes for namespace.
+     */
+    com.google.protobuf.ByteString
+        getNamespaceBytes();
+
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest> 
+        getIdsList();
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    adiom.v1.Messages.ListByIdRequest.IdRequest getIds(int index);
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    int getIdsCount();
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    java.util.List<? extends adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder> 
+        getIdsOrBuilderList();
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder getIdsOrBuilder(
+        int index);
+
+    /**
+     * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+     * @return The enum numeric value on the wire for type.
+     */
+    int getTypeValue();
+    /**
+     * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+     * @return The type.
+     */
+    adiom.v1.Messages.UpdateType getType();
+  }
+  /**
+   * Protobuf type {@code adiom.v1.ListByIdRequest}
+   */
+  public static final class ListByIdRequest extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.ListByIdRequest)
+      ListByIdRequestOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        ListByIdRequest.class.getName());
+    }
+    // Use ListByIdRequest.newBuilder() to construct.
+    private ListByIdRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private ListByIdRequest() {
+      namespace_ = "";
+      ids_ = java.util.Collections.emptyList();
+      type_ = 0;
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.ListByIdRequest.class, adiom.v1.Messages.ListByIdRequest.Builder.class);
+    }
+
+    public interface IdRequestOrBuilder extends
+        // @@protoc_insertion_point(interface_extends:adiom.v1.ListByIdRequest.IdRequest)
+        com.google.protobuf.MessageOrBuilder {
+
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      java.util.List<adiom.v1.Messages.BsonValue> 
+          getIdList();
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      adiom.v1.Messages.BsonValue getId(int index);
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      int getIdCount();
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      java.util.List<? extends adiom.v1.Messages.BsonValueOrBuilder> 
+          getIdOrBuilderList();
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      adiom.v1.Messages.BsonValueOrBuilder getIdOrBuilder(
+          int index);
+    }
+    /**
+     * Protobuf type {@code adiom.v1.ListByIdRequest.IdRequest}
+     */
+    public static final class IdRequest extends
+        com.google.protobuf.GeneratedMessage implements
+        // @@protoc_insertion_point(message_implements:adiom.v1.ListByIdRequest.IdRequest)
+        IdRequestOrBuilder {
+    private static final long serialVersionUID = 0L;
+      static {
+        com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+          com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+          /* major= */ 4,
+          /* minor= */ 29,
+          /* patch= */ 1,
+          /* suffix= */ "",
+          IdRequest.class.getName());
+      }
+      // Use IdRequest.newBuilder() to construct.
+      private IdRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+        super(builder);
+      }
+      private IdRequest() {
+        id_ = java.util.Collections.emptyList();
+      }
+
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_IdRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.ListByIdRequest.IdRequest.class, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder.class);
+      }
+
+      public static final int ID_FIELD_NUMBER = 1;
+      @SuppressWarnings("serial")
+      private java.util.List<adiom.v1.Messages.BsonValue> id_;
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      @java.lang.Override
+      public java.util.List<adiom.v1.Messages.BsonValue> getIdList() {
+        return id_;
+      }
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      @java.lang.Override
+      public java.util.List<? extends adiom.v1.Messages.BsonValueOrBuilder> 
+          getIdOrBuilderList() {
+        return id_;
+      }
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      @java.lang.Override
+      public int getIdCount() {
+        return id_.size();
+      }
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.BsonValue getId(int index) {
+        return id_.get(index);
+      }
+      /**
+       * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.BsonValueOrBuilder getIdOrBuilder(
+          int index) {
+        return id_.get(index);
+      }
+
+      private byte memoizedIsInitialized = -1;
+      @java.lang.Override
+      public final boolean isInitialized() {
+        byte isInitialized = memoizedIsInitialized;
+        if (isInitialized == 1) return true;
+        if (isInitialized == 0) return false;
+
+        memoizedIsInitialized = 1;
+        return true;
+      }
+
+      @java.lang.Override
+      public void writeTo(com.google.protobuf.CodedOutputStream output)
+                          throws java.io.IOException {
+        for (int i = 0; i < id_.size(); i++) {
+          output.writeMessage(1, id_.get(i));
+        }
+        getUnknownFields().writeTo(output);
+      }
+
+      @java.lang.Override
+      public int getSerializedSize() {
+        int size = memoizedSize;
+        if (size != -1) return size;
+
+        size = 0;
+        for (int i = 0; i < id_.size(); i++) {
+          size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(1, id_.get(i));
+        }
+        size += getUnknownFields().getSerializedSize();
+        memoizedSize = size;
+        return size;
+      }
+
+      @java.lang.Override
+      public boolean equals(final java.lang.Object obj) {
+        if (obj == this) {
+         return true;
+        }
+        if (!(obj instanceof adiom.v1.Messages.ListByIdRequest.IdRequest)) {
+          return super.equals(obj);
+        }
+        adiom.v1.Messages.ListByIdRequest.IdRequest other = (adiom.v1.Messages.ListByIdRequest.IdRequest) obj;
+
+        if (!getIdList()
+            .equals(other.getIdList())) return false;
+        if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+        return true;
+      }
+
+      @java.lang.Override
+      public int hashCode() {
+        if (memoizedHashCode != 0) {
+          return memoizedHashCode;
+        }
+        int hash = 41;
+        hash = (19 * hash) + getDescriptor().hashCode();
+        if (getIdCount() > 0) {
+          hash = (37 * hash) + ID_FIELD_NUMBER;
+          hash = (53 * hash) + getIdList().hashCode();
+        }
+        hash = (29 * hash) + getUnknownFields().hashCode();
+        memoizedHashCode = hash;
+        return hash;
+      }
+
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          java.nio.ByteBuffer data)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          java.nio.ByteBuffer data,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          com.google.protobuf.ByteString data)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          com.google.protobuf.ByteString data,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(byte[] data)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          byte[] data,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return PARSER.parseFrom(data, extensionRegistry);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(java.io.InputStream input)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseWithIOException(PARSER, input);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          java.io.InputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseWithIOException(PARSER, input, extensionRegistry);
+      }
+
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseDelimitedFrom(java.io.InputStream input)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseDelimitedWithIOException(PARSER, input);
+      }
+
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseDelimitedFrom(
+          java.io.InputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          com.google.protobuf.CodedInputStream input)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseWithIOException(PARSER, input);
+      }
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest parseFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessage
+            .parseWithIOException(PARSER, input, extensionRegistry);
+      }
+
+      @java.lang.Override
+      public Builder newBuilderForType() { return newBuilder(); }
+      public static Builder newBuilder() {
+        return DEFAULT_INSTANCE.toBuilder();
+      }
+      public static Builder newBuilder(adiom.v1.Messages.ListByIdRequest.IdRequest prototype) {
+        return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+      }
+      @java.lang.Override
+      public Builder toBuilder() {
+        return this == DEFAULT_INSTANCE
+            ? new Builder() : new Builder().mergeFrom(this);
+      }
+
+      @java.lang.Override
+      protected Builder newBuilderForType(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        Builder builder = new Builder(parent);
+        return builder;
+      }
+      /**
+       * Protobuf type {@code adiom.v1.ListByIdRequest.IdRequest}
+       */
+      public static final class Builder extends
+          com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+          // @@protoc_insertion_point(builder_implements:adiom.v1.ListByIdRequest.IdRequest)
+          adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder {
+        public static final com.google.protobuf.Descriptors.Descriptor
+            getDescriptor() {
+          return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor;
+        }
+
+        @java.lang.Override
+        protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+            internalGetFieldAccessorTable() {
+          return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_IdRequest_fieldAccessorTable
+              .ensureFieldAccessorsInitialized(
+                  adiom.v1.Messages.ListByIdRequest.IdRequest.class, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder.class);
+        }
+
+        // Construct using adiom.v1.Messages.ListByIdRequest.IdRequest.newBuilder()
+        private Builder() {
+
+        }
+
+        private Builder(
+            com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+          super(parent);
+
+        }
+        @java.lang.Override
+        public Builder clear() {
+          super.clear();
+          bitField0_ = 0;
+          if (idBuilder_ == null) {
+            id_ = java.util.Collections.emptyList();
+          } else {
+            id_ = null;
+            idBuilder_.clear();
+          }
+          bitField0_ = (bitField0_ & ~0x00000001);
+          return this;
+        }
+
+        @java.lang.Override
+        public com.google.protobuf.Descriptors.Descriptor
+            getDescriptorForType() {
+          return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor;
+        }
+
+        @java.lang.Override
+        public adiom.v1.Messages.ListByIdRequest.IdRequest getDefaultInstanceForType() {
+          return adiom.v1.Messages.ListByIdRequest.IdRequest.getDefaultInstance();
+        }
+
+        @java.lang.Override
+        public adiom.v1.Messages.ListByIdRequest.IdRequest build() {
+          adiom.v1.Messages.ListByIdRequest.IdRequest result = buildPartial();
+          if (!result.isInitialized()) {
+            throw newUninitializedMessageException(result);
+          }
+          return result;
+        }
+
+        @java.lang.Override
+        public adiom.v1.Messages.ListByIdRequest.IdRequest buildPartial() {
+          adiom.v1.Messages.ListByIdRequest.IdRequest result = new adiom.v1.Messages.ListByIdRequest.IdRequest(this);
+          buildPartialRepeatedFields(result);
+          if (bitField0_ != 0) { buildPartial0(result); }
+          onBuilt();
+          return result;
+        }
+
+        private void buildPartialRepeatedFields(adiom.v1.Messages.ListByIdRequest.IdRequest result) {
+          if (idBuilder_ == null) {
+            if (((bitField0_ & 0x00000001) != 0)) {
+              id_ = java.util.Collections.unmodifiableList(id_);
+              bitField0_ = (bitField0_ & ~0x00000001);
+            }
+            result.id_ = id_;
+          } else {
+            result.id_ = idBuilder_.build();
+          }
+        }
+
+        private void buildPartial0(adiom.v1.Messages.ListByIdRequest.IdRequest result) {
+          int from_bitField0_ = bitField0_;
+        }
+
+        @java.lang.Override
+        public Builder mergeFrom(com.google.protobuf.Message other) {
+          if (other instanceof adiom.v1.Messages.ListByIdRequest.IdRequest) {
+            return mergeFrom((adiom.v1.Messages.ListByIdRequest.IdRequest)other);
+          } else {
+            super.mergeFrom(other);
+            return this;
+          }
+        }
+
+        public Builder mergeFrom(adiom.v1.Messages.ListByIdRequest.IdRequest other) {
+          if (other == adiom.v1.Messages.ListByIdRequest.IdRequest.getDefaultInstance()) return this;
+          if (idBuilder_ == null) {
+            if (!other.id_.isEmpty()) {
+              if (id_.isEmpty()) {
+                id_ = other.id_;
+                bitField0_ = (bitField0_ & ~0x00000001);
+              } else {
+                ensureIdIsMutable();
+                id_.addAll(other.id_);
+              }
+              onChanged();
+            }
+          } else {
+            if (!other.id_.isEmpty()) {
+              if (idBuilder_.isEmpty()) {
+                idBuilder_.dispose();
+                idBuilder_ = null;
+                id_ = other.id_;
+                bitField0_ = (bitField0_ & ~0x00000001);
+                idBuilder_ = 
+                  com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                     getIdFieldBuilder() : null;
+              } else {
+                idBuilder_.addAllMessages(other.id_);
+              }
+            }
+          }
+          this.mergeUnknownFields(other.getUnknownFields());
+          onChanged();
+          return this;
+        }
+
+        @java.lang.Override
+        public final boolean isInitialized() {
+          return true;
+        }
+
+        @java.lang.Override
+        public Builder mergeFrom(
+            com.google.protobuf.CodedInputStream input,
+            com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+            throws java.io.IOException {
+          if (extensionRegistry == null) {
+            throw new java.lang.NullPointerException();
+          }
+          try {
+            boolean done = false;
+            while (!done) {
+              int tag = input.readTag();
+              switch (tag) {
+                case 0:
+                  done = true;
+                  break;
+                case 10: {
+                  adiom.v1.Messages.BsonValue m =
+                      input.readMessage(
+                          adiom.v1.Messages.BsonValue.parser(),
+                          extensionRegistry);
+                  if (idBuilder_ == null) {
+                    ensureIdIsMutable();
+                    id_.add(m);
+                  } else {
+                    idBuilder_.addMessage(m);
+                  }
+                  break;
+                } // case 10
+                default: {
+                  if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                    done = true; // was an endgroup tag
+                  }
+                  break;
+                } // default:
+              } // switch (tag)
+            } // while (!done)
+          } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+            throw e.unwrapIOException();
+          } finally {
+            onChanged();
+          } // finally
+          return this;
+        }
+        private int bitField0_;
+
+        private java.util.List<adiom.v1.Messages.BsonValue> id_ =
+          java.util.Collections.emptyList();
+        private void ensureIdIsMutable() {
+          if (!((bitField0_ & 0x00000001) != 0)) {
+            id_ = new java.util.ArrayList<adiom.v1.Messages.BsonValue>(id_);
+            bitField0_ |= 0x00000001;
+           }
+        }
+
+        private com.google.protobuf.RepeatedFieldBuilder<
+            adiom.v1.Messages.BsonValue, adiom.v1.Messages.BsonValue.Builder, adiom.v1.Messages.BsonValueOrBuilder> idBuilder_;
+
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public java.util.List<adiom.v1.Messages.BsonValue> getIdList() {
+          if (idBuilder_ == null) {
+            return java.util.Collections.unmodifiableList(id_);
+          } else {
+            return idBuilder_.getMessageList();
+          }
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public int getIdCount() {
+          if (idBuilder_ == null) {
+            return id_.size();
+          } else {
+            return idBuilder_.getCount();
+          }
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public adiom.v1.Messages.BsonValue getId(int index) {
+          if (idBuilder_ == null) {
+            return id_.get(index);
+          } else {
+            return idBuilder_.getMessage(index);
+          }
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder setId(
+            int index, adiom.v1.Messages.BsonValue value) {
+          if (idBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIdIsMutable();
+            id_.set(index, value);
+            onChanged();
+          } else {
+            idBuilder_.setMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder setId(
+            int index, adiom.v1.Messages.BsonValue.Builder builderForValue) {
+          if (idBuilder_ == null) {
+            ensureIdIsMutable();
+            id_.set(index, builderForValue.build());
+            onChanged();
+          } else {
+            idBuilder_.setMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder addId(adiom.v1.Messages.BsonValue value) {
+          if (idBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIdIsMutable();
+            id_.add(value);
+            onChanged();
+          } else {
+            idBuilder_.addMessage(value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder addId(
+            int index, adiom.v1.Messages.BsonValue value) {
+          if (idBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIdIsMutable();
+            id_.add(index, value);
+            onChanged();
+          } else {
+            idBuilder_.addMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder addId(
+            adiom.v1.Messages.BsonValue.Builder builderForValue) {
+          if (idBuilder_ == null) {
+            ensureIdIsMutable();
+            id_.add(builderForValue.build());
+            onChanged();
+          } else {
+            idBuilder_.addMessage(builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder addId(
+            int index, adiom.v1.Messages.BsonValue.Builder builderForValue) {
+          if (idBuilder_ == null) {
+            ensureIdIsMutable();
+            id_.add(index, builderForValue.build());
+            onChanged();
+          } else {
+            idBuilder_.addMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder addAllId(
+            java.lang.Iterable<? extends adiom.v1.Messages.BsonValue> values) {
+          if (idBuilder_ == null) {
+            ensureIdIsMutable();
+            com.google.protobuf.AbstractMessageLite.Builder.addAll(
+                values, id_);
+            onChanged();
+          } else {
+            idBuilder_.addAllMessages(values);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder clearId() {
+          if (idBuilder_ == null) {
+            id_ = java.util.Collections.emptyList();
+            bitField0_ = (bitField0_ & ~0x00000001);
+            onChanged();
+          } else {
+            idBuilder_.clear();
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public Builder removeId(int index) {
+          if (idBuilder_ == null) {
+            ensureIdIsMutable();
+            id_.remove(index);
+            onChanged();
+          } else {
+            idBuilder_.remove(index);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public adiom.v1.Messages.BsonValue.Builder getIdBuilder(
+            int index) {
+          return getIdFieldBuilder().getBuilder(index);
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public adiom.v1.Messages.BsonValueOrBuilder getIdOrBuilder(
+            int index) {
+          if (idBuilder_ == null) {
+            return id_.get(index);  } else {
+            return idBuilder_.getMessageOrBuilder(index);
+          }
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public java.util.List<? extends adiom.v1.Messages.BsonValueOrBuilder> 
+             getIdOrBuilderList() {
+          if (idBuilder_ != null) {
+            return idBuilder_.getMessageOrBuilderList();
+          } else {
+            return java.util.Collections.unmodifiableList(id_);
+          }
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public adiom.v1.Messages.BsonValue.Builder addIdBuilder() {
+          return getIdFieldBuilder().addBuilder(
+              adiom.v1.Messages.BsonValue.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public adiom.v1.Messages.BsonValue.Builder addIdBuilder(
+            int index) {
+          return getIdFieldBuilder().addBuilder(
+              index, adiom.v1.Messages.BsonValue.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .adiom.v1.BsonValue id = 1 [json_name = "id"];</code>
+         */
+        public java.util.List<adiom.v1.Messages.BsonValue.Builder> 
+             getIdBuilderList() {
+          return getIdFieldBuilder().getBuilderList();
+        }
+        private com.google.protobuf.RepeatedFieldBuilder<
+            adiom.v1.Messages.BsonValue, adiom.v1.Messages.BsonValue.Builder, adiom.v1.Messages.BsonValueOrBuilder> 
+            getIdFieldBuilder() {
+          if (idBuilder_ == null) {
+            idBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+                adiom.v1.Messages.BsonValue, adiom.v1.Messages.BsonValue.Builder, adiom.v1.Messages.BsonValueOrBuilder>(
+                    id_,
+                    ((bitField0_ & 0x00000001) != 0),
+                    getParentForChildren(),
+                    isClean());
+            id_ = null;
+          }
+          return idBuilder_;
+        }
+
+        // @@protoc_insertion_point(builder_scope:adiom.v1.ListByIdRequest.IdRequest)
+      }
+
+      // @@protoc_insertion_point(class_scope:adiom.v1.ListByIdRequest.IdRequest)
+      private static final adiom.v1.Messages.ListByIdRequest.IdRequest DEFAULT_INSTANCE;
+      static {
+        DEFAULT_INSTANCE = new adiom.v1.Messages.ListByIdRequest.IdRequest();
+      }
+
+      public static adiom.v1.Messages.ListByIdRequest.IdRequest getDefaultInstance() {
+        return DEFAULT_INSTANCE;
+      }
+
+      private static final com.google.protobuf.Parser<IdRequest>
+          PARSER = new com.google.protobuf.AbstractParser<IdRequest>() {
+        @java.lang.Override
+        public IdRequest parsePartialFrom(
+            com.google.protobuf.CodedInputStream input,
+            com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+            throws com.google.protobuf.InvalidProtocolBufferException {
+          Builder builder = newBuilder();
+          try {
+            builder.mergeFrom(input, extensionRegistry);
+          } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+            throw e.setUnfinishedMessage(builder.buildPartial());
+          } catch (com.google.protobuf.UninitializedMessageException e) {
+            throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+          } catch (java.io.IOException e) {
+            throw new com.google.protobuf.InvalidProtocolBufferException(e)
+                .setUnfinishedMessage(builder.buildPartial());
+          }
+          return builder.buildPartial();
+        }
+      };
+
+      public static com.google.protobuf.Parser<IdRequest> parser() {
+        return PARSER;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Parser<IdRequest> getParserForType() {
+        return PARSER;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdRequest.IdRequest getDefaultInstanceForType() {
+        return DEFAULT_INSTANCE;
+      }
+
+    }
+
+    public static final int NAMESPACE_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private volatile java.lang.Object namespace_ = "";
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The namespace.
+     */
+    @java.lang.Override
+    public java.lang.String getNamespace() {
+      java.lang.Object ref = namespace_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        namespace_ = s;
+        return s;
+      }
+    }
+    /**
+     * <code>string namespace = 1 [json_name = "namespace"];</code>
+     * @return The bytes for namespace.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNamespaceBytes() {
+      java.lang.Object ref = namespace_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        namespace_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    public static final int IDS_FIELD_NUMBER = 2;
+    @SuppressWarnings("serial")
+    private java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest> ids_;
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest> getIdsList() {
+      return ids_;
+    }
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder> 
+        getIdsOrBuilderList() {
+      return ids_;
+    }
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    @java.lang.Override
+    public int getIdsCount() {
+      return ids_.size();
+    }
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.ListByIdRequest.IdRequest getIds(int index) {
+      return ids_.get(index);
+    }
+    /**
+     * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder getIdsOrBuilder(
+        int index) {
+      return ids_.get(index);
+    }
+
+    public static final int TYPE_FIELD_NUMBER = 3;
+    private int type_ = 0;
+    /**
+     * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+     * @return The enum numeric value on the wire for type.
+     */
+    @java.lang.Override public int getTypeValue() {
+      return type_;
+    }
+    /**
+     * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+     * @return The type.
+     */
+    @java.lang.Override public adiom.v1.Messages.UpdateType getType() {
+      adiom.v1.Messages.UpdateType result = adiom.v1.Messages.UpdateType.forNumber(type_);
+      return result == null ? adiom.v1.Messages.UpdateType.UNRECOGNIZED : result;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(namespace_)) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 1, namespace_);
+      }
+      for (int i = 0; i < ids_.size(); i++) {
+        output.writeMessage(2, ids_.get(i));
+      }
+      if (type_ != adiom.v1.Messages.UpdateType.UPDATE_TYPE_UNKNOWN.getNumber()) {
+        output.writeEnum(3, type_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(namespace_)) {
+        size += com.google.protobuf.GeneratedMessage.computeStringSize(1, namespace_);
+      }
+      for (int i = 0; i < ids_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, ids_.get(i));
+      }
+      if (type_ != adiom.v1.Messages.UpdateType.UPDATE_TYPE_UNKNOWN.getNumber()) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeEnumSize(3, type_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.ListByIdRequest)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.ListByIdRequest other = (adiom.v1.Messages.ListByIdRequest) obj;
+
+      if (!getNamespace()
+          .equals(other.getNamespace())) return false;
+      if (!getIdsList()
+          .equals(other.getIdsList())) return false;
+      if (type_ != other.type_) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + NAMESPACE_FIELD_NUMBER;
+      hash = (53 * hash) + getNamespace().hashCode();
+      if (getIdsCount() > 0) {
+        hash = (37 * hash) + IDS_FIELD_NUMBER;
+        hash = (53 * hash) + getIdsList().hashCode();
+      }
+      hash = (37 * hash) + TYPE_FIELD_NUMBER;
+      hash = (53 * hash) + type_;
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.ListByIdRequest parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.ListByIdRequest parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.ListByIdRequest parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.ListByIdRequest prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.ListByIdRequest}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.ListByIdRequest)
+        adiom.v1.Messages.ListByIdRequestOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.ListByIdRequest.class, adiom.v1.Messages.ListByIdRequest.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.ListByIdRequest.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        namespace_ = "";
+        if (idsBuilder_ == null) {
+          ids_ = java.util.Collections.emptyList();
+        } else {
+          ids_ = null;
+          idsBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        type_ = 0;
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdRequest_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdRequest getDefaultInstanceForType() {
+        return adiom.v1.Messages.ListByIdRequest.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdRequest build() {
+        adiom.v1.Messages.ListByIdRequest result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdRequest buildPartial() {
+        adiom.v1.Messages.ListByIdRequest result = new adiom.v1.Messages.ListByIdRequest(this);
+        buildPartialRepeatedFields(result);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartialRepeatedFields(adiom.v1.Messages.ListByIdRequest result) {
+        if (idsBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) != 0)) {
+            ids_ = java.util.Collections.unmodifiableList(ids_);
+            bitField0_ = (bitField0_ & ~0x00000002);
+          }
+          result.ids_ = ids_;
+        } else {
+          result.ids_ = idsBuilder_.build();
+        }
+      }
+
+      private void buildPartial0(adiom.v1.Messages.ListByIdRequest result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          result.namespace_ = namespace_;
+        }
+        if (((from_bitField0_ & 0x00000004) != 0)) {
+          result.type_ = type_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.ListByIdRequest) {
+          return mergeFrom((adiom.v1.Messages.ListByIdRequest)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.ListByIdRequest other) {
+        if (other == adiom.v1.Messages.ListByIdRequest.getDefaultInstance()) return this;
+        if (!other.getNamespace().isEmpty()) {
+          namespace_ = other.namespace_;
+          bitField0_ |= 0x00000001;
+          onChanged();
+        }
+        if (idsBuilder_ == null) {
+          if (!other.ids_.isEmpty()) {
+            if (ids_.isEmpty()) {
+              ids_ = other.ids_;
+              bitField0_ = (bitField0_ & ~0x00000002);
+            } else {
+              ensureIdsIsMutable();
+              ids_.addAll(other.ids_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.ids_.isEmpty()) {
+            if (idsBuilder_.isEmpty()) {
+              idsBuilder_.dispose();
+              idsBuilder_ = null;
+              ids_ = other.ids_;
+              bitField0_ = (bitField0_ & ~0x00000002);
+              idsBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getIdsFieldBuilder() : null;
+            } else {
+              idsBuilder_.addAllMessages(other.ids_);
+            }
+          }
+        }
+        if (other.type_ != 0) {
+          setTypeValue(other.getTypeValue());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                namespace_ = input.readStringRequireUtf8();
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 10
+              case 18: {
+                adiom.v1.Messages.ListByIdRequest.IdRequest m =
+                    input.readMessage(
+                        adiom.v1.Messages.ListByIdRequest.IdRequest.parser(),
+                        extensionRegistry);
+                if (idsBuilder_ == null) {
+                  ensureIdsIsMutable();
+                  ids_.add(m);
+                } else {
+                  idsBuilder_.addMessage(m);
+                }
+                break;
+              } // case 18
+              case 24: {
+                type_ = input.readEnum();
+                bitField0_ |= 0x00000004;
+                break;
+              } // case 24
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private java.lang.Object namespace_ = "";
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return The namespace.
+       */
+      public java.lang.String getNamespace() {
+        java.lang.Object ref = namespace_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          namespace_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return The bytes for namespace.
+       */
+      public com.google.protobuf.ByteString
+          getNamespaceBytes() {
+        java.lang.Object ref = namespace_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          namespace_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @param value The namespace to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNamespace(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        namespace_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNamespace() {
+        namespace_ = getDefaultInstance().getNamespace();
+        bitField0_ = (bitField0_ & ~0x00000001);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string namespace = 1 [json_name = "namespace"];</code>
+       * @param value The bytes for namespace to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNamespaceBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        namespace_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+
+      private java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest> ids_ =
+        java.util.Collections.emptyList();
+      private void ensureIdsIsMutable() {
+        if (!((bitField0_ & 0x00000002) != 0)) {
+          ids_ = new java.util.ArrayList<adiom.v1.Messages.ListByIdRequest.IdRequest>(ids_);
+          bitField0_ |= 0x00000002;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.ListByIdRequest.IdRequest, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder, adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder> idsBuilder_;
+
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest> getIdsList() {
+        if (idsBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(ids_);
+        } else {
+          return idsBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public int getIdsCount() {
+        if (idsBuilder_ == null) {
+          return ids_.size();
+        } else {
+          return idsBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public adiom.v1.Messages.ListByIdRequest.IdRequest getIds(int index) {
+        if (idsBuilder_ == null) {
+          return ids_.get(index);
+        } else {
+          return idsBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder setIds(
+          int index, adiom.v1.Messages.ListByIdRequest.IdRequest value) {
+        if (idsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureIdsIsMutable();
+          ids_.set(index, value);
+          onChanged();
+        } else {
+          idsBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder setIds(
+          int index, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder builderForValue) {
+        if (idsBuilder_ == null) {
+          ensureIdsIsMutable();
+          ids_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          idsBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder addIds(adiom.v1.Messages.ListByIdRequest.IdRequest value) {
+        if (idsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureIdsIsMutable();
+          ids_.add(value);
+          onChanged();
+        } else {
+          idsBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder addIds(
+          int index, adiom.v1.Messages.ListByIdRequest.IdRequest value) {
+        if (idsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureIdsIsMutable();
+          ids_.add(index, value);
+          onChanged();
+        } else {
+          idsBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder addIds(
+          adiom.v1.Messages.ListByIdRequest.IdRequest.Builder builderForValue) {
+        if (idsBuilder_ == null) {
+          ensureIdsIsMutable();
+          ids_.add(builderForValue.build());
+          onChanged();
+        } else {
+          idsBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder addIds(
+          int index, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder builderForValue) {
+        if (idsBuilder_ == null) {
+          ensureIdsIsMutable();
+          ids_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          idsBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder addAllIds(
+          java.lang.Iterable<? extends adiom.v1.Messages.ListByIdRequest.IdRequest> values) {
+        if (idsBuilder_ == null) {
+          ensureIdsIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, ids_);
+          onChanged();
+        } else {
+          idsBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder clearIds() {
+        if (idsBuilder_ == null) {
+          ids_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000002);
+          onChanged();
+        } else {
+          idsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public Builder removeIds(int index) {
+        if (idsBuilder_ == null) {
+          ensureIdsIsMutable();
+          ids_.remove(index);
+          onChanged();
+        } else {
+          idsBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public adiom.v1.Messages.ListByIdRequest.IdRequest.Builder getIdsBuilder(
+          int index) {
+        return getIdsFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder getIdsOrBuilder(
+          int index) {
+        if (idsBuilder_ == null) {
+          return ids_.get(index);  } else {
+          return idsBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public java.util.List<? extends adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder> 
+           getIdsOrBuilderList() {
+        if (idsBuilder_ != null) {
+          return idsBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(ids_);
+        }
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public adiom.v1.Messages.ListByIdRequest.IdRequest.Builder addIdsBuilder() {
+        return getIdsFieldBuilder().addBuilder(
+            adiom.v1.Messages.ListByIdRequest.IdRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public adiom.v1.Messages.ListByIdRequest.IdRequest.Builder addIdsBuilder(
+          int index) {
+        return getIdsFieldBuilder().addBuilder(
+            index, adiom.v1.Messages.ListByIdRequest.IdRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .adiom.v1.ListByIdRequest.IdRequest ids = 2 [json_name = "ids"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.ListByIdRequest.IdRequest.Builder> 
+           getIdsBuilderList() {
+        return getIdsFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.ListByIdRequest.IdRequest, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder, adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder> 
+          getIdsFieldBuilder() {
+        if (idsBuilder_ == null) {
+          idsBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              adiom.v1.Messages.ListByIdRequest.IdRequest, adiom.v1.Messages.ListByIdRequest.IdRequest.Builder, adiom.v1.Messages.ListByIdRequest.IdRequestOrBuilder>(
+                  ids_,
+                  ((bitField0_ & 0x00000002) != 0),
+                  getParentForChildren(),
+                  isClean());
+          ids_ = null;
+        }
+        return idsBuilder_;
+      }
+
+      private int type_ = 0;
+      /**
+       * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+       * @return The enum numeric value on the wire for type.
+       */
+      @java.lang.Override public int getTypeValue() {
+        return type_;
+      }
+      /**
+       * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+       * @param value The enum numeric value on the wire for type to set.
+       * @return This builder for chaining.
+       */
+      public Builder setTypeValue(int value) {
+        type_ = value;
+        bitField0_ |= 0x00000004;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+       * @return The type.
+       */
+      @java.lang.Override
+      public adiom.v1.Messages.UpdateType getType() {
+        adiom.v1.Messages.UpdateType result = adiom.v1.Messages.UpdateType.forNumber(type_);
+        return result == null ? adiom.v1.Messages.UpdateType.UNRECOGNIZED : result;
+      }
+      /**
+       * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+       * @param value The type to set.
+       * @return This builder for chaining.
+       */
+      public Builder setType(adiom.v1.Messages.UpdateType value) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        bitField0_ |= 0x00000004;
+        type_ = value.getNumber();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.adiom.v1.UpdateType type = 3 [json_name = "type"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearType() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        type_ = 0;
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.ListByIdRequest)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.ListByIdRequest)
+    private static final adiom.v1.Messages.ListByIdRequest DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.ListByIdRequest();
+    }
+
+    public static adiom.v1.Messages.ListByIdRequest getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<ListByIdRequest>
+        PARSER = new com.google.protobuf.AbstractParser<ListByIdRequest>() {
+      @java.lang.Override
+      public ListByIdRequest parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<ListByIdRequest> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ListByIdRequest> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.ListByIdRequest getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface ListByIdResponseOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.ListByIdResponse)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    java.util.List<com.google.protobuf.ByteString> getDataList();
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    int getDataCount();
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    com.google.protobuf.ByteString getData(int index);
+  }
+  /**
+   * Protobuf type {@code adiom.v1.ListByIdResponse}
+   */
+  public static final class ListByIdResponse extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.ListByIdResponse)
+      ListByIdResponseOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        ListByIdResponse.class.getName());
+    }
+    // Use ListByIdResponse.newBuilder() to construct.
+    private ListByIdResponse(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private ListByIdResponse() {
+      data_ = emptyList(com.google.protobuf.ByteString.class);
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_ListByIdResponse_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_ListByIdResponse_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.ListByIdResponse.class, adiom.v1.Messages.ListByIdResponse.Builder.class);
+    }
+
+    public static final int DATA_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ =
+        emptyList(com.google.protobuf.ByteString.class);
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @return A list containing the data.
+     */
+    @java.lang.Override
+    public java.util.List<com.google.protobuf.ByteString>
+        getDataList() {
+      return data_;
+    }
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @return The count of data.
+     */
+    public int getDataCount() {
+      return data_.size();
+    }
+    /**
+     * <code>repeated bytes data = 1 [json_name = "data"];</code>
+     * @param index The index of the element to return.
+     * @return The data at the given index.
+     */
+    public com.google.protobuf.ByteString getData(int index) {
+      return data_.get(index);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < data_.size(); i++) {
+        output.writeBytes(1, data_.get(i));
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      {
+        int dataSize = 0;
+        for (int i = 0; i < data_.size(); i++) {
+          dataSize += com.google.protobuf.CodedOutputStream
+            .computeBytesSizeNoTag(data_.get(i));
+        }
+        size += dataSize;
+        size += 1 * getDataList().size();
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.ListByIdResponse)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.ListByIdResponse other = (adiom.v1.Messages.ListByIdResponse) obj;
+
+      if (!getDataList()
+          .equals(other.getDataList())) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getDataCount() > 0) {
+        hash = (37 * hash) + DATA_FIELD_NUMBER;
+        hash = (53 * hash) + getDataList().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.ListByIdResponse parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.ListByIdResponse parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.ListByIdResponse parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.ListByIdResponse prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.ListByIdResponse}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.ListByIdResponse)
+        adiom.v1.Messages.ListByIdResponseOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdResponse_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdResponse_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.ListByIdResponse.class, adiom.v1.Messages.ListByIdResponse.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.ListByIdResponse.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_ListByIdResponse_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdResponse getDefaultInstanceForType() {
+        return adiom.v1.Messages.ListByIdResponse.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdResponse build() {
+        adiom.v1.Messages.ListByIdResponse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.ListByIdResponse buildPartial() {
+        adiom.v1.Messages.ListByIdResponse result = new adiom.v1.Messages.ListByIdResponse(this);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartial0(adiom.v1.Messages.ListByIdResponse result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          data_.makeImmutable();
+          result.data_ = data_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.ListByIdResponse) {
+          return mergeFrom((adiom.v1.Messages.ListByIdResponse)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.ListByIdResponse other) {
+        if (other == adiom.v1.Messages.ListByIdResponse.getDefaultInstance()) return this;
+        if (!other.data_.isEmpty()) {
+          if (data_.isEmpty()) {
+            data_ = other.data_;
+            data_.makeImmutable();
+            bitField0_ |= 0x00000001;
+          } else {
+            ensureDataIsMutable();
+            data_.addAll(other.data_);
+          }
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                com.google.protobuf.ByteString v = input.readBytes();
+                ensureDataIsMutable();
+                data_.add(v);
+                break;
+              } // case 10
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private com.google.protobuf.Internal.ProtobufList<com.google.protobuf.ByteString> data_ = emptyList(com.google.protobuf.ByteString.class);
+      private void ensureDataIsMutable() {
+        if (!data_.isModifiable()) {
+          data_ = makeMutableCopy(data_);
+        }
+        bitField0_ |= 0x00000001;
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @return A list containing the data.
+       */
+      public java.util.List<com.google.protobuf.ByteString>
+          getDataList() {
+        data_.makeImmutable();
+        return data_;
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @return The count of data.
+       */
+      public int getDataCount() {
+        return data_.size();
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @param index The index of the element to return.
+       * @return The data at the given index.
+       */
+      public com.google.protobuf.ByteString getData(int index) {
+        return data_.get(index);
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @param index The index to set the value at.
+       * @param value The data to set.
+       * @return This builder for chaining.
+       */
+      public Builder setData(
+          int index, com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.set(index, value);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @param value The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addData(com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        ensureDataIsMutable();
+        data_.add(value);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @param values The data to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllData(
+          java.lang.Iterable<? extends com.google.protobuf.ByteString> values) {
+        ensureDataIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, data_);
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated bytes data = 1 [json_name = "data"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearData() {
+        data_ = emptyList(com.google.protobuf.ByteString.class);
+        bitField0_ = (bitField0_ & ~0x00000001);
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.ListByIdResponse)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.ListByIdResponse)
+    private static final adiom.v1.Messages.ListByIdResponse DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.ListByIdResponse();
+    }
+
+    public static adiom.v1.Messages.ListByIdResponse getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<ListByIdResponse>
+        PARSER = new com.google.protobuf.AbstractParser<ListByIdResponse>() {
+      @java.lang.Override
+      public ListByIdResponse parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<ListByIdResponse> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ListByIdResponse> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.ListByIdResponse getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   public interface GetTransformInfoRequestOrBuilder extends
       // @@protoc_insertion_point(interface_extends:adiom.v1.GetTransformInfoRequest)
       com.google.protobuf.MessageOrBuilder {
@@ -23840,6 +26199,21 @@ public final class Messages {
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_adiom_v1_StreamLSNResponse_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_ListByIdRequest_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_ListByIdRequest_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_ListByIdRequest_IdRequest_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_ListByIdResponse_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_ListByIdResponse_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_adiom_v1_GetTransformInfoRequest_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -23890,87 +26264,94 @@ public final class Messages {
       "header\030\002 \001(\tR\017partitionHeader\022\'\n\017partiti" +
       "on_value\030\003 \001(\tR\016partitionValue\022\026\n\006cursor" +
       "\030\004 \001(\014R\006cursor\022\'\n\017estimated_count\030\005 \001(\004R" +
-      "\016estimatedCount\"\211\003\n\014Capabilities\0225\n\006sour" +
+      "\016estimatedCount\"\247\003\n\014Capabilities\0225\n\006sour" +
       "ce\030\001 \001(\0132\035.adiom.v1.Capabilities.SourceR" +
       "\006source\022/\n\004sink\030\002 \001(\0132\033.adiom.v1.Capabil" +
-      "ities.SinkR\004sink\032\302\001\n\006Source\022D\n\024supported" +
+      "ities.SinkR\004sink\032\340\001\n\006Source\022D\n\024supported" +
       "_data_types\030\001 \003(\0162\022.adiom.v1.DataTypeR\022s" +
       "upportedDataTypes\022\035\n\nlsn_stream\030\002 \001(\010R\tl" +
       "snStream\0220\n\024multi_namespace_plan\030\003 \001(\010R\022" +
       "multiNamespacePlan\022!\n\014default_plan\030\004 \001(\010" +
-      "R\013defaultPlan\032L\n\004Sink\022D\n\024supported_data_" +
-      "types\030\001 \003(\0162\022.adiom.v1.DataTypeR\022support" +
-      "edDataTypes\"\020\n\016GetInfoRequest\"\244\001\n\017GetInf" +
-      "oResponse\022\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030\002 \001" +
-      "(\tR\006dbType\022\030\n\007version\030\003 \001(\tR\007version\022\022\n\004" +
-      "spec\030\004 \001(\tR\004spec\022:\n\014capabilities\030\005 \001(\0132\026" +
-      ".adiom.v1.CapabilitiesR\014capabilities\";\n\033" +
-      "GetNamespaceMetadataRequest\022\034\n\tnamespace" +
-      "\030\001 \001(\tR\tnamespace\"4\n\034GetNamespaceMetadat" +
-      "aResponse\022\024\n\005count\030\001 \001(\004R\005count\"r\n\023Gener" +
-      "atePlanRequest\022\036\n\nnamespaces\030\001 \003(\tR\nname" +
-      "spaces\022!\n\014initial_sync\030\002 \001(\010R\013initialSyn" +
-      "c\022\030\n\007updates\030\003 \001(\010R\007updates\"\226\001\n\024Generate" +
-      "PlanResponse\0223\n\npartitions\030\001 \003(\0132\023.adiom" +
-      ".v1.PartitionR\npartitions\022I\n\022updates_par" +
-      "titions\030\002 \003(\0132\032.adiom.v1.UpdatesPartitio" +
-      "nR\021updatesPartitions\"\235\001\n\006Update\022#\n\002id\030\001 " +
-      "\003(\0132\023.adiom.v1.BsonValueR\002id\022(\n\004type\030\002 \001" +
-      "(\0162\024.adiom.v1.UpdateTypeR\004type\022\022\n\004data\030\003" +
-      " \001(\014R\004data\0220\n\024partial_update_unset\030\004 \003(\t" +
-      "R\022partialUpdateUnset\"\204\001\n\017ListDataRequest" +
-      "\0221\n\tpartition\030\001 \001(\0132\023.adiom.v1.Partition" +
-      "R\tpartition\022&\n\004type\030\002 \001(\0162\022.adiom.v1.Dat" +
-      "aTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020L" +
-      "istDataResponse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013n" +
-      "ext_cursor\030\002 \001(\014R\nnextCursor\"l\n\020WriteDat" +
-      "aRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022\022" +
-      "\n\004data\030\002 \003(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom" +
-      ".v1.DataTypeR\004type\"\023\n\021WriteDataResponse\"" +
-      "\207\001\n\023WriteUpdatesRequest\022\034\n\tnamespace\030\001 \001" +
-      "(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom.v" +
-      "1.UpdateR\007updates\022&\n\004type\030\003 \001(\0162\022.adiom." +
-      "v1.DataTypeR\004type\"\026\n\024WriteUpdatesRespons" +
-      "e\"v\n\024StreamUpdatesRequest\022\036\n\nnamespaces\030" +
-      "\001 \003(\tR\nnamespaces\022&\n\004type\030\002 \001(\0162\022.adiom." +
-      "v1.DataTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006curso" +
-      "r\"\262\001\n\025StreamUpdatesResponse\022*\n\007updates\030\001" +
-      " \003(\0132\020.adiom.v1.UpdateR\007updates\022\034\n\tnames" +
-      "pace\030\002 \001(\tR\tnamespace\022\037\n\013next_cursor\030\003 \001" +
-      "(\014R\nnextCursor\022.\n\004time\030\004 \001(\0132\032.google.pr" +
-      "otobuf.TimestampR\004time\"J\n\020StreamLSNReque" +
-      "st\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022\026\n\006cu" +
-      "rsor\030\002 \001(\014R\006cursor\"F\n\021StreamLSNResponse\022" +
-      "\020\n\003lsn\030\001 \001(\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\n" +
-      "nextCursor\"\031\n\027GetTransformInfoRequest\"\246\002" +
-      "\n\030GetTransformInfoResponse\022P\n\ntransforms" +
-      "\030\001 \003(\01320.adiom.v1.GetTransformInfoRespon" +
-      "se.TransformInfoR\ntransforms\0224\n\026use_mult" +
-      "iple_responses\030\002 \001(\010R\024useMultipleRespons" +
-      "es\032\201\001\n\rTransformInfo\0225\n\014request_type\030\001 \001" +
-      "(\0162\022.adiom.v1.DataTypeR\013requestType\0229\n\016r" +
-      "esponse_types\030\002 \003(\0162\022.adiom.v1.DataTypeR" +
-      "\rresponseTypes\"\343\001\n\023GetTransformRequest\022\034" +
-      "\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007updates\030" +
-      "\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n\004data" +
-      "\030\003 \003(\014R\004data\0225\n\014request_type\030\004 \001(\0162\022.adi" +
-      "om.v1.DataTypeR\013requestType\0227\n\rresponse_" +
-      "type\030\005 \001(\0162\022.adiom.v1.DataTypeR\014response" +
-      "Type\"q\n\021TransformResponse\022\034\n\tnamespace\030\001" +
+      "R\013defaultPlan\022\034\n\nlist_by_id\030\005 \001(\010R\010listB" +
+      "yId\032L\n\004Sink\022D\n\024supported_data_types\030\001 \003(" +
+      "\0162\022.adiom.v1.DataTypeR\022supportedDataType" +
+      "s\"\020\n\016GetInfoRequest\"\244\001\n\017GetInfoResponse\022" +
+      "\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030\002 \001(\tR\006dbType" +
+      "\022\030\n\007version\030\003 \001(\tR\007version\022\022\n\004spec\030\004 \001(\t" +
+      "R\004spec\022:\n\014capabilities\030\005 \001(\0132\026.adiom.v1." +
+      "CapabilitiesR\014capabilities\";\n\033GetNamespa" +
+      "ceMetadataRequest\022\034\n\tnamespace\030\001 \001(\tR\tna" +
+      "mespace\"4\n\034GetNamespaceMetadataResponse\022" +
+      "\024\n\005count\030\001 \001(\004R\005count\"r\n\023GeneratePlanReq" +
+      "uest\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022!\n\014" +
+      "initial_sync\030\002 \001(\010R\013initialSync\022\030\n\007updat" +
+      "es\030\003 \001(\010R\007updates\"\226\001\n\024GeneratePlanRespon" +
+      "se\0223\n\npartitions\030\001 \003(\0132\023.adiom.v1.Partit" +
+      "ionR\npartitions\022I\n\022updates_partitions\030\002 " +
+      "\003(\0132\032.adiom.v1.UpdatesPartitionR\021updates" +
+      "Partitions\"\235\001\n\006Update\022#\n\002id\030\001 \003(\0132\023.adio" +
+      "m.v1.BsonValueR\002id\022(\n\004type\030\002 \001(\0162\024.adiom" +
+      ".v1.UpdateTypeR\004type\022\022\n\004data\030\003 \001(\014R\004data" +
+      "\0220\n\024partial_update_unset\030\004 \003(\tR\022partialU" +
+      "pdateUnset\"\204\001\n\017ListDataRequest\0221\n\tpartit" +
+      "ion\030\001 \001(\0132\023.adiom.v1.PartitionR\tpartitio" +
+      "n\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004typ" +
+      "e\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020ListDataRes" +
+      "ponse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013next_cursor" +
+      "\030\002 \001(\014R\nnextCursor\"l\n\020WriteDataRequest\022\034" +
+      "\n\tnamespace\030\001 \001(\tR\tnamespace\022\022\n\004data\030\002 \003" +
+      "(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTy" +
+      "peR\004type\"\023\n\021WriteDataResponse\"\207\001\n\023WriteU" +
+      "pdatesRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamesp" +
+      "ace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007" +
+      "updates\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTyp" +
+      "eR\004type\"\026\n\024WriteUpdatesResponse\"v\n\024Strea" +
+      "mUpdatesRequest\022\036\n\nnamespaces\030\001 \003(\tR\nnam" +
+      "espaces\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTyp" +
+      "eR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025Stre" +
+      "amUpdatesResponse\022*\n\007updates\030\001 \003(\0132\020.adi" +
+      "om.v1.UpdateR\007updates\022\034\n\tnamespace\030\002 \001(\t" +
+      "R\tnamespace\022\037\n\013next_cursor\030\003 \001(\014R\nnextCu" +
+      "rsor\022.\n\004time\030\004 \001(\0132\032.google.protobuf.Tim" +
+      "estampR\004time\"J\n\020StreamLSNRequest\022\036\n\nname" +
+      "spaces\030\001 \003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014" +
+      "R\006cursor\"F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001" +
+      "(\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\nnextCursor" +
+      "\"\302\001\n\017ListByIdRequest\022\034\n\tnamespace\030\001 \001(\tR" +
+      "\tnamespace\0225\n\003ids\030\002 \003(\0132#.adiom.v1.ListB" +
+      "yIdRequest.IdRequestR\003ids\022(\n\004type\030\003 \001(\0162" +
+      "\024.adiom.v1.UpdateTypeR\004type\0320\n\tIdRequest" +
+      "\022#\n\002id\030\001 \003(\0132\023.adiom.v1.BsonValueR\002id\"&\n" +
+      "\020ListByIdResponse\022\022\n\004data\030\001 \003(\014R\004data\"\031\n" +
+      "\027GetTransformInfoRequest\"\246\002\n\030GetTransfor" +
+      "mInfoResponse\022P\n\ntransforms\030\001 \003(\01320.adio" +
+      "m.v1.GetTransformInfoResponse.TransformI" +
+      "nfoR\ntransforms\0224\n\026use_multiple_response" +
+      "s\030\002 \001(\010R\024useMultipleResponses\032\201\001\n\rTransf" +
+      "ormInfo\0225\n\014request_type\030\001 \001(\0162\022.adiom.v1" +
+      ".DataTypeR\013requestType\0229\n\016response_types" +
+      "\030\002 \003(\0162\022.adiom.v1.DataTypeR\rresponseType" +
+      "s\"\343\001\n\023GetTransformRequest\022\034\n\tnamespace\030\001" +
       " \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom" +
-      ".v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\"" +
-      "\257\001\n\024GetTransformResponse\022\034\n\tnamespace\030\001 " +
-      "\001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom." +
-      "v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\0229" +
-      "\n\tresponses\030\004 \003(\0132\033.adiom.v1.TransformRe" +
-      "sponseR\tresponses*R\n\010DataType\022\025\n\021DATA_TY" +
-      "PE_UNKNOWN\020\000\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025" +
-      "\n\021DATA_TYPE_JSON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023" +
-      "UPDATE_TYPE_UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INS" +
-      "ERT\020\001\022\026\n\022UPDATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_" +
-      "TYPE_DELETE\020\003\022\036\n\032UPDATE_TYPE_PARTIAL_UPD" +
-      "ATE\020\004B2Z0github.com/adiom-data/dsync/gen" +
-      "/adiom/v1;adiomv1b\006proto3"
+      ".v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\022" +
+      "5\n\014request_type\030\004 \001(\0162\022.adiom.v1.DataTyp" +
+      "eR\013requestType\0227\n\rresponse_type\030\005 \001(\0162\022." +
+      "adiom.v1.DataTypeR\014responseType\"q\n\021Trans" +
+      "formResponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespa" +
+      "ce\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007u" +
+      "pdates\022\022\n\004data\030\003 \003(\014R\004data\"\257\001\n\024GetTransf" +
+      "ormResponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespac" +
+      "e\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007up" +
+      "dates\022\022\n\004data\030\003 \003(\014R\004data\0229\n\tresponses\030\004" +
+      " \003(\0132\033.adiom.v1.TransformResponseR\trespo" +
+      "nses*R\n\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020\000\022" +
+      "\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE_J" +
+      "SON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023UPDATE_TYPE_U" +
+      "NKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPDA" +
+      "TE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020\003" +
+      "\022\036\n\032UPDATE_TYPE_PARTIAL_UPDATE\020\004B2Z0gith" +
+      "ub.com/adiom-data/dsync/gen/adiom/v1;adi" +
+      "omv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -24006,7 +26387,7 @@ public final class Messages {
     internal_static_adiom_v1_Capabilities_Source_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Capabilities_Source_descriptor,
-        new java.lang.String[] { "SupportedDataTypes", "LsnStream", "MultiNamespacePlan", "DefaultPlan", });
+        new java.lang.String[] { "SupportedDataTypes", "LsnStream", "MultiNamespacePlan", "DefaultPlan", "ListById", });
     internal_static_adiom_v1_Capabilities_Sink_descriptor =
       internal_static_adiom_v1_Capabilities_descriptor.getNestedTypes().get(1);
     internal_static_adiom_v1_Capabilities_Sink_fieldAccessorTable = new
@@ -24115,14 +26496,32 @@ public final class Messages {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_StreamLSNResponse_descriptor,
         new java.lang.String[] { "Lsn", "NextCursor", });
-    internal_static_adiom_v1_GetTransformInfoRequest_descriptor =
+    internal_static_adiom_v1_ListByIdRequest_descriptor =
       getDescriptor().getMessageTypes().get(21);
+    internal_static_adiom_v1_ListByIdRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_ListByIdRequest_descriptor,
+        new java.lang.String[] { "Namespace", "Ids", "Type", });
+    internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor =
+      internal_static_adiom_v1_ListByIdRequest_descriptor.getNestedTypes().get(0);
+    internal_static_adiom_v1_ListByIdRequest_IdRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_ListByIdRequest_IdRequest_descriptor,
+        new java.lang.String[] { "Id", });
+    internal_static_adiom_v1_ListByIdResponse_descriptor =
+      getDescriptor().getMessageTypes().get(22);
+    internal_static_adiom_v1_ListByIdResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_ListByIdResponse_descriptor,
+        new java.lang.String[] { "Data", });
+    internal_static_adiom_v1_GetTransformInfoRequest_descriptor =
+      getDescriptor().getMessageTypes().get(23);
     internal_static_adiom_v1_GetTransformInfoRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformInfoRequest_descriptor,
         new java.lang.String[] { });
     internal_static_adiom_v1_GetTransformInfoResponse_descriptor =
-      getDescriptor().getMessageTypes().get(22);
+      getDescriptor().getMessageTypes().get(24);
     internal_static_adiom_v1_GetTransformInfoResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformInfoResponse_descriptor,
@@ -24134,19 +26533,19 @@ public final class Messages {
         internal_static_adiom_v1_GetTransformInfoResponse_TransformInfo_descriptor,
         new java.lang.String[] { "RequestType", "ResponseTypes", });
     internal_static_adiom_v1_GetTransformRequest_descriptor =
-      getDescriptor().getMessageTypes().get(23);
+      getDescriptor().getMessageTypes().get(25);
     internal_static_adiom_v1_GetTransformRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformRequest_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Data", "RequestType", "ResponseType", });
     internal_static_adiom_v1_TransformResponse_descriptor =
-      getDescriptor().getMessageTypes().get(24);
+      getDescriptor().getMessageTypes().get(26);
     internal_static_adiom_v1_TransformResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_TransformResponse_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Data", });
     internal_static_adiom_v1_GetTransformResponse_descriptor =
-      getDescriptor().getMessageTypes().get(25);
+      getDescriptor().getMessageTypes().get(27);
     internal_static_adiom_v1_GetTransformResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformResponse_descriptor,

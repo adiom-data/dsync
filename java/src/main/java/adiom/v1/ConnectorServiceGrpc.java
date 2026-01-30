@@ -260,6 +260,37 @@ public final class ConnectorServiceGrpc {
     return getStreamLSNMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<adiom.v1.Messages.ListByIdRequest,
+      adiom.v1.Messages.ListByIdResponse> getListByIdMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "ListById",
+      requestType = adiom.v1.Messages.ListByIdRequest.class,
+      responseType = adiom.v1.Messages.ListByIdResponse.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<adiom.v1.Messages.ListByIdRequest,
+      adiom.v1.Messages.ListByIdResponse> getListByIdMethod() {
+    io.grpc.MethodDescriptor<adiom.v1.Messages.ListByIdRequest, adiom.v1.Messages.ListByIdResponse> getListByIdMethod;
+    if ((getListByIdMethod = ConnectorServiceGrpc.getListByIdMethod) == null) {
+      synchronized (ConnectorServiceGrpc.class) {
+        if ((getListByIdMethod = ConnectorServiceGrpc.getListByIdMethod) == null) {
+          ConnectorServiceGrpc.getListByIdMethod = getListByIdMethod =
+              io.grpc.MethodDescriptor.<adiom.v1.Messages.ListByIdRequest, adiom.v1.Messages.ListByIdResponse>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "ListById"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  adiom.v1.Messages.ListByIdRequest.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  adiom.v1.Messages.ListByIdResponse.getDefaultInstance()))
+              .setSchemaDescriptor(new ConnectorServiceMethodDescriptorSupplier("ListById"))
+              .build();
+        }
+      }
+    }
+    return getListByIdMethod;
+  }
+
   /**
    * Creates a new async stub that supports all call types for the service
    */
@@ -369,6 +400,13 @@ public final class ConnectorServiceGrpc {
         io.grpc.stub.StreamObserver<adiom.v1.Messages.StreamLSNResponse> responseObserver) {
       io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getStreamLSNMethod(), responseObserver);
     }
+
+    /**
+     */
+    default void listById(adiom.v1.Messages.ListByIdRequest request,
+        io.grpc.stub.StreamObserver<adiom.v1.Messages.ListByIdResponse> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getListByIdMethod(), responseObserver);
+    }
   }
 
   /**
@@ -467,6 +505,14 @@ public final class ConnectorServiceGrpc {
       io.grpc.stub.ClientCalls.asyncServerStreamingCall(
           getChannel().newCall(getStreamLSNMethod(), getCallOptions()), request, responseObserver);
     }
+
+    /**
+     */
+    public void listById(adiom.v1.Messages.ListByIdRequest request,
+        io.grpc.stub.StreamObserver<adiom.v1.Messages.ListByIdResponse> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getListByIdMethod(), getCallOptions()), request, responseObserver);
+    }
   }
 
   /**
@@ -548,6 +594,13 @@ public final class ConnectorServiceGrpc {
       return io.grpc.stub.ClientCalls.blockingServerStreamingCall(
           getChannel(), getStreamLSNMethod(), getCallOptions(), request);
     }
+
+    /**
+     */
+    public adiom.v1.Messages.ListByIdResponse listById(adiom.v1.Messages.ListByIdRequest request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getListByIdMethod(), getCallOptions(), request);
+    }
   }
 
   /**
@@ -619,6 +672,14 @@ public final class ConnectorServiceGrpc {
       return io.grpc.stub.ClientCalls.futureUnaryCall(
           getChannel().newCall(getListDataMethod(), getCallOptions()), request);
     }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<adiom.v1.Messages.ListByIdResponse> listById(
+        adiom.v1.Messages.ListByIdRequest request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getListByIdMethod(), getCallOptions()), request);
+    }
   }
 
   private static final int METHODID_GET_INFO = 0;
@@ -629,6 +690,7 @@ public final class ConnectorServiceGrpc {
   private static final int METHODID_LIST_DATA = 5;
   private static final int METHODID_STREAM_UPDATES = 6;
   private static final int METHODID_STREAM_LSN = 7;
+  private static final int METHODID_LIST_BY_ID = 8;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -678,6 +740,10 @@ public final class ConnectorServiceGrpc {
         case METHODID_STREAM_LSN:
           serviceImpl.streamLSN((adiom.v1.Messages.StreamLSNRequest) request,
               (io.grpc.stub.StreamObserver<adiom.v1.Messages.StreamLSNResponse>) responseObserver);
+          break;
+        case METHODID_LIST_BY_ID:
+          serviceImpl.listById((adiom.v1.Messages.ListByIdRequest) request,
+              (io.grpc.stub.StreamObserver<adiom.v1.Messages.ListByIdResponse>) responseObserver);
           break;
         default:
           throw new AssertionError();
@@ -753,6 +819,13 @@ public final class ConnectorServiceGrpc {
               adiom.v1.Messages.StreamLSNRequest,
               adiom.v1.Messages.StreamLSNResponse>(
                 service, METHODID_STREAM_LSN)))
+        .addMethod(
+          getListByIdMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              adiom.v1.Messages.ListByIdRequest,
+              adiom.v1.Messages.ListByIdResponse>(
+                service, METHODID_LIST_BY_ID)))
         .build();
   }
 
@@ -809,6 +882,7 @@ public final class ConnectorServiceGrpc {
               .addMethod(getListDataMethod())
               .addMethod(getStreamUpdatesMethod())
               .addMethod(getStreamLSNMethod())
+              .addMethod(getListByIdMethod())
               .build();
         }
       }

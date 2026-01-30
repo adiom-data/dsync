@@ -30,6 +30,7 @@ import (
 )
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	bootstrapPath string
 	updatesPath   string
 	loop          bool

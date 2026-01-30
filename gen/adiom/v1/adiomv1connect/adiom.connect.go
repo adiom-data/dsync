@@ -59,6 +59,9 @@ const (
 	// ConnectorServiceStreamLSNProcedure is the fully-qualified name of the ConnectorService's
 	// StreamLSN RPC.
 	ConnectorServiceStreamLSNProcedure = "/adiom.v1.ConnectorService/StreamLSN"
+	// ConnectorServiceListByIdProcedure is the fully-qualified name of the ConnectorService's ListById
+	// RPC.
+	ConnectorServiceListByIdProcedure = "/adiom.v1.ConnectorService/ListById"
 	// TransformServiceGetTransformInfoProcedure is the fully-qualified name of the TransformService's
 	// GetTransformInfo RPC.
 	TransformServiceGetTransformInfoProcedure = "/adiom.v1.TransformService/GetTransformInfo"
@@ -78,6 +81,7 @@ var (
 	connectorServiceListDataMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListData")
 	connectorServiceStreamUpdatesMethodDescriptor        = connectorServiceServiceDescriptor.Methods().ByName("StreamUpdates")
 	connectorServiceStreamLSNMethodDescriptor            = connectorServiceServiceDescriptor.Methods().ByName("StreamLSN")
+	connectorServiceListByIdMethodDescriptor             = connectorServiceServiceDescriptor.Methods().ByName("ListById")
 	transformServiceServiceDescriptor                    = v1.File_adiom_v1_adiom_proto.Services().ByName("TransformService")
 	transformServiceGetTransformInfoMethodDescriptor     = transformServiceServiceDescriptor.Methods().ByName("GetTransformInfo")
 	transformServiceGetTransformMethodDescriptor         = transformServiceServiceDescriptor.Methods().ByName("GetTransform")
@@ -95,6 +99,7 @@ type ConnectorServiceClient interface {
 	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	StreamUpdates(context.Context, *connect.Request[v1.StreamUpdatesRequest]) (*connect.ServerStreamForClient[v1.StreamUpdatesResponse], error)
 	StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest]) (*connect.ServerStreamForClient[v1.StreamLSNResponse], error)
+	ListById(context.Context, *connect.Request[v1.ListByIdRequest]) (*connect.Response[v1.ListByIdResponse], error)
 }
 
 // NewConnectorServiceClient constructs a client for the adiom.v1.ConnectorService service. By
@@ -155,6 +160,12 @@ func NewConnectorServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(connectorServiceStreamLSNMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listById: connect.NewClient[v1.ListByIdRequest, v1.ListByIdResponse](
+			httpClient,
+			baseURL+ConnectorServiceListByIdProcedure,
+			connect.WithSchema(connectorServiceListByIdMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -168,6 +179,7 @@ type connectorServiceClient struct {
 	listData             *connect.Client[v1.ListDataRequest, v1.ListDataResponse]
 	streamUpdates        *connect.Client[v1.StreamUpdatesRequest, v1.StreamUpdatesResponse]
 	streamLSN            *connect.Client[v1.StreamLSNRequest, v1.StreamLSNResponse]
+	listById             *connect.Client[v1.ListByIdRequest, v1.ListByIdResponse]
 }
 
 // GetInfo calls adiom.v1.ConnectorService.GetInfo.
@@ -210,6 +222,11 @@ func (c *connectorServiceClient) StreamLSN(ctx context.Context, req *connect.Req
 	return c.streamLSN.CallServerStream(ctx, req)
 }
 
+// ListById calls adiom.v1.ConnectorService.ListById.
+func (c *connectorServiceClient) ListById(ctx context.Context, req *connect.Request[v1.ListByIdRequest]) (*connect.Response[v1.ListByIdResponse], error) {
+	return c.listById.CallUnary(ctx, req)
+}
+
 // ConnectorServiceHandler is an implementation of the adiom.v1.ConnectorService service.
 type ConnectorServiceHandler interface {
 	GetInfo(context.Context, *connect.Request[v1.GetInfoRequest]) (*connect.Response[v1.GetInfoResponse], error)
@@ -222,6 +239,7 @@ type ConnectorServiceHandler interface {
 	ListData(context.Context, *connect.Request[v1.ListDataRequest]) (*connect.Response[v1.ListDataResponse], error)
 	StreamUpdates(context.Context, *connect.Request[v1.StreamUpdatesRequest], *connect.ServerStream[v1.StreamUpdatesResponse]) error
 	StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest], *connect.ServerStream[v1.StreamLSNResponse]) error
+	ListById(context.Context, *connect.Request[v1.ListByIdRequest]) (*connect.Response[v1.ListByIdResponse], error)
 }
 
 // NewConnectorServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -278,6 +296,12 @@ func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.Han
 		connect.WithSchema(connectorServiceStreamLSNMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	connectorServiceListByIdHandler := connect.NewUnaryHandler(
+		ConnectorServiceListByIdProcedure,
+		svc.ListById,
+		connect.WithSchema(connectorServiceListByIdMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/adiom.v1.ConnectorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ConnectorServiceGetInfoProcedure:
@@ -296,6 +320,8 @@ func NewConnectorServiceHandler(svc ConnectorServiceHandler, opts ...connect.Han
 			connectorServiceStreamUpdatesHandler.ServeHTTP(w, r)
 		case ConnectorServiceStreamLSNProcedure:
 			connectorServiceStreamLSNHandler.ServeHTTP(w, r)
+		case ConnectorServiceListByIdProcedure:
+			connectorServiceListByIdHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -335,6 +361,10 @@ func (UnimplementedConnectorServiceHandler) StreamUpdates(context.Context, *conn
 
 func (UnimplementedConnectorServiceHandler) StreamLSN(context.Context, *connect.Request[v1.StreamLSNRequest], *connect.ServerStream[v1.StreamLSNResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.StreamLSN is not implemented"))
+}
+
+func (UnimplementedConnectorServiceHandler) ListById(context.Context, *connect.Request[v1.ListByIdRequest]) (*connect.Response[v1.ListByIdResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("adiom.v1.ConnectorService.ListById is not implemented"))
 }
 
 // TransformServiceClient is a client for the adiom.v1.TransformService service.

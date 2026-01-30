@@ -21,6 +21,7 @@ import (
 )
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	id          string
 	logJson     bool
 	sleep       time.Duration
@@ -146,5 +147,10 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 }
 
 func NewConn(id string, logJson bool, sleep time.Duration, sleepJitter time.Duration) adiomv1connect.ConnectorServiceHandler {
-	return &conn{id, logJson, sleep, sleepJitter}
+	return &conn{
+		id:          id,
+		logJson:     logJson,
+		sleep:       sleep,
+		sleepJitter: sleepJitter,
+	}
 }

@@ -27,6 +27,7 @@ const (
 	ConnectorService_ListData_FullMethodName             = "/adiom.v1.ConnectorService/ListData"
 	ConnectorService_StreamUpdates_FullMethodName        = "/adiom.v1.ConnectorService/StreamUpdates"
 	ConnectorService_StreamLSN_FullMethodName            = "/adiom.v1.ConnectorService/StreamLSN"
+	ConnectorService_ListById_FullMethodName             = "/adiom.v1.ConnectorService/ListById"
 )
 
 // ConnectorServiceClient is the client API for ConnectorService service.
@@ -43,6 +44,7 @@ type ConnectorServiceClient interface {
 	ListData(ctx context.Context, in *ListDataRequest, opts ...grpc.CallOption) (*ListDataResponse, error)
 	StreamUpdates(ctx context.Context, in *StreamUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamUpdatesResponse], error)
 	StreamLSN(ctx context.Context, in *StreamLSNRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamLSNResponse], error)
+	ListById(ctx context.Context, in *ListByIdRequest, opts ...grpc.CallOption) (*ListByIdResponse, error)
 }
 
 type connectorServiceClient struct {
@@ -151,6 +153,16 @@ func (c *connectorServiceClient) StreamLSN(ctx context.Context, in *StreamLSNReq
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ConnectorService_StreamLSNClient = grpc.ServerStreamingClient[StreamLSNResponse]
 
+func (c *connectorServiceClient) ListById(ctx context.Context, in *ListByIdRequest, opts ...grpc.CallOption) (*ListByIdResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListByIdResponse)
+	err := c.cc.Invoke(ctx, ConnectorService_ListById_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConnectorServiceServer is the server API for ConnectorService service.
 // All implementations must embed UnimplementedConnectorServiceServer
 // for forward compatibility.
@@ -165,6 +177,7 @@ type ConnectorServiceServer interface {
 	ListData(context.Context, *ListDataRequest) (*ListDataResponse, error)
 	StreamUpdates(*StreamUpdatesRequest, grpc.ServerStreamingServer[StreamUpdatesResponse]) error
 	StreamLSN(*StreamLSNRequest, grpc.ServerStreamingServer[StreamLSNResponse]) error
+	ListById(context.Context, *ListByIdRequest) (*ListByIdResponse, error)
 	mustEmbedUnimplementedConnectorServiceServer()
 }
 
@@ -198,6 +211,9 @@ func (UnimplementedConnectorServiceServer) StreamUpdates(*StreamUpdatesRequest, 
 }
 func (UnimplementedConnectorServiceServer) StreamLSN(*StreamLSNRequest, grpc.ServerStreamingServer[StreamLSNResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamLSN not implemented")
+}
+func (UnimplementedConnectorServiceServer) ListById(context.Context, *ListByIdRequest) (*ListByIdResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListById not implemented")
 }
 func (UnimplementedConnectorServiceServer) mustEmbedUnimplementedConnectorServiceServer() {}
 func (UnimplementedConnectorServiceServer) testEmbeddedByValue()                          {}
@@ -350,6 +366,24 @@ func _ConnectorService_StreamLSN_Handler(srv interface{}, stream grpc.ServerStre
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ConnectorService_StreamLSNServer = grpc.ServerStreamingServer[StreamLSNResponse]
 
+func _ConnectorService_ListById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListByIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectorServiceServer).ListById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConnectorService_ListById_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectorServiceServer).ListById(ctx, req.(*ListByIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConnectorService_ServiceDesc is the grpc.ServiceDesc for ConnectorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var ConnectorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListData",
 			Handler:    _ConnectorService_ListData_Handler,
+		},
+		{
+			MethodName: "ListById",
+			Handler:    _ConnectorService_ListById_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
