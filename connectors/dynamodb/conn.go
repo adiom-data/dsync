@@ -24,6 +24,7 @@ import (
 )
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	client        *client
 	streamsClient *dynamodbstreams.Client
 	spec          string
