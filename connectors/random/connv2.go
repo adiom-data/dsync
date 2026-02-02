@@ -20,6 +20,7 @@ import (
 )
 
 type connV2 struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	payload                         map[string]any
 	namespacePrefix                 string
 	initialSource                   []byte

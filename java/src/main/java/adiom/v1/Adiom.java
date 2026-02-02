@@ -35,7 +35,7 @@ public final class Adiom {
   static {
     java.lang.String[] descriptorData = {
       "\n\024adiom/v1/adiom.proto\022\010adiom.v1\032\027adiom/" +
-      "v1/messages.proto2\374\004\n\020ConnectorService\022>" +
+      "v1/messages.proto2\277\005\n\020ConnectorService\022>" +
       "\n\007GetInfo\022\030.adiom.v1.GetInfoRequest\032\031.ad" +
       "iom.v1.GetInfoResponse\022e\n\024GetNamespaceMe" +
       "tadata\022%.adiom.v1.GetNamespaceMetadataRe" +
@@ -51,13 +51,15 @@ public final class Adiom {
       "adiom.v1.StreamUpdatesRequest\032\037.adiom.v1" +
       ".StreamUpdatesResponse0\001\022F\n\tStreamLSN\022\032." +
       "adiom.v1.StreamLSNRequest\032\033.adiom.v1.Str" +
-      "eamLSNResponse0\0012\274\001\n\020TransformService\022Y\n" +
-      "\020GetTransformInfo\022!.adiom.v1.GetTransfor" +
-      "mInfoRequest\032\".adiom.v1.GetTransformInfo" +
-      "Response\022M\n\014GetTransform\022\035.adiom.v1.GetT" +
-      "ransformRequest\032\036.adiom.v1.GetTransformR" +
-      "esponseB2Z0github.com/adiom-data/dsync/g" +
-      "en/adiom/v1;adiomv1b\006proto3"
+      "eamLSNResponse0\001\022A\n\010GetByIds\022\031.adiom.v1." +
+      "GetByIdsRequest\032\032.adiom.v1.GetByIdsRespo" +
+      "nse2\274\001\n\020TransformService\022Y\n\020GetTransform" +
+      "Info\022!.adiom.v1.GetTransformInfoRequest\032" +
+      "\".adiom.v1.GetTransformInfoResponse\022M\n\014G" +
+      "etTransform\022\035.adiom.v1.GetTransformReque" +
+      "st\032\036.adiom.v1.GetTransformResponseB2Z0gi" +
+      "thub.com/adiom-data/dsync/gen/adiom/v1;a" +
+      "diomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,

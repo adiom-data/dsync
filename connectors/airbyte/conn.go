@@ -15,6 +15,7 @@ import (
 )
 
 type source struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	dockerImage string
 	config      string
 

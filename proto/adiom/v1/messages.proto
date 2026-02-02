@@ -55,6 +55,9 @@ message Capabilities {
         // allows requesting a plan without specifying any namespaces
         // the behavior is up to the source- usually it means all available namespaces
         bool default_plan = 4;
+
+        // whether the GetByIds endpoint is functional
+        bool get_by_ids = 5;
     }
     message Sink {
         repeated DataType supported_data_types = 1;
@@ -157,6 +160,22 @@ message StreamLSNRequest {
 message StreamLSNResponse {
     uint64 lsn = 1;
     bytes next_cursor = 2;
+}
+
+message GetByIdsRequest {
+    message IdRequest {
+        repeated BsonValue id = 1;
+    }
+    string namespace = 1;
+    repeated IdRequest ids = 2;
+    DataType type = 3;
+}
+
+message GetByIdsResponse {
+    message ResponseItem {
+        bytes data = 1; // empty if not found
+    }
+    repeated ResponseItem data = 1; // order should be the same as the request ids
 }
 
 message GetTransformInfoRequest {}

@@ -64,6 +64,7 @@ type buffer struct {
 }
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	client *mongo.Client
 
 	settings ConnectorSettings
@@ -326,6 +327,7 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 				LsnStream:          true,
 				MultiNamespacePlan: true,
 				DefaultPlan:        !c.settings.PerNamespaceStreams,
+				GetByIds:           true,
 			},
 			Sink: &adiomv1.Capabilities_Sink{
 				SupportedDataTypes: []adiomv1.DataType{adiomv1.DataType_DATA_TYPE_MONGO_BSON},
@@ -1045,4 +1047,49 @@ func maybeUnavailableError(err error) error {
 		return connect.NewError(connect.CodeUnavailable, err)
 	}
 	return connect.NewError(connect.CodeInternal, err)
+}
+
+// GetByIds implements adiomv1connect.ConnectorServiceHandler.
+func (c *conn) GetByIds(ctx context.Context, r *connect.Request[adiomv1.GetByIdsRequest]) (*connect.Response[adiomv1.GetByIdsResponse], error) {
+	col, _, ok := GetCol(c.client, r.Msg.GetNamespace())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
+	}
+
+	// TODO: maybe use batch endpoint if we need to optimize
+	res := make([]*adiomv1.GetByIdsResponse_ResponseItem, len(r.Msg.GetIds()))
+	var eg errgroup.Group
+	for i, id := range r.Msg.GetIds() {
+		eg.Go(func() error {
+			if len(id.GetId()) < 1 {
+				res[i] = &adiomv1.GetByIdsResponse_ResponseItem{}
+				return nil
+			}
+			bv := id.GetId()[0]
+			rawVal := bson.RawValue{
+				Type:  bsontype.Type(bv.GetType()),
+				Value: bv.GetData(),
+			}
+			v, err := col.FindOne(ctx, bson.M{"_id": rawVal}).Raw()
+			if err != nil {
+				if errors.Is(err, mongo.ErrNoDocuments) {
+					res[i] = &adiomv1.GetByIdsResponse_ResponseItem{}
+					return nil
+				}
+				return fmt.Errorf("err in findone: %w", err)
+			}
+			res[i] = &adiomv1.GetByIdsResponse_ResponseItem{
+				Data: v,
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("err finding ids: %w", err))
+	}
+
+	return connect.NewResponse(&adiomv1.GetByIdsResponse{
+		Data: res,
+	}), nil
 }

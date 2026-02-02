@@ -52,6 +52,7 @@ type PostgresSettings struct {
 }
 
 type conn struct {
+	adiomv1connect.UnimplementedConnectorServiceHandler
 	replicationUrl string
 	id             uint64
 	c              *pgxpool.Pool
