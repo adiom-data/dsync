@@ -28,6 +28,7 @@ import com.azure.cosmos.implementation.ImplementationBridgeHelpers.CosmosAsyncCo
 import com.azure.cosmos.models.CosmosBulkOperationResponse;
 import com.azure.cosmos.models.CosmosBulkOperations;
 import com.azure.cosmos.models.CosmosChangeFeedRequestOptions;
+import com.azure.cosmos.models.CosmosItemIdentity;
 import com.azure.cosmos.models.CosmosItemOperation;
 import com.azure.cosmos.models.CosmosQueryRequestOptions;
 import com.azure.cosmos.models.FeedRange;
@@ -48,6 +49,8 @@ import adiom.v1.Messages.Capabilities;
 import adiom.v1.Messages.DataType;
 import adiom.v1.Messages.GeneratePlanRequest;
 import adiom.v1.Messages.GeneratePlanResponse;
+import adiom.v1.Messages.GetByIdsRequest;
+import adiom.v1.Messages.GetByIdsResponse;
 import adiom.v1.Messages.GetInfoRequest;
 import adiom.v1.Messages.GetInfoResponse;
 import adiom.v1.Messages.GetNamespaceMetadataRequest;
@@ -204,7 +207,8 @@ public class Main {
                     .setCapabilities(Capabilities.newBuilder()
                             .setSource(Source.newBuilder()
                                     .addSupportedDataTypes(DataType.DATA_TYPE_JSON_ID)
-                                    .setMultiNamespacePlan(true))
+                                    .setMultiNamespacePlan(true)
+                                    .setGetByIds(true))
                             .setSink(Sink.newBuilder()
                                     .addSupportedDataTypes(DataType.DATA_TYPE_JSON_ID)))
                     .build());
@@ -406,7 +410,7 @@ public class Main {
                 }
 
                 CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions
-                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
+                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1).allVersionsAndDeletes();
                 UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder()
                         .addNamespaces(namespace);
                 for (FeedResponse<Object> fr : helper.container.queryChangeFeed(ccfro, Object.class).iterableByPage()) {
@@ -438,6 +442,57 @@ public class Main {
 
         private synchronized long nextIndex() {
             return currentIndex++;
+        }
+
+        @Override
+        public void getByIds(GetByIdsRequest request, StreamObserver<GetByIdsResponse> responseObserver) {
+            GetByIdsResponse.Builder respBuilder = GetByIdsResponse.newBuilder();
+            java.util.Map<String, Integer> m = new java.util.HashMap<>();
+            List<CosmosItemIdentity> itemsToRead = new ArrayList<>();
+
+            NsHelper helper = getNsHelper(responseObserver, request.getNamespace());
+            if (helper == null) {
+                return;
+            }
+            List<String> idKeys = new ArrayList<>();
+            for (String path: helper.pkd.getPaths()) {
+                idKeys.add(path.substring(1));
+            }
+            if (!idKeys.getLast().equals("id")) {
+                idKeys.add("id");
+            }
+
+            int i = 0;
+            for (GetByIdsRequest.IdRequest id : request.getIdsList()) {
+                PartitionKey pk = BsonHelper.getPartitionKey(id.getIdList());
+                String idPart = BsonHelper.getId(id.getIdList());
+                List<String> idParts = BsonHelper.getIdParts(id.getIdList());
+                itemsToRead.add(new CosmosItemIdentity(pk, idPart));
+                StringBuilder sb = new StringBuilder();
+                for (String s : idParts) {
+                    sb.append(s);
+                    sb.append(",");
+                }
+                m.put(sb.toString(), i);
+                respBuilder.addData(GetByIdsResponse.ResponseItem.getDefaultInstance());
+                i++;
+            }
+            FeedResponse<JsonNode> fr = helper.container.readMany(itemsToRead, JsonNode.class);
+            for (JsonNode n : fr.getResults()) {
+                StringBuilder sb = new StringBuilder();
+                for (String s : idKeys) {
+                    sb.append(n.get(s).asText());
+                    sb.append(",");
+                }
+                int idx = m.get(sb.toString());
+                ObjectNode objectNode = (ObjectNode) (n);
+                objectNode.remove(CosmosInternalKeys);
+                ByteString data = ByteString.copyFromUtf8(n.toString());
+                respBuilder.setData(idx, GetByIdsResponse.ResponseItem.newBuilder().setData(data));
+            }
+
+            responseObserver.onNext(respBuilder.build());
+            responseObserver.onCompleted();
         }
 
         @Override
@@ -545,6 +600,13 @@ public class Main {
             if (helper == null) {
                 return;
             }
+            List<String> idKeys = new ArrayList<>();
+            for (String path: helper.pkd.getPaths()) {
+                idKeys.add(path.substring(1));
+            }
+            if (!idKeys.getLast().equals("id")) {
+                idKeys.add("id");
+            }
 
             String continuation = request.getCursor().toStringUtf8();
 
@@ -556,22 +618,32 @@ public class Main {
                     List<Update> updates = new ArrayList<>();
                     for (JsonNode node : fr.getResults()) {
                         JsonNode opType = node.get("metadata").get("operationType");
-                        if (opType != null && opType.asText() == "delete") {
-                            String id = node.get("metadata").get("id").asText();
-                            updates.add(Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE)
-                                    .addId(BsonHelper.toId(id)).build());
+                        if (opType != null && opType.asText().equals("delete")) {
+                            Update.Builder b = Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE);
+                            for (String k : idKeys) {
+                                if (k.equals("id")) {
+                                    b.addId(BsonHelper.toId(k, node.get("metadata").get(k).asText()));
+                                } else {
+                                    b.addId(BsonHelper.toId(k, node.get("metadata").get("partitionKey").get(k).asText()));
+                                }
+                            }
+                            updates.add(b.build());
                         } else {
                             adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
-                            if (opType != null && opType.asText() == "create") {
+                            if (opType != null && opType.asText().equals("create")) {
                                 typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
                             }
                             JsonNode currentNode = node.get("current");
                             ObjectNode objectNode = (ObjectNode) (currentNode);
                             objectNode.remove(CosmosInternalKeys);
-                            String id = currentNode.get("id").asText();
-                            updates.add(Update.newBuilder().setType(typ)
-                                    .setData(ByteString.copyFromUtf8(currentNode.toString())).addId(BsonHelper.toId(id))
-                                    .build());
+
+                            Update.Builder b = Update.newBuilder().setType(typ)
+                                    .setData(ByteString.copyFromUtf8(currentNode.toString()));
+                            for (String k : idKeys) {
+                                b.addId(BsonHelper.toId(k, currentNode.get(k).asText()));
+                            }
+
+                            updates.add(b.build());
                         }
                     }
 
