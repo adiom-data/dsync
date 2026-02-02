@@ -43,6 +43,7 @@ type ConnectorSettings struct {
 	SampleFactor               int   // a factor to determine how many extra samples per partition are used
 	MaxPageSize                int
 	PerNamespaceStreams        bool
+	SkipBatchOverwrite         bool
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 
@@ -259,6 +260,9 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	}()
 
 	for _, partition := range partitions {
+		if !r.Msg.GetInitialSync() {
+			break
+		}
 		eg.Go(func() error {
 			ns, _ := ToNS(partition.Namespace)
 			col := c.client.Database(ns.Db).Collection(ns.Col)
@@ -998,7 +1002,7 @@ func (c *conn) maybeIsolateErrors(ctx context.Context, collection *mongo.Collect
 }
 
 // inserts data and overwrites on conflict
-func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}, ignoreSecondDuplicateError bool) error {
+func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []interface{}, skipBatchOverwrite bool, ignoreSecondDuplicateError bool) error {
 	// eagerly attempt an unordered insert
 	_, bwErr := collection.InsertMany(ctx, documents, options.InsertMany().SetOrdered(false))
 
@@ -1027,12 +1031,12 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 			if isBSONObjectTooLargeError(bwErr) {
 				slog.Debug(fmt.Sprintf("Bulk write failed due to BSON object too large: %v", bwErr))
 				mid := len(documents) / 2
-				err := insertBatchOverwrite(ctx, collection, documents[:mid], ignoreSecondDuplicateError)
+				err := insertBatchOverwrite(ctx, collection, documents[:mid], skipBatchOverwrite, ignoreSecondDuplicateError)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Bulk write failed (first half, up to %d): %v", mid, err))
 					return err
 				}
-				err = insertBatchOverwrite(ctx, collection, documents[mid:], ignoreSecondDuplicateError)
+				err = insertBatchOverwrite(ctx, collection, documents[mid:], skipBatchOverwrite, ignoreSecondDuplicateError)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Bulk write failed (second half, from %d): %v", mid, err))
 					return err
@@ -1044,8 +1048,8 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 			return bwErr
 		}
 
-		// redo them all as a bulk replace
-		if len(bulkOverwrite) > 0 {
+		// maybe redo them all as a bulk replace
+		if len(bulkOverwrite) > 0 && !skipBatchOverwrite {
 			_, err := collection.BulkWrite(ctx, bulkOverwrite, options.BulkWrite().SetOrdered(false))
 			if err != nil {
 				if ignoreSecondDuplicateError {
@@ -1088,7 +1092,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	for _, data := range r.Msg.GetData() {
 		batch = append(batch, bson.Raw(data))
 		if c.settings.WriterMaxBatchSize > 0 && len(batch) >= c.settings.WriterMaxBatchSize {
-			err := insertBatchOverwrite(ctx, col, batch, ignoreSecondDuplicateError)
+			err := insertBatchOverwrite(ctx, col, batch, c.settings.SkipBatchOverwrite, ignoreSecondDuplicateError)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
@@ -1099,7 +1103,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		}
 	}
 	if len(batch) > 0 {
-		err := insertBatchOverwrite(ctx, col, batch, ignoreSecondDuplicateError)
+		err := insertBatchOverwrite(ctx, col, batch, c.settings.SkipBatchOverwrite, ignoreSecondDuplicateError)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to insert batch: %v", err))
