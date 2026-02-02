@@ -756,6 +756,10 @@ func CosmosFlags(settings *cosmos.ConnectorSettings) []cli.Flag {
 
 func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 	return []cli.Flag{
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "skip-batch-overwrite",
+			Destination: &settings.SkipBatchOverwrite,
+		}),
 		altsrc.NewDurationFlag(&cli.DurationFlag{
 			Name:        "server-timeout",
 			Required:    false,
