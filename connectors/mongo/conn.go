@@ -53,6 +53,7 @@ type ConnectorSettings struct {
 	IsolateOnWriteError                []string
 	IsolatedRetryAmount                int
 	IsolatedRetrySkipFailed            bool
+	ID                                 string
 }
 
 func setDefault[T comparable](field *T, defaultValue T) {
@@ -345,8 +346,13 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 	}
 	version := commandResult["version"]
 
+	id := c.settings.ID
+	if id == "" {
+		id = string(generateConnectorID(c.settings.ConnectionString + c.settings.Query))
+	}
+
 	return connect.NewResponse(&adiomv1.GetInfoResponse{
-		Id:      string(generateConnectorID(c.settings.ConnectionString + c.settings.Query)),
+		Id:      id,
 		DbType:  connectorDBType,
 		Version: version.(string),
 		Spec:    connectorSpec,

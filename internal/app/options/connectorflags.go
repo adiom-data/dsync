@@ -391,6 +391,10 @@ func GetRegisteredConnectors() []RegisteredConnector {
 						Name:  "skip-initial-sync-duplicate-namespace",
 						Usage: "repeatable unique index namespace",
 					}),
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "id",
+						Destination: &settings.ID,
+					}),
 				}...), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					uniqueIndexNamespacesSlice := c.StringSlice("unique-index-namespace")
 					if len(uniqueIndexNamespacesSlice) > 0 {
