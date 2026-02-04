@@ -1020,15 +1020,25 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 		// check if it's a bulk write exception
 		var bwErrWriteErrors mongo.BulkWriteException
 		if errors.As(bwErr, &bwErrWriteErrors) {
+			gotTooLargeError := false
 			for _, we := range bwErrWriteErrors.WriteErrors {
 				if mongo.IsDuplicateKeyError(we.WriteError) {
 					doc := documents[we.Index]
 					id := doc.(bson.Raw).Lookup("_id") //we know it's there because there was a conflict on _id //XXX: should we check that it's the right type?
 					bulkOverwrite = append(bulkOverwrite, mongo.NewReplaceOneModel().SetFilter(bson.M{"_id": id}).SetReplacement(doc).SetUpsert(true))
+				} else if isBSONObjectTooLargeError(we.WriteError) || isBSONObjectTooLargeError(we) {
+					doc := documents[we.Index]
+					id := doc.(bson.Raw).Lookup("_id").String()
+					slog.Error("individual too large error", "id", id, "size", len(doc.(bson.Raw)), "err", we, "err2", we.WriteError)
+					gotTooLargeError = true
 				} else {
 					slog.Error(fmt.Sprintf("Failure to insert document into collection: %v", we.WriteError))
 					return bwErr
 				}
+			}
+			if gotTooLargeError {
+				slog.Error("got individual too large error", "doc-count", len(documents))
+				return bwErr
 			}
 		} else {
 			// check if the error is a BSONObjectTooLarge error
