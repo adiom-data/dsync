@@ -760,6 +760,11 @@ func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
 			Name:        "skip-batch-overwrite",
 			Destination: &settings.SkipBatchOverwrite,
 		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "full-document-key",
+			Usage:       "uses the full document key instead of just _id (except for batch overwrites)",
+			Destination: &settings.FullDocumentKey,
+		}),
 		altsrc.NewDurationFlag(&cli.DurationFlag{
 			Name:        "server-timeout",
 			Required:    false,
