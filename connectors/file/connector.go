@@ -26,11 +26,11 @@ import (
 )
 
 var (
-	ErrPathRequired      = errors.New("path is required")
-	ErrUnsupportedType   = errors.New("unsupported data type for file connector")
-	ErrUnsupportedFormat = errors.New("unsupported format (only csv is supported)")
-	ErrMissingIDColumn   = errors.New("csv file must have an 'id' column")
-	ErrInvalidDelimiter  = errors.New("delimiter must be a single character")
+	ErrPathRequired      = errors.New("file path is required in connection URI (e.g., file:///path/to/dir)")
+	ErrUnsupportedType   = errors.New("unsupported data type: file connector only supports JSON_ID and MONGO_BSON")
+	ErrUnsupportedFormat = errors.New("unsupported format: file connector currently only supports 'csv' format")
+	ErrMissingIDColumn   = errors.New("CSV file must have an 'id' column as the document identifier")
+	ErrInvalidDelimiter  = errors.New("invalid delimiter: must be a single character (e.g., ',' or ';')")
 )
 
 const (
@@ -64,11 +64,11 @@ type csvFileWriter struct {
 func parseFileConnectionString(raw string) (string, error) {
 	const prefix = "file://"
 	if !strings.HasPrefix(strings.ToLower(raw), prefix) {
-		return "", fmt.Errorf("invalid file connection string %q", raw)
+		return "", fmt.Errorf("invalid connection URI %q: must start with 'file://' (e.g., file:///path/to/data)", raw)
 	}
 	path := raw[len(prefix):]
 	if path == "" {
-		return "", fmt.Errorf("missing path in %q", raw)
+		return "", fmt.Errorf("missing path in connection URI %q: expected file:///path/to/dir or file:///path/to/file.csv", raw)
 	}
 	return path, nil
 }
@@ -97,7 +97,7 @@ func (c *connector) namespaceToPath(basePath, namespace string) string {
 func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 	path, err := parseFileConnectionString(settings.Uri)
 	if err != nil {
-		return nil, fmt.Errorf("bad uri format %v", settings.Uri)
+		return nil, fmt.Errorf("bad uri format %v (%v)", settings.Uri, err)
 	}
 	settings.Path = path
 
@@ -109,7 +109,7 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 		settings.Format = DefaultFormat
 	}
 	if !strings.EqualFold(settings.Format, "csv") {
-		return nil, ErrUnsupportedFormat
+		return nil, fmt.Errorf("%w: got %q", ErrUnsupportedFormat, settings.Format)
 	}
 
 	if settings.Delimiter == 0 {
@@ -120,7 +120,7 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 	isDir := false
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("stat path: %w", err)
+			return nil, fmt.Errorf("failed to access path %q: %w", settings.Path, err)
 		}
 		// Path doesn't exist - treat as directory for sink operations
 		isDir = true
@@ -174,7 +174,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 	if c.isDir {
 		err := filepath.WalkDir(c.settings.Path, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to access %q: %w", path, err)
 			}
 			if d.IsDir() {
 				slog.Debug("skipping directory", "path", path, "dir", d)
@@ -207,7 +207,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 			return nil
 		})
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("walk directory: %w", err))
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to scan directory %q for CSV files: %w", c.settings.Path, err))
 		}
 	} else {
 		namespace := c.pathToNamespace(filepath.Dir(c.settings.Path), c.settings.Path)
@@ -290,14 +290,14 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	part := req.Msg.GetPartition()
 	if part == nil || len(part.GetCursor()) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partition cursor (file path) is required"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partition cursor is required: must contain the file path"))
 	}
 
 	path := string(part.GetCursor())
 
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("open file %s: %w", path, err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to open CSV file %q: %w", path, err))
 	}
 	defer file.Close()
 
@@ -306,7 +306,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 
 	records, err := reader.ReadAll()
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("read csv from %s: %w", path, err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to parse CSV file %q: %w", path, err))
 	}
 
 	if len(records) == 0 {
@@ -331,17 +331,17 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		case adiomv1.DataType_DATA_TYPE_JSON_ID:
 			jsonDoc, err := json.Marshal(doc)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal json in %s: %w", path, err))
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to JSON in file %q: %w", path, err))
 			}
 			data = append(data, jsonDoc)
 		case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
 			bsonDoc, err := bson.Marshal(doc)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal bson in %s: %w", path, err))
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to BSON in file %q: %w", path, err))
 			}
 			data = append(data, bsonDoc)
 		default:
-			return nil, connect.NewError(connect.CodeInvalidArgument, ErrUnsupportedType)
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w: requested type %v", ErrUnsupportedType, req.Msg.GetType()))
 		}
 	}
 
@@ -396,12 +396,12 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 		path := c.namespaceToPath(c.settings.Path, namespace)
 
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return fmt.Errorf("create directory: %w", err)
+			return fmt.Errorf("failed to create directory for namespace %q: %w", namespace, err)
 		}
 
 		file, err := os.Create(path)
 		if err != nil {
-			return fmt.Errorf("create file %s: %w", path, err)
+			return fmt.Errorf("failed to create CSV file %q for namespace %q: %w", path, namespace, err)
 		}
 
 		csvWriter := csv.NewWriter(file)
@@ -432,7 +432,7 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 				writer.header = header
 			}
 			if err := writer.writer.Write(writer.header); err != nil {
-				return fmt.Errorf("write header: %w", err)
+				return fmt.Errorf("failed to write CSV header for namespace %q: %w", namespace, err)
 			}
 		}
 
@@ -453,7 +453,7 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 			}
 		}
 		if err := writer.writer.Write(row); err != nil {
-			return fmt.Errorf("write row: %w", err)
+			return fmt.Errorf("failed to write CSV row for namespace %q: %w", namespace, err)
 		}
 	}
 
@@ -466,13 +466,13 @@ func convertFromData(data []byte, dataType adiomv1.DataType) (map[string]interfa
 	case adiomv1.DataType_DATA_TYPE_JSON_ID:
 		var doc map[string]interface{}
 		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("unmarshal json: %w", err)
+			return nil, fmt.Errorf("failed to parse input data as JSON: %w", err)
 		}
 		return doc, nil
 	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
 		var doc map[string]interface{}
 		if err := bson.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("unmarshal bson: %w", err)
+			return nil, fmt.Errorf("failed to parse input data as BSON: %w", err)
 		}
 		if idVal, ok := doc["_id"]; ok {
 			doc["id"] = idVal
@@ -480,7 +480,7 @@ func convertFromData(data []byte, dataType adiomv1.DataType) (map[string]interfa
 		}
 		return doc, nil
 	default:
-		return nil, ErrUnsupportedType
+		return nil, fmt.Errorf("%w: got %v", ErrUnsupportedType, dataType)
 	}
 }
 
