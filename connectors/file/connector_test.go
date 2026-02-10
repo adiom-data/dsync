@@ -47,7 +47,7 @@ func TestNewConn_InvalidUri(t *testing.T) {
 	_, err := NewConn(ConnectorSettings{
 		Uri: "invalid://path",
 	})
-	require.Error(t, err)
+	require.Error(t, err, "should reject URI with invalid scheme (not file://)")
 }
 
 func TestNewConn_UnsupportedFormat(t *testing.T) {
@@ -337,7 +337,7 @@ func TestListData_InvalidCSV(t *testing.T) {
 		Partition: planResp.Msg.GetPartitions()[0],
 		Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
 	}))
-	require.Error(t, err)
+	require.Error(t, err, "should fail to parse CSV with malformed quotes")
 }
 
 func TestListData_UnsupportedType(t *testing.T) {
@@ -353,7 +353,7 @@ func TestListData_UnsupportedType(t *testing.T) {
 		Partition: planResp.Msg.GetPartitions()[0],
 		Type:      adiomv1.DataType_DATA_TYPE_UNKNOWN,
 	}))
-	require.Error(t, err)
+	require.Error(t, err, "should reject unsupported data type (DATA_TYPE_UNKNOWN)")
 }
 
 func TestGetNamespaceMetadata(t *testing.T) {
@@ -543,7 +543,7 @@ func TestWriteUpdates_Unimplemented(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = conn.WriteUpdates(context.Background(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{}))
-	require.Error(t, err)
+	require.Error(t, err, "WriteUpdates should return unimplemented error for file connector")
 }
 
 func TestStreamUpdates_Unimplemented(t *testing.T) {
@@ -553,7 +553,7 @@ func TestStreamUpdates_Unimplemented(t *testing.T) {
 	require.NoError(t, err)
 
 	err = conn.StreamUpdates(context.Background(), connect.NewRequest(&adiomv1.StreamUpdatesRequest{}), nil)
-	require.Error(t, err)
+	require.Error(t, err, "StreamUpdates should return unimplemented error for file connector")
 }
 
 func TestStreamLSN_Unimplemented(t *testing.T) {
@@ -563,7 +563,7 @@ func TestStreamLSN_Unimplemented(t *testing.T) {
 	require.NoError(t, err)
 
 	err = conn.StreamLSN(context.Background(), connect.NewRequest(&adiomv1.StreamLSNRequest{}), nil)
-	require.Error(t, err)
+	require.Error(t, err, "StreamLSN should return unimplemented error for file connector")
 }
 
 
@@ -581,7 +581,7 @@ func TestUnevenRows(t *testing.T) {
 		Partition: planResp.Msg.GetPartitions()[0],
 		Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
 	}))
-	require.Error(t, err)
+	require.Error(t, err, "should fail to parse CSV with inconsistent number of fields per row")
 }
 
 func TestNoIdColumn(t *testing.T) {
