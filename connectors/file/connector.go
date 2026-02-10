@@ -311,16 +311,6 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	}
 
 	header := records[0]
-	idIndex := -1
-	for i, col := range header {
-		if strings.EqualFold(col, "id") {
-			idIndex = i
-			break
-		}
-	}
-	if idIndex == -1 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, ErrMissingIDColumn)
-	}
 
 	var data [][]byte
 	for _, row := range records[1:] {
@@ -339,10 +329,6 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 			}
 			data = append(data, jsonDoc)
 		case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-			if idVal, ok := doc["id"]; ok {
-				doc["_id"] = idVal
-				delete(doc, "id")
-			}
 			bsonDoc, err := bson.Marshal(doc)
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal bson in %s: %w", path, err))
