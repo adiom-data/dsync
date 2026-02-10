@@ -13,6 +13,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
+	fileconnector "github.com/adiom-data/dsync/connectors/file"
 	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/postgres"
@@ -323,6 +324,23 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				}
 				return CreateHelper("s3", "s3://bucket[/prefix] [options]", S3Flags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					return s3connector.NewConn(settings)
+				})(args, as)
+			},
+		},
+		{
+			Name: "File",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(strings.ToLower(s), "file://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				if len(args) == 0 {
+					return nil, nil, fmt.Errorf("missing file connection string: %w", ErrMissingConnector)
+				}
+				settings := fileconnector.ConnectorSettings{
+					Uri: args[0],
+				}
+				return CreateHelper("file", "file:///path/to/dir OR file:///path/to/file.csv [options]", FileFlags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					return fileconnector.NewConn(settings)
 				})(args, as)
 			},
 		},
@@ -642,6 +660,31 @@ func WeaviateFlags() []cli.Flag {
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:   "use-identity-mapper",
 			Hidden: true,
+		}),
+	}
+}
+
+func FileFlags(settings *fileconnector.ConnectorSettings) []cli.Flag {
+	var delimiterStr string
+	return []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "format",
+			Usage:       "Output format for stored files (only 'csv' supported)",
+			Value:       "csv",
+			Destination: &settings.Format,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "delimiter",
+			Usage:       "CSV delimiter character",
+			Value:       ",",
+			Destination: &delimiterStr,
+			Action: func(_ *cli.Context, v string) error {
+				if len(v) != 1 {
+					return fileconnector.ErrInvalidDelimiter
+				}
+				settings.Delimiter = rune(v[0])
+				return nil
+			},
 		}),
 	}
 }
