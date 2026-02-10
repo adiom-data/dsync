@@ -73,19 +73,25 @@ func parseFileConnectionString(raw string) (string, error) {
 	return path, nil
 }
 
-func pathToNamespace(basePath, filePath string) string {
+func (c *connector) fileExtension() string {
+	return "." + strings.ToLower(c.settings.Format)
+}
+
+func (c *connector) pathToNamespace(basePath, filePath string) string {
 	relPath, err := filepath.Rel(basePath, filePath)
 	if err != nil {
-		relPath = filePath
+		relPath = filepath.Base(filePath)
 	}
-	relPath = strings.TrimSuffix(relPath, ".csv")
+	// Remove file extension
+	relPath = strings.TrimSuffix(relPath, c.fileExtension())
+	// Convert path separators to dots for namespace
 	relPath = strings.ReplaceAll(relPath, string(filepath.Separator), ".")
 	return relPath
 }
 
-func namespaceToPath(basePath, namespace string) string {
+func (c *connector) namespaceToPath(basePath, namespace string) string {
 	relPath := strings.ReplaceAll(namespace, ".", string(filepath.Separator))
-	return filepath.Join(basePath, relPath+".csv")
+	return filepath.Join(basePath, relPath+c.fileExtension())
 }
 
 func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
@@ -174,12 +180,12 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 				slog.Debug("skipping directory", "path", path, "dir", d)
 				return nil
 			}
-			if !strings.HasSuffix(strings.ToLower(path), ".csv") {
-				slog.Debug("skipping non-csv file", "path", path, "dir", d)
+			if !strings.HasSuffix(strings.ToLower(path), c.fileExtension()) {
+				slog.Debug("skipping non-matching file", "path", path, "dir", d, "expectedExt", c.fileExtension())
 				return nil
 			}
 
-			namespace := pathToNamespace(c.settings.Path, path)
+			namespace := c.pathToNamespace(c.settings.Path, path)
 
 			if filterByNamespace {
 				if _, ok := requestedNamespaces[namespace]; !ok {
@@ -204,7 +210,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("walk directory: %w", err))
 		}
 	} else {
-		namespace := pathToNamespace(filepath.Dir(c.settings.Path), c.settings.Path)
+		namespace := c.pathToNamespace(filepath.Dir(c.settings.Path), c.settings.Path)
 
 		if filterByNamespace {
 			if _, ok := requestedNamespaces[namespace]; !ok {
@@ -263,7 +269,7 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 
 	var path string
 	if c.isDir {
-		path = namespaceToPath(c.settings.Path, namespace)
+		path = c.namespaceToPath(c.settings.Path, namespace)
 	} else {
 		path = c.settings.Path
 	}
@@ -387,7 +393,7 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 
 	writer, ok := c.writers[namespace]
 	if !ok {
-		path := namespaceToPath(c.settings.Path, namespace)
+		path := c.namespaceToPath(c.settings.Path, namespace)
 
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 			return fmt.Errorf("create directory: %w", err)
