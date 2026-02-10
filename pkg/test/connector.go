@@ -19,12 +19,13 @@ type ConnectorTestSuite struct {
 	namespace            string
 	connectorFactoryFunc func() adiomv1connect.ConnectorServiceClient
 
-	Bootstrap         func(context.Context) error
-	InsertUpdates     func(context.Context) error
-	AssertExists      func(context.Context, *assert.Assertions, []*adiomv1.BsonValue, bool) error
-	NumPages          int
-	NumItems          int
-	SkipDuplicateTest bool
+	Bootstrap            func(context.Context) error
+	InsertUpdates        func(context.Context) error
+	AssertExists         func(context.Context, *assert.Assertions, []*adiomv1.BsonValue, bool) error
+	NumPages             int
+	NumItems             int
+	SkipDuplicateTest    bool
+	SkipWriteUpdatesTest bool
 }
 
 func ClientFromHandler(h adiomv1connect.ConnectorServiceHandler) adiomv1connect.ConnectorServiceClient {
@@ -216,47 +217,49 @@ func (suite *ConnectorTestSuite) TestAll() {
 				}
 			})
 
-			suite.Run("TestWriteUpdates", func() {
-				for _, t := range supported {
-					if t == adiomv1.DataType_DATA_TYPE_MONGO_BSON {
-						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
-						_, err := c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-							Namespace: suite.namespace,
-							Updates: []*adiomv1.Update{{
-								Id:   sampleBsonIDProto,
-								Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
-								Data: sampleBsonUpdate,
-							}},
-							Type: t,
-						}))
-						suite.Assert().NoError(err)
-						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+			if !suite.SkipWriteUpdatesTest {
+				suite.Run("TestWriteUpdates", func() {
+					for _, t := range supported {
+						if t == adiomv1.DataType_DATA_TYPE_MONGO_BSON {
+							_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+							_, err := c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+								Namespace: suite.namespace,
+								Updates: []*adiomv1.Update{{
+									Id:   sampleBsonIDProto,
+									Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
+									Data: sampleBsonUpdate,
+								}},
+								Type: t,
+							}))
+							suite.Assert().NoError(err)
+							_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
 
-						_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-							Namespace: suite.namespace,
-							Updates: []*adiomv1.Update{{
-								Id:   sampleBsonIDProto,
-								Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
-							}},
-							Type: t,
-						}))
-						suite.Assert().NoError(err)
-						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
+							_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+								Namespace: suite.namespace,
+								Updates: []*adiomv1.Update{{
+									Id:   sampleBsonIDProto,
+									Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
+								}},
+								Type: t,
+							}))
+							suite.Assert().NoError(err)
+							_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, false)
 
-						_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
-							Namespace: suite.namespace,
-							Updates: []*adiomv1.Update{{
-								Id:   sampleBsonIDProto,
-								Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
-								Data: sampleBson,
-							}},
-							Type: t,
-						}))
-						suite.Assert().NoError(err)
-						_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+							_, err = c.WriteUpdates(ctx, connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+								Namespace: suite.namespace,
+								Updates: []*adiomv1.Update{{
+									Id:   sampleBsonIDProto,
+									Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
+									Data: sampleBson,
+								}},
+								Type: t,
+							}))
+							suite.Assert().NoError(err)
+							_ = suite.AssertExists(ctx, suite.Assert(), sampleBsonIDProto, true)
+						}
 					}
-				}
-			})
+				})
+			}
 		})
 	}
 }

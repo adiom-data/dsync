@@ -15,8 +15,11 @@ import (
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	pkgtest "github.com/adiom-data/dsync/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -596,4 +599,41 @@ func TestNoIdColumn(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	assert.Len(t, resp.Msg.GetData(), 2)
+}
+
+func TestFileConnectorSuite(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "file_connector_suite_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "suite_test.csv")
+
+	tSuite := pkgtest.NewConnectorTestSuite(
+		"suite_test",
+		func() adiomv1connect.ConnectorServiceClient {
+			conn, err := NewConn(ConnectorSettings{
+				Uri: "file://" + tmpDir,
+			})
+			if err != nil {
+				t.FailNow()
+			}
+			return pkgtest.ClientFromHandler(conn)
+		},
+		func(ctx context.Context) error {
+			content := `id,data
+1,hi
+2,hi2
+3,hi3
+`
+			return os.WriteFile(testFile, []byte(content), 0644)
+		},
+		nil, // no streaming updates support
+		1,   // 1 partition/page
+		3,   // 3 items
+	)
+	// Skip duplicate test since BSON marshaling of maps doesn't guarantee key order
+	tSuite.SkipDuplicateTest = true
+	// File connector doesn't support WriteUpdates
+	tSuite.SkipWriteUpdatesTest = true
+	suite.Run(t, tSuite)
 }
