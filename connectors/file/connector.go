@@ -62,9 +62,10 @@ type connector struct {
 }
 
 type csvFileWriter struct {
-	file   *os.File
-	writer *csv.Writer
-	header []string
+	file      *os.File
+	writer    *csv.Writer
+	header    []string
+	headerSet map[string]bool
 }
 
 func (c *connector) fileExtension() string {
@@ -459,8 +460,27 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 			} else {
 				writer.header = header
 			}
+			// Build header set for fast lookup
+			writer.headerSet = make(map[string]bool, len(writer.header))
+			for _, col := range writer.header {
+				writer.headerSet[col] = true
+			}
 			if err := writer.writer.Write(writer.header); err != nil {
 				return fmt.Errorf("failed to write CSV header for namespace %q: %w", namespace, err)
+			}
+		}
+
+		// Check for extra keys not in header
+		for k := range doc {
+			normalizedKey := k
+			if k == "_id" {
+				normalizedKey = "id"
+			}
+			if writer.headerSet[normalizedKey] == false {
+				slog.Warn("document has key not in CSV header, data will be lost",
+					"namespace", namespace,
+					"key", k,
+					"header", writer.header)
 			}
 		}
 
