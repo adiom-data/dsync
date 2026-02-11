@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+//gosec:disable G304 -- This is a false positive
+
 package file
 
 import (

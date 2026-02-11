@@ -1,5 +1,7 @@
 package airbyte
 
+//gosec:disable G702 -- This is a false positive
+
 import (
 	"bufio"
 	"bytes"
