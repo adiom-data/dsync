@@ -331,7 +331,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	}
 	defer file.Close()
 
-	// Seek to byte offset
+	// Seek to byte offset for pagination
 	if cursor.ByteOffset > 0 {
 		if _, err := file.Seek(cursor.ByteOffset, io.SeekStart); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to seek to offset %d in %q: %w", cursor.ByteOffset, cursor.Path, err))
@@ -341,7 +341,8 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	reader := csv.NewReader(file)
 	reader.Comma = c.settings.Delimiter
 
-	// Read or use cached header
+	// For initial request, read header from file
+	// For pagination, use cached header (file is already positioned past header)
 	header := cursor.Header
 	if header == nil {
 		var err error
@@ -398,16 +399,14 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	}
 
 	// Build next cursor if there's more data
+	// Use InputOffset() to get precise byte position after the last read row
 	var nextCursor []byte
 	if !hitEOF {
-		currentOffset, err := file.Seek(0, io.SeekCurrent)
-		if err == nil {
-			nextCursor, _ = json.Marshal(listDataCursor{
-				Path:       cursor.Path,
-				ByteOffset: currentOffset,
-				Header:     header,
-			})
-		}
+		nextCursor, _ = json.Marshal(listDataCursor{
+			Path:       cursor.Path,
+			ByteOffset: cursor.ByteOffset + reader.InputOffset(),
+			Header:     header,
+		})
 	}
 
 	return connect.NewResponse(&adiomv1.ListDataResponse{
