@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -249,15 +250,22 @@ func (c *connector) countRecords(path string) (int, error) {
 	reader := csv.NewReader(file)
 	reader.Comma = c.settings.Delimiter
 
-	records, err := reader.ReadAll()
-	if err != nil {
-		return 0, err
+	count := 0
+	for {
+		_, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, err
+		}
+		count++
 	}
 
-	if len(records) <= 1 {
+	if count <= 1 {
 		return 0, nil
 	}
-	return len(records) - 1, nil // subtract header
+	return count - 1, nil // subtract header
 }
 
 func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
