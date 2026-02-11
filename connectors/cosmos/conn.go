@@ -279,6 +279,7 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
 				Type: uint32(idType),
+				Name: "_id",
 			}},
 			Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 		}, nil
@@ -299,6 +300,7 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 		Id: []*adiomv1.BsonValue{{
 			Data: idVal,
 			Type: uint32(idType),
+			Name: "_id",
 		}},
 		Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 		Data: fullDocumentRaw,
@@ -333,6 +335,7 @@ func checkForDeletes(ctx context.Context, client *mongo.Client, witnessClient *m
 				Id: []*adiomv1.BsonValue{{
 					Data: idVal,
 					Type: uint32(idType),
+					Name: "_id",
 				}},
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
 			})
