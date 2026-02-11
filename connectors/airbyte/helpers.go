@@ -1,5 +1,7 @@
 package airbyte
 
+//gosec:disable G702 -- This is a false positive
+
 import (
 	"bufio"
 	"bytes"
@@ -48,7 +50,7 @@ func (e *AirbyteExecutable) createCommand(ctx context.Context, action string, co
 		args = append(args, "--state", "/tmp/state.json")
 	}
 
-	return exec.CommandContext(ctx, "docker", args...)
+	return exec.CommandContext(ctx, "docker", args...) //nolint:gosec // G702: args are intentionally user-provided (docker image name and config paths)
 }
 
 func (e *AirbyteExecutable) Spec(ctx context.Context) ([]byte, error) {
