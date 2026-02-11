@@ -239,7 +239,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 }
 
 func (c *connector) countRecords(path string) (int, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is intentionally user-provided for file connector
 	if err != nil {
 		return 0, err
 	}
@@ -295,7 +295,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 
 	path := string(part.GetCursor())
 
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is intentionally user-provided for file connector
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to open CSV file %q: %w", path, err))
 	}
@@ -395,11 +395,11 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 	if !ok {
 		path := c.namespaceToPath(c.settings.Path, namespace)
 
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			return fmt.Errorf("failed to create directory for namespace %q: %w", namespace, err)
 		}
 
-		file, err := os.Create(path)
+		file, err := os.Create(path) //nolint:gosec // G304: path is intentionally user-provided for file connector
 		if err != nil {
 			return fmt.Errorf("failed to create CSV file %q for namespace %q: %w", path, namespace, err)
 		}
@@ -492,9 +492,11 @@ func (c *connector) Teardown() {
 	c.writeMutex.Lock()
 	defer c.writeMutex.Unlock()
 
-	for _, writer := range c.writers {
+	for ns, writer := range c.writers {
 		writer.writer.Flush()
-		writer.file.Close()
+		if err := writer.file.Close(); err != nil {
+			slog.Warn("failed to close CSV file", "namespace", ns, "err", err)
+		}
 	}
 	c.writers = make(map[string]*csvFileWriter)
 }
