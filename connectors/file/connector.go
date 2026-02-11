@@ -296,39 +296,77 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 	}), nil
 }
 
+const DefaultBatchSize = 1000
+
+type listDataCursor struct {
+	Path   string `json:"path"`
+	Offset int    `json:"offset"`
+}
+
 func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
 	part := req.Msg.GetPartition()
 	if part == nil || len(part.GetCursor()) == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partition cursor is required: must contain the file path"))
 	}
 
-	path := string(part.GetCursor())
+	// Parse cursor - it's either a plain path (initial) or JSON with path+offset (pagination)
+	var cursor listDataCursor
+	if err := json.Unmarshal(req.Msg.GetCursor(), &cursor); err != nil || cursor.Path == "" {
+		// Initial request - cursor from partition is just the path
+		cursor = listDataCursor{
+			Path:   string(part.GetCursor()),
+			Offset: 0,
+		}
+	}
 
-	file, err := os.Open(path) //nolint:gosec // G304: path is intentionally user-provided for file connector
+	file, err := os.Open(cursor.Path) //nolint:gosec // G304: path is intentionally user-provided for file connector
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to open CSV file %q: %w", path, err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to open CSV file %q: %w", cursor.Path, err))
 	}
 	defer file.Close()
 
 	reader := csv.NewReader(file)
 	reader.Comma = c.settings.Delimiter
 
-	records, err := reader.ReadAll()
+	// Read header
+	header, err := reader.Read()
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to parse CSV file %q: %w", path, err))
+		if err == io.EOF {
+			return connect.NewResponse(&adiomv1.ListDataResponse{
+				Data:       nil,
+				NextCursor: nil,
+			}), nil
+		}
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV header from %q: %w", cursor.Path, err))
 	}
 
-	if len(records) == 0 {
-		return connect.NewResponse(&adiomv1.ListDataResponse{
-			Data:       nil,
-			NextCursor: nil,
-		}), nil
+	// Skip to offset
+	for i := 0; i < cursor.Offset; i++ {
+		_, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				return connect.NewResponse(&adiomv1.ListDataResponse{
+					Data:       nil,
+					NextCursor: nil,
+				}), nil
+			}
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to skip to offset %d in %q: %w", cursor.Offset, cursor.Path, err))
+		}
 	}
 
-	header := records[0]
-
+	// Read batch
 	var data [][]byte
-	for _, row := range records[1:] {
+	rowsRead := 0
+	for rowsRead < DefaultBatchSize {
+		row, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV row from %q: %w", cursor.Path, err))
+		}
+		rowsRead++
+
 		doc := make(map[string]interface{})
 		for i, col := range header {
 			if i < len(row) {
@@ -340,13 +378,13 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		case adiomv1.DataType_DATA_TYPE_JSON_ID:
 			jsonDoc, err := json.Marshal(doc)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to JSON in file %q: %w", path, err))
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to JSON in file %q: %w", cursor.Path, err))
 			}
 			data = append(data, jsonDoc)
 		case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
 			bsonDoc, err := bson.Marshal(doc)
 			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to BSON in file %q: %w", path, err))
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to BSON in file %q: %w", cursor.Path, err))
 			}
 			data = append(data, bsonDoc)
 		default:
@@ -354,9 +392,22 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		}
 	}
 
+	// Build next cursor if there's more data
+	var nextCursor []byte
+	if rowsRead == DefaultBatchSize {
+		// Check if there's more data
+		_, err := reader.Read()
+		if err == nil {
+			nextCursor, _ = json.Marshal(listDataCursor{
+				Path:   cursor.Path,
+				Offset: cursor.Offset + rowsRead,
+			})
+		}
+	}
+
 	return connect.NewResponse(&adiomv1.ListDataResponse{
 		Data:       data,
-		NextCursor: nil,
+		NextCursor: nextCursor,
 	}), nil
 }
 
