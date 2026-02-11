@@ -299,8 +299,9 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 const DefaultBatchSize = 1000
 
 type listDataCursor struct {
-	Path   string `json:"path"`
-	Offset int    `json:"offset"`
+	Path       string   `json:"path"`
+	ByteOffset int64    `json:"byteOffset"`
+	Header     []string `json:"header"`
 }
 
 func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.ListDataRequest]) (*connect.Response[adiomv1.ListDataResponse], error) {
@@ -314,8 +315,9 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	if err := json.Unmarshal(req.Msg.GetCursor(), &cursor); err != nil || cursor.Path == "" {
 		// Initial request - cursor from partition is just the path
 		cursor = listDataCursor{
-			Path:   string(part.GetCursor()),
-			Offset: 0,
+			Path:       string(part.GetCursor()),
+			ByteOffset: 0,
+			Header:     nil,
 		}
 	}
 
@@ -325,24 +327,21 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	}
 	defer file.Close()
 
+	// Seek to byte offset
+	if cursor.ByteOffset > 0 {
+		if _, err := file.Seek(cursor.ByteOffset, io.SeekStart); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to seek to offset %d in %q: %w", cursor.ByteOffset, cursor.Path, err))
+		}
+	}
+
 	reader := csv.NewReader(file)
 	reader.Comma = c.settings.Delimiter
 
-	// Read header
-	header, err := reader.Read()
-	if err != nil {
-		if err == io.EOF {
-			return connect.NewResponse(&adiomv1.ListDataResponse{
-				Data:       nil,
-				NextCursor: nil,
-			}), nil
-		}
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV header from %q: %w", cursor.Path, err))
-	}
-
-	// Skip to offset
-	for i := 0; i < cursor.Offset; i++ {
-		_, err := reader.Read()
+	// Read or use cached header
+	header := cursor.Header
+	if header == nil {
+		var err error
+		header, err = reader.Read()
 		if err != nil {
 			if err == io.EOF {
 				return connect.NewResponse(&adiomv1.ListDataResponse{
@@ -350,17 +349,19 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 					NextCursor: nil,
 				}), nil
 			}
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to skip to offset %d in %q: %w", cursor.Offset, cursor.Path, err))
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV header from %q: %w", cursor.Path, err))
 		}
 	}
 
 	// Read batch
 	var data [][]byte
 	rowsRead := 0
+	hitEOF := false
 	for rowsRead < DefaultBatchSize {
 		row, err := reader.Read()
 		if err != nil {
 			if err == io.EOF {
+				hitEOF = true
 				break
 			}
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV row from %q: %w", cursor.Path, err))
@@ -394,13 +395,13 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 
 	// Build next cursor if there's more data
 	var nextCursor []byte
-	if rowsRead == DefaultBatchSize {
-		// Check if there's more data
-		_, err := reader.Read()
+	if !hitEOF {
+		currentOffset, err := file.Seek(0, io.SeekCurrent)
 		if err == nil {
 			nextCursor, _ = json.Marshal(listDataCursor{
-				Path:   cursor.Path,
-				Offset: cursor.Offset + rowsRead,
+				Path:       cursor.Path,
+				ByteOffset: currentOffset,
+				Header:     header,
 			})
 		}
 	}
