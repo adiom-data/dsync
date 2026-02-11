@@ -36,9 +36,9 @@ var (
 )
 
 const (
-	DefaultDelimiter  = ','
-	DefaultFormat     = "csv"
-	DefaultBatchSize  = 10000
+	DefaultDelimiter = ','
+	DefaultFormat    = "csv"
+	DefaultBatchSize = 10000
 )
 
 type ConnectorSettings struct {
@@ -65,37 +65,8 @@ type csvFileWriter struct {
 	header []string
 }
 
-func parseFileConnectionString(raw string) (string, error) {
-	const prefix = "file://"
-	if !strings.HasPrefix(strings.ToLower(raw), prefix) {
-		return "", fmt.Errorf("invalid connection URI %q: must start with 'file://' (e.g., file:///path/to/data)", raw)
-	}
-	path := raw[len(prefix):]
-	if path == "" {
-		return "", fmt.Errorf("missing path in connection URI %q: expected file:///path/to/dir or file:///path/to/file.csv", raw)
-	}
-	return path, nil
-}
-
 func (c *connector) fileExtension() string {
 	return "." + strings.ToLower(c.settings.Format)
-}
-
-func (c *connector) pathToNamespace(basePath, filePath string) string {
-	relPath, err := filepath.Rel(basePath, filePath)
-	if err != nil {
-		relPath = filepath.Base(filePath)
-	}
-	// Remove file extension
-	relPath = strings.TrimSuffix(relPath, c.fileExtension())
-	// Convert path separators to dots for namespace
-	relPath = strings.ReplaceAll(relPath, string(filepath.Separator), ".")
-	return relPath
-}
-
-func (c *connector) namespaceToPath(basePath, namespace string) string {
-	relPath := strings.ReplaceAll(namespace, ".", string(filepath.Separator))
-	return filepath.Join(basePath, relPath+c.fileExtension())
 }
 
 func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
@@ -193,7 +164,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 				return nil
 			}
 
-			namespace := c.pathToNamespace(c.settings.Path, path)
+			namespace := pathToNamespace(c.settings.Path, path, c.fileExtension())
 
 			if filterByNamespace {
 				if _, ok := requestedNamespaces[namespace]; !ok {
@@ -218,7 +189,7 @@ func (c *connector) GeneratePlan(ctx context.Context, req *connect.Request[adiom
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to scan directory %q for CSV files: %w", c.settings.Path, err))
 		}
 	} else {
-		namespace := c.pathToNamespace(filepath.Dir(c.settings.Path), c.settings.Path)
+		namespace := pathToNamespace(filepath.Dir(c.settings.Path), c.settings.Path, c.fileExtension())
 
 		if filterByNamespace {
 			if _, ok := requestedNamespaces[namespace]; !ok {
@@ -264,49 +235,6 @@ func (c *connector) countRecords(path string) (int, error) {
 	return count - 1, nil // subtract header
 }
 
-// countCSVRows counts CSV rows efficiently by scanning bytes and tracking quote state.
-// This handles quoted fields containing newlines correctly without parsing field values.
-func countCSVRows(r io.Reader) (int, error) {
-	buf := make([]byte, 32*1024)
-	count := 0
-	inQuotes := false
-	lastWasNewline := true // track if we're at start of line
-
-	for {
-		n, err := r.Read(buf)
-		if n > 0 {
-			for i := 0; i < n; i++ {
-				b := buf[i]
-				switch {
-				case b == '"':
-					inQuotes = !inQuotes
-					lastWasNewline = false
-				case b == '\n' && !inQuotes:
-					count++
-					lastWasNewline = true
-				case b == '\r' && !inQuotes:
-					// handle \r\n or standalone \r
-					lastWasNewline = false
-				default:
-					lastWasNewline = false
-				}
-			}
-		}
-		if err != nil {
-			if err == io.EOF {
-				// count final row if file doesn't end with newline
-				if !lastWasNewline {
-					count++
-				}
-				break
-			}
-			return 0, err
-		}
-	}
-
-	return count, nil
-}
-
 func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
 	namespace := req.Msg.GetNamespace()
 	if namespace == "" {
@@ -317,7 +245,7 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 
 	var path string
 	if c.isDir {
-		path = c.namespaceToPath(c.settings.Path, namespace)
+		path = namespaceToPath(c.settings.Path, namespace, c.fileExtension())
 	} else {
 		path = c.settings.Path
 	}
@@ -490,7 +418,7 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 
 	writer, ok := c.writers[namespace]
 	if !ok {
-		path := c.namespaceToPath(c.settings.Path, namespace)
+		path := namespaceToPath(c.settings.Path, namespace, c.fileExtension())
 
 		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			return fmt.Errorf("failed to create directory for namespace %q: %w", namespace, err)
@@ -558,30 +486,6 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 	writer.writer.Flush()
 	return writer.writer.Error()
 }
-
-func convertFromData(data []byte, dataType adiomv1.DataType) (map[string]interface{}, error) {
-	switch dataType {
-	case adiomv1.DataType_DATA_TYPE_JSON_ID:
-		var doc map[string]interface{}
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("failed to parse input data as JSON: %w", err)
-		}
-		return doc, nil
-	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-		var doc map[string]interface{}
-		if err := bson.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("failed to parse input data as BSON: %w", err)
-		}
-		if idVal, ok := doc["_id"]; ok {
-			doc["id"] = idVal
-			delete(doc, "_id")
-		}
-		return doc, nil
-	default:
-		return nil, fmt.Errorf("%w: got %v", ErrUnsupportedType, dataType)
-	}
-}
-
 func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("updates not supported by file connector"))
 }
