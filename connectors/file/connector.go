@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -426,6 +427,7 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 				}
 				header = append(header, k)
 			}
+			sort.Strings(header)
 			if hasID {
 				writer.header = append([]string{"id"}, header...)
 			} else {
