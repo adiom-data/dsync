@@ -415,6 +415,7 @@ func (c *connector) WriteData(ctx context.Context, req *connect.Request[adiomv1.
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
+// XXX: this ignores _id if id is present
 func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) error {
 	c.writeMutex.Lock()
 	defer c.writeMutex.Unlock()

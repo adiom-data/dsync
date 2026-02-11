@@ -536,6 +536,57 @@ func TestWriteData_CustomDelimiter(t *testing.T) {
 	assert.Contains(t, string(content), ";")
 }
 
+func TestWriteData_BothIdAndUnderscoreId(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "file_connector_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	conn, err := NewConn(ConnectorSettings{
+		Uri: "file://" + tmpDir,
+	})
+	require.NoError(t, err)
+
+	// Document with both "id" and "_id" fields - "id" should take precedence
+	doc, _ := json.Marshal(map[string]interface{}{
+		"id":   "explicit-id",
+		"_id":  "underscore-id",
+		"name": "Test",
+	})
+
+	_, err = conn.WriteData(context.Background(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace: "both_ids",
+		Data:      [][]byte{doc},
+		Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
+	}))
+	require.NoError(t, err)
+
+	conn.(interface{ Teardown() }).Teardown()
+
+	// Read back and verify "id" field was used
+	readConn, err := NewConn(ConnectorSettings{
+		Uri: "file://" + filepath.Join(tmpDir, "both_ids.csv"),
+	})
+	require.NoError(t, err)
+
+	planResp, err := readConn.GeneratePlan(context.Background(), connect.NewRequest(&adiomv1.GeneratePlanRequest{}))
+	require.NoError(t, err)
+
+	resp, err := readConn.ListData(context.Background(), connect.NewRequest(&adiomv1.ListDataRequest{
+		Partition: planResp.Msg.GetPartitions()[0],
+		Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
+	}))
+	require.NoError(t, err)
+	require.Len(t, resp.Msg.GetData(), 1)
+
+	var readDoc map[string]interface{}
+	require.NoError(t, json.Unmarshal(resp.Msg.GetData()[0], &readDoc))
+	assert.Equal(t, "explicit-id", readDoc["id"], "id field should take precedence over _id")
+	assert.Equal(t, "Test", readDoc["name"])
+	// _id should not appear as a separate column since it maps to id
+	_, hasUnderscoreId := readDoc["_id"]
+	assert.False(t, hasUnderscoreId, "_id should not be a separate column")
+}
+
 func TestWriteUpdates_Unimplemented(t *testing.T) {
 	conn, err := NewConn(ConnectorSettings{
 		Uri: "file://" + getTestDataPath(),
