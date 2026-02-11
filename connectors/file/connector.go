@@ -253,25 +253,58 @@ func (c *connector) countRecords(path string) (int, error) {
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
-	reader.Comma = c.settings.Delimiter
-
-	count := 0
-	for {
-		_, err := reader.Read()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return 0, err
-		}
-		count++
+	count, err := countCSVRows(file)
+	if err != nil {
+		return 0, err
 	}
 
 	if count <= 1 {
 		return 0, nil
 	}
 	return count - 1, nil // subtract header
+}
+
+// countCSVRows counts CSV rows efficiently by scanning bytes and tracking quote state.
+// This handles quoted fields containing newlines correctly without parsing field values.
+func countCSVRows(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	inQuotes := false
+	lastWasNewline := true // track if we're at start of line
+
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			for i := 0; i < n; i++ {
+				b := buf[i]
+				switch {
+				case b == '"':
+					inQuotes = !inQuotes
+					lastWasNewline = false
+				case b == '\n' && !inQuotes:
+					count++
+					lastWasNewline = true
+				case b == '\r' && !inQuotes:
+					// handle \r\n or standalone \r
+					lastWasNewline = false
+				default:
+					lastWasNewline = false
+				}
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				// count final row if file doesn't end with newline
+				if !lastWasNewline {
+					count++
+				}
+				break
+			}
+			return 0, err
+		}
+	}
+
+	return count, nil
 }
 
 func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Request[adiomv1.GetNamespaceMetadataRequest]) (*connect.Response[adiomv1.GetNamespaceMetadataResponse], error) {
