@@ -36,8 +36,9 @@ var (
 )
 
 const (
-	DefaultDelimiter = ','
-	DefaultFormat    = "csv"
+	DefaultDelimiter  = ','
+	DefaultFormat     = "csv"
+	DefaultBatchSize  = 10000
 )
 
 type ConnectorSettings struct {
@@ -45,6 +46,7 @@ type ConnectorSettings struct {
 	Path      string
 	Format    string
 	Delimiter rune
+	BatchSize int
 }
 
 type connector struct {
@@ -116,6 +118,10 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 
 	if settings.Delimiter == 0 {
 		settings.Delimiter = DefaultDelimiter
+	}
+
+	if settings.BatchSize <= 0 {
+		settings.BatchSize = DefaultBatchSize
 	}
 
 	info, err := os.Stat(settings.Path)
@@ -296,8 +302,6 @@ func (c *connector) GetNamespaceMetadata(ctx context.Context, req *connect.Reque
 	}), nil
 }
 
-const DefaultBatchSize = 1000
-
 type listDataCursor struct {
 	Path       string   `json:"path"`
 	ByteOffset int64    `json:"byteOffset"`
@@ -357,7 +361,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	var data [][]byte
 	rowsRead := 0
 	hitEOF := false
-	for rowsRead < DefaultBatchSize {
+	for rowsRead < c.settings.BatchSize {
 		row, err := reader.Read()
 		if err != nil {
 			if err == io.EOF {

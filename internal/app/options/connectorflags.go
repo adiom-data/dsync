@@ -686,6 +686,12 @@ func FileFlags(settings *fileconnector.ConnectorSettings) []cli.Flag {
 				return nil
 			},
 		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "batch-size",
+			Usage:       "Number of records to read per batch when listing data",
+			Value:       fileconnector.DefaultBatchSize,
+			Destination: &settings.BatchSize,
+		}),
 	}
 }
 
