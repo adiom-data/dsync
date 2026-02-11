@@ -601,6 +601,146 @@ func TestNoIdColumn(t *testing.T) {
 	assert.Len(t, resp.Msg.GetData(), 2)
 }
 
+func TestListData_BatchSize_SmallerThanFile(t *testing.T) {
+	// Create a test file with 10 records
+	tmpDir, err := os.MkdirTemp("", "file_connector_batch_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "batch_test.csv")
+	content := `id,name,value
+1,Item1,A
+2,Item2,B
+3,Item3,C
+4,Item4,D
+5,Item5,E
+6,Item6,F
+7,Item7,G
+8,Item8,H
+9,Item9,I
+10,Item10,J
+`
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0644))
+
+	tests := []struct {
+		name      string
+		batchSize int
+	}{
+		{"batch size 1", 1},
+		{"batch size 2", 2},
+		{"batch size 3", 3},
+		{"batch size 5", 5},
+		{"batch size 9", 9},
+		{"batch size 10", 10},
+		{"batch size 11", 11},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, err := NewConn(ConnectorSettings{
+				Uri:       "file://" + testFile,
+				BatchSize: tc.batchSize,
+			})
+			require.NoError(t, err)
+
+			planResp, err := conn.GeneratePlan(context.Background(), connect.NewRequest(&adiomv1.GeneratePlanRequest{}))
+			require.NoError(t, err)
+			require.Len(t, planResp.Msg.GetPartitions(), 1)
+
+			partition := planResp.Msg.GetPartitions()[0]
+			var allData [][]byte
+			var cursor []byte
+			calls := 0
+
+			for {
+				calls++
+				resp, err := conn.ListData(context.Background(), connect.NewRequest(&adiomv1.ListDataRequest{
+					Partition: partition,
+					Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
+					Cursor:    cursor,
+				}))
+				require.NoError(t, err)
+
+				allData = append(allData, resp.Msg.GetData()...)
+				cursor = resp.Msg.GetNextCursor()
+
+				if cursor == nil {
+					break
+				}
+			}
+
+			assert.Len(t, allData, 10, "should retrieve all 10 records")
+			assert.GreaterOrEqual(t, calls, 1, "should make at least 1 ListData call")
+
+			// Verify data integrity - check first and last records
+			var firstDoc, lastDoc map[string]interface{}
+			require.NoError(t, json.Unmarshal(allData[0], &firstDoc))
+			require.NoError(t, json.Unmarshal(allData[9], &lastDoc))
+			assert.Equal(t, "1", firstDoc["id"])
+			assert.Equal(t, "Item1", firstDoc["name"])
+			assert.Equal(t, "10", lastDoc["id"])
+			assert.Equal(t, "Item10", lastDoc["name"])
+		})
+	}
+}
+
+func TestListData_BatchSize_DataIntegrity(t *testing.T) {
+	// Test that all records are returned correctly with small batch size
+	tmpDir, err := os.MkdirTemp("", "file_connector_integrity_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "integrity_test.csv")
+	content := `id,value
+1,A
+2,B
+3,C
+4,D
+5,E
+`
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0644))
+
+	conn, err := NewConn(ConnectorSettings{
+		Uri:       "file://" + testFile,
+		BatchSize: 2,
+	})
+	require.NoError(t, err)
+
+	planResp, err := conn.GeneratePlan(context.Background(), connect.NewRequest(&adiomv1.GeneratePlanRequest{}))
+	require.NoError(t, err)
+
+	partition := planResp.Msg.GetPartitions()[0]
+	var allData [][]byte
+	var cursor []byte
+
+	for {
+		resp, err := conn.ListData(context.Background(), connect.NewRequest(&adiomv1.ListDataRequest{
+			Partition: partition,
+			Type:      adiomv1.DataType_DATA_TYPE_JSON_ID,
+			Cursor:    cursor,
+		}))
+		require.NoError(t, err)
+		allData = append(allData, resp.Msg.GetData()...)
+		cursor = resp.Msg.GetNextCursor()
+		if cursor == nil {
+			break
+		}
+	}
+
+	require.Len(t, allData, 5)
+
+	// Verify each record
+	expectedIDs := []string{"1", "2", "3", "4", "5"}
+	expectedValues := []string{"A", "B", "C", "D", "E"}
+
+	for i, data := range allData {
+		var doc map[string]interface{}
+		require.NoError(t, json.Unmarshal(data, &doc))
+		assert.Equal(t, expectedIDs[i], doc["id"], "record %d should have correct id", i)
+		assert.Equal(t, expectedValues[i], doc["value"], "record %d should have correct value", i)
+	}
+}
+
 func TestFileConnectorSuite(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "file_connector_suite_test")
 	require.NoError(t, err)
