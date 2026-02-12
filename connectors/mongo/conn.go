@@ -636,33 +636,21 @@ func convertChangeStreamEventToUpdate(change MongoUpdate, fullDocumentKey bool) 
 
 	switch optype {
 	case "insert":
-		fullDocument := change.FullDocument
-		// convert fulldocument to BSON.Raw
-		fullDocumentRaw, err := bson.Marshal(fullDocument)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal full document: %v", err)
-		}
 		update = &adiomv1.Update{
 			Id:   id,
 			Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
-			Data: fullDocumentRaw,
+			Data: change.FullDocument,
 		}
 	case "update", "replace":
 		// get the full state of the document after the change
-		if change.FullDocument == nil {
+		if len(change.FullDocument) == 0 {
 			//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
 			return nil, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
-		}
-		fullDocument := change.FullDocument
-		// convert fulldocument to BSON.Raw
-		fullDocumentRaw, err := bson.Marshal(fullDocument)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal full document: %v", err)
 		}
 		update = &adiomv1.Update{
 			Id:   id,
 			Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
-			Data: fullDocumentRaw,
+			Data: change.FullDocument,
 		}
 	case "delete":
 		update = &adiomv1.Update{
@@ -687,7 +675,7 @@ type MongoUpdate struct {
 	NS            bson.M               `bson:"ns"`
 	ClusterTime   *primitive.Timestamp `bson:"clusterTime"`
 	DocumentKey   bson.D               `bson:"documentKey"`
-	FullDocument  bson.M               `bson:"fullDocument"`
+	FullDocument  bson.Raw             `bson:"fullDocument"`
 	OperationType string               `bson:"operationType"`
 }
 
