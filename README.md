@@ -67,6 +67,11 @@ docker run --network host --rm markadiom/dsync
 
 You can also download the latest release as a binary from the [GitHub Releases](https://github.com/adiom-data/dsync/releases/latest) page.
 
+> [!TIP]
+> You can use Homebrew to easily install Dsync on your Mac:
+> 
+> `brew install adiom-data/homebrew-tap/dsync`
+
 ## 2. (Optional) Prepare the destination MongoDB instance
 
 If you already have the desired destination MongoDB instance up and running, you can skip this step. Otherwise, use the following steps to launch MongoDB on your local machine:
