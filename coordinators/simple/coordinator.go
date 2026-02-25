@@ -41,6 +41,7 @@ type Simple struct {
 	integrityStatusMutex sync.RWMutex
 
 	numParallelIntegrityCheckTasks int
+	err                            error
 }
 
 func NewSimpleCoordinator(numParallelIntegrityCheckTasks int) *Simple {
@@ -346,6 +347,10 @@ func (c *Simple) WaitForFlowDone(flowId iface.FlowID) error {
 	// Wait for the flow to be done
 	<-flowDet.flowDone //TODO (AK, 6/2024): should we just return the channel?
 
+	if c.err != nil {
+		return c.err
+	}
+
 	return nil
 }
 
@@ -383,6 +388,9 @@ func (c *Simple) FlowDestroy(fid iface.FlowID) {
 }
 
 func (c *Simple) NotifyError(err error) {
+	c.flowMutex.Lock()
+	defer c.flowMutex.Unlock()
+	c.err = err
 	c.flowCancel()
 }
 

@@ -412,6 +412,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 
 	tasks := readPlan.Tasks
 	slog.Info(fmt.Sprintf("number of tasks: %d", len(tasks)))
+	var flowErrMut sync.Mutex
+	var flowErr error
 
 	// If everything, then don't pass any namespaces
 	// Otherwise, we want only unique fully qualified namespaces (which currently is fully contained in task.Def.Col)
@@ -671,6 +673,9 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						if !errors.Is(err, context.Canceled) {
 							slog.Error(fmt.Sprintf("Error processing task: %v", task), "error", err)
 						}
+						flowErrMut.Lock()
+						flowErr = err
+						flowErrMut.Unlock()
 						initialSyncFailed.Store(true)
 						continue
 					}
@@ -879,6 +884,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 		if res.Err() != nil {
 			if !errors.Is(res.Err(), context.Canceled) {
+				flowErr = res.Err()
 				slog.Error(fmt.Sprintf("Failed during stream updates: %v", res.Err()))
 			}
 		}
@@ -893,9 +899,13 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		close(dataChannel) //send a signal downstream that we are done sending data //TODO (AK, 6/2024): is this the right way to do it?
 
 		slog.Info(fmt.Sprintf("Connector %s is done reading for flow %s", c.id, flowId))
-		err := c.coord.NotifyDone(flowId, c.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
-		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", c.id, flowId, err))
+		if flowErr != nil {
+			c.coord.NotifyError(flowErr)
+		} else {
+			err := c.coord.NotifyDone(flowId, c.id) //TODO (AK, 6/2024): Should we also pass an error to the coord notification if applicable?
+			if err != nil {
+				slog.Error(fmt.Sprintf("Failed to notify coordinator that the connector %s is done reading for flow %s: %v", c.id, flowId, err))
+			}
 		}
 	}()
 
