@@ -248,6 +248,7 @@ func runDsync(c *cli.Context) error {
 
 	var wg sync.WaitGroup
 	runnerCtx, runnerCancelFunc := context.WithCancel(c.Context)
+	defer runnerCancelFunc()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGPIPE)
 
