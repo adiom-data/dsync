@@ -410,7 +410,10 @@ public class Main {
                 }
 
                 CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions
-                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1).allVersionsAndDeletes();
+                        .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
+                if (!"true".equalsIgnoreCase(System.getenv("COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES"))) {
+                    ccfro.allVersionsAndDeletes();
+                }
                 UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder()
                         .addNamespaces(namespace);
                 for (FeedResponse<Object> fr : helper.container.queryChangeFeed(ccfro, Object.class).iterableByPage()) {
@@ -611,8 +614,12 @@ public class Main {
             String continuation = request.getCursor().toStringUtf8();
 
             while (!Context.current().isCancelled()) {
-                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(CosmosChangeFeedRequestOptions
-                        .createForProcessingFromContinuation(continuation).allVersionsAndDeletes(), JsonNode.class)
+                CosmosChangeFeedRequestOptions streamCfro = CosmosChangeFeedRequestOptions
+                        .createForProcessingFromContinuation(continuation);
+                if (!"true".equalsIgnoreCase(System.getenv("COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES"))) {
+                    streamCfro.allVersionsAndDeletes();
+                }
+                Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(streamCfro, JsonNode.class)
                         .iterableByPage();
                 for (FeedResponse<JsonNode> fr : it) {
                     List<Update> updates = new ArrayList<>();
