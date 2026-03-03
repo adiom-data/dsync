@@ -88,10 +88,12 @@ import reactor.core.publisher.Flux;
 public class Main {
 
     private static final int COSMOS_MAX_ITEM_BYTES = 2_000_000; // Azure Cosmos DB per-item max (2MB)
+    private static final boolean COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES =
+            "true".equalsIgnoreCase(System.getenv("COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES"));
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    private static final List<String> DEFAULT_COSMOS_INTERNAL_KEYS = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts");
+    private static final List<String> DEFAULT_COSMOS_INTERNAL_KEYS = Arrays.asList("_rid", "_self", "_etag", "_attachments", "_ts", "_lsn");
     private static List<String> CosmosInternalKeys;
     private static Config CONFIG;
     private static Cache<Long, CacheItem> CACHE = Caffeine.newBuilder().expireAfterAccess(150, TimeUnit.SECONDS)
@@ -411,7 +413,7 @@ public class Main {
 
                 CosmosChangeFeedRequestOptions ccfro = CosmosChangeFeedRequestOptions
                         .createForProcessingFromNow(FeedRange.forFullRange()).setMaxItemCount(1);
-                if (!"true".equalsIgnoreCase(System.getenv("COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES"))) {
+                if (!COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES) {
                     ccfro.allVersionsAndDeletes();
                 }
                 UpdatesPartition.Builder updatesPartitionBuilder = UpdatesPartition.newBuilder()
@@ -616,7 +618,7 @@ public class Main {
             while (!Context.current().isCancelled()) {
                 CosmosChangeFeedRequestOptions streamCfro = CosmosChangeFeedRequestOptions
                         .createForProcessingFromContinuation(continuation);
-                if (!"true".equalsIgnoreCase(System.getenv("COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES"))) {
+                if (!COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES) {
                     streamCfro.allVersionsAndDeletes();
                 }
                 Iterable<FeedResponse<JsonNode>> it = helper.container.queryChangeFeed(streamCfro, JsonNode.class)
@@ -624,34 +626,45 @@ public class Main {
                 for (FeedResponse<JsonNode> fr : it) {
                     List<Update> updates = new ArrayList<>();
                     for (JsonNode node : fr.getResults()) {
-                        JsonNode opType = node.get("metadata").get("operationType");
-                        if (opType != null && opType.asText().equals("delete")) {
-                            Update.Builder b = Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE);
-                            for (String k : idKeys) {
-                                if (k.equals("id")) {
-                                    b.addId(BsonHelper.toId(k, node.get("metadata").get(k).asText()));
-                                } else {
-                                    b.addId(BsonHelper.toId(k, node.get("metadata").get("partitionKey").get(k).asText()));
+                        if (!COSMOS_DISABLE_ALL_VERSIONS_AND_DELETES) {
+                            JsonNode opType = node.get("metadata").get("operationType");
+                            if (opType != null && opType.asText().equals("delete")) {
+                                Update.Builder b = Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_DELETE);
+                                for (String k : idKeys) {
+                                    if (k.equals("id")) {
+                                        b.addId(BsonHelper.toId(k, node.get("metadata").get(k).asText()));
+                                    } else {
+                                        b.addId(BsonHelper.toId(k, node.get("metadata").get("partitionKey").get(k).asText()));
+                                    }
                                 }
+                                updates.add(b.build());
+                            } else {
+                                adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
+                                if (opType != null && opType.asText().equals("create")) {
+                                    typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
+                                }
+                                JsonNode currentNode = node.get("current");
+                                ObjectNode objectNode = (ObjectNode) (currentNode);
+                                objectNode.remove(CosmosInternalKeys);
+
+                                Update.Builder b = Update.newBuilder().setType(typ)
+                                        .setData(ByteString.copyFromUtf8(currentNode.toString()));
+                                for (String k : idKeys) {
+                                    b.addId(BsonHelper.toId(k, currentNode.get(k).asText()));
+                                }
+                                updates.add(b.build());
                             }
-                            updates.add(b.build());
                         } else {
-                            adiom.v1.Messages.UpdateType typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE;
-                            if (opType != null && opType.asText().equals("create")) {
-                                typ = adiom.v1.Messages.UpdateType.UPDATE_TYPE_INSERT;
-                            }
-                            JsonNode currentNode = node.get("current");
-                            ObjectNode objectNode = (ObjectNode) (currentNode);
-                            objectNode.remove(CosmosInternalKeys);
+                                ObjectNode objectNode = (ObjectNode) (node);
+                                objectNode.remove(CosmosInternalKeys);
 
-                            Update.Builder b = Update.newBuilder().setType(typ)
-                                    .setData(ByteString.copyFromUtf8(currentNode.toString()));
-                            for (String k : idKeys) {
-                                b.addId(BsonHelper.toId(k, currentNode.get(k).asText()));
-                            }
-
-                            updates.add(b.build());
-                        }
+                                Update.Builder b = Update.newBuilder().setType(adiom.v1.Messages.UpdateType.UPDATE_TYPE_UPDATE)
+                                        .setData(ByteString.copyFromUtf8(node.toString()));
+                                for (String k : idKeys) {
+                                    b.addId(BsonHelper.toId(k, node.get(k).asText()));
+                                }
+                                updates.add(b.build());
+                        }   
                     }
 
                     continuation = fr.getContinuationToken();
