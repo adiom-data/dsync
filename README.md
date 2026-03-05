@@ -45,7 +45,7 @@ Given source and destination databases, dsync completes an initial sync transfer
 
 ### Other
 
-<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>S3 Storage</td><td><em>-</em></td><td>Available</td><td>Source, Sink</td><td>Export into and from S3 in JSON format. CDC isn't supported: use "--mode InitialSync"</td></tr></tbody></table>
+<table><thead><tr><th width="139.41015625">Type</th><th>Version</th><th>Status</th><th>Capabilities</th><th width="183.00390625">Notes</th></tr></thead><tbody><tr><td>S3 Storage</td><td><em>-</em></td><td>Available</td><td>Source, Sink</td><td>Export into and from S3 in JSON format. CDC isn't supported: use "--mode InitialSync"</td></tr><tr><td>File</td><td><em>-</em></td><td>Available</td><td>Source, Sink</td><td>Only CSV for now</td></td></tr></tbody></table>
 
 
 # Quickstart
