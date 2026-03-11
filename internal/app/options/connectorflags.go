@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/IBM/sarama"
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
 	fileconnector "github.com/adiom-data/dsync/connectors/file"
+	"github.com/adiom-data/dsync/connectors/kafka"
 	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/null"
 	"github.com/adiom-data/dsync/connectors/postgres"
@@ -23,6 +25,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/sqlbatch"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -634,6 +637,66 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			}),
 		},
 		{
+			Name: "kafka-dst",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "kafka-dst")
+			},
+			Create: CreateHelper("kafka-dst", "kafka-dst", []cli.Flag{
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name: "brokers",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "default-topic",
+				}),
+				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+					Name: "namespace-topic",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "sasl-user",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name: "sasl-password",
+				}),
+				altsrc.NewStringFlag(&cli.StringFlag{
+					Name:  "data-type",
+					Value: adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
+				}),
+			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				brokers := c.StringSlice("brokers")
+				defaultTopic := c.String("default-topic")
+				namespaceTopic := c.StringSlice("namespace-topic")
+				user := c.String("sasl-user")
+				password := c.String("sasl-password")
+				dataType := adiomv1.DataType(adiomv1.DataType_value[c.String("data-type")])
+
+				tm := map[string]string{}
+				for _, m := range namespaceTopic {
+					ns, topic, ok := strings.Cut(m, ":")
+					if !ok {
+						return nil, fmt.Errorf("invalid topic mapping %v", m)
+					}
+					tm[ns] = topic
+				}
+				return kafka.NewDestKafka(brokers, defaultTopic, tm, user, password, dataType)
+			}),
+		},
+		{
+			Name: "kafka-src",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "kafka-src")
+			},
+			Create: CreateHelper("kafka-src", "kafka-src", KafkaSrcFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return ParseKafkaSrcFlags(c)
+			}),
+		},
+		{
+			Name: "kafka-wrap",
+			IsConnector: func(s string) bool {
+				return strings.EqualFold(s, "kafka-wrap")
+			},
+			Create: KafkaWrap,
+		},
+		{
 			Name: "grpc",
 			IsConnector: func(s string) bool {
 				return strings.HasPrefix(s, "grpc://")
@@ -646,6 +709,113 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return conn.(adiomv1connect.ConnectorServiceClient), restArgs, err
 			},
 		},
+	}
+}
+
+func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+	var conn adiomv1connect.ConnectorServiceHandler
+	var restArgs []string
+	app := &cli.App{
+		HelpName:  "kafka-wrap",
+		Usage:     "Connector",
+		UsageText: "kafka-wrap [options] [source-connector] [connector-options]",
+		Flags:     KafkaSrcFlags(),
+		Action: func(c *cli.Context) error {
+			var err error
+			restArgs = c.Args().Slice()
+			conn, err = ParseKafkaSrcFlags(c)
+			if err != nil {
+				return err
+			}
+			registeredConnectors := GetRegisteredConnectors()
+			if len(restArgs) < 1 {
+				return fmt.Errorf("missing connector for kafka-wrap")
+			}
+			for _, c := range registeredConnectors {
+				if c.IsConnector(restArgs[0]) {
+					if c.Create != nil {
+						underlying, newRestArgs, err := c.Create(restArgs, as)
+						if err != nil {
+							return fmt.Errorf("err creating wrapped connector: %w", err)
+						}
+						restArgs = newRestArgs
+						conn = kafka.NewKafkaWrapConn(conn, underlying)
+						return nil
+					} else if c.CreateRemote != nil {
+						underlying, newRestArgs, err := c.CreateRemote(restArgs, as)
+						if err != nil {
+							return fmt.Errorf("err creating wrapped connector: %w", err)
+						}
+						restArgs = newRestArgs
+						conn = kafka.NewKafkaWrapConn(conn, underlying)
+						return nil
+					} else {
+						return fmt.Errorf("unable to wrap connector")
+					}
+				}
+			}
+
+			return err
+		},
+	}
+	if err := app.Run(args); err != nil {
+		return nil, nil, err
+	}
+	if conn != nil {
+		return conn, restArgs, nil
+	}
+	return nil, nil, ErrHelp
+}
+
+func ParseKafkaSrcFlags(c *cli.Context) (adiomv1connect.ConnectorServiceHandler, error) {
+	brokers := c.StringSlice("brokers")
+	topics := c.StringSlice("topics")
+	topicMappings := c.StringSlice("topic-mappings")
+	user := c.String("sasl-user")
+	password := c.String("sasl-password")
+	kafkaOffset := c.Int64("offset")
+	dataType := adiomv1.DataType(adiomv1.DataType_value[c.String("data-type")])
+
+	tm := map[string][]string{}
+	for _, topic := range topics {
+		tm[topic] = nil
+	}
+	for _, m := range topicMappings {
+		topic, ns, ok := strings.Cut(m, ":")
+		if !ok {
+			return nil, fmt.Errorf("invalid topic mapping %v", m)
+		}
+		tm[topic] = append(tm[topic], ns)
+	}
+	return kafka.NewKafkaConn(brokers, tm, kafka.DsyncMessageToUpdate, kafka.DsyncMessageToNamespace, user, password, kafkaOffset, dataType), nil
+}
+
+func KafkaSrcFlags() []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name: "brokers",
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name: "topics",
+		}),
+		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+			Name: "topic-mappings",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name: "sasl-user",
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name: "sasl-password",
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:  "offset",
+			Usage: "Custom offset for kafka (a time, or -2 for oldest)",
+			Value: sarama.OffsetNewest,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "data-type",
+			Value: adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
+		}),
 	}
 }
 
