@@ -13,10 +13,21 @@ description: Create a new dsync connector with test suite. Use when adding suppo
 
 ## Instructions
 
+### 0. Review Data Source/Sink capabilities
+- How is the data stored and in what format (and what's the underlying storage engine, where applicable)
+- What does the API look like and if there's a Go driver for it
+- How does it write and can it support massively parallel batch writes (for sinks)
+- How does it read and can it support massively parallelized reads (for sources)
+- How best to parallelize the reads using existing APIs and taking advantage of the data source architecture (for sources)
+- How does it do CDC or change tracking - how can we get the full record on updates (for sources)
+- When multiple versions are available, what are the behavioral differences
+
 ### 1. Study an Existing Connector
 Read a similar connector as reference. Good examples:
 - `connectors/s3/` - File-based sink with batching
+- `connectors/postgres/` - Full-featured with CDC using logical replication
 - `connectors/mongo/` - Full-featured with streaming
+- `connectors/sqlbatch/` - Connector for SQL sources using a custom query and change-tracking with polling for CDC
 - `connectors/null/` - Minimal sink-only
 - `connectors/random/` - Source-only
 
