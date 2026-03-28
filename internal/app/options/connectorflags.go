@@ -13,6 +13,7 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
+	"github.com/adiom-data/dsync/connectors/couchdb"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
 	fileconnector "github.com/adiom-data/dsync/connectors/file"
 	"github.com/adiom-data/dsync/connectors/kafka"
@@ -515,6 +516,21 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					}
 					settings.URL = args[0]
 					return postgres.NewConn(c.Context, settings)
+				})(args, as)
+			},
+		},
+		{
+			Name: "CouchDB",
+			IsConnector: func(s string) bool {
+				lower := strings.ToLower(s)
+				return strings.HasPrefix(lower, "couchdb://") ||
+					strings.HasPrefix(lower, "couchdbs://") ||
+					strings.HasPrefix(lower, "cloudant://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				settings := couchdb.ConnectorSettings{Uri: args[0]}
+				return CreateHelper("CouchDB", "couchdb://user:pass@host:port OR cloudant://user:pass@account.cloudant.com [options]", CouchDBFlags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					return couchdb.NewConn(settings)
 				})(args, as)
 			},
 		},
@@ -1060,6 +1076,43 @@ var postgresSettingsDefault = postgres.PostgresSettings{
 	EstimatedCountThreshold:    1000000,
 	TargetDocCountPerPartition: 100000,
 	EnableReplicaMode:          true,
+}
+
+func CouchDBFlags(settings *couchdb.ConnectorSettings) []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "server-timeout",
+			Usage:       "Connection timeout for the CouchDB server",
+			Destination: &settings.ServerConnectTimeout,
+		}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{
+			Name:        "ping-timeout",
+			Usage:       "Ping timeout for the CouchDB server",
+			Destination: &settings.PingTimeout,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "writer-batch-size",
+			Usage:       "Maximum batch size for bulk writes",
+			Destination: &settings.WriterMaxBatchSize,
+		}),
+		altsrc.NewInt64Flag(&cli.Int64Flag{
+			Name:        "doc-partition",
+			Usage:       "Target number of documents per partition",
+			Value:       50000,
+			Destination: &settings.TargetDocCountPerPartition,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "max-page-size",
+			Usage:       "Maximum page size for listing data",
+			Value:       1000,
+			Destination: &settings.MaxPageSize,
+		}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{
+			Name:        "include-system-dbs",
+			Usage:       "Include system databases (_users, _replicator, etc.)",
+			Destination: &settings.IncludeSystemDbs,
+		}),
+	}
 }
 
 func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
