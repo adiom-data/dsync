@@ -466,9 +466,11 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		"heartbeat":    1000, // 1 second heartbeat
 	}
 
-	// Only set 'since' if we have a valid cursor
+	// Only set 'since' if we have a valid cursor, otherwise start from now
 	if since != "" {
 		params["since"] = since
+	} else {
+		params["since"] = "now"
 	}
 
 	changes := db.Changes(ctx, kivik.Params(params))
@@ -557,6 +559,8 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 
 	if since != "" {
 		params["since"] = since
+	} else {
+		params["since"] = "now"
 	}
 
 	changes := db.Changes(ctx, kivik.Params(params))
