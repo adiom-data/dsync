@@ -368,10 +368,89 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	}), nil
 }
 
+func (c *conn) writeDataBatch(ctx context.Context, db *kivik.DB, docs []map[string]interface{}) error {
+	if len(docs) == 0 {
+		return nil
+	}
+
+	// Convert to interface slice for BulkDocs
+	bulkDocs := make([]interface{}, len(docs))
+	for i, doc := range docs {
+		bulkDocs[i] = doc
+	}
+
+	// First attempt: optimistic insert
+	results, err := db.BulkDocs(ctx, bulkDocs)
+	if err != nil {
+		return fmt.Errorf("failed to bulk insert documents: %w", err)
+	}
+
+	// Collect conflicts (409 errors)
+	var conflictIDs []string
+	conflictDocs := make(map[string]map[string]interface{})
+	for i, result := range results {
+		if result.Error != nil {
+			if kivik.HTTPStatus(result.Error) == 409 {
+				docID, ok := docs[i]["_id"].(string)
+				if ok {
+					conflictIDs = append(conflictIDs, docID)
+					conflictDocs[docID] = docs[i]
+				}
+			} else {
+				slog.Error(fmt.Sprintf("Failed to insert document %s: %v", result.ID, result.Error))
+			}
+		}
+	}
+
+	// Retry conflicts with revisions
+	if len(conflictIDs) > 0 {
+		rows := db.AllDocs(ctx, kivik.Params(map[string]interface{}{
+			"keys": conflictIDs,
+		}))
+		for rows.Next() {
+			id, err := rows.ID()
+			if err != nil {
+				continue
+			}
+			var value struct {
+				Rev string `json:"rev"`
+			}
+			if err := rows.ScanValue(&value); err == nil && value.Rev != "" {
+				if doc, exists := conflictDocs[id]; exists {
+					doc["_rev"] = value.Rev
+				}
+			}
+		}
+		rows.Close()
+
+		// Retry with revisions
+		var retryDocs []interface{}
+		for _, doc := range conflictDocs {
+			if _, hasRev := doc["_rev"]; hasRev {
+				retryDocs = append(retryDocs, doc)
+			}
+		}
+
+		if len(retryDocs) > 0 {
+			retryResults, err := db.BulkDocs(ctx, retryDocs)
+			if err != nil {
+				return fmt.Errorf("failed to bulk upsert conflicting documents: %w", err)
+			}
+			for _, result := range retryResults {
+				if result.Error != nil {
+					slog.Error(fmt.Sprintf("Failed to upsert document %s: %v", result.ID, result.Error))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
 	db := c.client.DB(r.Msg.GetNamespace())
 
-	var docs []interface{}
+	var docs []map[string]interface{}
 	for _, data := range r.Msg.GetData() {
 		var doc map[string]interface{}
 		if err := json.Unmarshal(data, &doc); err != nil {
@@ -381,29 +460,15 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		docs = append(docs, doc)
 
 		if c.settings.WriterMaxBatchSize > 0 && len(docs) >= c.settings.WriterMaxBatchSize {
-			results, err := db.BulkDocs(ctx, docs)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to bulk insert documents: %w", err))
-			}
-			for _, result := range results {
-				if result.Error != nil {
-					slog.Error(fmt.Sprintf("Failed to insert document %s: %v", result.ID, result.Error))
-				}
+			if err := c.writeDataBatch(ctx, db, docs); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 			docs = nil
 		}
 	}
 
-	if len(docs) > 0 {
-		results, err := db.BulkDocs(ctx, docs)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to bulk insert documents: %w", err))
-		}
-		for _, result := range results {
-			if result.Error != nil {
-				slog.Error(fmt.Sprintf("Failed to insert document %s: %v", result.ID, result.Error))
-			}
-		}
+	if err := c.writeDataBatch(ctx, db, docs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
