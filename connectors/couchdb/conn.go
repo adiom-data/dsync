@@ -164,10 +164,10 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				docsPerPartition := count / numPartitions
 
 				rows := db.AllDocs(ctx, kivik.Params(map[string]interface{}{
-					"limit": numPartitions - 1,
-					"skip":  docsPerPartition,
+					"include_docs": false,
+					"limit":        numPartitions - 1,
+					"skip":         docsPerPartition,
 				}))
-				defer rows.Close()
 
 				var boundaries []string
 				for rows.Next() {
@@ -180,6 +180,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 						break
 					}
 				}
+				rows.Close()
 
 				var prevKey string
 				for i, boundary := range boundaries {
@@ -237,7 +238,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				if err == nil && meta != nil {
 					lastSeq = meta.LastSeq
 				}
-				info.Close()
+				_ = info.Close()
 			}
 
 			updatesPartitions = append(updatesPartitions, &adiomv1.UpdatesPartition{
@@ -380,16 +381,28 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		docs = append(docs, doc)
 
 		if c.settings.WriterMaxBatchSize > 0 && len(docs) >= c.settings.WriterMaxBatchSize {
-			if _, err := db.BulkDocs(ctx, docs); err != nil {
+			results, err := db.BulkDocs(ctx, docs)
+			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to bulk insert documents: %w", err))
+			}
+			for _, result := range results {
+				if result.Error != nil {
+					slog.Error(fmt.Sprintf("Failed to insert document %s: %v", result.ID, result.Error))
+				}
 			}
 			docs = nil
 		}
 	}
 
 	if len(docs) > 0 {
-		if _, err := db.BulkDocs(ctx, docs); err != nil {
+		results, err := db.BulkDocs(ctx, docs)
+		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to bulk insert documents: %w", err))
+		}
+		for _, result := range results {
+			if result.Error != nil {
+				slog.Error(fmt.Sprintf("Failed to insert document %s: %v", result.ID, result.Error))
+			}
 		}
 	}
 
@@ -398,8 +411,50 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	db := c.client.DB(r.Msg.GetNamespace())
+	updates := r.Msg.GetUpdates()
 
-	for _, update := range r.Msg.GetUpdates() {
+	if len(updates) == 0 {
+		return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
+	}
+
+	// Collect all document IDs to fetch revisions in batch
+	var docIDs []string
+	docIDSet := make(map[string]struct{})
+	for _, update := range updates {
+		if len(update.GetId()) == 0 {
+			continue
+		}
+		docID := string(update.GetId()[0].GetData())
+		if _, exists := docIDSet[docID]; !exists {
+			docIDs = append(docIDs, docID)
+			docIDSet[docID] = struct{}{}
+		}
+	}
+
+	// Batch fetch all existing revisions using _all_docs with keys
+	revMap := make(map[string]string)
+	if len(docIDs) > 0 {
+		rows := db.AllDocs(ctx, kivik.Params(map[string]interface{}{
+			"keys": docIDs,
+		}))
+		for rows.Next() {
+			id, err := rows.ID()
+			if err != nil {
+				continue
+			}
+			var value struct {
+				Rev string `json:"rev"`
+			}
+			if err := rows.ScanValue(&value); err == nil && value.Rev != "" {
+				revMap[id] = value.Rev
+			}
+		}
+		rows.Close()
+	}
+
+	// Prepare batch operations
+	var upsertDocs []interface{}
+	for _, update := range updates {
 		if len(update.GetId()) == 0 {
 			continue
 		}
@@ -414,34 +469,34 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 				continue
 			}
 
-			var existingRev string
-			result := db.Get(ctx, docID)
-			var existing map[string]interface{}
-			if err := result.ScanDoc(&existing); err == nil {
-				if rev, ok := existing["_rev"].(string); ok {
-					existingRev = rev
-				}
-			}
-
-			if existingRev != "" {
-				doc["_rev"] = existingRev
+			if rev, exists := revMap[docID]; exists {
+				doc["_rev"] = rev
 			} else {
 				delete(doc, "_rev")
 			}
-
-			if _, err := db.Put(ctx, docID, doc); err != nil {
-				slog.Error(fmt.Sprintf("Failed to upsert document %s: %v", docID, err))
-			}
+			upsertDocs = append(upsertDocs, doc)
 
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			result := db.Get(ctx, docID)
-			var existing map[string]interface{}
-			if err := result.ScanDoc(&existing); err == nil {
-				if rev, ok := existing["_rev"].(string); ok {
-					if _, err := db.Delete(ctx, docID, rev); err != nil {
-						slog.Error(fmt.Sprintf("Failed to delete document %s: %v", docID, err))
-					}
-				}
+			if rev, exists := revMap[docID]; exists {
+				upsertDocs = append(upsertDocs, map[string]interface{}{
+					"_id":      docID,
+					"_rev":     rev,
+					"_deleted": true,
+				})
+			}
+		}
+	}
+
+	// Execute bulk operation
+	if len(upsertDocs) > 0 {
+		results, err := db.BulkDocs(ctx, upsertDocs)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to bulk write documents: %w", err))
+		}
+		// Log any individual document errors
+		for _, result := range results {
+			if result.Error != nil {
+				slog.Error(fmt.Sprintf("Failed to write document %s: %v", result.ID, result.Error))
 			}
 		}
 	}
