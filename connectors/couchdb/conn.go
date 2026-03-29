@@ -180,7 +180,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 						break
 					}
 				}
-				rows.Close()
+				_ = rows.Close()
 
 				var prevKey string
 				for i, boundary := range boundaries {
@@ -225,7 +225,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			if err := changes.Err(); err != nil {
 				slog.Warn(fmt.Sprintf("Failed to get changes for database %s: %v", ns, err))
 			}
-			changes.Close()
+			_ = changes.Close()
 
 			if lastSeq == "" {
 				info := db.Changes(ctx, kivik.Params(map[string]interface{}{
@@ -421,7 +421,7 @@ func (c *conn) writeDataBatch(ctx context.Context, db *kivik.DB, docs []map[stri
 				}
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 
 		// Retry with revisions
 		var retryDocs []interface{}
@@ -514,7 +514,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 				revMap[id] = value.Rev
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 
 	// Prepare batch operations
