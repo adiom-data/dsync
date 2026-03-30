@@ -163,24 +163,35 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				numPartitions := (count + c.settings.TargetDocCountPerPartition - 1) / c.settings.TargetDocCountPerPartition
 				docsPerPartition := count / numPartitions
 
-				rows := db.AllDocs(ctx, kivik.Params(map[string]interface{}{
-					"include_docs": false,
-					"limit":        numPartitions - 1,
-					"skip":         docsPerPartition,
-				}))
-
+				// Find partition boundaries using chained startkey queries
+				// Each query skips docsPerPartition from the previous boundary
 				var boundaries []string
-				for rows.Next() {
-					id, err := rows.ID()
-					if err != nil {
-						continue
+				var startKey string
+
+				for i := 1; i < int(numPartitions); i++ {
+					params := map[string]interface{}{
+						"include_docs": false,
+						"limit":        1,
+						"skip":         docsPerPartition,
 					}
-					boundaries = append(boundaries, id)
-					if len(boundaries) >= int(numPartitions)-1 {
-						break
+					if startKey != "" {
+						params["startkey"] = startKey
+					}
+
+					rows := db.AllDocs(ctx, kivik.Params(params))
+					if rows.Next() {
+						id, err := rows.ID()
+						if err == nil {
+							boundaries = append(boundaries, id)
+							startKey = id
+						}
+					}
+					rows.Close()
+
+					if len(boundaries) < i {
+						break // No more docs available
 					}
 				}
-				_ = rows.Close()
 
 				var prevKey string
 				for i, boundary := range boundaries {
