@@ -117,8 +117,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			var idOutput []any
 			for _, id := range updates.GetId() {
 				var v any
-				if err := bson.UnmarshalValue(bsontype.Type(id.GetType()), id.GetData(), &v); err != nil {
-					return nil, connect.NewError(connect.CodeInternal, err)
+				if r.Msg.GetType() == adiomv1.DataType_DATA_TYPE_JSON_ID {
+					v = string(id.GetData())
+				} else {
+					if err := bson.UnmarshalValue(bsontype.Type(id.GetType()), id.GetData(), &v); err != nil {
+						return nil, connect.NewError(connect.CodeInternal, err)
+					}
 				}
 				idOutput = append(idOutput, v)
 			}
