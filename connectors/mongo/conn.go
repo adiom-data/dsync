@@ -70,6 +70,7 @@ type conn struct {
 	client *mongo.Client
 
 	settings ConnectorSettings
+	flavor   MongoFlavor
 
 	nextCursorID    atomic.Int64
 	ctx             context.Context
@@ -265,19 +266,19 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			if numSamples > 1000000 {
 				slog.Warn("More than 1000000 samples requested", "samples", numSamples)
 			}
-			res, err := col.Aggregate(ctx, mongo.Pipeline{{{"$sample", bson.D{{"size", numSamples}}}}, {{"$project", bson.D{{"_id", 1}}}}, {{"$sort", bson.D{{"_id", 1}}}}})
+			ids, err := c.sampleIDs(ctx, col, numSamples)
 			if err != nil {
 				return fmt.Errorf("error getting %v samples for partition: %w", numSamples, err)
 			}
 			var factorCount = c.settings.SampleFactor / 2
 			var low bson.RawValue
-			for res.Next(ctx) {
+			for _, id := range ids {
 				if factorCount > 0 {
 					factorCount -= 1
 					continue
 				}
 				factorCount = c.settings.SampleFactor - 1
-				high := res.Current.Lookup("_id")
+				high := id
 				ch <- &adiomv1.Partition{
 					Namespace:      partition.GetNamespace(),
 					EstimatedCount: uint64(c.settings.TargetDocCountPerPartition),
@@ -566,7 +567,7 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			{{"$match", nsFilter}},
 		}
 	}
-	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor()))
+	opts := c.changeStreamOpts(r.Msg.GetCursor())
 
 	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
@@ -707,7 +708,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			{{"$match", nsFilter}},
 		}
 	}
-	opts := moptions.ChangeStream().SetStartAfter(bson.Raw(r.Msg.GetCursor())).SetFullDocument("updateLookup")
+	opts := c.changeStreamOpts(r.Msg.GetCursor()).SetFullDocument("updateLookup")
 
 	changeStream, err := watcher.Watch(ctx, pipeline, opts)
 	if err != nil {
@@ -995,12 +996,23 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 	return &conn{
 		client:          client,
 		settings:        settings,
+		flavor:          GetMongoFlavor(settings.ConnectionString),
 		ctx:             ctx,
 		cancel:          cancel,
 		buffers:         map[int64]buffer{},
 		cleanupInterval: 5 * time.Minute,
 		query:           query,
 	}
+}
+
+func (c *conn) changeStreamOpts(cursor []byte) *moptions.ChangeStreamOptions {
+	opts := moptions.ChangeStream()
+	if c.flavor == FlavorDocumentDB {
+		opts.SetResumeAfter(bson.Raw(cursor))
+	} else {
+		opts.SetStartAfter(bson.Raw(cursor))
+	}
+	return opts
 }
 
 func maybeUnavailableError(err error) error {

@@ -479,7 +479,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				if strings.HasPrefix(s, "mongodb://") || strings.HasPrefix(s, "mongodb+srv://") {
 					flavor := mongo.GetMongoFlavor(s)
-					return flavor == mongo.FlavorMongoDB || flavor == mongo.FlavorCosmosDB_VCORE
+					return flavor == mongo.FlavorMongoDB || flavor == mongo.FlavorCosmosDB_VCORE || flavor == mongo.FlavorDocumentDB
 				}
 				return false
 			},
