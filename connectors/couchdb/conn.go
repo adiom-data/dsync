@@ -310,20 +310,22 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		"limit":        pageSize + 1, // fetch one extra to detect if there's a next page
 	}
 
+	// Always apply partition end bound
+	startKey, endKey := decodeCursor(partition.GetCursor())
+	if endKey != "" {
+		params["endkey"] = endKey
+	}
+
 	pageCursor := r.Msg.GetCursor()
 	if len(pageCursor) > 0 {
 		// Page cursor from previous call - start after this key
 		params["startkey"] = string(pageCursor)
 		params["skip"] = 1 // skip the document we already returned
 	} else {
-		// Initial call - use partition cursor if present
-		startKey, endKey := decodeCursor(partition.GetCursor())
+		// Initial call - use partition start key if present
 		if startKey != "" {
 			params["startkey"] = startKey
 			params["skip"] = 1
-		}
-		if endKey != "" {
-			params["endkey"] = endKey
 		}
 	}
 
