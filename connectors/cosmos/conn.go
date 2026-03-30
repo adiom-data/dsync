@@ -230,12 +230,6 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			defer changeStream.Close(ctx)
 
 			for changeStream.Next(ctx) {
-				var change bson.M
-				if err := changeStream.Decode(&change); err != nil {
-					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
-					continue
-				}
-
 				lsnTracker.IncrementLSN(ns)
 
 				if changeStream.RemainingBatchLength() == 0 {
@@ -261,19 +255,27 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 	return nil
 }
 
-func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
+func convertChangeStreamEventToUpdate(change mongoconn.MongoUpdate) (*adiomv1.Update, error) {
 	//slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
-	// treat all change stream events as updates
 	// get the id of the document that was changed
-	id := change["documentKey"].(bson.M)["_id"]
-	// convert id to raw bson
-	idType, idVal, err := bson.MarshalValue(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal _id: %v", err)
+	var idType bson.Type
+	var idVal []byte
+	for _, k := range change.DocumentKey {
+		if k.Key == "_id" {
+			var err error
+			idType, idVal, err = bson.MarshalValue(k.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal _id: %v", err)
+			}
+			break
+		}
+	}
+	if idVal == nil {
+		return nil, fmt.Errorf("_id not found in documentKey")
 	}
 
-	if change["operationType"] == "delete" {
+	if change.OperationType == "delete" {
 		return &adiomv1.Update{
 			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
@@ -285,15 +287,9 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 	}
 
 	// get the full state of the document after the change
-	if change["fullDocument"] == nil {
+	if len(change.FullDocument) == 0 {
 		//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
 		return nil, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
-	}
-	fullDocument := change["fullDocument"].(bson.M)
-	// convert fulldocument to BSON.Raw
-	fullDocumentRaw, err := bson.Marshal(fullDocument)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal full document: %v", err)
 	}
 	update := &adiomv1.Update{
 		Id: []*adiomv1.BsonValue{{
@@ -302,7 +298,7 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			Name: "_id",
 		}},
 		Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
-		Data: fullDocumentRaw,
+		Data: change.FullDocument,
 	}
 	return update, nil
 }
@@ -453,7 +449,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			var updates []*adiomv1.Update
 
 			for changeStream.Next(ctx) {
-				var change bson.M
+				var change mongoconn.MongoUpdate
 				if err := changeStream.Decode(&change); err != nil {
 					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
 					continue
