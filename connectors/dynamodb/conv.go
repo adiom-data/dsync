@@ -120,7 +120,7 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 			arr = append(arr, bson.Binary{
 				Subtype: bson.TypeBinaryGeneric,
 				Data:    v,
-			}, nil)
+			})
 		}
 		return arr, nil
 
