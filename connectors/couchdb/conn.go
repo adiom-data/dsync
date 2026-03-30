@@ -186,7 +186,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 							startKey = id
 						}
 					}
-					rows.Close()
+					_ = rows.Close()
 
 					if len(boundaries) < i {
 						break // No more docs available
