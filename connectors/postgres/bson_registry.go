@@ -6,11 +6,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsoncodec"
-	"go.mongodb.org/mongo-driver/bson/bsonrw"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var (
@@ -18,15 +14,16 @@ var (
 	tTime    = reflect.TypeOf(time.Time{})
 )
 
-// decimalCodec handles encoding/decoding between decimal.Decimal and primitive.Decimal128
+// decimalCodec handles encoding/decoding between decimal.Decimal and bson.Decimal128
 type decimalCodec struct{}
 
-var _ bsoncodec.ValueCodec = &decimalCodec{}
+var _ bson.ValueEncoder = &decimalCodec{}
+var _ bson.ValueDecoder = &decimalCodec{}
 
 // EncodeValue encodes a decimal.Decimal to a BSON Decimal128
-func (dc *decimalCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+func (dc *decimalCodec) EncodeValue(ec bson.EncodeContext, vw bson.ValueWriter, val reflect.Value) error {
 	if !val.IsValid() || val.Type() != tDecimal {
-		return bsoncodec.ValueEncoderError{
+		return bson.ValueEncoderError{
 			Name:     "DecimalEncodeValue",
 			Types:    []reflect.Type{tDecimal},
 			Received: val,
@@ -35,8 +32,8 @@ func (dc *decimalCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueW
 
 	dec := val.Interface().(decimal.Decimal)
 
-	// Convert decimal.Decimal to primitive.Decimal128
-	dec128, err := primitive.ParseDecimal128(dec.String())
+	// Convert decimal.Decimal to bson.Decimal128
+	dec128, err := bson.ParseDecimal128(dec.String())
 	if err != nil {
 		return fmt.Errorf("error converting decimal.Decimal to Decimal128: %w", err)
 	}
@@ -45,30 +42,30 @@ func (dc *decimalCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueW
 }
 
 // DecodeValue decodes a BSON Decimal128 to a decimal.Decimal
-func (dc *decimalCodec) DecodeValue(dc2 bsoncodec.DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+func (dc *decimalCodec) DecodeValue(dc2 bson.DecodeContext, vr bson.ValueReader, val reflect.Value) error {
 	if !val.CanSet() || val.Type() != tDecimal {
-		return bsoncodec.ValueDecoderError{
+		return bson.ValueDecoderError{
 			Name:     "DecimalDecodeValue",
 			Types:    []reflect.Type{tDecimal},
 			Received: val,
 		}
 	}
 
-	var dec128 primitive.Decimal128
+	var dec128 bson.Decimal128
 	switch vr.Type() {
-	case bsontype.Decimal128:
+	case bson.TypeDecimal128:
 		var err error
 		dec128, err = vr.ReadDecimal128()
 		if err != nil {
 			return err
 		}
-	case bsontype.Null:
+	case bson.TypeNull:
 		if err := vr.ReadNull(); err != nil {
 			return err
 		}
 		val.Set(reflect.Zero(tDecimal))
 		return nil
-	case bsontype.Undefined:
+	case bson.TypeUndefined:
 		if err := vr.ReadUndefined(); err != nil {
 			return err
 		}
@@ -78,7 +75,7 @@ func (dc *decimalCodec) DecodeValue(dc2 bsoncodec.DecodeContext, vr bsonrw.Value
 		return fmt.Errorf("cannot decode %v into a decimal.Decimal", vr.Type())
 	}
 
-	// Convert primitive.Decimal128 to decimal.Decimal
+	// Convert bson.Decimal128 to decimal.Decimal
 	str := dec128.String()
 	dec, err := decimal.NewFromString(str)
 	if err != nil {
@@ -89,15 +86,16 @@ func (dc *decimalCodec) DecodeValue(dc2 bsoncodec.DecodeContext, vr bsonrw.Value
 	return nil
 }
 
-// dateTimeCodec handles encoding/decoding between time.Time and primitive.DateTime
+// dateTimeCodec handles encoding/decoding between time.Time and bson.DateTime
 type dateTimeCodec struct{}
 
-var _ bsoncodec.ValueCodec = &dateTimeCodec{}
+var _ bson.ValueEncoder = &dateTimeCodec{}
+var _ bson.ValueDecoder = &dateTimeCodec{}
 
 // EncodeValue encodes a time.Time to a BSON DateTime
-func (dtc *dateTimeCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+func (dtc *dateTimeCodec) EncodeValue(ec bson.EncodeContext, vw bson.ValueWriter, val reflect.Value) error {
 	if !val.IsValid() || val.Type() != tTime {
-		return bsoncodec.ValueEncoderError{
+		return bson.ValueEncoderError{
 			Name:     "DateTimeEncodeValue",
 			Types:    []reflect.Type{tTime},
 			Received: val,
@@ -105,14 +103,14 @@ func (dtc *dateTimeCodec) EncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.Valu
 	}
 
 	t := val.Interface().(time.Time)
-	dt := primitive.NewDateTimeFromTime(t)
+	dt := bson.NewDateTimeFromTime(t)
 	return vw.WriteDateTime(int64(dt))
 }
 
 // DecodeValue decodes a BSON DateTime to a time.Time
-func (dtc *dateTimeCodec) DecodeValue(dc bsoncodec.DecodeContext, vr bsonrw.ValueReader, val reflect.Value) error {
+func (dtc *dateTimeCodec) DecodeValue(dc bson.DecodeContext, vr bson.ValueReader, val reflect.Value) error {
 	if !val.CanSet() || val.Type() != tTime {
-		return bsoncodec.ValueDecoderError{
+		return bson.ValueDecoderError{
 			Name:     "DateTimeDecodeValue",
 			Types:    []reflect.Type{tTime},
 			Received: val,
@@ -121,19 +119,19 @@ func (dtc *dateTimeCodec) DecodeValue(dc bsoncodec.DecodeContext, vr bsonrw.Valu
 
 	var dt int64
 	switch vr.Type() {
-	case bsontype.DateTime:
+	case bson.TypeDateTime:
 		var err error
 		dt, err = vr.ReadDateTime()
 		if err != nil {
 			return err
 		}
-	case bsontype.Null:
+	case bson.TypeNull:
 		if err := vr.ReadNull(); err != nil {
 			return err
 		}
 		val.Set(reflect.Zero(tTime))
 		return nil
-	case bsontype.Undefined:
+	case bson.TypeUndefined:
 		if err := vr.ReadUndefined(); err != nil {
 			return err
 		}
@@ -143,28 +141,28 @@ func (dtc *dateTimeCodec) DecodeValue(dc bsoncodec.DecodeContext, vr bsonrw.Valu
 		return fmt.Errorf("cannot decode %v into a time.Time", vr.Type())
 	}
 
-	// Convert primitive.DateTime to time.Time
-	t := primitive.DateTime(dt).Time()
+	// Convert bson.DateTime to time.Time
+	t := bson.DateTime(dt).Time()
 	val.Set(reflect.ValueOf(t.UTC()))
 	return nil
 }
 
 // NewBSONRegistry creates a new BSON registry with decimal.Decimal support
-func NewBSONRegistry() *bsoncodec.Registry {
-	rb := bson.NewRegistryBuilder()
+func NewBSONRegistry() *bson.Registry {
+	reg := bson.NewRegistry()
 
 	// Register the decimal codec for decimal.Decimal type
 	codec := &decimalCodec{}
-	rb.RegisterTypeEncoder(tDecimal, codec)
-	rb.RegisterTypeDecoder(tDecimal, codec)
+	reg.RegisterTypeEncoder(tDecimal, codec)
+	reg.RegisterTypeDecoder(tDecimal, codec)
 
 	// Register the dateTime codec for time.Time type
 	dtCodec := &dateTimeCodec{}
-	//rb.RegisterTypeEncoder(tTime, dtCodec) //we don't need custom encoder for time.Time
-	rb.RegisterTypeDecoder(tTime, dtCodec)
+	//reg.RegisterTypeEncoder(tTime, dtCodec) //we don't need custom encoder for time.Time
+	reg.RegisterTypeDecoder(tTime, dtCodec)
 
-	rb.RegisterTypeMapEntry(bsontype.DateTime, tTime)
-	rb.RegisterTypeMapEntry(bsontype.Decimal128, tDecimal)
+	reg.RegisterTypeMapEntry(bson.TypeDateTime, tTime)
+	reg.RegisterTypeMapEntry(bson.TypeDecimal128, tDecimal)
 
-	return rb.Build()
+	return reg
 }

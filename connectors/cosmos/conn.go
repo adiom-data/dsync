@@ -15,10 +15,9 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	moptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -64,7 +63,7 @@ func encodeResumeToken(epoch int64, token []byte) []byte {
 func decodeResumeToken(input []byte) (int64, []byte) {
 	var s bson.M
 	_ = bson.Unmarshal(input, &s)
-	return s["a"].(int64), s["b"].(primitive.Binary).Data
+	return s["a"].(int64), s["b"].(bson.Binary).Data
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -209,13 +208,13 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
 			}
-			var opts *moptions.ChangeStreamOptions
+			var opts *moptions.ChangeStreamOptionsBuilder
 			if token != nil {
 				//set the change stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
 			} else { //we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
-				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
+				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
@@ -430,13 +429,13 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
 			}
-			var opts *moptions.ChangeStreamOptions
+			var opts *moptions.ChangeStreamOptionsBuilder
 			if token != nil {
 				//set the change stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
 			} else { //we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
-				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
+				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
@@ -528,10 +527,8 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 	var witnessMongoClient *mongo.Client
 	// Connect to the witness MongoDB instance
 	if settings.EmulateDeletes {
-		ctxConnect, cancel := context.WithTimeout(context.Background(), settings.ServerConnectTimeout)
-		defer cancel()
 		clientOptions := moptions.Client().ApplyURI(settings.WitnessMongoConnString).SetConnectTimeout(settings.ServerConnectTimeout)
-		client, err := mongo.Connect(ctxConnect, clientOptions)
+		client, err := mongo.Connect(clientOptions)
 		if err != nil {
 			panic(err)
 		}

@@ -27,10 +27,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/tryvium-travels/memongo"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -120,7 +119,7 @@ func TestCosmosConnectorSuite2(t *testing.T) {
 
 	tSuite.AssertExists = func(ctx context.Context, a *assert.Assertions, id []*adiomv1.BsonValue, exists bool) error {
 		mongoID := bson.RawValue{
-			Type:  bsontype.Type(id[0].GetType()),
+			Type:  bson.Type(id[0].GetType()),
 			Value: id[0].GetData(),
 		}
 		idFilter := bson.D{{Key: "_id", Value: mongoID}}
@@ -460,7 +459,7 @@ type CosmosTestDataStore struct {
 func (c *CosmosTestDataStore) Setup() error {
 	// connect to the underlying database
 	clientOptions := options.Client().ApplyURI(c.ConnectionString)
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return err
 	}

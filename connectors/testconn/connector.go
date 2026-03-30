@@ -24,9 +24,7 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type conn struct {
@@ -133,13 +131,13 @@ func bsonToJsonable(bs interface{}) (interface{}, error) {
 		return b, nil
 	case string:
 		return b, nil
-	case primitive.DateTime:
+	case bson.DateTime:
 		return b.Time().Format(time.RFC3339), nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return b.Hex(), nil
-	case primitive.Binary:
+	case bson.Binary:
 		return base64.StdEncoding.EncodeToString(b.Data), nil
-	case primitive.Decimal128:
+	case bson.Decimal128:
 		return b.String(), nil
 	default:
 		return &types.AttributeValueMemberS{Value: "XUnsupportedX"}, nil
@@ -237,7 +235,7 @@ Loop:
 
 			toMarshal := idRes.(bson.D)[0].Value
 			if r.Msg.GetType() == adiomv1.DataType_DATA_TYPE_JSON_ID {
-				toMarshal = toMarshal.(primitive.ObjectID).Hex()
+				toMarshal = toMarshal.(bson.ObjectID).Hex()
 			}
 
 			idType, idVal, err := bson.MarshalValue(toMarshal)
@@ -352,19 +350,19 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	for _, update := range r.Msg.GetUpdates() {
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
+			idBson := bson.RawValue{Type: bson.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("insert\t" + idBson.String() + "\t" + bson.Raw(update.GetData()).String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
+			idBson := bson.RawValue{Type: bson.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("update\t" + idBson.String() + "\t" + bson.Raw(update.GetData()).String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)
 			}
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			idBson := bson.RawValue{Type: bsontype.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
+			idBson := bson.RawValue{Type: bson.Type(update.GetId()[0].GetType()), Value: update.GetId()[0].GetData()}
 			_, err := f.WriteString("delete\t" + idBson.String() + "\n")
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInternal, err)

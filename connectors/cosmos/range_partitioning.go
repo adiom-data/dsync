@@ -12,10 +12,9 @@ import (
 	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // split the range between two boundaries into equal parts
@@ -65,7 +64,7 @@ func splitRangeObjectId(value1 bson.RawValue, value2 bson.RawValue, numParts int
 	boundaries := make([]bson.RawValue, numParts+1)
 	for i := 1; i < numParts; i++ {
 		t := minT.Add(time.Duration(i) * partSize)
-		val := primitive.NewObjectIDFromTimestamp(t)
+		val := bson.NewObjectIDFromTimestamp(t)
 		boundaries[i] = bson.RawValue{
 			Type:  bson.TypeObjectID,
 			Value: val[:],

@@ -10,13 +10,12 @@ import (
 
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/sync/errgroup"
 )
 
-var supportedIDTypes = map[bsontype.Type]bool{
+var supportedIDTypes = map[bson.Type]bool{
 	bson.TypeObjectID: true,
 	bson.TypeString:   true,
 	bson.TypeInt32:    true,

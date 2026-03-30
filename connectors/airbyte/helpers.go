@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/sync/errgroup"
 )
 

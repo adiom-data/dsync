@@ -12,7 +12,7 @@ import (
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/brianvoe/gofakeit/v7"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const (

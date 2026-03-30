@@ -16,8 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3vectors/document"
 	"github.com/aws/aws-sdk-go-v2/service/s3vectors/types"
 	"github.com/pgvector/pgvector-go"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -115,7 +114,7 @@ func idToKey(id []*adiomv1.BsonValue) (string, error) {
 		first := id[0]
 		var res string
 		var idAny any
-		if err := bson.UnmarshalValue(bsontype.Type(first.GetType()), first.GetData(), &idAny); err != nil {
+		if err := bson.UnmarshalValue(bson.Type(first.GetType()), first.GetData(), &idAny); err != nil {
 			return "", fmt.Errorf("err unmarshalling id: %w", err)
 		}
 		switch t := idAny.(type) {

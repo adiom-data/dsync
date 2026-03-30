@@ -9,9 +9,9 @@ import (
 	"context"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	moptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var streamPipeline = mongo.Pipeline{
@@ -27,7 +27,7 @@ var streamPipelineWithDelete = mongo.Pipeline{
 }
 
 // Creates a single changestream compatible with CosmosDB with the provided options
-func createChangeStream(ctx context.Context, client *mongo.Client, namespace iface.Location, opts *moptions.ChangeStreamOptions, withDelete bool) (*mongo.ChangeStream, error) {
+func createChangeStream(ctx context.Context, client *mongo.Client, namespace iface.Location, opts moptions.Lister[moptions.ChangeStreamOptions], withDelete bool) (*mongo.ChangeStream, error) {
 	db := namespace.Database
 	col := namespace.Collection
 	collection := client.Database(db).Collection(col)
