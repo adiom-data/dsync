@@ -7,8 +7,7 @@ package mongo
 
 import (
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var (
@@ -37,7 +36,7 @@ func createChangeStreamNamespaceFilterFromTasks(tasks []iface.ReadPlanTask) bson
 // create a change stream filter that covers all namespaces except system
 func createChangeStreamNamespaceFilter() bson.D {
 	return bson.D{{"$and", []bson.D{
-		{{"ns.db", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedDBPatternCS}}}}},
-		{{"ns.coll", bson.D{{"$regex", primitive.Regex{Pattern: ExcludedSystemCollPatternCS}}}}},
+		{{"ns.db", bson.D{{"$regex", bson.Regex{Pattern: ExcludedDBPatternCS}}}}},
+		{{"ns.coll", bson.D{{"$regex", bson.Regex{Pattern: ExcludedSystemCollPatternCS}}}}},
 	}}}
 }

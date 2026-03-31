@@ -32,8 +32,7 @@ import (
 	"github.com/cespare/xxhash"
 	"github.com/google/uuid"
 	"go.akshayshah.org/memhttp"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/time/rate"
 )
 
@@ -102,11 +101,11 @@ func (c *connector) GetConnectorStatus(flowId iface.FlowID) iface.ConnectorStatu
 
 func IDPartToString(a any) string {
 	switch t := a.(type) {
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return t.Hex()
 	case string:
 		return t
-	case primitive.Binary:
+	case bson.Binary:
 		if t.Subtype == bson.TypeBinaryUUID {
 			id, err := uuid.FromBytes(t.Data)
 			if err == nil {
@@ -181,7 +180,7 @@ func HashBson(hasher hash.Hash64, b bson.Raw, arr bool, projection map[string]in
 			if _, err := hasher.Write([]byte(e.Key())); err != nil {
 				return err
 			}
-			if err := HashBson(hasher, v.Array(), true, innerProjection); err != nil {
+			if err := HashBson(hasher, bson.Raw(v.Array()), true, innerProjection); err != nil {
 				return err
 			}
 		} else {
@@ -212,7 +211,7 @@ func (c *connector) IntegrityCheck(ctx context.Context, task iface.IntegrityChec
 
 	var pCursor []byte
 	if task.Low != nil {
-		pCursor = task.Low.(primitive.Binary).Data
+		pCursor = task.Low.(bson.Binary).Data
 	}
 	namespace := task.Namespace
 	for {
@@ -328,7 +327,7 @@ func (c *connector) RequestCreateReadPlan(flowId iface.FlowID, options iface.Con
 					Id: iface.ReadPlanTaskID(curID),
 				}
 				task.Def.Col = partition.GetNamespace()
-				task.Def.Low = primitive.Binary{Data: partition.GetCursor()}
+				task.Def.Low = bson.Binary{Data: partition.GetCursor()}
 				task.EstimatedDocCount = int64(partition.GetEstimatedCount())
 				tasks = append(tasks, task)
 			}
@@ -570,7 +569,7 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						var cursor []byte
 						var pCursor []byte
 						if task.Def.Low != nil {
-							pCursor = task.Def.Low.(primitive.Binary).Data
+							pCursor = task.Def.Low.(bson.Binary).Data
 						}
 						for {
 							res, err := c.maybeOptimizedImpl.ListData(c.flowCtx, connect.NewRequest(&adiomv1.ListDataRequest{

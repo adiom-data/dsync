@@ -10,9 +10,7 @@ import (
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type conn struct {
@@ -105,13 +103,13 @@ func fromBson(bs interface{}) (interface{}, error) {
 		return b, nil
 	case string:
 		return b, nil
-	case primitive.DateTime:
+	case bson.DateTime:
 		return b.Time().Format(time.RFC3339), nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return b.Hex(), nil
-	case primitive.Binary:
+	case bson.Binary:
 		return b.Data, nil
-	case primitive.Decimal128:
+	case bson.Decimal128:
 		return b.String(), nil
 	default:
 		return "UNSUPPORTED", nil
@@ -219,7 +217,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		update := allUpdates[len(allUpdates)-1-i]
 		idPart := update.GetId()[0]
 		var id interface{}
-		if err := bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
+		if err := bson.UnmarshalValue(bson.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
 		idStr, err := fromBson(id)
@@ -241,7 +239,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		for _, update := range updates {
 			idPart := update.GetId()[0]
 			var id interface{}
-			if err := bson.UnmarshalValue(bsontype.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
+			if err := bson.UnmarshalValue(bson.Type(idPart.GetType()), idPart.GetData(), &id); err != nil {
 				return err
 			}
 			idStr, err := fromBson(id)

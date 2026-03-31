@@ -20,12 +20,10 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	moptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -366,10 +364,10 @@ func EncodeCursor(low bson.RawValue, high bson.RawValue) []byte {
 	}
 	var d bson.D
 	if !low.IsZero() {
-		d = append(d, primitive.E{"low", low})
+		d = append(d, bson.E{"low", low})
 	}
 	if !high.IsZero() {
-		d = append(d, primitive.E{"high", high})
+		d = append(d, bson.E{"high", high})
 	}
 	res, _ := bson.Marshal(d)
 	return res
@@ -665,7 +663,7 @@ func convertChangeStreamEventToUpdate(change MongoUpdate, fullDocumentKey bool) 
 	return update, nil
 }
 
-func toTimestampPB(t primitive.Timestamp) *timestamppb.Timestamp {
+func toTimestampPB(t bson.Timestamp) *timestamppb.Timestamp {
 	if t.IsZero() {
 		return nil
 	}
@@ -674,7 +672,7 @@ func toTimestampPB(t primitive.Timestamp) *timestamppb.Timestamp {
 
 type MongoUpdate struct {
 	NS            bson.M               `bson:"ns"`
-	ClusterTime   *primitive.Timestamp `bson:"clusterTime"`
+	ClusterTime   *bson.Timestamp `bson:"clusterTime"`
 	DocumentKey   bson.D               `bson:"documentKey"`
 	FullDocument  bson.Raw             `bson:"fullDocument"`
 	OperationType string               `bson:"operationType"`
@@ -720,7 +718,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	var updates []*adiomv1.Update
 	var currentNamespace string
 	var lastResumeToken bson.Raw
-	var lastTime primitive.Timestamp
+	var lastTime bson.Timestamp
 
 	for changeStream.Next(ctx) {
 		var change MongoUpdate
@@ -920,7 +918,7 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			if !c.settings.FullDocumentKey && key != "_id" {
 				continue
 			}
-			typ := bsontype.Type(idPart.GetType())
+			typ := bson.Type(idPart.GetType())
 			idFilter = append(idFilter, bson.E{Key: key, Value: bson.RawValue{Type: typ, Value: idPart.GetData()}})
 		}
 		if len(idFilter) == 0 {
@@ -952,10 +950,8 @@ func MongoClient(ctx context.Context, settings ConnectorSettings) (*mongo.Client
 	setDefault(&settings.PingTimeout, 2*time.Second)
 
 	// Connect to the MongoDB instance
-	ctxConnect, cancelConnect := context.WithTimeout(ctx, settings.ServerConnectTimeout)
-	defer cancelConnect()
 	clientOptions := moptions.Client().SetAppName("dsync").ApplyURI(settings.ConnectionString).SetConnectTimeout(settings.ServerConnectTimeout)
-	client, err := mongo.Connect(ctxConnect, clientOptions)
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1001,7 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 	}
 }
 
-func (c *conn) changeStreamOpts(cursor []byte) *moptions.ChangeStreamOptions {
+func (c *conn) changeStreamOpts(cursor []byte) *moptions.ChangeStreamOptionsBuilder {
 	opts := moptions.ChangeStream()
 	if c.flavor == FlavorDocumentDB {
 		opts.SetResumeAfter(bson.Raw(cursor))
@@ -1044,7 +1040,7 @@ func (c *conn) GetByIds(ctx context.Context, r *connect.Request[adiomv1.GetByIds
 			}
 			bv := id.GetId()[0]
 			rawVal := bson.RawValue{
-				Type:  bsontype.Type(bv.GetType()),
+				Type:  bson.Type(bv.GetType()),
 				Value: bv.GetData(),
 			}
 			v, err := col.FindOne(ctx, bson.M{"_id": rawVal}).Raw()

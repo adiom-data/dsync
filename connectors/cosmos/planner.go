@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/exp/rand"
 )
 

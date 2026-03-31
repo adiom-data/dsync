@@ -16,8 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	streamtypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // TODO: this is an arbitrary mapping right now
@@ -63,13 +62,13 @@ func fromBson(bs interface{}) (types.AttributeValue, error) {
 		return &types.AttributeValueMemberN{Value: fmt.Sprintf("%f", b)}, nil
 	case string:
 		return &types.AttributeValueMemberS{Value: b}, nil
-	case primitive.DateTime:
+	case bson.DateTime:
 		return &types.AttributeValueMemberS{Value: b.Time().Format(time.RFC3339)}, nil
-	case primitive.ObjectID:
+	case bson.ObjectID:
 		return &types.AttributeValueMemberS{Value: b.Hex()}, nil
-	case primitive.Binary:
+	case bson.Binary:
 		return &types.AttributeValueMemberB{Value: b.Data}, nil
-	case primitive.Decimal128:
+	case bson.Decimal128:
 		return &types.AttributeValueMemberN{Value: b.String()}, nil
 	case nil:
 		return &types.AttributeValueMemberNULL{Value: true}, nil
@@ -107,7 +106,7 @@ func toInterfaceMap(av types.AttributeValue) (map[string]interface{}, error) {
 func toBson(av types.AttributeValue) (interface{}, error) {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
-		return primitive.Binary{
+		return bson.Binary{
 			Subtype: bson.TypeBinaryGeneric,
 			Data:    tv.Value,
 		}, nil
@@ -118,10 +117,10 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 	case *types.AttributeValueMemberBS:
 		var arr bson.A
 		for _, v := range tv.Value {
-			arr = append(arr, primitive.Binary{
+			arr = append(arr, bson.Binary{
 				Subtype: bson.TypeBinaryGeneric,
 				Data:    v,
-			}, nil)
+			})
 		}
 		return arr, nil
 
@@ -376,7 +375,7 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 	if err := dynamoWriteKeyValue(&buf, v2); err != nil {
 		return nil, err
 	}
-	return primitive.Binary{
+	return bson.Binary{
 		Subtype: bson.TypeBinaryGeneric,
 		Data:    buf.Bytes(),
 	}, nil

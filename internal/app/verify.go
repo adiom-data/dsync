@@ -22,8 +22,7 @@ import (
 	"github.com/cespare/xxhash"
 	"github.com/urfave/cli/v2"
 	"go.akshayshah.org/memhttp"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -129,7 +128,7 @@ func (s *source) readUpdates(ctx context.Context, partitions []*adiomv1.UpdatesP
 				for _, update := range msg.GetUpdates() {
 					var idBson []bson.RawValue
 					for _, id := range update.GetId() {
-						idBson = append(idBson, bson.RawValue{Type: bsontype.Type(id.GetType()), Value: id.GetData()})
+						idBson = append(idBson, bson.RawValue{Type: bson.Type(id.GetType()), Value: id.GetData()})
 					}
 					if update.GetType() == adiomv1.UpdateType_UPDATE_TYPE_DELETE {
 						ch <- Update{

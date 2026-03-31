@@ -13,10 +13,10 @@ import (
 	"time"
 
 	connectorMongo "github.com/adiom-data/dsync/connectors/mongo"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/connstring"
 )
 
 // default db name if not set in the connection string
@@ -60,10 +60,8 @@ func (s *StateStore) Setup(ctx context.Context) error {
 	reg.RegisterTypeMapEntry(bson.TypeEmbeddedDocument, tM)
 
 	// Connect to the MongoDB instance
-	ctxConnect, cancelConnectCtx := context.WithTimeout(s.ctx, s.settings.serverConnectTimeout)
-	defer cancelConnectCtx()
 	clientOptions := options.Client().ApplyURI(s.settings.ConnectionString).SetConnectTimeout(s.settings.serverConnectTimeout).SetRegistry(reg)
-	client, err := mongo.Connect(ctxConnect, clientOptions)
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		slog.Debug("Error connecting to MongoDB instance")
 		return err

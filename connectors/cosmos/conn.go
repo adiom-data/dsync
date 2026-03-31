@@ -15,10 +15,9 @@ import (
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	moptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	moptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -64,7 +63,7 @@ func encodeResumeToken(epoch int64, token []byte) []byte {
 func decodeResumeToken(input []byte) (int64, []byte) {
 	var s bson.M
 	_ = bson.Unmarshal(input, &s)
-	return s["a"].(int64), s["b"].(primitive.Binary).Data
+	return s["a"].(int64), s["b"].(bson.Binary).Data
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -209,13 +208,13 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
 			}
-			var opts *moptions.ChangeStreamOptions
+			var opts *moptions.ChangeStreamOptionsBuilder
 			if token != nil {
 				//set the change stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
 			} else { //we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
-				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
+				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
@@ -231,12 +230,6 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			defer changeStream.Close(ctx)
 
 			for changeStream.Next(ctx) {
-				var change bson.M
-				if err := changeStream.Decode(&change); err != nil {
-					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
-					continue
-				}
-
 				lsnTracker.IncrementLSN(ns)
 
 				if changeStream.RemainingBatchLength() == 0 {
@@ -262,19 +255,27 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 	return nil
 }
 
-func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
+func convertChangeStreamEventToUpdate(change mongoconn.MongoUpdate) (*adiomv1.Update, error) {
 	//slog.Debug(fmt.Sprintf("Converting change stream event %v", change))
 
-	// treat all change stream events as updates
 	// get the id of the document that was changed
-	id := change["documentKey"].(bson.M)["_id"]
-	// convert id to raw bson
-	idType, idVal, err := bson.MarshalValue(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal _id: %v", err)
+	var idType bson.Type
+	var idVal []byte
+	for _, k := range change.DocumentKey {
+		if k.Key == "_id" {
+			var err error
+			idType, idVal, err = bson.MarshalValue(k.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal _id: %v", err)
+			}
+			break
+		}
+	}
+	if idVal == nil {
+		return nil, fmt.Errorf("_id not found in documentKey")
 	}
 
-	if change["operationType"] == "delete" {
+	if change.OperationType == "delete" {
 		return &adiomv1.Update{
 			Id: []*adiomv1.BsonValue{{
 				Data: idVal,
@@ -286,15 +287,9 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 	}
 
 	// get the full state of the document after the change
-	if change["fullDocument"] == nil {
+	if len(change.FullDocument) == 0 {
 		//TODO (AK, 6/2024): find a better way to report that we need to ignore this event
 		return nil, nil // no full document, nothing to do (probably got deleted before we got to the event in the change stream)
-	}
-	fullDocument := change["fullDocument"].(bson.M)
-	// convert fulldocument to BSON.Raw
-	fullDocumentRaw, err := bson.Marshal(fullDocument)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal full document: %v", err)
 	}
 	update := &adiomv1.Update{
 		Id: []*adiomv1.BsonValue{{
@@ -303,7 +298,7 @@ func convertChangeStreamEventToUpdate(change bson.M) (*adiomv1.Update, error) {
 			Name: "_id",
 		}},
 		Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
-		Data: fullDocumentRaw,
+		Data: change.FullDocument,
 	}
 	return update, nil
 }
@@ -430,13 +425,13 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
 			}
-			var opts *moptions.ChangeStreamOptions
+			var opts *moptions.ChangeStreamOptionsBuilder
 			if token != nil {
 				//set the change stream options to start from the resume token
 				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
 			} else { //we need to start from the read plan creation time to be safe
 				// create timestamp from read plan start time
-				ts := primitive.Timestamp{T: uint32(readPlanStartAt)}
+				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
 				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
 				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
 			}
@@ -454,7 +449,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			var updates []*adiomv1.Update
 
 			for changeStream.Next(ctx) {
-				var change bson.M
+				var change mongoconn.MongoUpdate
 				if err := changeStream.Decode(&change); err != nil {
 					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
 					continue
@@ -528,10 +523,8 @@ func NewConn(settings ConnectorSettings) adiomv1connect.ConnectorServiceHandler 
 	var witnessMongoClient *mongo.Client
 	// Connect to the witness MongoDB instance
 	if settings.EmulateDeletes {
-		ctxConnect, cancel := context.WithTimeout(context.Background(), settings.ServerConnectTimeout)
-		defer cancel()
 		clientOptions := moptions.Client().ApplyURI(settings.WitnessMongoConnString).SetConnectTimeout(settings.ServerConnectTimeout)
-		client, err := mongo.Connect(ctxConnect, clientOptions)
+		client, err := mongo.Connect(clientOptions)
 		if err != nil {
 			panic(err)
 		}

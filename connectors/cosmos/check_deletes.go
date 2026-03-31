@@ -16,10 +16,9 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -179,7 +178,7 @@ func checkSourceIdsAndGenerateDeletesWorker(ctx context.Context, client *mongo.C
 		}
 
 		// convert result to array
-		missingIds = []interface{}(res["missingIds"].(primitive.A))
+		missingIds = []interface{}(res["missingIds"].(bson.A))
 	} else {
 		slog.Debug(fmt.Sprintf("Missing ids source query returned nothing for %v", idsWithLoc.loc))
 		//this means all are missing on the source!

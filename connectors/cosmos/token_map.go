@@ -15,7 +15,7 @@ import (
 	"sync"
 
 	"github.com/adiom-data/dsync/protocol/iface"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type TokenMap struct {

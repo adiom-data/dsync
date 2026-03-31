@@ -21,10 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsoncodec"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/sync/errgroup"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
@@ -59,7 +56,7 @@ type conn struct {
 
 	pkeys        map[string][]string
 	settings     PostgresSettings
-	bsonRegistry *bsoncodec.Registry
+	bsonRegistry *bson.Registry
 }
 
 func (c *conn) Teardown() {
@@ -441,7 +438,7 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
 		m["_id"] = b
-		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, m)
+		marshalled, err := marshalWithRegistry(c.bsonRegistry, m)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
@@ -474,9 +471,9 @@ func (c *conn) StreamLSN(context.Context, *connect.Request[adiomv1.StreamLSNRequ
 	return nil
 }
 
-func toMongoID(reg *bsoncodec.Registry, in []interface{}) ([]*adiomv1.BsonValue, interface{}, error) {
+func toMongoID(reg *bson.Registry, in []interface{}) ([]*adiomv1.BsonValue, interface{}, error) {
 	if len(in) == 1 {
-		typ, data, err := bson.MarshalValueWithRegistry(reg, in[0])
+		typ, data, err := marshalValueWithRegistry(reg, in[0])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -489,15 +486,15 @@ func toMongoID(reg *bsoncodec.Registry, in []interface{}) ([]*adiomv1.BsonValue,
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(in); err != nil {
-		return nil, primitive.Binary{}, err
+		return nil, bson.Binary{}, err
 	}
-	b := primitive.Binary{
+	b := bson.Binary{
 		Subtype: bson.TypeBinaryGeneric,
 		Data:    buf.Bytes(),
 	}
-	typ, data, err := bson.MarshalValueWithRegistry(reg, b)
+	typ, data, err := marshalValueWithRegistry(reg, b)
 	if err != nil {
-		return nil, primitive.Binary{}, err
+		return nil, bson.Binary{}, err
 	}
 	return []*adiomv1.BsonValue{{
 		Name: "_id",
@@ -516,7 +513,7 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 			return nil, err
 		}
 		update.New["_id"] = b
-		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, update.New)
+		marshalled, err := marshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
 		}
@@ -533,7 +530,7 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 			return nil, err
 		}
 		update.New["_id"] = b
-		marshalled, err := bson.MarshalWithRegistry(c.bsonRegistry, update.New)
+		marshalled, err := marshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
 		}
@@ -816,12 +813,12 @@ func fromMongoID(id []*adiomv1.BsonValue) ([]interface{}, error) {
 	}
 
 	var value interface{}
-	if err := bson.UnmarshalValue(bsontype.Type(id[0].GetType()), id[0].GetData(), &value); err != nil {
+	if err := bson.UnmarshalValue(bson.Type(id[0].GetType()), id[0].GetData(), &value); err != nil {
 		return nil, err
 	}
 
 	// If it's a binary (composite key), decode it
-	if b, ok := value.(primitive.Binary); ok && b.Subtype == bson.TypeBinaryGeneric {
+	if b, ok := value.(bson.Binary); ok && b.Subtype == bson.TypeBinaryGeneric {
 		var compositeKey []interface{}
 		br := bytes.NewReader(b.Data)
 		dec := gob.NewDecoder(br)

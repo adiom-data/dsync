@@ -8,7 +8,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/common"
 	"github.com/cespare/xxhash"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func compareHash(t *testing.T, hasher hash.Hash64, left []byte, right []byte, projection map[string]interface{}) bool {

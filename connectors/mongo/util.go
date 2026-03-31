@@ -16,15 +16,15 @@ import (
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/connstring"
 )
 
 //XXX (AK, 6/2024): this is not going to work on anything but a dedicated Mongo cluster
 /*
-func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timestamp, error) {
+func getLastOpTime(ctx context.Context, client *mongo.Client) (*bson.Timestamp, error) {
 	appendOplogNoteCmd := bson.D{
 		{"appendOplogNote", 1},
 		{"data", bson.D{{"adiom-connector", "lastOpTime"}}},
@@ -43,7 +43,7 @@ func getLastOpTime(ctx context.Context, client *mongo.Client) (*primitive.Timest
 	}
 
 	t, i := opTimeRaw.Timestamp()
-	return &primitive.Timestamp{T: t, I: i}, nil
+	return &bson.Timestamp{T: t, I: i}, nil
 }
 */
 
@@ -57,7 +57,7 @@ const (
 )
 
 type Watchable interface {
-	Watch(ctx context.Context, pipeline interface{}, opts ...*options.ChangeStreamOptions) (*mongo.ChangeStream, error)
+	Watch(ctx context.Context, pipeline interface{}, opts ...options.Lister[options.ChangeStreamOptions]) (*mongo.ChangeStream, error)
 }
 
 func getLatestResumeToken(ctx context.Context, client Watchable) (bson.Raw, error) {
