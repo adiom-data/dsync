@@ -68,6 +68,10 @@ Required elements:
    - `WriteUpdates` - incremental updates (or Unimplemented)
 7. **Teardown()** for cleanup
 
+Notes:
+- Read planning should attempt to partition source data set into random equally sized tasks in an efficient way, avoiding a complete table scan.
+- Writing should be done in an efficient way, using batch writes where possible, handling write errors. Writes should deterministically overwrite pre-existing data.
+
 Error message guidelines:
 - Include context (file path, namespace, operation)
 - Explain what went wrong AND what was expected
