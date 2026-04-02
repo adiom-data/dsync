@@ -15,6 +15,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
 	fileconnector "github.com/adiom-data/dsync/connectors/file"
+	"github.com/adiom-data/dsync/connectors/firestore"
 	"github.com/adiom-data/dsync/connectors/kafka"
 	"github.com/adiom-data/dsync/connectors/mongo"
 	"github.com/adiom-data/dsync/connectors/null"
@@ -414,6 +415,21 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					), nil
 				}
 			}),
+		},
+		{
+			Name: "Firestore",
+			IsConnector: func(s string) bool {
+				return strings.HasPrefix(strings.ToLower(s), "firestore://")
+			},
+			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
+				if len(args) == 0 {
+					return nil, nil, fmt.Errorf("missing firestore connection string: %w", ErrMissingConnector)
+				}
+				settings := firestore.ConnectorSettings{Uri: args[0]}
+				return CreateHelper("Firestore", "firestore://project-id[/database-id] [options]", FirestoreFlags(&settings), func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					return firestore.NewConn(c.Context, settings)
+				})(args, as)
+			},
 		},
 		{
 			Name: "s3vectors",
@@ -1131,5 +1147,26 @@ func insecureClient() *http.Client {
 				return net.Dial(network, addr)
 			},
 		},
+	}
+}
+
+func FirestoreFlags(settings *firestore.ConnectorSettings) []cli.Flag {
+	return []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "credentials-file",
+			Usage:       "Path to GCP service account JSON credentials file",
+			Destination: &settings.CredentialsFile,
+		}),
+		altsrc.NewIntFlag(&cli.IntFlag{
+			Name:        "batch-size",
+			Usage:       "Maximum documents per batch write (max 500)",
+			Value:       500,
+			Destination: &settings.BatchSize,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "id",
+			Usage:       "A fixed id for the connector",
+			Destination: &settings.ID,
+		}),
 	}
 }
