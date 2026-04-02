@@ -10,6 +10,7 @@ description: Create a new dsync connector with test suite. Use when adding suppo
 - Know the URI scheme (e.g., `file://`, `s3://`, `mongodb://`)
 - Understand what operations the source supports (read, write, streaming)
 - Understand data types that need to be supported (JSON and/or BSON)
+- Check how to run the data source/sink locally (e.g. via Docker) for testing or if the user needs to provision it manually
 
 ## Instructions
 
@@ -167,6 +168,8 @@ Evaluate output for: namespaces, data content, warnings, errors.
 
 Run dsync with the new connector as source:
 ```bash
-go run main.go <new-connector-uri> "/dev/null --log-json"
+go run main.go <new-connector-uri> /dev/null --log-json
 ```
 Evaluate output for: namespaces, data content, warnings, errors.
+
+Try running both (one from /dev/fakesource to the new connector, and another one from the new connector to /dev/null) at the same time to ensure that the CDC is working correctly.
