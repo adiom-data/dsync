@@ -198,22 +198,33 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 }
 
 func (c *conn) writeBatch(ctx context.Context, collectionName string, data [][]byte, dataType adiomv1.DataType) error {
-	batch := c.client.Batch()
+	bw := c.client.BulkWriter(ctx)
 	collection := c.client.Collection(collectionName)
 
+	var jobs []*firestore.BulkWriterJob
 	for _, raw := range data {
 		docID, docData, err := extractDocumentIDAndData(raw, dataType)
 		if err != nil {
+			bw.End()
 			return fmt.Errorf("failed to extract document ID: %w", err)
 		}
 
 		docRef := collection.Doc(docID)
-		batch.Set(docRef, docData)
+		job, err := bw.Set(docRef, docData)
+		if err != nil {
+			bw.End()
+			return fmt.Errorf("failed to queue set operation: %w", err)
+		}
+		jobs = append(jobs, job)
 	}
 
-	_, err := batch.Commit(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to commit batch: %w", err)
+	bw.End()
+
+	// Check for errors in jobs
+	for i, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return fmt.Errorf("failed to write document %d: %w", i, err)
+		}
 	}
 
 	slog.Debug("wrote batch to firestore", "collection", collectionName, "count", len(data))
@@ -221,42 +232,64 @@ func (c *conn) writeBatch(ctx context.Context, collectionName string, data [][]b
 }
 
 func (c *conn) writeUpdatesBatch(ctx context.Context, collectionName string, updates []*adiomv1.Update, dataType adiomv1.DataType) error {
-	batch := c.client.Batch()
+	bw := c.client.BulkWriter(ctx)
 	collection := c.client.Collection(collectionName)
 	idKey := getIDFieldName(dataType)
 
+	var jobs []*firestore.BulkWriterJob
 	for _, update := range updates {
 		docID, err := extractIDFromBsonValues(update.GetId())
 		if err != nil {
+			bw.End()
 			return fmt.Errorf("failed to extract document ID from update: %w", err)
 		}
 
 		docRef := collection.Doc(docID)
+		var job *firestore.BulkWriterJob
 
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			batch.Delete(docRef)
+			job, err = bw.Delete(docRef)
+			if err != nil {
+				bw.End()
+				return fmt.Errorf("failed to queue delete operation: %w", err)
+			}
 		case adiomv1.UpdateType_UPDATE_TYPE_UPDATE, adiomv1.UpdateType_UPDATE_TYPE_INSERT:
 			docData, err := rawToMap(update.GetData(), dataType)
 			if err != nil {
+				bw.End()
 				return fmt.Errorf("failed to convert update data: %w", err)
 			}
 			delete(docData, idKey)
-			batch.Set(docRef, docData)
+			job, err = bw.Set(docRef, docData)
+			if err != nil {
+				bw.End()
+				return fmt.Errorf("failed to queue set operation: %w", err)
+			}
 		default:
 			slog.Warn("unknown update type, treating as upsert", "type", update.GetType())
 			docData, err := rawToMap(update.GetData(), dataType)
 			if err != nil {
+				bw.End()
 				return fmt.Errorf("failed to convert update data: %w", err)
 			}
 			delete(docData, idKey)
-			batch.Set(docRef, docData)
+			job, err = bw.Set(docRef, docData)
+			if err != nil {
+				bw.End()
+				return fmt.Errorf("failed to queue set operation: %w", err)
+			}
 		}
+		jobs = append(jobs, job)
 	}
 
-	_, err := batch.Commit(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to commit updates batch: %w", err)
+	bw.End()
+
+	// Check for errors in jobs
+	for i, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return fmt.Errorf("failed to write update %d: %w", i, err)
+		}
 	}
 
 	slog.Debug("wrote updates batch to firestore", "collection", collectionName, "count", len(updates))

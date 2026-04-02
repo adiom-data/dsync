@@ -66,8 +66,8 @@ func clearCollection(ctx context.Context, client *firestore.Client, collectionNa
 	iter := col.Documents(ctx)
 	defer iter.Stop()
 
-	batch := client.Batch()
-	count := 0
+	bw := client.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
 
 	for {
 		doc, err := iter.Next()
@@ -75,23 +75,22 @@ func clearCollection(ctx context.Context, client *firestore.Client, collectionNa
 			break
 		}
 		if err != nil {
+			bw.End()
 			return err
 		}
-		batch.Delete(doc.Ref)
-		count++
-
-		// Firestore batch limit is 500
-		if count >= 500 {
-			if _, err := batch.Commit(ctx); err != nil {
-				return err
-			}
-			batch = client.Batch()
-			count = 0
+		job, err := bw.Delete(doc.Ref)
+		if err != nil {
+			bw.End()
+			return err
 		}
+		jobs = append(jobs, job)
 	}
 
-	if count > 0 {
-		if _, err := batch.Commit(ctx); err != nil {
+	bw.End()
+
+	// Check for errors
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
 			return err
 		}
 	}
