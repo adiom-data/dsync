@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"connectrpc.com/connect"
@@ -21,6 +22,7 @@ import (
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	pkgtest "github.com/adiom-data/dsync/pkg/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"google.golang.org/api/iterator"
@@ -357,6 +359,157 @@ func TestFirestoreWriteUpdatesDelete(t *testing.T) {
 	// Verify document was deleted
 	_, err = testClient.Collection(collectionName).Doc("to-delete").Get(ctx)
 	assert.Error(t, err, "Document should not exist after delete")
+}
+
+// TestFirestoreComplexBsonTypes tests writing complex BSON documents with various types
+func TestFirestoreComplexBsonTypes(t *testing.T) {
+	if getEmulatorHost() == "" {
+		t.Skip("Skipping integration test: FIRESTORE_EMULATOR_HOST not set")
+	}
+
+	ctx := context.Background()
+	projectID := getTestProjectID()
+	collectionName := "complex_bson_test"
+
+	// Create connector
+	connector, err := NewConn(ctx, ConnectorSettings{
+		Uri:       "firestore://" + projectID,
+		BatchSize: 500,
+	})
+	require.NoError(t, err)
+	defer connector.(interface{ Teardown() }).Teardown()
+
+	// Create test client for verification
+	testClient, err := newTestClient(ctx)
+	require.NoError(t, err)
+	defer testClient.Close()
+
+	// Clear collection first
+	err = clearCollection(ctx, testClient, collectionName)
+	require.NoError(t, err)
+
+	client := pkgtest.ClientFromHandler(connector)
+
+	// Create test data with various BSON types
+	docID := bson.ObjectID{0x66, 0xf4, 0xc6, 0x92, 0x91, 0xab, 0x1a, 0x55, 0x33, 0x94, 0x5e, 0x37}
+	refID1 := bson.ObjectID{0x66, 0xf4, 0xc6, 0x92, 0x91, 0xab, 0x1a, 0x55, 0x33, 0x94, 0x5e, 0x38}
+	refID2 := bson.ObjectID{0x66, 0xf4, 0xc6, 0x92, 0x91, 0xab, 0x1a, 0x55, 0x33, 0x94, 0x5e, 0x39}
+	createdAt := bson.DateTime(1704067200000) // 2024-01-01 00:00:00 UTC
+	updatedAt := bson.DateTime(1704153600000) // 2024-01-02 00:00:00 UTC
+	binaryData := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+	decimal, _ := bson.ParseDecimal128("12345.6789")
+
+	doc := bson.D{
+		{Key: "_id", Value: docID},
+		{Key: "name", Value: "complex-document"},
+		{Key: "createdAt", Value: createdAt},
+		{Key: "updatedAt", Value: updatedAt},
+		{Key: "binaryData", Value: bson.Binary{Subtype: bson.TypeBinaryGeneric, Data: binaryData}},
+		{Key: "price", Value: decimal},
+		{Key: "tags", Value: bson.A{"tag1", "tag2", "tag3"}},
+		{Key: "refs", Value: bson.A{refID1, refID2}},
+		{Key: "metadata", Value: bson.D{
+			{Key: "version", Value: int32(42)},
+			{Key: "lastModified", Value: updatedAt},
+			{Key: "nested", Value: bson.D{
+				{Key: "deep", Value: "value"},
+				{Key: "deepRef", Value: refID1},
+			}},
+		}},
+		{Key: "active", Value: true},
+		{Key: "count", Value: int64(9999999999)},
+		{Key: "score", Value: 3.14159},
+		{Key: "nullField", Value: nil},
+		{Key: "mixedArray", Value: bson.A{
+			"string",
+			int32(123),
+			true,
+			createdAt,
+			refID1,
+		}},
+	}
+
+	// Marshal to BSON
+	encoded, err := bson.Marshal(doc)
+	require.NoError(t, err)
+
+	// Write via connector
+	_, err = client.WriteData(ctx, connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace: collectionName,
+		Data:      [][]byte{encoded},
+		Type:      adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+	}))
+	require.NoError(t, err)
+
+	// Read back from Firestore and verify
+	docSnap, err := testClient.Collection(collectionName).Doc(docID.Hex()).Get(ctx)
+	require.NoError(t, err)
+
+	data := docSnap.Data()
+
+	// Verify string field
+	assert.Equal(t, "complex-document", data["name"])
+
+	// Verify DateTime -> time.Time conversion
+	createdAtResult, ok := data["createdAt"].(time.Time)
+	assert.True(t, ok, "createdAt should be time.Time, got %T", data["createdAt"])
+	assert.Equal(t, int64(1704067200000), createdAtResult.UnixMilli())
+
+	updatedAtResult, ok := data["updatedAt"].(time.Time)
+	assert.True(t, ok, "updatedAt should be time.Time")
+	assert.Equal(t, int64(1704153600000), updatedAtResult.UnixMilli())
+
+	// Verify Binary -> []byte conversion
+	binaryResult, ok := data["binaryData"].([]byte)
+	assert.True(t, ok, "binaryData should be []byte, got %T", data["binaryData"])
+	assert.Equal(t, binaryData, binaryResult)
+
+	// Verify Decimal128 -> string conversion
+	priceResult, ok := data["price"].(string)
+	assert.True(t, ok, "price should be string, got %T", data["price"])
+	assert.Equal(t, "12345.6789", priceResult)
+
+	// Verify string array
+	tagsResult, ok := data["tags"].([]any)
+	assert.True(t, ok, "tags should be []any")
+	assert.Equal(t, []any{"tag1", "tag2", "tag3"}, tagsResult)
+
+	// Verify ObjectID array -> string array conversion
+	refsResult, ok := data["refs"].([]any)
+	assert.True(t, ok, "refs should be []any")
+	assert.Equal(t, []any{refID1.Hex(), refID2.Hex()}, refsResult)
+
+	// Verify nested document
+	metadataResult, ok := data["metadata"].(map[string]any)
+	assert.True(t, ok, "metadata should be map[string]any, got %T", data["metadata"])
+	assert.Equal(t, int64(42), metadataResult["version"]) // Firestore converts int32 to int64
+	lastModified, ok := metadataResult["lastModified"].(time.Time)
+	assert.True(t, ok, "lastModified should be time.Time")
+	assert.Equal(t, int64(1704153600000), lastModified.UnixMilli())
+
+	// Verify deeply nested document
+	nestedResult, ok := metadataResult["nested"].(map[string]any)
+	assert.True(t, ok, "nested should be map[string]any")
+	assert.Equal(t, "value", nestedResult["deep"])
+	assert.Equal(t, refID1.Hex(), nestedResult["deepRef"])
+
+	// Verify primitives
+	assert.Equal(t, true, data["active"])
+	assert.Equal(t, int64(9999999999), data["count"])
+	assert.Equal(t, 3.14159, data["score"])
+	assert.Nil(t, data["nullField"])
+
+	// Verify mixed array with type conversions
+	mixedResult, ok := data["mixedArray"].([]any)
+	assert.True(t, ok, "mixedArray should be []any")
+	assert.Len(t, mixedResult, 5)
+	assert.Equal(t, "string", mixedResult[0])
+	assert.Equal(t, int64(123), mixedResult[1]) // Firestore converts int32 to int64
+	assert.Equal(t, true, mixedResult[2])
+	mixedTime, ok := mixedResult[3].(time.Time)
+	assert.True(t, ok, "mixed array datetime should be time.Time")
+	assert.Equal(t, int64(1704067200000), mixedTime.UnixMilli())
+	assert.Equal(t, refID1.Hex(), mixedResult[4])
 }
 
 // Helper to encode map to JSON

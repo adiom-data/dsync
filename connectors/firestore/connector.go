@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"connectrpc.com/connect"
@@ -302,6 +303,12 @@ func rawToMap(raw []byte, dataType adiomv1.DataType) (map[string]any, error) {
 		if err := bson.Unmarshal(raw, &docData); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal BSON: %w", err)
 		}
+		// Convert BSON-specific types to Firestore-compatible types
+		converted, err := convertBsonTypes(docData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert BSON types: %w", err)
+		}
+		docData = converted
 	case adiomv1.DataType_DATA_TYPE_JSON_ID:
 		if err := json.Unmarshal(raw, &docData); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
@@ -311,6 +318,85 @@ func rawToMap(raw []byte, dataType adiomv1.DataType) (map[string]any, error) {
 	}
 
 	return docData, nil
+}
+
+// convertBsonTypes recursively converts BSON-specific types to Firestore-compatible types
+func convertBsonTypes(m map[string]any) (map[string]any, error) {
+	result := make(map[string]any, len(m))
+	for k, v := range m {
+		converted, err := convertBsonValue(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert field %q: %w", k, err)
+		}
+		result[k] = converted
+	}
+	return result, nil
+}
+
+func convertBsonValue(v any) (any, error) {
+	switch val := v.(type) {
+	case nil:
+		return nil, nil
+	case bool, int32, int64, float64, string:
+		return val, nil
+	case bson.ObjectID:
+		return val.Hex(), nil
+	case bson.DateTime:
+		return val.Time().UTC(), nil
+	case bson.Binary:
+		return val.Data, nil
+	case bson.Decimal128:
+		return val.String(), nil
+	case bson.Timestamp:
+		return time.Unix(int64(val.T), 0).UTC(), nil
+	case bson.Regex:
+		return map[string]any{"pattern": val.Pattern, "options": val.Options}, nil
+	case bson.D:
+		m := make(map[string]any, len(val))
+		for _, elem := range val {
+			converted, err := convertBsonValue(elem.Value)
+			if err != nil {
+				return nil, err
+			}
+			m[elem.Key] = converted
+		}
+		return m, nil
+	case bson.M:
+		m := make(map[string]any, len(val))
+		for k, elem := range val {
+			converted, err := convertBsonValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = converted
+		}
+		return m, nil
+	case bson.A:
+		arr := make([]any, len(val))
+		for i, elem := range val {
+			converted, err := convertBsonValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			arr[i] = converted
+		}
+		return arr, nil
+	case map[string]any:
+		return convertBsonTypes(val)
+	case []any:
+		arr := make([]any, len(val))
+		for i, elem := range val {
+			converted, err := convertBsonValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			arr[i] = converted
+		}
+		return arr, nil
+	default:
+		// For unknown types, return as-is and let Firestore handle it
+		return val, nil
+	}
 }
 
 func valueToString(v any) (string, error) {
