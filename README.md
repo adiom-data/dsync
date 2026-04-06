@@ -25,6 +25,21 @@ Given source and destination databases, dsync completes an initial sync transfer
 
 ![Dsync progress reporting sample](/img/screenshot.png?width=20&raw=true)
 
+## Features
+
+* Highly parallelized initial sync
+* Automatic transition to CDC with no user action needed
+* Optimized writes
+* Resumability both during initial sync and during CDC
+* Reverse sync
+* JSON and BSON support
+* Transformers (including [CEL-based transformer](https://github.com/adiom-data/public/tree/main/dsync-transform) in Enterprise version)
+* Observability
+* Embedded verifiers
+* Only compute needed - run it in VM, Docker, Kubernetes. No persistent storage required
+
+Additionally, dsync supports load levels, rate limiting, namespace filtering and remapping, and query-based filtering for some connectors.
+
 ## Supported Connectors
 
 ### System
