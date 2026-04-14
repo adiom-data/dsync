@@ -1,0 +1,19 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message GrpcFlags {
+  option (commandargs.v1.command) = {
+    name: "grpc"
+    usage: "grpc://address:port [options]"
+  };
+
+  bool insecure = 1 [(commandargs.v1.flag) = {
+    usage: "Connect without TLS"
+  }];
+  bool gzip = 2 [(commandargs.v1.flag) = {
+    usage: "Use gzip on requests"
+  }];
+}

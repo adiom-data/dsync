@@ -1,7 +1,11 @@
 # For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
 version: v2
 modules:
-  - path: proto
+  - path: proto/dsync
+  - path: proto/connectorcommands
+    name: buf.build/adiom/connectorcommands
+deps:
+  - buf.build/adiom/commandargs
 lint:
   use:
     - STANDARD

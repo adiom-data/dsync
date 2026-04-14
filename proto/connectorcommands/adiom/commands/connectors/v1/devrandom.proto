@@ -1,0 +1,11 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message DevRandomFlags {
+  option (commandargs.v1.command) = {
+    name: "/dev/random"
+  };
+}

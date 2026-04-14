@@ -1,0 +1,55 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message KafkaSrcFlags {
+  option (commandargs.v1.command) = {
+    name: "kafka-src"
+  };
+
+  repeated string brokers = 1;
+  repeated string topics = 2;
+  repeated string topic_mappings = 3 [(commandargs.v1.flag) = {
+    name: "topic-mappings"
+  }];
+  string sasl_user = 4 [(commandargs.v1.flag) = {
+    name: "sasl-user"
+  }];
+  string sasl_password = 5 [(commandargs.v1.flag) = {
+    name: "sasl-password"
+  }];
+  int64 offset = 6 [(commandargs.v1.flag) = {
+    usage: "Custom offset for kafka (a time, or -2 for oldest)"
+    default: "-1"
+  }];
+  string data_type = 7 [(commandargs.v1.flag) = {
+    name: "data-type"
+    default: "DATA_TYPE_MONGO_BSON"
+  }];
+}
+
+message KafkaDstFlags {
+  option (commandargs.v1.command) = {
+    name: "kafka-dst"
+  };
+
+  repeated string brokers = 1;
+  string default_topic = 2 [(commandargs.v1.flag) = {
+    name: "default-topic"
+  }];
+  repeated string namespace_topic = 3 [(commandargs.v1.flag) = {
+    name: "namespace-topic"
+  }];
+  string sasl_user = 4 [(commandargs.v1.flag) = {
+    name: "sasl-user"
+  }];
+  string sasl_password = 5 [(commandargs.v1.flag) = {
+    name: "sasl-password"
+  }];
+  string data_type = 6 [(commandargs.v1.flag) = {
+    name: "data-type"
+    default: "DATA_TYPE_MONGO_BSON"
+  }];
+}

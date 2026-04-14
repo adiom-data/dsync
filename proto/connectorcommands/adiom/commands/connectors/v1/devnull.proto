@@ -1,0 +1,27 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+import "google/protobuf/duration.proto";
+
+message DevNullFlags {
+  option (commandargs.v1.command) = {
+    name: "/dev/null"
+  };
+
+  google.protobuf.Duration sleep = 1 [(commandargs.v1.flag) = {
+    usage: "Sleep time between requests"
+  }];
+  google.protobuf.Duration sleep_jitter = 2 [(commandargs.v1.flag) = {
+    name: "sleep-jitter"
+    usage: "If sleep is set, additional jitter"
+  }];
+  bool log_json = 3 [(commandargs.v1.flag) = {
+    name: "log-json"
+    usage: "Convert data to json and log INFO"
+  }];
+  string id = 4 [(commandargs.v1.flag) = {
+    usage: "A fixed id for the connector"
+  }];
+}

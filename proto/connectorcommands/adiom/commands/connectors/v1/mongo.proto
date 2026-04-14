@@ -1,0 +1,59 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+import "google/protobuf/duration.proto";
+
+// Base flags shared between MongoDB and CosmosDB connectors
+message MongoBaseFlags {
+  option (commandargs.v1.command) = {
+    name: "MongoBase"
+  };
+
+  bool skip_batch_overwrite = 1;
+  bool full_document_key = 2 [(commandargs.v1.flag) = {
+    usage: "uses the full document key instead of just _id (except for batch overwrites)"
+  }];
+  google.protobuf.Duration server_timeout = 3 [(commandargs.v1.flag) = {
+    name: "server-timeout"
+  }];
+  google.protobuf.Duration ping_timeout = 4 [(commandargs.v1.flag) = {
+    name: "ping-timeout"
+  }];
+  int32 writer_batch_size = 5 [(commandargs.v1.flag) = {
+    name: "writer-batch-size"
+  }];
+  int64 doc_partition = 6 [(commandargs.v1.flag) = {
+    name: "doc-partition"
+    default: "50000"
+  }];
+  int32 max_page_size = 7 [(commandargs.v1.flag) = {
+    name: "max-page-size"
+  }];
+  string initial_sync_query = 8 [(commandargs.v1.flag) = {
+    name: "initial-sync-query"
+    usage: "query filter for the initial data copy (v2 Extended JSON)"
+    aliases: ["q"]
+  }];
+}
+
+// Full MongoDB flags = base + MongoDB-specific extras
+message MongoFlags {
+  option (commandargs.v1.command) = {
+    name: "MongoDB"
+    usage: "mongodb://connection-string [options]"
+  };
+
+  MongoBaseFlags base = 1;
+
+  int32 sample_factor = 2 [(commandargs.v1.flag) = {
+    name: "sample-factor"
+    usage: "Number of extra samples per partition"
+    default: "10"
+  }];
+  bool per_namespace_streams = 3 [(commandargs.v1.flag) = {
+    name: "per-namespace-streams"
+    usage: "Each namespace has a separate stream"
+  }];
+}

@@ -1,13 +1,12 @@
 module github.com/adiom-data/dsync
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/IBM/sarama v1.46.3
+	github.com/adiom-data/commandargs v0.0.0-20260415173909-157c91bb5601
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.70
@@ -43,7 +42,7 @@ require (
 	golang.org/x/net v0.46.0
 	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.73.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.11
 )
 
 require (

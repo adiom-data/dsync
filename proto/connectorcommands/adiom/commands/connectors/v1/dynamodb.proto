@@ -1,0 +1,26 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message DynamoDBFlags {
+  option (commandargs.v1.command) = {
+    name: "DynamoDB"
+    usage: "dynamodb OR dynamodb://localstack"
+  };
+
+  int32 doc_partition = 1 [(commandargs.v1.flag) = {
+    name: "doc-partition"
+    usage: "Target number of documents per partition"
+    default: "50000"
+  }];
+  int32 plan_parallelism = 2 [(commandargs.v1.flag) = {
+    name: "plan-parallelism"
+    usage: "Parallelism during planning"
+    default: "4"
+  }];
+  string id = 3 [(commandargs.v1.flag) = {
+    usage: "A fixed id for the connector"
+  }];
+}

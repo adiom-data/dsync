@@ -1,0 +1,40 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+import "google/protobuf/duration.proto";
+import "adiom/commands/connectors/v1/mongo.proto";
+
+message CosmosFlags {
+  option (commandargs.v1.command) = {
+    name: "CosmosDB"
+    usage: "mongodb://cosmos-connection-string [options]"
+  };
+
+  MongoBaseFlags mongo = 1;
+
+  int32 cosmos_reader_max_namespaces = 2 [(commandargs.v1.flag) = {
+    name: "cosmos-reader-max-namespaces"
+    default: "8"
+    usage: "max namespaces to copy (keep under 15)"
+    category: "Cosmos DB-specific Options"
+  }];
+  string cosmos_deletes_cdc = 3 [(commandargs.v1.flag) = {
+    name: "cosmos-deletes-cdc"
+    usage: "witness connection string for CosmosDB deletes"
+    category: "Cosmos DB-specific Options"
+  }];
+  google.protobuf.Duration cosmos_delete_interval = 4 [(commandargs.v1.flag) = {
+    name: "cosmos-delete-interval"
+    category: "Cosmos DB-specific Options"
+  }];
+  int32 cosmos_parallel_partition_workers = 5 [(commandargs.v1.flag) = {
+    name: "cosmos-parallel-partition-workers"
+  }];
+  bool cosmos_stream_deletes_enabled = 6 [(commandargs.v1.flag) = {
+    name: "cosmos-stream-deletes-enabled"
+    usage: "If this cosmos instance supports deletes in the change stream"
+    category: "Cosmos DB-specific Options"
+  }];
+}
