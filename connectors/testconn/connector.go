@@ -380,8 +380,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 }
 
 func (c *conn) Teardown() {
-	_ = c.writeBootstrap.Close()
-	_ = c.writeUpdates.Close()
+	if c.writeBootstrap != nil {
+		_ = c.writeBootstrap.Close()
+	}
+	if c.writeUpdates != nil {
+		_ = c.writeUpdates.Close()
+	}
 }
 
 func NewConn(path string) adiomv1connect.ConnectorServiceHandler {
