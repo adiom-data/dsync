@@ -21,7 +21,7 @@
 go.work
 
 # Binary
-dsync
+/dsync
 java/target
 
 # Log files

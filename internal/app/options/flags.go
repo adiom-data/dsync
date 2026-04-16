@@ -29,8 +29,7 @@ const (
 	DefaultPprofPort = 8081
 	// DefaultWebPort is the default port for the web server.
 	DefaultWebPort = 8080
-	// DefaultMaxNumNamespaces is the default maximum number of namespaces that can be copied from the CosmosDB connector.
-	cosmosDefaultMaxNumNamespaces = 8
+
 )
 
 var validModes = []string{iface.SyncModeFull, iface.SyncModeCDC, iface.SyncModeInitialSync}

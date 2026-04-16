@@ -1,0 +1,62 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message S3Flags {
+  option (commandargs.v1.command) = {
+    name: "s3"
+    usage: "s3://bucket[/prefix] [options]"
+  };
+
+  bool pretty_json = 1 [(commandargs.v1.flag) = {
+    name: "pretty-json"
+    usage: "Pretty-print JSON output data"
+    default: "true"
+  }];
+  string region = 2 [(commandargs.v1.flag) = {
+    usage: "AWS region for the target bucket"
+    required: true
+  }];
+  string prefix = 3 [(commandargs.v1.flag) = {
+    usage: "Override or append to the key prefix derived from the connection string"
+  }];
+  string output_format = 4 [(commandargs.v1.flag) = {
+    name: "output-format"
+    usage: "Output format for stored objects (only 'json' supported)"
+    default: "json"
+  }];
+  string profile = 5 [(commandargs.v1.flag) = {
+    usage: "Shared config profile"
+  }];
+  string endpoint = 6 [(commandargs.v1.flag) = {
+    usage: "Custom S3 endpoint (for Localstack or S3-compatible services)"
+  }];
+  string access_key_id = 7 [(commandargs.v1.flag) = {
+    name: "access-key-id"
+    usage: "Static AWS access key ID"
+  }];
+  string secret_access_key = 8 [(commandargs.v1.flag) = {
+    name: "secret-access-key"
+    usage: "Static AWS secret access key"
+  }];
+  string session_token = 9 [(commandargs.v1.flag) = {
+    name: "session-token"
+    usage: "Static AWS session token"
+  }];
+  bool use_path_style = 10 [(commandargs.v1.flag) = {
+    name: "use-path-style"
+    usage: "Use path-style addressing (useful for Localstack/minio)"
+  }];
+  int64 max_file_size = 11 [(commandargs.v1.flag) = {
+    name: "max-file-size"
+    usage: "Maximum size of a single file in S3 (in MB)"
+    default: "10"
+  }];
+  int64 max_total_memory = 12 [(commandargs.v1.flag) = {
+    name: "max-total-memory"
+    usage: "Maximum total memory for batching before flushing to S3 (in MB)"
+    default: "100"
+  }];
+}

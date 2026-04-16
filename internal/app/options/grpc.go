@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	connectorsv1 "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
 )
 
 var GRPCConnector = ConfigureGRPCFactory("Connector", nil, func(c connect.HTTPClient, s string, opts ...connect.ClientOption) interface{} {
@@ -69,29 +69,24 @@ func ConfigureGRPCFactory(usage string, missingErr error, f func(connect.HTTPCli
 			HelpName:  "grpc",
 			Usage:     usage,
 			UsageText: "grpc://address:port [options]",
-			Flags: []cli.Flag{
-				altsrc.NewBoolFlag(&cli.BoolFlag{
-					Name:  "insecure",
-					Usage: "Connect without TLS",
-				}),
-				altsrc.NewBoolFlag(&cli.BoolFlag{
-					Name:  "gzip",
-					Usage: "Use gzip on requests",
-				}),
-			},
+			Flags:     connectorsv1.GrpcFlagsCommandFlags(),
 			Action: func(c *cli.Context) error {
 				restArgs = c.Args().Slice()
+				flags, err := connectorsv1.ParseGrpcFlags(c)
+				if err != nil {
+					return err
+				}
 				_, endpoint, ok := strings.Cut(args[0], "://")
 				if !ok {
 					return fmt.Errorf("invalid connection string %v", args[0])
 				}
 				options := []connect.ClientOption{connect.WithGRPC()}
-				if c.Bool("gzip") {
+				if flags.Gzip {
 					options = append(options, connect.WithSendGzip())
 				}
 				finalEndpoint := "https://" + endpoint
 				httpClient := http.DefaultClient
-				if c.Bool("insecure") {
+				if flags.Insecure {
 					httpClient = insecureClient()
 					finalEndpoint = "http://" + endpoint
 				}

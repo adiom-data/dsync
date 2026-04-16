@@ -14,3 +14,5 @@ plugins:
     out: java/src/main/java
   - remote: buf.build/protocolbuffers/java:v29.1
     out: java/src/main/java
+inputs:
+  - directory: proto/dsync

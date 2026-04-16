@@ -1,0 +1,16 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message SqlbatchFlags {
+  option (commandargs.v1.command) = {
+    name: "sqlbatch"
+  };
+
+  string config = 1 [(commandargs.v1.flag) = {
+    required: true
+    default: "config.yml"
+  }];
+}

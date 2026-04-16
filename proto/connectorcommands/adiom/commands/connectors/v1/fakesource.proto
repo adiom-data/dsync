@@ -1,0 +1,75 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+import "google/protobuf/duration.proto";
+
+message FakeSourceFlags {
+  option (commandargs.v1.command) = {
+    name: "/dev/fakesource"
+  };
+
+  google.protobuf.Duration sleep = 1 [(commandargs.v1.flag) = {
+    usage: "Sleep time between requests"
+  }];
+  google.protobuf.Duration jitter = 2 [(commandargs.v1.flag) = {
+    usage: "Additional jitter to certain durations"
+  }];
+  google.protobuf.Duration update_duration = 3 [(commandargs.v1.flag) = {
+    name: "update-duration"
+    usage: "Time for each update-batch-size to be produced"
+    default: "400ms"
+  }];
+  google.protobuf.Duration stream_tick = 4 [(commandargs.v1.flag) = {
+    name: "stream-tick"
+    usage: "Polling time to check for stream updates"
+    default: "1s"
+  }];
+  int32 num_namespaces = 5 [(commandargs.v1.flag) = {
+    name: "num-namespaces"
+    usage: "Number of namespaces (index starts at 0)"
+    default: "2"
+  }];
+  int32 num_partitions_per_namespace = 6 [(commandargs.v1.flag) = {
+    name: "num-partitions-per-namespace"
+    usage: "Number of partitions per namespace"
+    default: "3"
+  }];
+  int32 num_update_partitions_per_namespace = 7 [(commandargs.v1.flag) = {
+    name: "num-update-partitions-per-namespace"
+    usage: "Number of update partitions per namespace. If set to 0, use a single stream for all."
+  }];
+  int64 num_docs_per_partition = 8 [(commandargs.v1.flag) = {
+    name: "num-docs-per-partition"
+    usage: "Number of docs per partition"
+    default: "1000"
+  }];
+  int32 batch_size = 9 [(commandargs.v1.flag) = {
+    name: "batch-size"
+    usage: "Number of docs per batch"
+    default: "150"
+  }];
+  int32 update_batch_size = 10 [(commandargs.v1.flag) = {
+    name: "update-batch-size"
+    usage: "Number of docs per update"
+    default: "50"
+  }];
+  int32 max_updates_per_tick = 11 [(commandargs.v1.flag) = {
+    name: "max-updates-per-tick"
+    usage: "Number of docs per update"
+    default: "300"
+  }];
+  string namespace_prefix = 12 [(commandargs.v1.flag) = {
+    name: "namespace-prefix"
+    usage: "Prefix for namespace"
+    default: "ns"
+  }];
+  repeated string payload = 13 [(commandargs.v1.flag) = {
+    usage: "Payload for all items (key:value)"
+  }];
+  string payload_json = 14 [(commandargs.v1.flag) = {
+    name: "payload-json"
+    usage: "Payload for all items as a json (overrides payload)"
+  }];
+}

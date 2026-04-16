@@ -1,0 +1,26 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message FileFlags {
+  option (commandargs.v1.command) = {
+    name: "file"
+    usage: "file:///path/to/dir OR file:///path/to/file.csv [options]"
+  };
+
+  string format = 1 [(commandargs.v1.flag) = {
+    usage: "Output format for stored files (only 'csv' supported)"
+    default: "csv"
+  }];
+  string delimiter = 2 [(commandargs.v1.flag) = {
+    usage: "CSV delimiter character"
+    default: ","
+  }];
+  int32 batch_size = 3 [(commandargs.v1.flag) = {
+    name: "batch-size"
+    usage: "Number of records to read per batch when listing data"
+    default: "10000"
+  }];
+}

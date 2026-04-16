@@ -1,0 +1,37 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+
+message S3VectorsFlags {
+  option (commandargs.v1.command) = {
+    name: "s3vectors"
+    usage: "s3vector or s3vectors"
+  };
+
+  string bucket = 1 [(commandargs.v1.flag) = {
+    usage: "the s3 vector bucket to use"
+    required: true
+  }];
+  string vector_key = 2 [(commandargs.v1.flag) = {
+    name: "vector-key"
+    usage: "The field containing the vector"
+    default: "data"
+  }];
+  int32 max_parallelism = 3 [(commandargs.v1.flag) = {
+    name: "max-parallelism"
+    usage: "Limits how many concurrent requests are made to s3vectors per worker."
+    default: "1"
+  }];
+  int32 rate_limit = 4 [(commandargs.v1.flag) = {
+    name: "rate-limit"
+    usage: "Max vectors per second across workers on this process per namespace (vector index)."
+    default: "2500"
+  }];
+  int32 batch_size = 5 [(commandargs.v1.flag) = {
+    name: "batch-size"
+    usage: "Max size of each PutVector requests (aws hard limit is 500)."
+    default: "500"
+  }];
+}

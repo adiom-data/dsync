@@ -8,9 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/IBM/sarama"
 	"github.com/adiom-data/dsync/connectors/airbyte"
 	"github.com/adiom-data/dsync/connectors/cosmos"
 	"github.com/adiom-data/dsync/connectors/dynamodb"
@@ -26,6 +24,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	connectorsv1 "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -180,7 +179,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "/dev/random")
 			},
-			Create: CreateHelper("/dev/random", "/dev/random", nil, func(*cli.Context, []string, AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+			Create: CreateHelper("/dev/random", "/dev/random", connectorsv1.DevRandomFlagsCommandFlags(), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 				return random.NewConn(random.ConnectorSettings{}), nil
 			}),
 		},
@@ -189,103 +188,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "/dev/fakesource")
 			},
-			Create: CreateHelper("/dev/fakesource", "/dev/fakesource", []cli.Flag{
-				&cli.DurationFlag{
-					Name:  "sleep",
-					Usage: "Sleep time between requests",
-				},
-				&cli.DurationFlag{
-					Name:  "jitter",
-					Usage: "Additional jitter to certain durations",
-				},
-				&cli.DurationFlag{
-					Name:  "update-duration",
-					Usage: "Time for each update-batch-size to be produced",
-					Value: time.Millisecond * 400,
-				},
-				&cli.DurationFlag{
-					Name:  "stream-tick",
-					Usage: "Polling time to check for stream updates",
-					Value: time.Second,
-				},
-				&cli.IntFlag{
-					Name:  "num-namespaces",
-					Usage: "Number of namespaces (index starts at 0)",
-					Value: 2,
-				},
-				&cli.IntFlag{
-					Name:  "num-partitions-per-namespace",
-					Usage: "Number of partitions per namespace",
-					Value: 3,
-				},
-				&cli.IntFlag{
-					Name:  "num-update-partitions-per-namespace",
-					Usage: "Number of update partitions per namespace. If set to 0, use a single stream for all.",
-				},
-				&cli.Int64Flag{
-					Name:  "num-docs-per-partition",
-					Usage: "Number of docs per partition",
-					Value: 1000,
-				},
-				&cli.IntFlag{
-					Name:  "batch-size",
-					Usage: "Number of docs per batch",
-					Value: 150,
-				},
-				&cli.IntFlag{
-					Name:  "update-batch-size",
-					Usage: "Number of docs per update",
-					Value: 50,
-				},
-				&cli.IntFlag{
-					Name:  "max-updates-per-tick",
-					Usage: "Number of docs per update",
-					Value: 300,
-				},
-				&cli.StringFlag{
-					Name:  "namespace-prefix",
-					Usage: "Prefix for namespace",
-					Value: "ns",
-				},
-				&cli.StringSliceFlag{
-					Name:  "payload",
-					Usage: "Payload for all items (`key:value`)",
-				},
-				&cli.StringFlag{
-					Name:  "payload-json",
-					Usage: "Payload for all items as a json (overrides payload)",
-				},
-			}, func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				var m map[string]any
-				payload := c.StringSlice("payload")
-				if len(payload) > 0 {
-					m = map[string]any{}
+			Create: CreateHelper("/dev/fakesource", "/dev/fakesource", connectorsv1.FakeSourceFlagsCommandFlags(), func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseFakeSourceFlags(c)
+				if err != nil {
+					return nil, err
 				}
-				for _, p := range payload {
-					k, v, _ := strings.Cut(p, ":")
-					m[k] = v
-				}
-				payloadJSON := c.String("payload-json")
-				if payloadJSON != "" {
-					if err := json.Unmarshal([]byte(payloadJSON), &m); err != nil {
-						return nil, fmt.Errorf("err unmarshalling payload-json: %w", err)
-					}
-				}
-				return random.NewConnV2(random.ConnV2Input{
-					NamespacePrefix:                 c.String("namespace-prefix"),
-					NumNamespaces:                   c.Int("num-namespaces"),
-					NumPartitionsPerNamespace:       c.Int("num-partitions-per-namespace"),
-					NumUpdatePartitionsPerNamespace: c.Int("num-update-partitions-per-namespace"),
-					BatchSize:                       c.Int("batch-size"),
-					UpdateBatchSize:                 c.Int("update-batch-size"),
-					MaxUpdatesPerTick:               c.Int("max-updates-per-tick"),
-					NumDocsPerPartition:             c.Int64("num-docs-per-partition"),
-					Payload:                         m,
-					Sleep:                           c.Duration("sleep"),
-					Jitter:                          c.Duration("jitter"),
-					UpdateDuration:                  c.Duration("update-duration"),
-					StreamTick:                      c.Duration("stream-tick"),
-				}), nil
+				return fakeSourceFromFlags(flags)
 			}),
 		},
 		{
@@ -293,25 +201,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "/dev/null")
 			},
-			Create: CreateHelper("/dev/null", "/dev/null", []cli.Flag{
-				&cli.DurationFlag{
-					Name:  "sleep",
-					Usage: "Sleep time between requests",
-				},
-				&cli.DurationFlag{
-					Name:  "sleep-jitter",
-					Usage: "If sleep is set, additional jitter",
-				},
-				&cli.BoolFlag{
-					Name:  "log-json",
-					Usage: "Convert data to json and log INFO",
-				},
-				&cli.StringFlag{
-					Name:  "id",
-					Usage: "A fixed id for the connector",
-				},
-			}, func(c *cli.Context, args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return null.NewConn(c.String("id"), c.Bool("log-json"), c.Duration("sleep"), c.Duration("sleep-jitter")), nil
+			Create: CreateHelper("/dev/null", "/dev/null", connectorsv1.DevNullFlagsCommandFlags(), func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseDevNullFlags(c)
+				if err != nil {
+					return nil, err
+				}
+				return null.NewConn(flags.Id, flags.LogJson, flags.Sleep.AsDuration(), flags.SleepJitter.AsDuration()), nil
 			}),
 		},
 		{
@@ -323,11 +218,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				if len(args) == 0 {
 					return nil, nil, fmt.Errorf("missing s3 connection string: %w", ErrMissingConnector)
 				}
-				settings := s3connector.ConnectorSettings{
-					Uri: args[0],
-				}
-				return CreateHelper("s3", "s3://bucket[/prefix] [options]", S3Flags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-					return s3connector.NewConn(settings)
+				return CreateHelper("s3", "s3://bucket[/prefix] [options]", connectorsv1.S3FlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					flags, err := connectorsv1.ParseS3Flags(c)
+					if err != nil {
+						return nil, err
+					}
+					return s3connector.NewConn(s3SettingsFromFlags(flags, args[0]))
 				})(args, as)
 			},
 		},
@@ -340,10 +236,15 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				if len(args) == 0 {
 					return nil, nil, fmt.Errorf("missing file connection string: %w", ErrMissingConnector)
 				}
-				settings := fileconnector.ConnectorSettings{
-					Uri: args[0],
-				}
-				return CreateHelper("file", "file:///path/to/dir OR file:///path/to/file.csv [options]", FileFlags(&settings), func(_ *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return CreateHelper("file", "file:///path/to/dir OR file:///path/to/file.csv [options]", connectorsv1.FileFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					flags, err := connectorsv1.ParseFileFlags(c)
+					if err != nil {
+						return nil, err
+					}
+					settings, err := fileSettingsFromFlags(flags, args[0])
+					if err != nil {
+						return nil, err
+					}
 					return fileconnector.NewConn(settings)
 				})(args, as)
 			},
@@ -366,13 +267,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "sqlbatch")
 			},
-			Create: CreateHelper("sqlbatch", "sqlbatch", []cli.Flag{
-				&cli.StringFlag{
-					Name:     "config",
-					Required: true,
-					Value:    "config.yml",
-				}}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return sqlbatch.NewConn(c.String("config"))
+			Create: CreateHelper("sqlbatch", "sqlbatch", connectorsv1.SqlbatchFlagsCommandFlags(), func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseSqlbatchFlags(c)
+				if err != nil {
+					return nil, err
+				}
+				return sqlbatch.NewConn(flags.Config)
 			}),
 		},
 		{
@@ -380,39 +280,24 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "dynamodb") || strings.EqualFold(s, "dynamodb://localstack")
 			},
-			Create: CreateHelper("DynamoDB", "dynamodb OR dynamodb://localstack", []cli.Flag{
-				&cli.IntFlag{
-					Name:  "doc-partition",
-					Usage: "Target number of documents per partition",
-					Value: 50000,
-				},
-				&cli.IntFlag{
-					Name:  "plan-parallelism",
-					Usage: "Parallelism during planning",
-					Value: 4,
-				},
-				&cli.StringFlag{
-					Name:  "id",
-					Usage: "A fixed id for the connector",
-				},
-			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+			Create: CreateHelper("DynamoDB", "dynamodb OR dynamodb://localstack", connectorsv1.DynamoDBFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseDynamoDBFlags(c)
+				if err != nil {
+					return nil, err
+				}
+				connString := ""
 				if strings.EqualFold(args[0], "dynamodb://localstack") {
-					_, connString, ok := strings.Cut(args[0], "://")
+					_, cs, ok := strings.Cut(args[0], "://")
 					if !ok {
 						return nil, fmt.Errorf("invalid connection string %v", args[0])
 					}
-					return dynamodb.NewConn(connString,
-						dynamodb.WithDocsPerSegment(c.Int("doc-partition")),
-						dynamodb.WithPlanParallelism(c.Int("plan-parallelism")),
-						dynamodb.WithID(c.String("id")),
-					), nil
-				} else {
-					return dynamodb.NewConn("",
-						dynamodb.WithDocsPerSegment(c.Int("doc-partition")),
-						dynamodb.WithPlanParallelism(c.Int("plan-parallelism")),
-						dynamodb.WithID(c.String("id")),
-					), nil
+					connString = cs
 				}
+				return dynamodb.NewConn(connString,
+					dynamodb.WithDocsPerSegment(int(flags.DocPartition)),
+					dynamodb.WithPlanParallelism(int(flags.PlanParallelism)),
+					dynamodb.WithID(flags.Id),
+				), nil
 			}),
 		},
 		{
@@ -420,39 +305,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "s3vector") || strings.EqualFold(s, "s3vectors")
 			},
-			Create: CreateHelper("s3vectors", "s3vector or s3vectors", []cli.Flag{
-				&cli.StringFlag{
-					Name:     "bucket",
-					Usage:    "the s3 vector bucket to use",
-					Required: true,
-				},
-				&cli.StringFlag{
-					Name:  "vector-key",
-					Value: "data",
-					Usage: "The field containing the vector",
-				},
-				&cli.IntFlag{
-					Name:  "max-parallelism",
-					Value: 1,
-					Usage: "Limits how many concurrent requests are made to s3vectors per worker.",
-				},
-				&cli.IntFlag{
-					Name:  "rate-limit",
-					Value: 2500,
-					Usage: "Max vectors per second across workers on this process per namespace (vector index).",
-				},
-				&cli.IntFlag{
-					Name:  "batch-size",
-					Value: 500,
-					Usage: "Max size of each PutVector requests (aws hard limit is 500).",
-				},
-			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				bucket := c.String("bucket")
-				vectorKey := c.String("vector-key")
-				maxParallelism := c.Int("max-parallelism")
-				rateLimit := c.Int("rate-limit")
-				batchSize := c.Int("batch-size")
-				return s3vector.NewConn(bucket, vectorKey, maxParallelism, batchSize, rateLimit)
+			Create: CreateHelper("s3vectors", "s3vector or s3vectors", connectorsv1.S3VectorsFlagsCommandFlags(), func(c *cli.Context, _ []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseS3VectorsFlags(c)
+				if err != nil {
+					return nil, err
+				}
+				return s3vector.NewConn(flags.Bucket, flags.VectorKey, int(flags.MaxParallelism), int(flags.BatchSize), int(flags.RateLimit))
 			}),
 		},
 		{
@@ -464,13 +322,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return false
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
-				settings := cosmos.ConnectorSettings{}
-				settings.ConnectionString = args[0]
-				if as.BaseThreadCount != 0 {
-					settings.NumParallelPartitionWorkers = as.BaseThreadCount / 2
-				}
-				return CreateHelper("CosmosDB", "mongodb://cosmos-connection-string [options]", CosmosFlags(&settings), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-					return cosmos.NewConn(settings), nil
+				return CreateHelper("CosmosDB", "mongodb://cosmos-connection-string [options]", connectorsv1.CosmosFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					flags, err := connectorsv1.ParseCosmosFlags(c)
+					if err != nil {
+						return nil, err
+					}
+					return cosmos.NewConn(cosmosSettingsFromFlags(flags, args[0], as)), nil
 				})(args, as)
 			},
 		},
@@ -484,21 +341,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return false
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
-				settings := mongo.ConnectorSettings{ConnectionString: args[0]}
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", append(MongoFlags(&settings), []cli.Flag{
-					altsrc.NewIntFlag(&cli.IntFlag{
-						Name:        "sample-factor",
-						Destination: &settings.SampleFactor,
-						Usage:       "Number of extra samples per partition",
-						Value:       10,
-					}),
-					altsrc.NewBoolFlag(&cli.BoolFlag{
-						Name:        "per-namespace-streams",
-						Usage:       "Each namespace has a separate stream",
-						Destination: &settings.PerNamespaceStreams,
-					}),
-				}...), func(_ *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-					return mongo.NewConn(settings)
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", connectorsv1.MongoFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					flags, err := connectorsv1.ParseMongoFlags(c)
+					if err != nil {
+						return nil, err
+					}
+					return mongo.NewConn(mongoSettingsFromFlags(flags, args[0]))
 				})(args, as)
 			},
 		},
@@ -508,13 +356,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
-				settings := postgresSettingsDefault
-				return CreateHelper("Postgres", postgresUsage, PostgresFlags(&settings), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-					if c.Bool("manual") {
-						settings.Force = false
+				return CreateHelper("Postgres", postgresUsage, connectorsv1.PostgresFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+					flags, err := connectorsv1.ParsePostgresFlags(c)
+					if err != nil {
+						return nil, err
 					}
-					settings.URL = args[0]
-					return postgres.NewConn(c.Context, settings)
+					return postgres.NewConn(c.Context, postgresSettingsFromFlags(flags, args[0]))
 				})(args, as)
 			},
 		},
@@ -641,43 +488,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "kafka-dst")
 			},
-			Create: CreateHelper("kafka-dst", "kafka-dst", []cli.Flag{
-				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
-					Name: "brokers",
-				}),
-				altsrc.NewStringFlag(&cli.StringFlag{
-					Name: "default-topic",
-				}),
-				altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
-					Name: "namespace-topic",
-				}),
-				altsrc.NewStringFlag(&cli.StringFlag{
-					Name: "sasl-user",
-				}),
-				altsrc.NewStringFlag(&cli.StringFlag{
-					Name: "sasl-password",
-				}),
-				altsrc.NewStringFlag(&cli.StringFlag{
-					Name:  "data-type",
-					Value: adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
-				}),
-			}, func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				brokers := c.StringSlice("brokers")
-				defaultTopic := c.String("default-topic")
-				namespaceTopic := c.StringSlice("namespace-topic")
-				user := c.String("sasl-user")
-				password := c.String("sasl-password")
-				dataType := adiomv1.DataType(adiomv1.DataType_value[c.String("data-type")])
-
-				tm := map[string]string{}
-				for _, m := range namespaceTopic {
-					ns, topic, ok := strings.Cut(m, ":")
-					if !ok {
-						return nil, fmt.Errorf("invalid topic mapping %v", m)
-					}
-					tm[ns] = topic
+			Create: CreateHelper("kafka-dst", "kafka-dst", connectorsv1.KafkaDstFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseKafkaDstFlags(c)
+				if err != nil {
+					return nil, err
 				}
-				return kafka.NewDestKafka(brokers, defaultTopic, tm, user, password, dataType)
+				return kafkaDstFromFlags(flags)
 			}),
 		},
 		{
@@ -685,8 +501,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 			IsConnector: func(s string) bool {
 				return strings.EqualFold(s, "kafka-src")
 			},
-			Create: CreateHelper("kafka-src", "kafka-src", KafkaSrcFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
-				return ParseKafkaSrcFlags(c)
+			Create: CreateHelper("kafka-src", "kafka-src", connectorsv1.KafkaSrcFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				flags, err := connectorsv1.ParseKafkaSrcFlags(c)
+				if err != nil {
+					return nil, err
+				}
+				return kafkaSrcFromFlags(flags)
 			}),
 		},
 		{
@@ -719,11 +539,14 @@ func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorSe
 		HelpName:  "kafka-wrap",
 		Usage:     "Connector",
 		UsageText: "kafka-wrap [options] [source-connector] [connector-options]",
-		Flags:     KafkaSrcFlags(),
+		Flags:     connectorsv1.KafkaSrcFlagsCommandFlags(),
 		Action: func(c *cli.Context) error {
-			var err error
 			restArgs = c.Args().Slice()
-			conn, err = ParseKafkaSrcFlags(c)
+			flags, err := connectorsv1.ParseKafkaSrcFlags(c)
+			if err != nil {
+				return err
+			}
+			conn, err = kafkaSrcFromFlags(flags)
 			if err != nil {
 				return err
 			}
@@ -767,56 +590,33 @@ func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorSe
 	return nil, nil, ErrHelp
 }
 
-func ParseKafkaSrcFlags(c *cli.Context) (adiomv1connect.ConnectorServiceHandler, error) {
-	brokers := c.StringSlice("brokers")
-	topics := c.StringSlice("topics")
-	topicMappings := c.StringSlice("topic-mappings")
-	user := c.String("sasl-user")
-	password := c.String("sasl-password")
-	kafkaOffset := c.Int64("offset")
-	dataType := adiomv1.DataType(adiomv1.DataType_value[c.String("data-type")])
-
+func kafkaSrcFromFlags(f *connectorsv1.KafkaSrcFlags) (adiomv1connect.ConnectorServiceHandler, error) {
+	dataType := adiomv1.DataType(adiomv1.DataType_value[f.DataType])
 	tm := map[string][]string{}
-	for _, topic := range topics {
+	for _, topic := range f.Topics {
 		tm[topic] = nil
 	}
-	for _, m := range topicMappings {
+	for _, m := range f.TopicMappings {
 		topic, ns, ok := strings.Cut(m, ":")
 		if !ok {
 			return nil, fmt.Errorf("invalid topic mapping %v", m)
 		}
 		tm[topic] = append(tm[topic], ns)
 	}
-	return kafka.NewKafkaConn(brokers, tm, kafka.DsyncMessageToUpdate, kafka.DsyncMessageToNamespace, user, password, kafkaOffset, dataType), nil
+	return kafka.NewKafkaConn(f.Brokers, tm, kafka.DsyncMessageToUpdate, kafka.DsyncMessageToNamespace, f.SaslUser, f.SaslPassword, f.Offset, dataType), nil
 }
 
-func KafkaSrcFlags() []cli.Flag {
-	return []cli.Flag{
-		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
-			Name: "brokers",
-		}),
-		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
-			Name: "topics",
-		}),
-		altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
-			Name: "topic-mappings",
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name: "sasl-user",
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name: "sasl-password",
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:  "offset",
-			Usage: "Custom offset for kafka (a time, or -2 for oldest)",
-			Value: sarama.OffsetNewest,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:  "data-type",
-			Value: adiomv1.DataType_DATA_TYPE_MONGO_BSON.String(),
-		}),
+func kafkaDstFromFlags(f *connectorsv1.KafkaDstFlags) (adiomv1connect.ConnectorServiceHandler, error) {
+	dataType := adiomv1.DataType(adiomv1.DataType_value[f.DataType])
+	tm := map[string]string{}
+	for _, m := range f.NamespaceTopic {
+		ns, topic, ok := strings.Cut(m, ":")
+		if !ok {
+			return nil, fmt.Errorf("invalid topic mapping %v", m)
+		}
+		tm[ns] = topic
 	}
+	return kafka.NewDestKafka(f.Brokers, f.DefaultTopic, tm, f.SaslUser, f.SaslPassword, dataType)
 }
 
 func WeaviateFlags() []cli.Flag {
@@ -849,189 +649,111 @@ func WeaviateFlags() []cli.Flag {
 	}
 }
 
-func FileFlags(settings *fileconnector.ConnectorSettings) []cli.Flag {
-	var delimiterStr string
-	return []cli.Flag{
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "format",
-			Usage:       "Output format for stored files (only 'csv' supported)",
-			Value:       "csv",
-			Destination: &settings.Format,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "delimiter",
-			Usage:       "CSV delimiter character",
-			Value:       ",",
-			Destination: &delimiterStr,
-			Action: func(_ *cli.Context, v string) error {
-				if len(v) != 1 {
-					return fileconnector.ErrInvalidDelimiter
-				}
-				settings.Delimiter = rune(v[0])
-				return nil
-			},
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "batch-size",
-			Usage:       "Number of records to read per batch when listing data",
-			Value:       fileconnector.DefaultBatchSize,
-			Destination: &settings.BatchSize,
-		}),
+func fileSettingsFromFlags(f *connectorsv1.FileFlags, uri string) (fileconnector.ConnectorSettings, error) {
+	if f.Delimiter != "" && len(f.Delimiter) != 1 {
+		return fileconnector.ConnectorSettings{}, fileconnector.ErrInvalidDelimiter
+	}
+	s := fileconnector.ConnectorSettings{
+		Uri:       uri,
+		Format:    f.Format,
+		BatchSize: int(f.BatchSize),
+	}
+	if len(f.Delimiter) == 1 {
+		s.Delimiter = rune(f.Delimiter[0])
+	}
+	return s, nil
+}
+
+func s3SettingsFromFlags(f *connectorsv1.S3Flags, uri string) s3connector.ConnectorSettings {
+	return s3connector.ConnectorSettings{
+		Uri:            uri,
+		PrettyJSON:     f.PrettyJson,
+		Region:         f.Region,
+		Prefix:         f.Prefix,
+		OutputFormat:   f.OutputFormat,
+		Profile:        f.Profile,
+		Endpoint:       f.Endpoint,
+		AccessKeyID:    f.AccessKeyId,
+		SecretAccessKey: f.SecretAccessKey,
+		SessionToken:   f.SessionToken,
+		UsePathStyle:   f.UsePathStyle,
+		MaxFileSizeMB:  f.MaxFileSize,
+		MaxTotalMemoryMB: f.MaxTotalMemory,
 	}
 }
 
-func S3Flags(settings *s3connector.ConnectorSettings) []cli.Flag {
-	return []cli.Flag{
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "pretty-json",
-			Usage:       "Pretty-print JSON output data",
-			Value:       true,
-			Destination: &settings.PrettyJSON,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "region",
-			Usage:       "AWS region for the target bucket",
-			Required:    true,
-			Destination: &settings.Region,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "prefix",
-			Usage:       "Override or append to the key prefix derived from the connection string",
-			Destination: &settings.Prefix,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "output-format",
-			Usage:       "Output format for stored objects (only 'json' supported)",
-			Value:       "json",
-			Destination: &settings.OutputFormat,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "profile",
-			Usage:       "Shared config profile",
-			Destination: &settings.Profile,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "endpoint",
-			Usage:       "Custom S3 endpoint (for Localstack or S3-compatible services)",
-			Destination: &settings.Endpoint,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "access-key-id",
-			Usage:       "Static AWS access key ID",
-			Destination: &settings.AccessKeyID,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "secret-access-key",
-			Usage:       "Static AWS secret access key",
-			Destination: &settings.SecretAccessKey,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "session-token",
-			Usage:       "Static AWS session token",
-			Destination: &settings.SessionToken,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "use-path-style",
-			Usage:       "Use path-style addressing (useful for Localstack/minio)",
-			Destination: &settings.UsePathStyle,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:        "max-file-size",
-			Usage:       "Maximum size of a single file in S3 (in MB)",
-			Value:       10,
-			Destination: &settings.MaxFileSizeMB,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:        "max-total-memory",
-			Usage:       "Maximum total memory for batching before flushing to S3 (in MB)",
-			Value:       100,
-			Destination: &settings.MaxTotalMemoryMB,
-		}),
+func mongoBaseSettingsFromFlags(f *connectorsv1.MongoBaseFlags, connString string) mongo.ConnectorSettings {
+	s := mongo.ConnectorSettings{ConnectionString: connString}
+	if f == nil {
+		return s
 	}
+	s.SkipBatchOverwrite = f.SkipBatchOverwrite
+	s.FullDocumentKey = f.FullDocumentKey
+	s.ServerConnectTimeout = f.ServerTimeout.AsDuration()
+	s.PingTimeout = f.PingTimeout.AsDuration()
+	s.WriterMaxBatchSize = int(f.WriterBatchSize)
+	s.TargetDocCountPerPartition = f.DocPartition
+	s.MaxPageSize = int(f.MaxPageSize)
+	s.Query = f.InitialSyncQuery
+	return s
 }
 
-func CosmosFlags(settings *cosmos.ConnectorSettings) []cli.Flag {
-	return append(MongoFlags(&settings.ConnectorSettings), []cli.Flag{
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "cosmos-reader-max-namespaces",
-			Usage:       "maximum number of namespaces that can be copied from the CosmosDB connector. Recommended to keep this number under 15 to avoid performance issues.",
-			Value:       cosmosDefaultMaxNumNamespaces,
-			Required:    false,
-			Destination: &settings.MaxNumNamespaces,
-			Category:    "Cosmos DB-specific Options",
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:     "cosmos-deletes-cdc",
-			Usage:    "witness connection string to generate CDC events for CosmosDB deletes",
-			Category: "Cosmos DB-specific Options",
-			Action: func(_ *cli.Context, v string) error {
-				settings.EmulateDeletes = true
-				settings.WitnessMongoConnString = v
-				return nil
-			},
-		}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{
-			Name:        "cosmos-delete-interval",
-			Required:    false,
-			Destination: &settings.DeletesCheckInterval,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "cosmos-parallel-partition-workers",
-			Required:    false,
-			Destination: &settings.NumParallelPartitionWorkers,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "cosmos-stream-deletes-enabled",
-			Usage:       "If this cosmos instance supports deletes in the change stream (currently a preview feature)",
-			Destination: &settings.WithDelete,
-		}),
-	}...)
+func mongoSettingsFromFlags(f *connectorsv1.MongoFlags, connString string) mongo.ConnectorSettings {
+	s := mongoBaseSettingsFromFlags(f.Base, connString)
+	s.SampleFactor = int(f.SampleFactor)
+	s.PerNamespaceStreams = f.PerNamespaceStreams
+	return s
 }
 
-func MongoFlags(settings *mongo.ConnectorSettings) []cli.Flag {
-	return []cli.Flag{
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "skip-batch-overwrite",
-			Destination: &settings.SkipBatchOverwrite,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "full-document-key",
-			Usage:       "uses the full document key instead of just _id (except for batch overwrites)",
-			Destination: &settings.FullDocumentKey,
-		}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{
-			Name:        "server-timeout",
-			Required:    false,
-			Destination: &settings.ServerConnectTimeout,
-		}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{
-			Name:        "ping-timeout",
-			Required:    false,
-			Destination: &settings.PingTimeout,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "writer-batch-size",
-			Required:    false,
-			Destination: &settings.WriterMaxBatchSize,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:        "doc-partition",
-			Required:    false,
-			Destination: &settings.TargetDocCountPerPartition,
-			Value:       50 * 1000,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "max-page-size",
-			Destination: &settings.MaxPageSize,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "initial-sync-query",
-			Usage:       "query filter for the initial data copy (v2 Extended JSON)",
-			Aliases:     []string{"q"},
-			Required:    false,
-			Destination: &settings.Query,
-		}),
+func cosmosSettingsFromFlags(f *connectorsv1.CosmosFlags, connString string, as AdditionalSettings) cosmos.ConnectorSettings {
+	s := cosmos.ConnectorSettings{
+		ConnectorSettings:           mongoBaseSettingsFromFlags(f.Mongo, connString),
+		MaxNumNamespaces:            int(f.CosmosReaderMaxNamespaces),
+		NumParallelPartitionWorkers: int(f.CosmosParallelPartitionWorkers),
+		WithDelete:                  f.CosmosStreamDeletesEnabled,
 	}
+	if as.BaseThreadCount != 0 && s.NumParallelPartitionWorkers == 0 {
+		s.NumParallelPartitionWorkers = as.BaseThreadCount / 2
+	}
+	if f.CosmosDeleteInterval != nil {
+		s.DeletesCheckInterval = f.CosmosDeleteInterval.AsDuration()
+	}
+	if f.CosmosDeletesCdc != "" {
+		s.EmulateDeletes = true
+		s.WitnessMongoConnString = f.CosmosDeletesCdc
+	}
+	return s
+}
+
+func fakeSourceFromFlags(f *connectorsv1.FakeSourceFlags) (adiomv1connect.ConnectorServiceHandler, error) {
+	var m map[string]any
+	if len(f.Payload) > 0 {
+		m = map[string]any{}
+	}
+	for _, p := range f.Payload {
+		k, v, _ := strings.Cut(p, ":")
+		m[k] = v
+	}
+	if f.PayloadJson != "" {
+		if err := json.Unmarshal([]byte(f.PayloadJson), &m); err != nil {
+			return nil, fmt.Errorf("err unmarshalling payload-json: %w", err)
+		}
+	}
+	return random.NewConnV2(random.ConnV2Input{
+		NamespacePrefix:                 f.NamespacePrefix,
+		NumNamespaces:                   int(f.NumNamespaces),
+		NumPartitionsPerNamespace:       int(f.NumPartitionsPerNamespace),
+		NumUpdatePartitionsPerNamespace: int(f.NumUpdatePartitionsPerNamespace),
+		BatchSize:                       int(f.BatchSize),
+		UpdateBatchSize:                 int(f.UpdateBatchSize),
+		MaxUpdatesPerTick:               int(f.MaxUpdatesPerTick),
+		NumDocsPerPartition:             f.NumDocsPerPartition,
+		Payload:                         m,
+		Sleep:                           f.Sleep.AsDuration(),
+		Jitter:                          f.Jitter.AsDuration(),
+		UpdateDuration:                  f.UpdateDuration.AsDuration(),
+		StreamTick:                      f.StreamTick.AsDuration(),
+	}), nil
 }
 
 var postgresUsage = `postgresql://user:pass@host:port [options]
@@ -1049,78 +771,25 @@ Destination:
    Not currently supported
 `
 
-var postgresSettingsDefault = postgres.PostgresSettings{
-	Force:                      true,
-	SlotName:                   "dsync_slot",
-	PublicationName:            "dsync_pub",
-	Limit:                      1000,
-	StreamMaxBatchWait:         time.Second * 5,
-	StreamMaxBatchSize:         100,
-	StreamFlushDelay:           time.Minute * 3,
-	EstimatedCountThreshold:    1000000,
-	TargetDocCountPerPartition: 100000,
-	EnableReplicaMode:          true,
-}
-
-func PostgresFlags(settings *postgres.PostgresSettings) []cli.Flag {
-	return []cli.Flag{
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "page-size",
-			Usage:       "Specify pagination limit when fetching for initial sync",
-			Value:       postgresSettingsDefault.Limit,
-			Destination: &settings.Limit,
-		}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{
-			Name:        "stream-max-batch-wait",
-			Usage:       "Force flush a stream batch after this interval",
-			Value:       postgresSettingsDefault.StreamMaxBatchWait,
-			Destination: &settings.StreamMaxBatchWait,
-		}),
-		altsrc.NewIntFlag(&cli.IntFlag{
-			Name:        "stream-max-batch-size",
-			Usage:       "Force flush a stream batch at this limit",
-			Value:       postgresSettingsDefault.StreamMaxBatchSize,
-			Destination: &settings.StreamMaxBatchSize,
-		}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{
-			Name:        "stream-flush-delay",
-			Usage:       "Delay before notifying postgres backend of stream progress. This should be comfortably larger than saving streaming cursor updates.",
-			Value:       postgresSettingsDefault.StreamFlushDelay,
-			Destination: &settings.StreamFlushDelay,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:  "manual",
-			Usage: "Use to not recreate replication slot and publication (e.g. if you are managing these outside). You will still need to clean up the slot later even if you don't use this.",
-			Value: !postgresSettingsDefault.Force,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "replication-slot",
-			Value:       postgresSettingsDefault.SlotName,
-			Destination: &postgresSettingsDefault.SlotName,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "publication-name",
-			Value:       postgresSettingsDefault.PublicationName,
-			Destination: &postgresSettingsDefault.PublicationName,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:        "estimated-count-threshold",
-			Usage:       "If estimated count is less than this, try a full count.",
-			Value:       postgresSettingsDefault.EstimatedCountThreshold,
-			Destination: &settings.EstimatedCountThreshold,
-		}),
-		altsrc.NewInt64Flag(&cli.Int64Flag{
-			Name:        "doc-partition",
-			Value:       postgresSettingsDefault.TargetDocCountPerPartition,
-			Destination: &settings.TargetDocCountPerPartition,
-		}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{
-			Name:        "enable-replica-mode",
-			Usage:       "Enable replica mode (SET session_replication_role = 'replica') for sink operations. This disables triggers and rules.",
-			Value:       postgresSettingsDefault.EnableReplicaMode,
-			Destination: &settings.EnableReplicaMode,
-		}),
+func postgresSettingsFromFlags(f *connectorsv1.PostgresFlags, url string) postgres.PostgresSettings {
+	s := postgres.PostgresSettings{
+		URL:                        url,
+		Force:                      !f.Manual,
+		SlotName:                   f.ReplicationSlot,
+		PublicationName:            f.PublicationName,
+		Limit:                      int(f.PageSize),
+		StreamMaxBatchSize:         int(f.StreamMaxBatchSize),
+		EstimatedCountThreshold:    f.EstimatedCountThreshold,
+		TargetDocCountPerPartition: f.DocPartition,
+		EnableReplicaMode:          f.EnableReplicaMode,
 	}
+	if f.StreamMaxBatchWait != nil {
+		s.StreamMaxBatchWait = f.StreamMaxBatchWait.AsDuration()
+	}
+	if f.StreamFlushDelay != nil {
+		s.StreamFlushDelay = f.StreamFlushDelay.AsDuration()
+	}
+	return s
 }
 
 func insecureClient() *http.Client {

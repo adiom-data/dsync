@@ -1,0 +1,10 @@
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  - local: protoc-gen-commandargs-urfave
+    out: gen
+    opt: paths=source_relative
+inputs:
+  - directory: proto/connectorcommands

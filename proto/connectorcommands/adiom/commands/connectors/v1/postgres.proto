@@ -1,0 +1,59 @@
+syntax = "proto3";
+package adiom.commands.connectors.v1;
+option go_package = "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1";
+
+import "commandargs/v1/options.proto";
+import "google/protobuf/duration.proto";
+
+message PostgresFlags {
+  option (commandargs.v1.command) = {
+    name: "Postgres"
+    usage: "postgresql://user:pass@host:port [options]"
+  };
+
+  int32 page_size = 1 [(commandargs.v1.flag) = {
+    name: "page-size"
+    usage: "Specify pagination limit when fetching for initial sync"
+    default: "1000"
+  }];
+  google.protobuf.Duration stream_max_batch_wait = 2 [(commandargs.v1.flag) = {
+    name: "stream-max-batch-wait"
+    usage: "Force flush a stream batch after this interval"
+    default: "5s"
+  }];
+  int32 stream_max_batch_size = 3 [(commandargs.v1.flag) = {
+    name: "stream-max-batch-size"
+    usage: "Force flush a stream batch at this limit"
+    default: "100"
+  }];
+  google.protobuf.Duration stream_flush_delay = 4 [(commandargs.v1.flag) = {
+    name: "stream-flush-delay"
+    usage: "Delay before notifying postgres backend of stream progress. This should be comfortably larger than saving streaming cursor updates."
+    default: "3m"
+  }];
+  bool manual = 5 [(commandargs.v1.flag) = {
+    usage: "Use to not recreate replication slot and publication (e.g. if you are managing these outside). You will still need to clean up the slot later even if you don't use this."
+  }];
+  string replication_slot = 6 [(commandargs.v1.flag) = {
+    name: "replication-slot"
+    default: "dsync_slot"
+  }];
+  string publication_name = 7 [(commandargs.v1.flag) = {
+    name: "publication-name"
+    default: "dsync_pub"
+  }];
+  int64 estimated_count_threshold = 8 [(commandargs.v1.flag) = {
+    name: "estimated-count-threshold"
+    usage: "If estimated count is less than this, try a full count."
+    default: "1000000"
+  }];
+  int64 doc_partition = 9 [(commandargs.v1.flag) = {
+    name: "doc-partition"
+    default: "100000"
+  }];
+  bool enable_replica_mode = 10 [(commandargs.v1.flag) = {
+    name: "enable-replica-mode"
+    usage: "Enable replica mode (SET session_replication_role = 'replica') for sink operations. This disables triggers and rules."
+    default: "true"
+  }];
+}
