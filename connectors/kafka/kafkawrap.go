@@ -88,3 +88,16 @@ func (k *kafkaWrapConn) StreamLSN(ctx context.Context, r *connect.Request[adiomv
 func (k *kafkaWrapConn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
 	return k.kafkaConn.StreamUpdates(ctx, r, s)
 }
+
+type teardownable interface {
+	Teardown()
+}
+
+func (k *kafkaWrapConn) Teardown() {
+	if t, ok := k.kafkaConn.(teardownable); ok {
+		t.Teardown()
+	}
+	if t, ok := k.kafkaWrapUnderlying.(teardownable); ok {
+		t.Teardown()
+	}
+}

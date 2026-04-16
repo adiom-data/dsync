@@ -969,6 +969,12 @@ func MongoClient(ctx context.Context, settings ConnectorSettings) (*mongo.Client
 
 func (c *conn) Teardown() {
 	c.cancel()
+	c.buffersMutex.Lock()
+	for id, buf := range c.buffers {
+		buf.cleanup.Stop()
+		delete(c.buffers, id)
+	}
+	c.buffersMutex.Unlock()
 	_ = c.client.Disconnect(context.Background())
 }
 

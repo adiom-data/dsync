@@ -34,6 +34,19 @@ import (
 var ErrMissingConnector = errors.New("missing or unsupported connector")
 var ErrHelp = errors.New("connector help used")
 
+type teardownable interface {
+	Teardown()
+}
+
+func teardownConnector(cc ConfiguredConnector) {
+	if t, ok := cc.Local.(teardownable); ok {
+		t.Teardown()
+	}
+	if t, ok := cc.Remote.(teardownable); ok {
+		t.Teardown()
+	}
+}
+
 type AdditionalSettings struct {
 	BaseThreadCount int
 }
@@ -90,6 +103,7 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 	}
 
 	if len(dstArgs) < 1 {
+		teardownConnector(src)
 		return src, dst, nil, fmt.Errorf("missing destination: %w", ErrMissingConnector)
 	}
 	var restArgs []string
@@ -97,10 +111,12 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 		if registeredConnector.IsConnector(dstArgs[0]) {
 			if registeredConnector.Create != nil {
 				if dst.Local, restArgs, err = registeredConnector.Create(dstArgs, additionalSettings); err != nil {
+					teardownConnector(src)
 					return src, dst, nil, err
 				}
 			} else {
 				if dst.Remote, restArgs, err = registeredConnector.CreateRemote(dstArgs, additionalSettings); err != nil {
+					teardownConnector(src)
 					return src, dst, nil, err
 				}
 			}
@@ -111,10 +127,12 @@ func ConfigureConnectors(args []string, additionalSettings AdditionalSettings) (
 			} else {
 				_, _, err = registeredConnector.CreateRemote([]string{dstArgs[0], "help"}, additionalSettings)
 			}
+			teardownConnector(src)
 			return src, dst, nil, err
 		}
 	}
 	if dst.Local == nil && dst.Remote == nil {
+		teardownConnector(src)
 		return src, dst, nil, fmt.Errorf("unsupported destination: %w", ErrMissingConnector)
 	}
 	return src, dst, restArgs, nil
@@ -552,6 +570,9 @@ func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorSe
 			}
 			registeredConnectors := GetRegisteredConnectors()
 			if len(restArgs) < 1 {
+				if t, ok := conn.(teardownable); ok {
+					t.Teardown()
+				}
 				return fmt.Errorf("missing connector for kafka-wrap")
 			}
 			for _, c := range registeredConnectors {
@@ -559,6 +580,9 @@ func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorSe
 					if c.Create != nil {
 						underlying, newRestArgs, err := c.Create(restArgs, as)
 						if err != nil {
+							if t, ok := conn.(teardownable); ok {
+								t.Teardown()
+							}
 							return fmt.Errorf("err creating wrapped connector: %w", err)
 						}
 						restArgs = newRestArgs
@@ -567,12 +591,18 @@ func KafkaWrap(args []string, as AdditionalSettings) (adiomv1connect.ConnectorSe
 					} else if c.CreateRemote != nil {
 						underlying, newRestArgs, err := c.CreateRemote(restArgs, as)
 						if err != nil {
+							if t, ok := conn.(teardownable); ok {
+								t.Teardown()
+							}
 							return fmt.Errorf("err creating wrapped connector: %w", err)
 						}
 						restArgs = newRestArgs
 						conn = kafka.NewKafkaWrapConn(conn, underlying)
 						return nil
 					} else {
+						if t, ok := conn.(teardownable); ok {
+							t.Teardown()
+						}
 						return fmt.Errorf("unable to wrap connector")
 					}
 				}
