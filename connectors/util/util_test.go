@@ -9,6 +9,33 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestBsonIdKey(t *testing.T) {
+	// Same parts produce equal keys.
+	a := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id", Type: 2, Data: []byte{1, 2, 3}}})
+	b := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id", Type: 2, Data: []byte{1, 2, 3}}})
+	assert.Equal(t, a, b)
+
+	// Different data produces different keys.
+	c := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id", Type: 2, Data: []byte{1, 2, 4}}})
+	assert.NotEqual(t, a, c)
+
+	// Different type produces different keys.
+	d := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id", Type: 3, Data: []byte{1, 2, 3}}})
+	assert.NotEqual(t, a, d)
+
+	// Different name produces different keys.
+	e := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_ix", Type: 2, Data: []byte{1, 2, 3}}})
+	assert.NotEqual(t, a, e)
+
+	// Data containing null bytes does not collide across boundary shifts.
+	x := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id", Type: 2, Data: []byte("ab\x00cd")}})
+	y := util.BsonIdKey([]*adiomv1.BsonValue{{Name: "_id\x00ab", Type: 2, Data: []byte("cd")}})
+	assert.NotEqual(t, x, y)
+
+	// Empty id list yields empty key.
+	assert.Equal(t, "", util.BsonIdKey(nil))
+}
+
 func TestKeepLastUpdate(t *testing.T) {
 	testData := []struct {
 		Name     string
