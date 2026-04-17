@@ -50,7 +50,10 @@ func (tv *TViewDetails) SetUpDisplay(app *tview.Application, errorText *tview.Te
 		AddItem(progressBarTextView, 1, 1, false).
 		AddItem(errorText, 0, 1, false)
 	tv.root = root //indices are 0, 1, 2, 3, corresponding to header, table, progressBar, and errorLogs respectively
+	table.SetFixed(1, 0)             // Keep the header row fixed
+	table.SetSelectable(true, false) // Allow row selection (vertical scrolling)
 	tv.app.SetRoot(root, true)
+	tv.app.SetFocus(table) // Set focus to the table (so that the user can scroll through it)
 }
 
 // Get the latest status report based on the runner progress struct and update the tview components accordingly
