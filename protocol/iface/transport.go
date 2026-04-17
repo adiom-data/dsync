@@ -42,6 +42,8 @@ const (
 	MutationType_Ignore
 
 	MutationType_Barrier
+
+	MutationType_Apply
 )
 
 const (

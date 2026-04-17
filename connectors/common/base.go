@@ -798,6 +798,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 								mutationType = iface.MutationType_Update
 							case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 								mutationType = iface.MutationType_Delete
+							case adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE:
+								mutationType = iface.MutationType_Apply
 							}
 
 							dataChannel <- iface.DataMessage{
@@ -822,6 +824,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 							mutationType = iface.MutationType_Update
 						case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 							mutationType = iface.MutationType_Delete
+						case adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE:
+							mutationType = iface.MutationType_Apply
 						}
 
 						dataChannel <- iface.DataMessage{
@@ -843,6 +847,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 						mutationType = iface.MutationType_Update
 					case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
 						mutationType = iface.MutationType_Delete
+					case adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE:
+						mutationType = iface.MutationType_Apply
 					}
 					c.progressTracker.UpdateChangeStreamProgressTracking()
 					readerProgress.changeStreamEvents.Add(1)
@@ -1123,20 +1129,26 @@ func (c *connector) ProcessDataMessages(dataMsgs []iface.DataMessage) error {
 			c.progressTracker.UpdateWriteLSN(dataMsg.SeqNum)
 		case iface.MutationType_Insert:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   *&dataMsg.Id,
+				Id:   dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Update:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   *&dataMsg.Id,
+				Id:   dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
 				Data: *dataMsg.Data,
 			})
 		case iface.MutationType_Delete:
 			msgs = append(msgs, &adiomv1.Update{
-				Id:   *&dataMsg.Id,
+				Id:   dataMsg.Id,
 				Type: adiomv1.UpdateType_UPDATE_TYPE_DELETE,
+			})
+		case iface.MutationType_Apply:
+			msgs = append(msgs, &adiomv1.Update{
+				Id:   dataMsg.Id,
+				Type: adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE,
+				Data: *dataMsg.Data,
 			})
 		default:
 			slog.Error(fmt.Sprintf("unsupported operation type during batch: %v", dataMsg.MutationType))
