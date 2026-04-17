@@ -896,45 +896,166 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
+func (c *conn) buildIdFilter(update *adiomv1.Update) (bson.D, string, error) {
+	var idFilter bson.D
+	var normalized []*adiomv1.BsonValue
+	if len(update.GetId()) == 0 {
+		return nil, "", fmt.Errorf("err update with unexpected empty id")
+	}
+	for _, idPart := range update.GetId() {
+		key := idPart.GetName()
+		// For backwards compatibility- we used to pass no key
+		if key == "" {
+			key = "_id"
+		}
+		if !c.settings.FullDocumentKey && key != "_id" {
+			continue
+		}
+		typ := bson.Type(idPart.GetType())
+		idFilter = append(idFilter, bson.E{Key: key, Value: bson.RawValue{Type: typ, Value: idPart.GetData()}})
+		normalized = append(normalized, &adiomv1.BsonValue{Name: key, Type: idPart.GetType(), Data: idPart.GetData()})
+	}
+	if len(idFilter) == 0 {
+		return nil, "", fmt.Errorf("err with _id not found- enable full-document-key or ensure an id part has the name _id: %v", update.GetId())
+	}
+	return idFilter, util.BsonIdKey(normalized), nil
+}
+
+func stripIdFields(raw bson.Raw, idFilter bson.D) (bson.Raw, error) {
+	idKeys := make(map[string]struct{}, len(idFilter))
+	for _, e := range idFilter {
+		idKeys[e.Key] = struct{}{}
+	}
+	elems, err := raw.Elements()
+	if err != nil {
+		return nil, fmt.Errorf("stripIdFields: malformed bson: %w", err)
+	}
+	filtered := make(bson.D, 0, len(elems))
+	stripped := false
+	for _, elem := range elems {
+		if _, ok := idKeys[elem.Key()]; ok {
+			stripped = true
+			continue
+		}
+		filtered = append(filtered, bson.E{Key: elem.Key(), Value: elem.Value()})
+	}
+	if !stripped {
+		return raw, nil
+	}
+	if len(filtered) == 0 {
+		return nil, nil
+	}
+	out, err := bson.Marshal(filtered)
+	if err != nil {
+		return nil, fmt.Errorf("stripIdFields: marshal filtered doc: %w", err)
+	}
+	return out, nil
+}
+
+// buildBulkModels converts a sequence of updates into a slice of mongo.WriteModel
+// ready for BulkWrite, along with whether the batch must run ordered.
+//
+// Iterates updates in reverse so that per-ID dedup keeps the last (chronological) operation.
+// When the last operation for an ID is a partial update, earlier operations for the same ID
+// are kept as ordered models so they execute in sequence before the unordered batch.
+func (c *conn) buildBulkModels(updates []*adiomv1.Update) ([]mongo.WriteModel, bool, error) {
+	var models []mongo.WriteModel
+	var orderedModels []mongo.WriteModel
+
+	seen := map[string]adiomv1.UpdateType{}
+
+	for i := len(updates) - 1; i >= 0; i-- {
+		update := updates[i]
+		idFilter, idKey, err := c.buildIdFilter(update)
+		if err != nil {
+			return nil, false, err
+		}
+
+		lastType, found := seen[idKey]
+		isNew := !found
+		if isNew {
+			seen[idKey] = update.GetType()
+			lastType = update.GetType()
+		}
+
+		switch update.GetType() {
+		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
+			model := mongo.NewReplaceOneModel().SetFilter(idFilter).SetReplacement(bson.Raw(update.GetData())).SetUpsert(true)
+			if isNew {
+				models = append(models, model)
+			} else if lastType == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
+				orderedModels = append(orderedModels, model)
+			}
+		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
+			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
+			if isNew {
+				models = append(models, model)
+			} else if lastType == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
+				orderedModels = append(orderedModels, model)
+			}
+		case adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE:
+			theUpdate := bson.M{}
+			if update.GetData() != nil {
+				stripped, err := stripIdFields(bson.Raw(update.GetData()), idFilter)
+				if err != nil {
+					return nil, false, err
+				}
+				if len(stripped) > 0 {
+					theUpdate["$set"] = stripped
+				}
+			}
+			if len(update.GetPartialUpdateUnset()) > 0 {
+				idKeys := make(map[string]struct{}, len(idFilter))
+				for _, e := range idFilter {
+					idKeys[e.Key] = struct{}{}
+				}
+				inner := bson.M{}
+				for _, field := range update.GetPartialUpdateUnset() {
+					if _, isId := idKeys[field]; isId {
+						continue
+					}
+					inner[field] = 1
+				}
+				if len(inner) > 0 {
+					theUpdate["$unset"] = inner
+				}
+			}
+			if len(theUpdate) == 0 {
+				continue
+			}
+			model := mongo.NewUpdateOneModel().SetFilter(idFilter).SetUpdate(theUpdate).SetUpsert(true)
+			if isNew {
+				models = append(models, model)
+			} else if lastType == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
+				orderedModels = append(orderedModels, model)
+			}
+		}
+	}
+
+	if len(orderedModels) > 0 {
+		slices.Reverse(orderedModels)
+		return append(orderedModels, models...), true, nil
+	}
+	return models, false, nil
+}
+
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	col, _, ok := GetCol(c.client, r.Msg.GetNamespace())
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
-	updates := util.KeepLastUpdate(r.Msg.GetUpdates())
-	var models []mongo.WriteModel
-	for _, update := range updates {
-		var idFilter bson.D
-		if len(update.GetId()) == 0 {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("err update with unexpected empty id"))
-		}
-		for _, idPart := range update.GetId() {
-			key := idPart.GetName()
-			// For backwards compatibility- we used to pass no key
-			if key == "" {
-				key = "_id"
-			}
-			if !c.settings.FullDocumentKey && key != "_id" {
-				continue
-			}
-			typ := bson.Type(idPart.GetType())
-			idFilter = append(idFilter, bson.E{Key: key, Value: bson.RawValue{Type: typ, Value: idPart.GetData()}})
-		}
-		if len(idFilter) == 0 {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("err with _id not found- enable full-document-key or ensure an id part has the name _id: %v", update.GetId()))
-		}
-		switch update.GetType() {
-		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-			model := mongo.NewReplaceOneModel().SetFilter(idFilter).SetReplacement(bson.Raw(update.GetData())).SetUpsert(true)
-			models = append(models, model)
-		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			model := mongo.NewDeleteOneModel().SetFilter(idFilter)
-			models = append(models, model)
-		}
+
+	finalModels, ordered, err := c.buildBulkModels(r.Msg.GetUpdates())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	_, err := col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+	if len(finalModels) == 0 {
+		return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
+	}
+
+	_, err = col.BulkWrite(ctx, finalModels, options.BulkWrite().SetOrdered(ordered))
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))

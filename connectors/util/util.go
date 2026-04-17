@@ -1,12 +1,35 @@
 package util
 
 import (
+	"encoding/binary"
 	"slices"
+	"strings"
 
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 
 	"github.com/cespare/xxhash"
 )
+
+// BsonIdKey returns a stable, map-indexable key derived from a list of
+// BsonValue id parts. Name and data are length-prefixed so ids cannot
+// collide even when data contains arbitrary bytes (including nulls).
+// The returned string may contain non-UTF-8 bytes and is intended only
+// for use as a map key or for equality comparison.
+func BsonIdKey(id []*adiomv1.BsonValue) string {
+	var b strings.Builder
+	var hdr [9]byte
+	for _, p := range id {
+		name := p.GetName()
+		data := p.GetData()
+		binary.BigEndian.PutUint32(hdr[0:4], uint32(len(name)))
+		hdr[4] = byte(p.GetType())
+		binary.BigEndian.PutUint32(hdr[5:9], uint32(len(data)))
+		b.Write(hdr[:])
+		b.WriteString(name)
+		b.Write(data)
+	}
+	return b.String()
+}
 
 type dataIdIndex struct {
 	dataId []*adiomv1.BsonValue
