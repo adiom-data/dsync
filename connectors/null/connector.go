@@ -125,6 +125,28 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 				slog.Info("write-updates", "i", i, "namespace", r.Msg.GetNamespace(), "type", updates.Type.String(), "id", idOutput)
 				continue
 			}
+			if updates.Type == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
+				if len(updates.GetData()) > 0 {
+					switch r.Msg.GetType() {
+					case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
+						var m map[string]any
+						if err := bson.Unmarshal(updates.GetData(), &m); err != nil {
+							return nil, connect.NewError(connect.CodeInternal, err)
+						}
+						jsonOutput, err := json.Marshal(m)
+						if err != nil {
+							return nil, connect.NewError(connect.CodeInternal, err)
+						}
+						output = string(jsonOutput)
+					case adiomv1.DataType_DATA_TYPE_JSON_ID:
+						output = string(updates.GetData())
+					}
+				} else {
+					output = ""
+				}
+				slog.Info("write-updates", "i", i, "namespace", r.Msg.GetNamespace(), "type", updates.Type.String(), "id", idOutput, "set", output, "unset", updates.GetPartialUpdateUnset(), "size", len(updates.GetData()))
+				continue
+			}
 			switch r.Msg.GetType() {
 			case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
 				var m map[string]any
