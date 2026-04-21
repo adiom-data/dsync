@@ -196,7 +196,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			for _, partition := range partitions {
 				ns, _ := ToNS(partition.Namespace)
 				col := c.client.Database(ns.Db).Collection(ns.Col)
-				resumeToken, err := getLatestResumeToken(ctx, col)
+				resumeToken, err := getLatestResumeToken(ctx, c.client, col)
 				if err != nil {
 					slog.Error(fmt.Sprintf("Failed to get latest resume token for ns %v: %v", partition.GetNamespace(), err))
 					return nil, connect.NewError(connect.CodeInternal, err)
@@ -208,7 +208,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 				})
 			}
 		} else {
-			resumeToken, err := getLatestResumeToken(ctx, c.client)
+			resumeToken, err := getLatestResumeToken(ctx, c.client, c.client)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get latest resume token: %v", err))
 				return nil, connect.NewError(connect.CodeInternal, err)
@@ -1007,6 +1007,11 @@ func NewConnWithClient(client *mongo.Client, settings ConnectorSettings) adiomv1
 
 func (c *conn) changeStreamOpts(cursor []byte) *moptions.ChangeStreamOptions {
 	opts := moptions.ChangeStream()
+	if ts, ok := decodeStartAtOperationTime(bson.Raw(cursor)); ok {
+		tsCopy := ts
+		opts.SetStartAtOperationTime(&tsCopy)
+		return opts
+	}
 	if c.flavor == FlavorDocumentDB {
 		opts.SetResumeAfter(bson.Raw(cursor))
 	} else {
