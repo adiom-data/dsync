@@ -179,6 +179,21 @@ func findLargestID(ctx context.Context, col *mongo.Collection) (bson.RawValue, e
 	return bson.RawValue{}, nil
 }
 
+func findSmallestID(ctx context.Context, col *mongo.Collection) (bson.RawValue, error) {
+	res, err := col.Find(ctx, bson.M{}, options.Find().SetSort(bson.M{"_id": 1}).SetLimit(1).SetProjection(bson.D{{"_id", 1}}))
+	if err != nil {
+		return bson.RawValue{}, fmt.Errorf("err in find: %w", err)
+	}
+	defer res.Close(ctx)
+	for res.Next(ctx) {
+		return res.Current.Lookup("_id"), nil
+	}
+	if res.Err() != nil {
+		return bson.RawValue{}, fmt.Errorf("err in iterating: %w", res.Err())
+	}
+	return bson.RawValue{}, nil
+}
+
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.GeneratePlanRequest]) (*connect.Response[adiomv1.GeneratePlanResponse], error) {
 	partitions, err := NamespacePartitions(ctx, r.Msg.GetNamespaces(), c.client)
@@ -241,15 +256,24 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		eg.Go(func() error {
 			ns, _ := ToNS(partition.Namespace)
 			col := c.client.Database(ns.Db).Collection(ns.Col)
+
+			lowest, err := findSmallestID(ctx, col)
+			if err != nil {
+				return fmt.Errorf("err finding smallest id: %w", err)
+			}
+			high, err := findLargestID(ctx, col)
+			if err != nil {
+				return fmt.Errorf("err finding largest id: %w", err)
+			}
+			if !lowest.IsZero() && !high.IsZero() && lowest.Type != high.Type {
+				return fmt.Errorf("mixed _id types not supported in %v: found %v and %v", partition.Namespace, lowest.Type, high.Type)
+			}
+
 			count, err := col.EstimatedDocumentCount(ctx)
 			if err != nil {
 				return err
 			}
 			if count < c.settings.TargetDocCountPerPartition*2 {
-				high, err := findLargestID(ctx, col)
-				if err != nil {
-					return fmt.Errorf("err finding largest id: %w", err)
-				}
 				ch <- &adiomv1.Partition{
 					Namespace:      partition.GetNamespace(),
 					EstimatedCount: uint64(count),
@@ -283,10 +307,6 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 					Cursor:         EncodeCursor(low, high),
 				}
 				low = high
-			}
-			high, err := findLargestID(ctx, col)
-			if err != nil {
-				return fmt.Errorf("err finding largest id: %w", err)
 			}
 			ch <- &adiomv1.Partition{
 				Namespace:      partition.GetNamespace(),
