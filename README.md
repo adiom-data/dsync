@@ -17,7 +17,9 @@ Common use cases for dsync:
 * Database replication
 * Data mobility
 
-Dsync is lightweight, flexible, and supports external connectors and transformers via gRPC. To run dsync, you just need to run the binary on your laptop, VM, or a docker container. Compute (CPU and RAM) is the only requirement, no storage is needed (except for logs)!
+Dsync is lightweight, flexible, and supports external connectors and transformers via gRPC. To run dsync, you just need to run the binary on your laptop, VM, or a docker container. Compute (CPU and RAM) is the only requirement, no storage is needed (except for logs)! 
+> [!TIP]
+> [**Enterprise edition** of Dsync](https://docs.adiom.io/enterprise/scalable-deployment) brings horizontal scalability, advanced observability, and transformations, while maintaining the same unparalleled ease of use.
 
 ![image](https://github.com/user-attachments/assets/5ad786fb-c180-4716-a443-e7bb0fef3619)
 
