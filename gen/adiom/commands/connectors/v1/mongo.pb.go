@@ -34,6 +34,7 @@ type MongoBaseFlags struct {
 	DocPartition       int64                  `protobuf:"varint,6,opt,name=doc_partition,json=docPartition,proto3" json:"doc_partition,omitempty"`
 	MaxPageSize        int32                  `protobuf:"varint,7,opt,name=max_page_size,json=maxPageSize,proto3" json:"max_page_size,omitempty"`
 	InitialSyncQuery   string                 `protobuf:"bytes,8,opt,name=initial_sync_query,json=initialSyncQuery,proto3" json:"initial_sync_query,omitempty"`
+	NamespaceFanout    int32                  `protobuf:"varint,9,opt,name=namespace_fanout,json=namespaceFanout,proto3" json:"namespace_fanout,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -124,6 +125,13 @@ func (x *MongoBaseFlags) GetInitialSyncQuery() string {
 	return ""
 }
 
+func (x *MongoBaseFlags) GetNamespaceFanout() int32 {
+	if x != nil {
+		return x.NamespaceFanout
+	}
+	return 0
+}
+
 // Full MongoDB flags = base + MongoDB-specific extras
 type MongoFlags struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
@@ -189,7 +197,7 @@ var File_adiom_commands_connectors_v1_mongo_proto protoreflect.FileDescriptor
 
 const file_adiom_commands_connectors_v1_mongo_proto_rawDesc = "" +
 	"\n" +
-	"(adiom/commands/connectors/v1/mongo.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\x1a\x1egoogle/protobuf/duration.proto\"\xc3\x05\n" +
+	"(adiom/commands/connectors/v1/mongo.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\x1a\x1egoogle/protobuf/duration.proto\"\xbe\x06\n" +
 	"\x0eMongoBaseFlags\x120\n" +
 	"\x14skip_batch_overwrite\x18\x01 \x01(\bR\x12skipBatchOverwrite\x12~\n" +
 	"\x11full_document_key\x18\x02 \x01(\bBR\x82\xb5\x18N\x12Luses the full document key instead of just _id (except for batch overwrites)R\x0ffullDocumentKey\x12V\n" +
@@ -204,7 +212,9 @@ const file_adiom_commands_connectors_v1_mongo_proto_rawDesc = "" +
 	"\rmax_page_size\x18\a \x01(\x05B\x13\x82\xb5\x18\x0f\n" +
 	"\rmax-page-sizeR\vmaxPageSize\x12\x84\x01\n" +
 	"\x12initial_sync_query\x18\b \x01(\tBV\x82\xb5\x18R\n" +
-	"\x12initial-sync-query\x129query filter for the initial data copy (v2 Extended JSON):\x01qR\x10initialSyncQuery:\x0f\x82\xb5\x18\v\n" +
+	"\x12initial-sync-query\x129query filter for the initial data copy (v2 Extended JSON):\x01qR\x10initialSyncQuery\x12y\n" +
+	"\x10namespace_fanout\x18\t \x01(\x05BN\x82\xb5\x18J\n" +
+	"\x10namespace-fanout\x121maximum number of namespaces to plan concurrently\x1a\x03100R\x0fnamespaceFanout:\x0f\x82\xb5\x18\v\n" +
 	"\tMongoBase\"\xe0\x02\n" +
 	"\n" +
 	"MongoFlags\x12@\n" +

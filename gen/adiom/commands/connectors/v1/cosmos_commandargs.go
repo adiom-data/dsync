@@ -39,6 +39,11 @@ func CosmosFlagsCommandFlags() []cli.Flag {
 			Aliases: []string{"q"},
 		},
 		&cli.IntFlag{
+			Name:  "namespace-fanout",
+			Usage: "maximum number of namespaces to plan concurrently",
+			Value: 100,
+		},
+		&cli.IntFlag{
 			Name:     "cosmos-reader-max-namespaces",
 			Usage:    "max namespaces to copy (keep under 15)",
 			Value:    8,
@@ -75,6 +80,7 @@ func ParseCosmosFlags(c *cli.Context) (*CosmosFlags, error) {
 	cfg.Mongo.DocPartition = c.Int64("doc-partition")
 	cfg.Mongo.MaxPageSize = int32(c.Int("max-page-size"))
 	cfg.Mongo.InitialSyncQuery = c.String("initial-sync-query")
+	cfg.Mongo.NamespaceFanout = int32(c.Int("namespace-fanout"))
 	cfg.CosmosReaderMaxNamespaces = int32(c.Int("cosmos-reader-max-namespaces"))
 	cfg.CosmosDeletesCdc = c.String("cosmos-deletes-cdc")
 	cfg.CosmosDeleteInterval = durationpb.New(c.Duration("cosmos-delete-interval"))
