@@ -122,6 +122,12 @@ func MongoFlagsCommandFlags() []cli.Flag {
 			Name:  "per-namespace-streams",
 			Usage: "Each namespace has a separate stream",
 		},
+		&cli.IntFlag{
+			Name:   "documentdb-sampling-fanout",
+			Usage:  "maximum number of concurrent sample requests for DocumentDB",
+			Value:  100,
+			Hidden: true,
+		},
 	}
 }
 
@@ -139,6 +145,7 @@ func ParseMongoFlags(c *cli.Context) (*MongoFlags, error) {
 	cfg.Base.NamespaceFanout = int32(c.Int("namespace-fanout"))
 	cfg.SampleFactor = int32(c.Int("sample-factor"))
 	cfg.PerNamespaceStreams = c.Bool("per-namespace-streams")
+	cfg.DocumentdbSamplingFanout = int32(c.Int("documentdb-sampling-fanout"))
 	return cfg, nil
 }
 

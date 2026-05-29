@@ -61,4 +61,10 @@ message MongoFlags {
     name: "per-namespace-streams"
     usage: "Each namespace has a separate stream"
   }];
+  int32 documentdb_sampling_fanout = 4 [(commandargs.v1.flag) = {
+    name: "documentdb-sampling-fanout"
+    usage: "maximum number of concurrent sample requests for DocumentDB"
+    default: "100"
+    hidden: true
+  }];
 }

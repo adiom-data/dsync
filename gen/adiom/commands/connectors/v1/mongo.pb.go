@@ -134,12 +134,13 @@ func (x *MongoBaseFlags) GetNamespaceFanout() int32 {
 
 // Full MongoDB flags = base + MongoDB-specific extras
 type MongoFlags struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Base                *MongoBaseFlags        `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
-	SampleFactor        int32                  `protobuf:"varint,2,opt,name=sample_factor,json=sampleFactor,proto3" json:"sample_factor,omitempty"`
-	PerNamespaceStreams bool                   `protobuf:"varint,3,opt,name=per_namespace_streams,json=perNamespaceStreams,proto3" json:"per_namespace_streams,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Base                     *MongoBaseFlags        `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	SampleFactor             int32                  `protobuf:"varint,2,opt,name=sample_factor,json=sampleFactor,proto3" json:"sample_factor,omitempty"`
+	PerNamespaceStreams      bool                   `protobuf:"varint,3,opt,name=per_namespace_streams,json=perNamespaceStreams,proto3" json:"per_namespace_streams,omitempty"`
+	DocumentdbSamplingFanout int32                  `protobuf:"varint,4,opt,name=documentdb_sampling_fanout,json=documentdbSamplingFanout,proto3" json:"documentdb_sampling_fanout,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *MongoFlags) Reset() {
@@ -193,6 +194,13 @@ func (x *MongoFlags) GetPerNamespaceStreams() bool {
 	return false
 }
 
+func (x *MongoFlags) GetDocumentdbSamplingFanout() int32 {
+	if x != nil {
+		return x.DocumentdbSamplingFanout
+	}
+	return 0
+}
+
 var File_adiom_commands_connectors_v1_mongo_proto protoreflect.FileDescriptor
 
 const file_adiom_commands_connectors_v1_mongo_proto_rawDesc = "" +
@@ -215,14 +223,16 @@ const file_adiom_commands_connectors_v1_mongo_proto_rawDesc = "" +
 	"\x12initial-sync-query\x129query filter for the initial data copy (v2 Extended JSON):\x01qR\x10initialSyncQuery\x12y\n" +
 	"\x10namespace_fanout\x18\t \x01(\x05BN\x82\xb5\x18J\n" +
 	"\x10namespace-fanout\x121maximum number of namespaces to plan concurrently\x1a\x03100R\x0fnamespaceFanout:\x0f\x82\xb5\x18\v\n" +
-	"\tMongoBase\"\xe0\x02\n" +
+	"\tMongoBase\"\x85\x04\n" +
 	"\n" +
 	"MongoFlags\x12@\n" +
 	"\x04base\x18\x01 \x01(\v2,.adiom.commands.connectors.v1.MongoBaseFlagsR\x04base\x12c\n" +
 	"\rsample_factor\x18\x02 \x01(\x05B>\x82\xb5\x18:\n" +
 	"\rsample-factor\x12%Number of extra samples per partition\x1a\x0210R\fsampleFactor\x12u\n" +
 	"\x15per_namespace_streams\x18\x03 \x01(\bBA\x82\xb5\x18=\n" +
-	"\x15per-namespace-streams\x12$Each namespace has a separate streamR\x13perNamespaceStreams:4\x82\xb5\x180\n" +
+	"\x15per-namespace-streams\x12$Each namespace has a separate streamR\x13perNamespaceStreams\x12\xa2\x01\n" +
+	"\x1adocumentdb_sampling_fanout\x18\x04 \x01(\x05Bd\x82\xb5\x18`\n" +
+	"\x1adocumentdb-sampling-fanout\x12;maximum number of concurrent sample requests for DocumentDB\x1a\x03100(\x01R\x18documentdbSamplingFanout:4\x82\xb5\x180\n" +
 	"\aMongoDB\"%mongodb://connection-string [options]BKZIgithub.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1b\x06proto3"
 
 var (

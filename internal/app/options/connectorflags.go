@@ -359,14 +359,12 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return false
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", mongoFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", connectorsv1.MongoFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					flags, err := connectorsv1.ParseMongoFlags(c)
 					if err != nil {
 						return nil, err
 					}
-					settings := mongoSettingsFromFlags(flags, args[0])
-					settings.DocumentDBSamplingFanout = c.Int("documentdb-sampling-fanout")
-					return mongo.NewConn(settings)
+					return mongo.NewConn(mongoSettingsFromFlags(flags, args[0]))
 				})(args, as)
 			},
 		},
@@ -731,19 +729,11 @@ func mongoBaseSettingsFromFlags(f *connectorsv1.MongoBaseFlags, connString strin
 	return s
 }
 
-func mongoFlagsCommandFlags() []cli.Flag {
-	flags := connectorsv1.MongoFlagsCommandFlags()
-	return append(flags, &cli.IntFlag{
-		Name:   "documentdb-sampling-fanout",
-		Value:  100,
-		Hidden: true,
-	})
-}
-
 func mongoSettingsFromFlags(f *connectorsv1.MongoFlags, connString string) mongo.ConnectorSettings {
 	s := mongoBaseSettingsFromFlags(f.Base, connString)
 	s.SampleFactor = int(f.SampleFactor)
 	s.PerNamespaceStreams = f.PerNamespaceStreams
+	s.DocumentDBSamplingFanout = int(f.DocumentdbSamplingFanout)
 	return s
 }
 
