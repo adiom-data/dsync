@@ -34,6 +34,17 @@ func bsonID(t *testing.T, name string, v interface{}) *adiomv1.BsonValue {
 	return &adiomv1.BsonValue{Name: name, Type: uint32(typ), Data: data}
 }
 
+func TestPlanningFanoutLimit(t *testing.T) {
+	assert.Equal(t, defaultNamespaceFanoutLimit, (&conn{flavor: FlavorMongoDB}).planningFanoutLimit())
+	assert.Equal(t, defaultNamespaceFanoutLimit, (&conn{flavor: FlavorDocumentDB}).planningFanoutLimit())
+	assert.Equal(t, 12, (&conn{settings: ConnectorSettings{NamespaceFanout: 12}, flavor: FlavorDocumentDB}).planningFanoutLimit())
+}
+
+func TestDocumentDBSamplingFanout(t *testing.T) {
+	assert.Equal(t, defaultDocumentDBSamplingFanoutLimit, (&conn{}).documentDBSamplingFanout())
+	assert.Equal(t, 17, (&conn{settings: ConnectorSettings{DocumentDBSamplingFanout: 17}}).documentDBSamplingFanout())
+}
+
 // buildIdFilter
 
 func TestBuildIdFilter_EmptyId(t *testing.T) {
@@ -173,9 +184,9 @@ func deleteU(t *testing.T, id string) *adiomv1.Update {
 
 func partialU(t *testing.T, id string, data bson.M, unset ...string) *adiomv1.Update {
 	u := &adiomv1.Update{
-		Id:                  []*adiomv1.BsonValue{bsonID(t, "_id", id)},
-		Type:                adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE,
-		PartialUpdateUnset:  unset,
+		Id:                 []*adiomv1.BsonValue{bsonID(t, "_id", id)},
+		Type:               adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE,
+		PartialUpdateUnset: unset,
 	}
 	if data != nil {
 		u.Data = mustMarshal(t, data)

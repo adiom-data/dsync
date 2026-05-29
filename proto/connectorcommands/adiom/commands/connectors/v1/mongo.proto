@@ -36,6 +36,11 @@ message MongoBaseFlags {
     usage: "query filter for the initial data copy (v2 Extended JSON)"
     aliases: ["q"]
   }];
+  int32 namespace_fanout = 9 [(commandargs.v1.flag) = {
+    name: "namespace-fanout"
+    usage: "maximum number of namespaces to plan concurrently"
+    default: "100"
+  }];
 }
 
 // Full MongoDB flags = base + MongoDB-specific extras

@@ -37,12 +37,19 @@ type ConnectorSettings struct {
 	TargetDocCountPerPartition int64 //target number of documents per partition (256k docs is 256MB with 1KB average doc size)
 	SampleFactor               int   // a factor to determine how many extra samples per partition are used
 	MaxPageSize                int
+	NamespaceFanout            int
+	DocumentDBSamplingFanout   int
 	PerNamespaceStreams        bool
 	SkipBatchOverwrite         bool
 	FullDocumentKey            bool
 
 	Query string // query filter, as a v2 Extended JSON string, e.g., '{\"x\":{\"$gt\":1}}'"
 }
+
+const (
+	defaultNamespaceFanoutLimit          = 100
+	defaultDocumentDBSamplingFanoutLimit = 100
+)
 
 func setDefault[T comparable](field *T, defaultValue T) {
 	if *field == *new(T) {
@@ -239,6 +246,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	done := make(chan struct{})
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(c.planningFanoutLimit())
 	var finalPartitions []*adiomv1.Partition
 	ch := make(chan *adiomv1.Partition)
 
@@ -288,6 +296,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			if numSamples > 1000000 {
 				slog.Warn("More than 1000000 samples requested", "samples", numSamples)
 			}
+			slog.Debug("Getting samples for namespace", "namespace", partition.GetNamespace(), "samples", numSamples)
 			ids, err := c.sampleIDs(ctx, col, numSamples)
 			if err != nil {
 				return fmt.Errorf("error getting %v samples for partition: %w", numSamples, err)
@@ -328,6 +337,13 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 		Partitions:        finalPartitions,
 		UpdatesPartitions: updatesPartitions,
 	}), nil
+}
+
+func (c *conn) planningFanoutLimit() int {
+	if c.settings.NamespaceFanout > 0 {
+		return c.settings.NamespaceFanout
+	}
+	return defaultNamespaceFanoutLimit
 }
 
 // GetInfo implements adiomv1connect.ConnectorServiceHandler.
@@ -691,11 +707,11 @@ func toTimestampPB(t bson.Timestamp) *timestamppb.Timestamp {
 }
 
 type MongoUpdate struct {
-	NS            bson.M               `bson:"ns"`
+	NS            bson.M          `bson:"ns"`
 	ClusterTime   *bson.Timestamp `bson:"clusterTime"`
-	DocumentKey   bson.D               `bson:"documentKey"`
-	FullDocument  bson.Raw             `bson:"fullDocument"`
-	OperationType string               `bson:"operationType"`
+	DocumentKey   bson.D          `bson:"documentKey"`
+	FullDocument  bson.Raw        `bson:"fullDocument"`
+	OperationType string          `bson:"operationType"`
 }
 
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
@@ -1122,6 +1138,8 @@ func (c *conn) Teardown() {
 func NewConn(connSettings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 	setDefault(&connSettings.TargetDocCountPerPartition, 512*1000)
 	setDefault(&connSettings.SampleFactor, 1)
+	setDefault(&connSettings.NamespaceFanout, defaultNamespaceFanoutLimit)
+	setDefault(&connSettings.DocumentDBSamplingFanout, defaultDocumentDBSamplingFanoutLimit)
 	client, err := MongoClient(context.Background(), connSettings)
 	if err != nil {
 		slog.Error(fmt.Sprintf("unable to connect to mongo client: %v", err))

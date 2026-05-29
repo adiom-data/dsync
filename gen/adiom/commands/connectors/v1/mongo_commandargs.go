@@ -38,6 +38,11 @@ func MongoBaseFlagsCommandFlags() []cli.Flag {
 			Usage:   "query filter for the initial data copy (v2 Extended JSON)",
 			Aliases: []string{"q"},
 		},
+		&cli.IntFlag{
+			Name:  "namespace-fanout",
+			Usage: "maximum number of namespaces to plan concurrently",
+			Value: 100,
+		},
 	}
 }
 
@@ -51,6 +56,7 @@ func ParseMongoBaseFlags(c *cli.Context) (*MongoBaseFlags, error) {
 	cfg.DocPartition = c.Int64("doc-partition")
 	cfg.MaxPageSize = int32(c.Int("max-page-size"))
 	cfg.InitialSyncQuery = c.String("initial-sync-query")
+	cfg.NamespaceFanout = int32(c.Int("namespace-fanout"))
 	return cfg, nil
 }
 
@@ -103,6 +109,11 @@ func MongoFlagsCommandFlags() []cli.Flag {
 			Aliases: []string{"q"},
 		},
 		&cli.IntFlag{
+			Name:  "namespace-fanout",
+			Usage: "maximum number of namespaces to plan concurrently",
+			Value: 100,
+		},
+		&cli.IntFlag{
 			Name:  "sample-factor",
 			Usage: "Number of extra samples per partition",
 			Value: 10,
@@ -125,6 +136,7 @@ func ParseMongoFlags(c *cli.Context) (*MongoFlags, error) {
 	cfg.Base.DocPartition = c.Int64("doc-partition")
 	cfg.Base.MaxPageSize = int32(c.Int("max-page-size"))
 	cfg.Base.InitialSyncQuery = c.String("initial-sync-query")
+	cfg.Base.NamespaceFanout = int32(c.Int("namespace-fanout"))
 	cfg.SampleFactor = int32(c.Int("sample-factor"))
 	cfg.PerNamespaceStreams = c.Bool("per-namespace-streams")
 	return cfg, nil

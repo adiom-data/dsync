@@ -71,6 +71,7 @@ func (c *conn) sampleIDs(ctx context.Context, col *mongo.Collection, numSamples 
 
 	results := make([]sampleResult, numSamples)
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(c.documentDBSamplingFanout())
 	for i := int64(0); i < numSamples; i++ {
 		i := i
 		eg.Go(func() error {
@@ -121,4 +122,11 @@ func (c *conn) sampleIDs(ctx context.Context, col *mongo.Collection, numSamples 
 	}
 
 	return ids, nil
+}
+
+func (c *conn) documentDBSamplingFanout() int {
+	if c.settings.DocumentDBSamplingFanout > 0 {
+		return c.settings.DocumentDBSamplingFanout
+	}
+	return defaultDocumentDBSamplingFanoutLimit
 }

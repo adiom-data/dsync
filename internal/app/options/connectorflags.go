@@ -23,8 +23,8 @@ import (
 	"github.com/adiom-data/dsync/connectors/sqlbatch"
 	"github.com/adiom-data/dsync/connectors/testconn"
 	"github.com/adiom-data/dsync/connectors/vector"
-	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	connectorsv1 "github.com/adiom-data/dsync/gen/adiom/commands/connectors/v1"
+	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -359,12 +359,14 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				return false
 			},
 			Create: func(args []string, as AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, []string, error) {
-				return CreateHelper("MongoDB", "mongodb://connection-string [options]", connectorsv1.MongoFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
+				return CreateHelper("MongoDB", "mongodb://connection-string [options]", mongoFlagsCommandFlags(), func(c *cli.Context, args []string, _ AdditionalSettings) (adiomv1connect.ConnectorServiceHandler, error) {
 					flags, err := connectorsv1.ParseMongoFlags(c)
 					if err != nil {
 						return nil, err
 					}
-					return mongo.NewConn(mongoSettingsFromFlags(flags, args[0]))
+					settings := mongoSettingsFromFlags(flags, args[0])
+					settings.DocumentDBSamplingFanout = c.Int("documentdb-sampling-fanout")
+					return mongo.NewConn(settings)
 				})(args, as)
 			},
 		},
@@ -696,18 +698,18 @@ func fileSettingsFromFlags(f *connectorsv1.FileFlags, uri string) (fileconnector
 
 func s3SettingsFromFlags(f *connectorsv1.S3Flags, uri string) s3connector.ConnectorSettings {
 	return s3connector.ConnectorSettings{
-		Uri:            uri,
-		PrettyJSON:     f.PrettyJson,
-		Region:         f.Region,
-		Prefix:         f.Prefix,
-		OutputFormat:   f.OutputFormat,
-		Profile:        f.Profile,
-		Endpoint:       f.Endpoint,
-		AccessKeyID:    f.AccessKeyId,
-		SecretAccessKey: f.SecretAccessKey,
-		SessionToken:   f.SessionToken,
-		UsePathStyle:   f.UsePathStyle,
-		MaxFileSizeMB:  f.MaxFileSize,
+		Uri:              uri,
+		PrettyJSON:       f.PrettyJson,
+		Region:           f.Region,
+		Prefix:           f.Prefix,
+		OutputFormat:     f.OutputFormat,
+		Profile:          f.Profile,
+		Endpoint:         f.Endpoint,
+		AccessKeyID:      f.AccessKeyId,
+		SecretAccessKey:  f.SecretAccessKey,
+		SessionToken:     f.SessionToken,
+		UsePathStyle:     f.UsePathStyle,
+		MaxFileSizeMB:    f.MaxFileSize,
 		MaxTotalMemoryMB: f.MaxTotalMemory,
 	}
 }
@@ -724,8 +726,18 @@ func mongoBaseSettingsFromFlags(f *connectorsv1.MongoBaseFlags, connString strin
 	s.WriterMaxBatchSize = int(f.WriterBatchSize)
 	s.TargetDocCountPerPartition = f.DocPartition
 	s.MaxPageSize = int(f.MaxPageSize)
+	s.NamespaceFanout = int(f.NamespaceFanout)
 	s.Query = f.InitialSyncQuery
 	return s
+}
+
+func mongoFlagsCommandFlags() []cli.Flag {
+	flags := connectorsv1.MongoFlagsCommandFlags()
+	return append(flags, &cli.IntFlag{
+		Name:   "documentdb-sampling-fanout",
+		Value:  100,
+		Hidden: true,
+	})
 }
 
 func mongoSettingsFromFlags(f *connectorsv1.MongoFlags, connString string) mongo.ConnectorSettings {
