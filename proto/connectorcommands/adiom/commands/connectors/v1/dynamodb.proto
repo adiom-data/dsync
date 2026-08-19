@@ -23,4 +23,9 @@ message DynamoDBFlags {
   string id = 3 [(commandargs.v1.flag) = {
     usage: "A fixed id for the connector"
   }];
+  string number_type = 4 [(commandargs.v1.flag) = {
+    name: "number-type"
+    usage: "MongoDB BSON type to use for DynamoDB numbers: string, int64, or int32"
+    default: "string"
+  }];
 }

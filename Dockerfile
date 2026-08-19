@@ -1,4 +1,4 @@
-FROM golang:1.24.6 AS build
+FROM golang:1.26.0 AS build
 
 WORKDIR /go/src/dsync
 COPY . .

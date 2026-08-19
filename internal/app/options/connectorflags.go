@@ -303,6 +303,9 @@ func GetRegisteredConnectors() []RegisteredConnector {
 				if err != nil {
 					return nil, err
 				}
+				if _, err := dynamodb.ParseNumberType(flags.NumberType); err != nil {
+					return nil, err
+				}
 				connString := ""
 				if strings.EqualFold(args[0], "dynamodb://localstack") {
 					_, cs, ok := strings.Cut(args[0], "://")
@@ -315,6 +318,7 @@ func GetRegisteredConnectors() []RegisteredConnector {
 					dynamodb.WithDocsPerSegment(int(flags.DocPartition)),
 					dynamodb.WithPlanParallelism(int(flags.PlanParallelism)),
 					dynamodb.WithID(flags.Id),
+					dynamodb.WithNumberType(flags.NumberType),
 				), nil
 			}),
 		},

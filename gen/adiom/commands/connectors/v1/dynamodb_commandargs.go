@@ -20,6 +20,11 @@ func DynamoDBFlagsCommandFlags() []cli.Flag {
 			Name:  "id",
 			Usage: "A fixed id for the connector",
 		},
+		&cli.StringFlag{
+			Name:  "number-type",
+			Usage: "MongoDB BSON type to use for DynamoDB numbers: string, int64, or int32",
+			Value: "string",
+		},
 	}
 }
 
@@ -28,6 +33,7 @@ func ParseDynamoDBFlags(c *cli.Context) (*DynamoDBFlags, error) {
 	cfg.DocPartition = int32(c.Int("doc-partition"))
 	cfg.PlanParallelism = int32(c.Int("plan-parallelism"))
 	cfg.Id = c.String("id")
+	cfg.NumberType = c.String("number-type")
 	return cfg, nil
 }
 

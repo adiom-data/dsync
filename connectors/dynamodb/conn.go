@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
+	"strings"
 	"sync"
 
 	"connectrpc.com/connect"
@@ -323,7 +324,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		for records := range ch {
 			var updates []*adiomv1.Update
 			for _, record := range records.Records {
-				update, err := streamRecordToUpdate(record, r.Msg.GetType(), arnToTableDetails[records.StreamARN].KeySchema)
+				update, err := streamRecordToUpdate(record, r.Msg.GetType(), arnToTableDetails[records.StreamARN].KeySchema, c.options.NumberType)
 				if err != nil {
 					slog.Error("skipping, error creating update,", "err", err)
 					continue Loop
@@ -429,6 +430,7 @@ type Options struct {
 	ID              string
 	DocsPerSegment  int
 	PlanParallelism int
+	NumberType      NumberType
 }
 
 func WithID(s string) func(*Options) {
@@ -449,10 +451,17 @@ func WithDocsPerSegment(n int) func(*Options) {
 	}
 }
 
+func WithNumberType(s string) func(*Options) {
+	return func(o *Options) {
+		o.NumberType = NumberType(strings.ToLower(s))
+	}
+}
+
 func NewConn(connStr string, optFns ...func(*Options)) adiomv1connect.ConnectorServiceHandler {
 	opts := Options{
 		DocsPerSegment:  50000,
 		PlanParallelism: 4,
+		NumberType:      NumberTypeString,
 	}
 	for _, fn := range optFns {
 		fn(&opts)
@@ -464,7 +473,7 @@ func NewConn(connStr string, optFns ...func(*Options)) adiomv1connect.ConnectorS
 		spec = connStr
 	}
 
-	client := NewClient(dynamoClient, streamsClient)
+	client := NewClient(dynamoClient, streamsClient, opts.NumberType)
 	return &conn{
 		client:        client,
 		streamsClient: streamsClient,

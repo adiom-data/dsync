@@ -19,6 +19,47 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+type NumberType string
+
+const (
+	NumberTypeString NumberType = "string"
+	NumberTypeInt64  NumberType = "int64"
+	NumberTypeInt32  NumberType = "int32"
+)
+
+func ParseNumberType(s string) (NumberType, error) {
+	if s == "" {
+		return NumberTypeString, nil
+	}
+	switch NumberType(strings.ToLower(s)) {
+	case NumberTypeString:
+		return NumberTypeString, nil
+	case NumberTypeInt64:
+		return NumberTypeInt64, nil
+	case NumberTypeInt32:
+		return NumberTypeInt32, nil
+	default:
+		return "", fmt.Errorf("unsupported DynamoDB number type %q", s)
+	}
+}
+
+func (n NumberType) convert(s string) (interface{}, error) {
+	switch n {
+	case "", NumberTypeString:
+		return s, nil
+	case NumberTypeInt64:
+		return strconv.ParseInt(s, 10, 64)
+	case NumberTypeInt32:
+		v, err := strconv.ParseInt(s, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		return int32(v), nil
+	default:
+		return nil, fmt.Errorf("unsupported DynamoDB number type %q", n)
+	}
+}
+
 // TODO: this is an arbitrary mapping right now
 func fromBson(bs interface{}) (types.AttributeValue, error) {
 	switch b := bs.(type) {
@@ -103,7 +144,7 @@ func toInterfaceMap(av types.AttributeValue) (map[string]interface{}, error) {
 	return jsonable, nil
 }
 
-func toBson(av types.AttributeValue) (interface{}, error) {
+func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error) {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
 		return bson.Binary{
@@ -127,7 +168,7 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 	case *types.AttributeValueMemberL:
 		var arr bson.A
 		for _, v := range tv.Value {
-			entry, err := toBson(v)
+			entry, err := toBson(v, numberType)
 			if err != nil {
 				return nil, err
 			}
@@ -138,7 +179,7 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 	case *types.AttributeValueMemberM:
 		m := bson.M{}
 		for k, v := range tv.Value {
-			entry, err := toBson(v)
+			entry, err := toBson(v, numberType)
 			if err != nil {
 				return nil, err
 			}
@@ -147,14 +188,16 @@ func toBson(av types.AttributeValue) (interface{}, error) {
 		return m, nil
 
 	case *types.AttributeValueMemberN:
-		// TODO: Should we convert to an actual number type?
-		return tv.Value, nil
+		return numberType.convert(tv.Value)
 
 	case *types.AttributeValueMemberNS:
-		// TODO: Should we convert to an actual number type?
 		var arr bson.A
 		for _, v := range tv.Value {
-			arr = append(arr, v)
+			entry, err := numberType.convert(v)
+			if err != nil {
+				return nil, err
+			}
+			arr = append(arr, entry)
 		}
 		return arr, nil
 
@@ -202,14 +245,14 @@ func itemsToJson(items []map[string]types.AttributeValue, keySchema []string) ([
 	return jsonItems, nil
 }
 
-func itemsToBson(items []map[string]types.AttributeValue, keySchema []string) ([][]byte, error) {
+func itemsToBson(items []map[string]types.AttributeValue, keySchema []string, numberType NumberType) ([][]byte, error) {
 	bsonItems := make([][]byte, len(items))
 	for i, m := range items {
-		id, err := dynamoKeyToIdBson(m, keySchema)
+		id, err := dynamoKeyToIdBson(m, keySchema, numberType)
 		if err != nil {
 			return nil, fmt.Errorf("err in key to bson: %w", err)
 		}
-		b, err := toBson(&types.AttributeValueMemberM{Value: m})
+		b, err := toBson(&types.AttributeValueMemberM{Value: m}, numberType)
 		if err != nil {
 			return nil, fmt.Errorf("err in to bson: %w", err)
 		}
@@ -356,13 +399,13 @@ func dynamoKeyToJsonId(attr map[string]types.AttributeValue, keySchema []string)
 	return res, id, nil
 }
 
-func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string) (interface{}, error) {
+func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType) (interface{}, error) {
 	v, ok := attr[keySchema[0]]
 	if !ok {
 		return nil, fmt.Errorf("key schema does not match actual keys")
 	}
 	if len(keySchema) == 1 {
-		return toBson(v)
+		return toBson(v, numberType)
 	}
 	v2, ok := attr[keySchema[1]]
 	if !ok {
@@ -381,11 +424,7 @@ func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string)
 	}, nil
 }
 
-func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string) (*adiomv1.BsonValue, error) {
-	b, err := dynamoKeyToIdBson(attr, keySchema)
-	if err != nil {
-		return nil, err
-	}
+func bsonValueFromInterface(b interface{}) (*adiomv1.BsonValue, error) {
 	typ, data, err := bson.MarshalValue(b)
 	if err != nil {
 		return nil, err
@@ -396,7 +435,15 @@ func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string) (*a
 	}, nil
 }
 
-func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, keySchema []string) (*adiomv1.Update, error) {
+func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType) (*adiomv1.BsonValue, error) {
+	b, err := dynamoKeyToIdBson(attr, keySchema, numberType)
+	if err != nil {
+		return nil, err
+	}
+	return bsonValueFromInterface(b)
+}
+
+func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, keySchema []string, numberType NumberType) (*adiomv1.Update, error) {
 	converted := map[string]types.AttributeValue{}
 	for k, v := range record.Dynamodb.Keys {
 		v2, err := streamTypeToDynamoType(v)
@@ -410,7 +457,11 @@ func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, 
 	var jId string // used for json id type
 	switch dataType {
 	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-		bsonValue, err := dynamoKeyToId(converted, keySchema)
+		idBson, err := dynamoKeyToIdBson(converted, keySchema, numberType)
+		if err != nil {
+			return nil, err
+		}
+		bsonValue, err := bsonValueFromInterface(idBson)
 		if err != nil {
 			return nil, err
 		}
@@ -451,11 +502,15 @@ func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, 
 	var marshaled []byte
 	switch dataType {
 	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-		b, err := toBson(r)
+		b, err := toBson(r, numberType)
 		if err != nil {
 			return nil, err
 		}
-		b.(bson.M)["_id"] = id
+		idBson, err := dynamoKeyToIdBson(converted, keySchema, numberType)
+		if err != nil {
+			return nil, err
+		}
+		b.(bson.M)["_id"] = idBson
 		marshaled, err = bson.Marshal(b)
 		if err != nil {
 			return nil, err
