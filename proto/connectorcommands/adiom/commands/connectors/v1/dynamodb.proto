@@ -25,7 +25,12 @@ message DynamoDBFlags {
   }];
   string number_type = 4 [(commandargs.v1.flag) = {
     name: "number-type"
-    usage: "MongoDB BSON type to use for DynamoDB numbers: string, int64, or int32"
+    usage: "Type to use for DynamoDB numbers in BSON: string, int64, int32, float64, or number (Decimal128). JSON uses the AWS float64 default unless this is set to number, which preserves exact JSON numbers."
     default: "string"
+  }];
+  string bson_id_format = 6 [(commandargs.v1.flag) = {
+    name: "bson-id-format"
+    usage: "MongoDB BSON _id/update id format for DynamoDB keys: binary or composite"
+    default: "binary"
   }];
 }

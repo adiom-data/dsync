@@ -316,18 +316,34 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	}
 
 	ch := make(chan stream.StreamRecords)
-	defer close(ch)
+	streamMult := NewStreamMult(c.streamsClient, state, ch)
+	eg2, egCtx := errgroup.WithContext(ctx)
 
-	var eg2 errgroup.Group
+	if err := streamMult.Start(egCtx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return connect.NewError(connect.CodeCanceled, err)
+		}
+		return connect.NewError(connect.CodeInternal, err)
+	}
+
 	eg2.Go(func() error {
-	Loop:
+		defer close(ch)
+		if err := streamMult.Wait(); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+			return err
+		}
+		return nil
+	})
+
+	eg2.Go(func() error {
 		for records := range ch {
 			var updates []*adiomv1.Update
 			for _, record := range records.Records {
-				update, err := streamRecordToUpdate(record, r.Msg.GetType(), arnToTableDetails[records.StreamARN].KeySchema, c.options.NumberType)
+				update, err := streamRecordToUpdate(record, r.Msg.GetType(), arnToTableDetails[records.StreamARN].KeySchema, c.options.NumberType, c.options.BsonIDFormat)
 				if err != nil {
-					slog.Error("skipping, error creating update,", "err", err)
-					continue Loop
+					return fmt.Errorf("error creating update: %w", err)
 				}
 				updates = append(updates, update)
 			}
@@ -353,25 +369,14 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 		return nil
 	})
 
-	streamMult := NewStreamMult(c.streamsClient, state, ch)
-	if err := streamMult.Start(ctx); err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		return connect.NewError(connect.CodeInternal, err)
-	}
-	if err := streamMult.Wait(); err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		return connect.NewError(connect.CodeInternal, err)
-	}
-	close(ch)
 	if err := eg2.Wait(); err != nil {
 		if errors.Is(err, context.Canceled) {
 			return connect.NewError(connect.CodeCanceled, err)
 		}
 		return connect.NewError(connect.CodeInternal, err)
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return connect.NewError(connect.CodeCanceled, ctx.Err())
 	}
 	return nil
 }
@@ -431,6 +436,7 @@ type Options struct {
 	DocsPerSegment  int
 	PlanParallelism int
 	NumberType      NumberType
+	BsonIDFormat    BsonIDFormat
 }
 
 func WithID(s string) func(*Options) {
@@ -457,11 +463,18 @@ func WithNumberType(s string) func(*Options) {
 	}
 }
 
+func WithBsonIDFormat(s string) func(*Options) {
+	return func(o *Options) {
+		o.BsonIDFormat = BsonIDFormat(strings.ToLower(s))
+	}
+}
+
 func NewConn(connStr string, optFns ...func(*Options)) adiomv1connect.ConnectorServiceHandler {
 	opts := Options{
 		DocsPerSegment:  50000,
 		PlanParallelism: 4,
 		NumberType:      NumberTypeString,
+		BsonIDFormat:    BsonIDFormatBinary,
 	}
 	for _, fn := range optFns {
 		fn(&opts)
@@ -473,7 +486,7 @@ func NewConn(connStr string, optFns ...func(*Options)) adiomv1connect.ConnectorS
 		spec = connStr
 	}
 
-	client := NewClient(dynamoClient, streamsClient, opts.NumberType)
+	client := NewClient(dynamoClient, streamsClient, opts.NumberType, opts.BsonIDFormat)
 	return &conn{
 		client:        client,
 		streamsClient: streamsClient,

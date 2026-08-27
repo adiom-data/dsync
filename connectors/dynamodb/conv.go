@@ -20,11 +20,17 @@ import (
 )
 
 type NumberType string
+type BsonIDFormat string
 
 const (
-	NumberTypeString NumberType = "string"
-	NumberTypeInt64  NumberType = "int64"
-	NumberTypeInt32  NumberType = "int32"
+	NumberTypeString  NumberType = "string"
+	NumberTypeInt64   NumberType = "int64"
+	NumberTypeInt32   NumberType = "int32"
+	NumberTypeFloat64 NumberType = "float64"
+	NumberTypeNumber  NumberType = "number"
+
+	BsonIDFormatBinary    BsonIDFormat = "binary"
+	BsonIDFormatComposite BsonIDFormat = "composite"
 )
 
 func ParseNumberType(s string) (NumberType, error) {
@@ -38,8 +44,26 @@ func ParseNumberType(s string) (NumberType, error) {
 		return NumberTypeInt64, nil
 	case NumberTypeInt32:
 		return NumberTypeInt32, nil
+	case NumberTypeFloat64:
+		return NumberTypeFloat64, nil
+	case NumberTypeNumber:
+		return NumberTypeNumber, nil
 	default:
 		return "", fmt.Errorf("unsupported DynamoDB number type %q", s)
+	}
+}
+
+func ParseBsonIDFormat(s string) (BsonIDFormat, error) {
+	if s == "" {
+		return BsonIDFormatBinary, nil
+	}
+	switch BsonIDFormat(strings.ToLower(s)) {
+	case BsonIDFormatBinary:
+		return BsonIDFormatBinary, nil
+	case BsonIDFormatComposite:
+		return BsonIDFormatComposite, nil
+	default:
+		return "", fmt.Errorf("unsupported DynamoDB BSON id format %q", s)
 	}
 }
 
@@ -55,6 +79,10 @@ func (n NumberType) convert(s string) (interface{}, error) {
 			return nil, err
 		}
 		return int32(v), nil
+	case NumberTypeFloat64:
+		return strconv.ParseFloat(s, 64)
+	case NumberTypeNumber:
+		return bson.ParseDecimal128(s)
 	default:
 		return nil, fmt.Errorf("unsupported DynamoDB number type %q", n)
 	}
@@ -64,7 +92,7 @@ func (n NumberType) convert(s string) (interface{}, error) {
 func fromBson(bs interface{}) (types.AttributeValue, error) {
 	switch b := bs.(type) {
 	case bson.A:
-		var arr []types.AttributeValue
+		arr := []types.AttributeValue{}
 		for _, v := range b {
 			vv, err := fromBson(v)
 			if err != nil {
@@ -135,15 +163,6 @@ func itemFromBson(item []byte) (map[string]types.AttributeValue, error) {
 	return m.Value, nil
 }
 
-func toInterfaceMap(av types.AttributeValue) (map[string]interface{}, error) {
-	var jsonable map[string]interface{}
-	if err := attributevalue.Unmarshal(av, &jsonable); err != nil {
-		return nil, err
-	}
-
-	return jsonable, nil
-}
-
 func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error) {
 	switch tv := av.(type) {
 	case *types.AttributeValueMemberB:
@@ -156,7 +175,7 @@ func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error)
 		return tv.Value, nil
 
 	case *types.AttributeValueMemberBS:
-		var arr bson.A
+		arr := bson.A{}
 		for _, v := range tv.Value {
 			arr = append(arr, bson.Binary{
 				Subtype: bson.TypeBinaryGeneric,
@@ -166,7 +185,7 @@ func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error)
 		return arr, nil
 
 	case *types.AttributeValueMemberL:
-		var arr bson.A
+		arr := bson.A{}
 		for _, v := range tv.Value {
 			entry, err := toBson(v, numberType)
 			if err != nil {
@@ -191,7 +210,7 @@ func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error)
 		return numberType.convert(tv.Value)
 
 	case *types.AttributeValueMemberNS:
-		var arr bson.A
+		arr := bson.A{}
 		for _, v := range tv.Value {
 			entry, err := numberType.convert(v)
 			if err != nil {
@@ -205,7 +224,7 @@ func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error)
 		return tv.Value, nil
 
 	case *types.AttributeValueMemberSS:
-		var arr bson.A
+		arr := bson.A{}
 		for _, v := range tv.Value {
 			arr = append(arr, v)
 		}
@@ -219,7 +238,54 @@ func toBson(av types.AttributeValue, numberType NumberType) (interface{}, error)
 	}
 }
 
-func itemsToJson(items []map[string]types.AttributeValue, keySchema []string) ([][]byte, error) {
+func normalizeJSONNumbers(v interface{}) interface{} {
+	switch tv := v.(type) {
+	case attributevalue.Number:
+		return json.Number(tv.String())
+	case []attributevalue.Number:
+		arr := make([]json.Number, 0, len(tv))
+		for _, n := range tv {
+			arr = append(arr, json.Number(n.String()))
+		}
+		return arr
+	case []interface{}:
+		arr := make([]interface{}, 0, len(tv))
+		for _, v := range tv {
+			arr = append(arr, normalizeJSONNumbers(v))
+		}
+		return arr
+	case map[string]interface{}:
+		m := map[string]interface{}{}
+		for k, v := range tv {
+			m[k] = normalizeJSONNumbers(v)
+		}
+		return m
+	default:
+		return v
+	}
+}
+
+func toInterfaceMap(av types.AttributeValue, numberType NumberType) (map[string]interface{}, error) {
+	var jsonable map[string]interface{}
+	switch numberType {
+	case "", NumberTypeFloat64, NumberTypeString, NumberTypeInt64, NumberTypeInt32:
+		if err := attributevalue.Unmarshal(av, &jsonable); err != nil {
+			return nil, err
+		}
+	case NumberTypeNumber:
+		if err := attributevalue.UnmarshalWithOptions(av, &jsonable, func(options *attributevalue.DecoderOptions) {
+			options.UseNumber = true
+		}); err != nil {
+			return nil, err
+		}
+		jsonable = normalizeJSONNumbers(jsonable).(map[string]interface{})
+	default:
+		return nil, fmt.Errorf("unsupported DynamoDB number type %q", numberType)
+	}
+	return jsonable, nil
+}
+
+func itemsToJson(items []map[string]types.AttributeValue, keySchema []string, numberType NumberType) ([][]byte, error) {
 	jsonItems := make([][]byte, 0, len(items))
 	for _, m := range items {
 		_, id, err := dynamoKeyToJsonId(m, keySchema)
@@ -227,7 +293,7 @@ func itemsToJson(items []map[string]types.AttributeValue, keySchema []string) ([
 			return nil, err
 		}
 
-		jsonable, err := toInterfaceMap(&types.AttributeValueMemberM{Value: m})
+		jsonable, err := toInterfaceMap(&types.AttributeValueMemberM{Value: m}, numberType)
 		if err != nil {
 			return nil, err
 		}
@@ -245,10 +311,10 @@ func itemsToJson(items []map[string]types.AttributeValue, keySchema []string) ([
 	return jsonItems, nil
 }
 
-func itemsToBson(items []map[string]types.AttributeValue, keySchema []string, numberType NumberType) ([][]byte, error) {
+func itemsToBson(items []map[string]types.AttributeValue, keySchema []string, numberType NumberType, bsonIDFormat BsonIDFormat) ([][]byte, error) {
 	bsonItems := make([][]byte, len(items))
 	for i, m := range items {
-		id, err := dynamoKeyToIdBson(m, keySchema, numberType)
+		id, err := dynamoKeyToIdBson(m, keySchema, numberType, bsonIDFormat)
 		if err != nil {
 			return nil, fmt.Errorf("err in key to bson: %w", err)
 		}
@@ -399,7 +465,49 @@ func dynamoKeyToJsonId(attr map[string]types.AttributeValue, keySchema []string)
 	return res, id, nil
 }
 
-func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType) (interface{}, error) {
+func dynamoKeyToCompositeBsonId(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType) ([]*adiomv1.BsonValue, interface{}, error) {
+	var res []*adiomv1.BsonValue
+	if len(keySchema) > 1 {
+		for _, k := range keySchema {
+			v, ok := attr[k]
+			if !ok {
+				return nil, nil, fmt.Errorf("key schema does not match actual keys")
+			}
+			b, err := toBson(v, numberType)
+			if err != nil {
+				return nil, nil, err
+			}
+			bsonValue, err := bsonValueFromInterface(b)
+			if err != nil {
+				return nil, nil, err
+			}
+			bsonValue.Name = k
+			res = append(res, bsonValue)
+		}
+	}
+	_, id, err := dynamoKeyToJsonId(attr, keySchema)
+	if err != nil {
+		return nil, nil, err
+	}
+	idValue, err := bsonValueFromInterface(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	idValue.Name = "_id"
+	res = append(res, idValue)
+	return res, id, nil
+}
+
+func dynamoKeyToIdBson(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType, bsonIDFormat BsonIDFormat) (interface{}, error) {
+	switch bsonIDFormat {
+	case "", BsonIDFormatBinary:
+	case BsonIDFormatComposite:
+		_, id, err := dynamoKeyToCompositeBsonId(attr, keySchema, numberType)
+		return id, err
+	default:
+		return nil, fmt.Errorf("unsupported DynamoDB BSON id format %q", bsonIDFormat)
+	}
+
 	v, ok := attr[keySchema[0]]
 	if !ok {
 		return nil, fmt.Errorf("key schema does not match actual keys")
@@ -435,15 +543,31 @@ func bsonValueFromInterface(b interface{}) (*adiomv1.BsonValue, error) {
 	}, nil
 }
 
-func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType) (*adiomv1.BsonValue, error) {
-	b, err := dynamoKeyToIdBson(attr, keySchema, numberType)
+func dynamoKeyToId(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType, bsonIDFormat BsonIDFormat) (*adiomv1.BsonValue, error) {
+	b, err := dynamoKeyToIdBson(attr, keySchema, numberType, bsonIDFormat)
 	if err != nil {
 		return nil, err
 	}
 	return bsonValueFromInterface(b)
 }
 
-func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, keySchema []string, numberType NumberType) (*adiomv1.Update, error) {
+func dynamoKeyToUpdateIdBson(attr map[string]types.AttributeValue, keySchema []string, numberType NumberType, bsonIDFormat BsonIDFormat) ([]*adiomv1.BsonValue, error) {
+	switch bsonIDFormat {
+	case "", BsonIDFormatBinary:
+		bsonValue, err := dynamoKeyToId(attr, keySchema, numberType, bsonIDFormat)
+		if err != nil {
+			return nil, err
+		}
+		return []*adiomv1.BsonValue{bsonValue}, nil
+	case BsonIDFormatComposite:
+		id, _, err := dynamoKeyToCompositeBsonId(attr, keySchema, numberType)
+		return id, err
+	default:
+		return nil, fmt.Errorf("unsupported DynamoDB BSON id format %q", bsonIDFormat)
+	}
+}
+
+func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, keySchema []string, numberType NumberType, bsonIDFormat BsonIDFormat) (*adiomv1.Update, error) {
 	converted := map[string]types.AttributeValue{}
 	for k, v := range record.Dynamodb.Keys {
 		v2, err := streamTypeToDynamoType(v)
@@ -457,15 +581,11 @@ func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, 
 	var jId string // used for json id type
 	switch dataType {
 	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-		idBson, err := dynamoKeyToIdBson(converted, keySchema, numberType)
+		var err error
+		id, err = dynamoKeyToUpdateIdBson(converted, keySchema, numberType, bsonIDFormat)
 		if err != nil {
 			return nil, err
 		}
-		bsonValue, err := bsonValueFromInterface(idBson)
-		if err != nil {
-			return nil, err
-		}
-		id = []*adiomv1.BsonValue{bsonValue}
 	case adiomv1.DataType_DATA_TYPE_JSON_ID:
 		var err error
 		id, jId, err = dynamoKeyToJsonId(converted, keySchema)
@@ -506,7 +626,7 @@ func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, 
 		if err != nil {
 			return nil, err
 		}
-		idBson, err := dynamoKeyToIdBson(converted, keySchema, numberType)
+		idBson, err := dynamoKeyToIdBson(converted, keySchema, numberType, bsonIDFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +636,7 @@ func streamRecordToUpdate(record streamtypes.Record, dataType adiomv1.DataType, 
 			return nil, err
 		}
 	case adiomv1.DataType_DATA_TYPE_JSON_ID:
-		j, err := toInterfaceMap(r)
+		j, err := toInterfaceMap(r, numberType)
 		if err != nil {
 			return nil, err
 		}

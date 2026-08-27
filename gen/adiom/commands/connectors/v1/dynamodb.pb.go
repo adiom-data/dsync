@@ -28,6 +28,7 @@ type DynamoDBFlags struct {
 	PlanParallelism int32                  `protobuf:"varint,2,opt,name=plan_parallelism,json=planParallelism,proto3" json:"plan_parallelism,omitempty"`
 	Id              string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	NumberType      string                 `protobuf:"bytes,4,opt,name=number_type,json=numberType,proto3" json:"number_type,omitempty"`
+	BsonIdFormat    string                 `protobuf:"bytes,6,opt,name=bson_id_format,json=bsonIdFormat,proto3" json:"bson_id_format,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -90,20 +91,29 @@ func (x *DynamoDBFlags) GetNumberType() string {
 	return ""
 }
 
+func (x *DynamoDBFlags) GetBsonIdFormat() string {
+	if x != nil {
+		return x.BsonIdFormat
+	}
+	return ""
+}
+
 var File_adiom_commands_connectors_v1_dynamodb_proto protoreflect.FileDescriptor
 
 const file_adiom_commands_connectors_v1_dynamodb_proto_rawDesc = "" +
 	"\n" +
-	"+adiom/commands/connectors/v1/dynamodb.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\"\xc9\x03\n" +
+	"+adiom/commands/connectors/v1/dynamodb.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\"\xd9\x05\n" +
 	"\rDynamoDBFlags\x12i\n" +
 	"\rdoc_partition\x18\x01 \x01(\x05BD\x82\xb5\x18@\n" +
 	"\rdoc-partition\x12(Target number of documents per partition\x1a\x0550000R\fdocPartition\x12a\n" +
 	"\x10plan_parallelism\x18\x02 \x01(\x05B6\x82\xb5\x182\n" +
 	"\x10plan-parallelism\x12\x1bParallelism during planning\x1a\x014R\x0fplanParallelism\x122\n" +
-	"\x02id\x18\x03 \x01(\tB\"\x82\xb5\x18\x1e\x12\x1cA fixed id for the connectorR\x02id\x12\x82\x01\n" +
-	"\vnumber_type\x18\x04 \x01(\tBa\x82\xb5\x18]\n" +
-	"\vnumber-type\x12FMongoDB BSON type to use for DynamoDB numbers: string, int64, or int32\x1a\x06stringR\n" +
-	"numberType:1\x82\xb5\x18-\n" +
+	"\x02id\x18\x03 \x01(\tB\"\x82\xb5\x18\x1e\x12\x1cA fixed id for the connectorR\x02id\x12\x83\x02\n" +
+	"\vnumber_type\x18\x04 \x01(\tB\xe1\x01\x82\xb5\x18\xdc\x01\n" +
+	"\vnumber-type\x12\xc4\x01Type to use for DynamoDB numbers in BSON: string, int64, int32, float64, or number (Decimal128). JSON uses the AWS float64 default unless this is set to number, which preserves exact JSON numbers.\x1a\x06stringR\n" +
+	"numberType\x12\x8c\x01\n" +
+	"\x0ebson_id_format\x18\x06 \x01(\tBf\x82\xb5\x18b\n" +
+	"\x0ebson-id-format\x12HMongoDB BSON _id/update id format for DynamoDB keys: binary or composite\x1a\x06binaryR\fbsonIdFormat:1\x82\xb5\x18-\n" +
 	"\bDynamoDB\"!dynamodb OR dynamodb://localstackBKZIgithub.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1b\x06proto3"
 
 var (

@@ -22,8 +22,13 @@ func DynamoDBFlagsCommandFlags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:  "number-type",
-			Usage: "MongoDB BSON type to use for DynamoDB numbers: string, int64, or int32",
+			Usage: "Type to use for DynamoDB numbers in BSON: string, int64, int32, float64, or number (Decimal128). JSON uses the AWS float64 default unless this is set to number, which preserves exact JSON numbers.",
 			Value: "string",
+		},
+		&cli.StringFlag{
+			Name:  "bson-id-format",
+			Usage: "MongoDB BSON _id/update id format for DynamoDB keys: binary or composite",
+			Value: "binary",
 		},
 	}
 }
@@ -34,6 +39,7 @@ func ParseDynamoDBFlags(c *cli.Context) (*DynamoDBFlags, error) {
 	cfg.PlanParallelism = int32(c.Int("plan-parallelism"))
 	cfg.Id = c.String("id")
 	cfg.NumberType = c.String("number-type")
+	cfg.BsonIdFormat = c.String("bson-id-format")
 	return cfg, nil
 }
 

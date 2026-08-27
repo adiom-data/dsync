@@ -20,6 +20,7 @@ type client struct {
 	dynamoClient  *dynamodb.Client
 	streamsClient *dynamodbstreams.Client
 	numberType    NumberType
+	bsonIDFormat  BsonIDFormat
 }
 
 type scanCursor struct {
@@ -141,12 +142,12 @@ func (c *client) Scan(ctx context.Context, dataType adiomv1.DataType, tableName 
 	switch dataType {
 	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
 		// TODO: factor in primary key so we can match with updates
-		items, err = itemsToBson(res.Items, sc.keySchema, c.numberType)
+		items, err = itemsToBson(res.Items, sc.keySchema, c.numberType, c.bsonIDFormat)
 		if err != nil {
 			return ScanResult{}, err
 		}
 	case adiomv1.DataType_DATA_TYPE_JSON_ID:
-		items, err = itemsToJson(res.Items, sc.keySchema)
+		items, err = itemsToJson(res.Items, sc.keySchema, c.numberType)
 		if err != nil {
 			return ScanResult{}, err
 		}
@@ -298,6 +299,11 @@ func (c *client) GetStreamState(ctx context.Context, arn string) (stream.StreamS
 	return state, nil
 }
 
-func NewClient(dynamoClient *dynamodb.Client, streamsClient *dynamodbstreams.Client, numberType NumberType) *client {
-	return &client{dynamoClient: dynamoClient, streamsClient: streamsClient, numberType: numberType}
+func NewClient(dynamoClient *dynamodb.Client, streamsClient *dynamodbstreams.Client, numberType NumberType, bsonIDFormat BsonIDFormat) *client {
+	return &client{
+		dynamoClient:  dynamoClient,
+		streamsClient: streamsClient,
+		numberType:    numberType,
+		bsonIDFormat:  bsonIDFormat,
+	}
 }

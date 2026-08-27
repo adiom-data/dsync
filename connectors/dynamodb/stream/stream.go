@@ -109,10 +109,14 @@ func (s *stream) startProcessShards(ctx context.Context, shards []*dynamodbstrea
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	go func() {
+		defer close(done)
 		for _, shard := range shards {
-			shardsToRun <- shard
+			select {
+			case shardsToRun <- shard:
+			case <-ctx.Done():
+				return
+			}
 		}
-		close(done)
 	}()
 
 	for {
@@ -161,14 +165,22 @@ func (s *stream) startProcessShards(ctx context.Context, shards []*dynamodbstrea
 						childShardIDs = append(childShardIDs, *childShard.ShardId)
 					}
 
-					ch <- StreamRecords{
+					select {
+					case ch <- StreamRecords{
 						StreamARN:     s.streamARN,
 						ShardID:       *shard.ShardId,
 						ChildShardIDs: childShardIDs,
+					}:
+					case <-egCtx.Done():
+						return egCtx.Err()
 					}
 
 					for _, childShard := range childShards {
-						shardsToRun <- childShard
+						select {
+						case shardsToRun <- childShard:
+						case <-egCtx.Done():
+							return egCtx.Err()
+						}
 					}
 					break
 				}
@@ -210,10 +222,14 @@ func (s *stream) processShard(ctx context.Context, shardInput *dynamodbstreams.G
 
 		if len(recordsRes.Records) > 0 {
 			s.options.Logger.Debug("shard received records", "num_records", len(recordsRes.Records), "shard_id", *shardInput.ShardId)
-			ch <- StreamRecords{
+			select {
+			case ch <- StreamRecords{
 				StreamARN: *shardInput.StreamArn,
 				ShardID:   *shardInput.ShardId,
 				Records:   recordsRes.Records,
+			}:
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
 
