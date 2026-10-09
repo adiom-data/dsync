@@ -975,12 +975,20 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 	var failures []*adiomv1.WriteFailure
 	var batch []indexedDocument
 	flush := func() error {
-		batchFailures, err := insertBatchOverwrite(ctx, col, batch, c.settings.SkipBatchOverwrite, partialResults)
+		currentBatch := batch
+		batch = nil
+		batchFailures, err := insertBatchOverwrite(ctx, col, currentBatch, c.settings.SkipBatchOverwrite, partialResults)
 		if err != nil {
-			return err
+			if !partialResults || ctx.Err() != nil {
+				return err
+			}
+			message := fmt.Sprintf("batch write failed: %v", err)
+			for _, document := range currentBatch {
+				failures = append(failures, &adiomv1.WriteFailure{Index: document.index, Message: message})
+			}
+			return nil
 		}
 		failures = append(failures, batchFailures...)
-		batch = nil
 		return nil
 	}
 
@@ -1063,10 +1071,9 @@ func stripIdFields(raw bson.Raw, idFilter bson.D) (bson.Raw, error) {
 }
 
 type indexedWriteModel struct {
-	model     mongo.WriteModel
-	indices   []uint32
-	idKey     string
-	effective bool
+	model   mongo.WriteModel
+	indices []uint32
+	idKey   string
 }
 
 func (c *conn) buildWriteModel(update *adiomv1.Update) (mongo.WriteModel, string, error) {
@@ -1152,7 +1159,7 @@ func (c *conn) buildIndexedBulkModels(updates []*adiomv1.Update) ([]indexedWrite
 		if update.model == nil {
 			continue
 		}
-		indexed := indexedWriteModel{model: update.model, indices: []uint32{update.index}, idKey: update.idKey, effective: isNew}
+		indexed := indexedWriteModel{model: update.model, indices: []uint32{update.index}, idKey: update.idKey}
 		if isNew {
 			models = append(models, indexed)
 		} else if lastType == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
@@ -1163,9 +1170,7 @@ func (c *conn) buildIndexedBulkModels(updates []*adiomv1.Update) ([]indexedWrite
 	}
 
 	for i := range models {
-		if models[i].effective {
-			models[i].indices = append(models[i].indices, superseded[models[i].idKey]...)
-		}
+		models[i].indices = append(models[i].indices, superseded[models[i].idKey]...)
 	}
 	if len(orderedModels) > 0 {
 		slices.Reverse(orderedModels)
@@ -1236,45 +1241,26 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
-	if r.Msg.GetPartialWriteResults() {
-		indexedModels, ordered, err := c.buildIndexedBulkModels(r.Msg.GetUpdates())
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		if len(indexedModels) == 0 {
-			return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
-		}
-
-		models := make([]mongo.WriteModel, len(indexedModels))
-		for i, model := range indexedModels {
-			models[i] = model.model
-		}
-		_, err = col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(ordered))
-		var failures []*adiomv1.WriteFailure
-		if err != nil {
-			writeFailures, ok := failuresFromBulkWrite(err, indexedModels, ordered)
-			if !ok {
-				if !errors.Is(err, context.Canceled) {
-					slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
-				}
-				return nil, maybeUnavailableError(err)
-			}
-			failures = append(failures, writeFailures...)
-		}
-		return connect.NewResponse(&adiomv1.WriteUpdatesResponse{Failures: normalizeWriteFailures(failures)}), nil
-	}
-
-	finalModels, ordered, err := c.buildBulkModels(r.Msg.GetUpdates())
+	indexedModels, ordered, err := c.buildIndexedBulkModels(r.Msg.GetUpdates())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	if len(finalModels) == 0 {
+	if len(indexedModels) == 0 {
 		return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
 	}
 
-	_, err = col.BulkWrite(ctx, finalModels, options.BulkWrite().SetOrdered(ordered))
+	models := make([]mongo.WriteModel, len(indexedModels))
+	for i, model := range indexedModels {
+		models[i] = model.model
+	}
+	_, err = col.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(ordered))
 	if err != nil {
+		if r.Msg.GetPartialWriteResults() {
+			if failures, attributable := failuresFromBulkWrite(err, indexedModels, ordered); attributable {
+				return connect.NewResponse(&adiomv1.WriteUpdatesResponse{Failures: normalizeWriteFailures(failures)}), nil
+			}
+		}
 		if !errors.Is(err, context.Canceled) {
 			slog.Error(fmt.Sprintf("Failed to insert bulk updates: %v", err))
 		}

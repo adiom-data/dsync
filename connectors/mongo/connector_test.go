@@ -254,6 +254,23 @@ func TestMongoConnectorPartialWriteResults(t *testing.T) {
 	assertDoc(t, col, map[string]string{"_id": "good-data", "unique": "free-data"})
 	assertNoDoc(t, col, "bad-data")
 
+	chunkedConnector := NewConnWithClient(client, ConnectorSettings{
+		ConnectionString:   TestMongoConnectionString,
+		WriterMaxBatchSize: 1,
+	})
+	chunkedResponse, err := chunkedConnector.WriteData(t.Context(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Data: [][]byte{
+			[]byte("not bson"),
+			toBson(t, bson.M{"_id": "good-after-batch-error", "unique": "free-after-batch-error"}),
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, chunkedResponse.Msg.GetFailures(), 1)
+	assert.Equal(t, uint32(0), chunkedResponse.Msg.GetFailures()[0].GetIndex())
+	assertDoc(t, col, map[string]string{"_id": "good-after-batch-error", "unique": "free-after-batch-error"})
+
 	updatesResponse, err := connector.WriteUpdates(t.Context(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{
 		Namespace:           namespace,
 		PartialWriteResults: true,
