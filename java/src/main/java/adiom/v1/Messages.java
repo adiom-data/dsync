@@ -4116,6 +4116,16 @@ public final class Messages {
        * @return The enum numeric value on the wire of supportedDataTypes at the given index.
        */
       int getSupportedDataTypesValue(int index);
+
+      /**
+       * <pre>
+       * Whether the connector can return individual failures from WriteData and WriteUpdates
+       * </pre>
+       *
+       * <code>bool partial_write_results = 2 [json_name = "partialWriteResults"];</code>
+       * @return The partialWriteResults.
+       */
+      boolean getPartialWriteResults();
     }
     /**
      * Protobuf type {@code adiom.v1.Capabilities.Sink}
@@ -4213,6 +4223,21 @@ public final class Messages {
       }
       private int supportedDataTypesMemoizedSerializedSize;
 
+      public static final int PARTIAL_WRITE_RESULTS_FIELD_NUMBER = 2;
+      private boolean partialWriteResults_ = false;
+      /**
+       * <pre>
+       * Whether the connector can return individual failures from WriteData and WriteUpdates
+       * </pre>
+       *
+       * <code>bool partial_write_results = 2 [json_name = "partialWriteResults"];</code>
+       * @return The partialWriteResults.
+       */
+      @java.lang.Override
+      public boolean getPartialWriteResults() {
+        return partialWriteResults_;
+      }
+
       private byte memoizedIsInitialized = -1;
       @java.lang.Override
       public final boolean isInitialized() {
@@ -4235,6 +4260,9 @@ public final class Messages {
         for (int i = 0; i < supportedDataTypes_.size(); i++) {
           output.writeEnumNoTag(supportedDataTypes_.getInt(i));
         }
+        if (partialWriteResults_ != false) {
+          output.writeBool(2, partialWriteResults_);
+        }
         getUnknownFields().writeTo(output);
       }
 
@@ -4256,6 +4284,10 @@ public final class Messages {
               .computeUInt32SizeNoTag(dataSize);
           }supportedDataTypesMemoizedSerializedSize = dataSize;
         }
+        if (partialWriteResults_ != false) {
+          size += com.google.protobuf.CodedOutputStream
+            .computeBoolSize(2, partialWriteResults_);
+        }
         size += getUnknownFields().getSerializedSize();
         memoizedSize = size;
         return size;
@@ -4272,6 +4304,8 @@ public final class Messages {
         adiom.v1.Messages.Capabilities.Sink other = (adiom.v1.Messages.Capabilities.Sink) obj;
 
         if (!supportedDataTypes_.equals(other.supportedDataTypes_)) return false;
+        if (getPartialWriteResults()
+            != other.getPartialWriteResults()) return false;
         if (!getUnknownFields().equals(other.getUnknownFields())) return false;
         return true;
       }
@@ -4287,6 +4321,9 @@ public final class Messages {
           hash = (37 * hash) + SUPPORTED_DATA_TYPES_FIELD_NUMBER;
           hash = (53 * hash) + supportedDataTypes_.hashCode();
         }
+        hash = (37 * hash) + PARTIAL_WRITE_RESULTS_FIELD_NUMBER;
+        hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
+            getPartialWriteResults());
         hash = (29 * hash) + getUnknownFields().hashCode();
         memoizedHashCode = hash;
         return hash;
@@ -4420,6 +4457,7 @@ public final class Messages {
           bitField0_ = 0;
           supportedDataTypes_ = emptyIntList();
           bitField0_ = (bitField0_ & ~0x00000001);
+          partialWriteResults_ = false;
           return this;
         }
 
@@ -4462,6 +4500,9 @@ public final class Messages {
 
         private void buildPartial0(adiom.v1.Messages.Capabilities.Sink result) {
           int from_bitField0_ = bitField0_;
+          if (((from_bitField0_ & 0x00000002) != 0)) {
+            result.partialWriteResults_ = partialWriteResults_;
+          }
         }
 
         @java.lang.Override
@@ -4485,6 +4526,9 @@ public final class Messages {
               supportedDataTypes_.addAll(other.supportedDataTypes_);
             }
             onChanged();
+          }
+          if (other.getPartialWriteResults() != false) {
+            setPartialWriteResults(other.getPartialWriteResults());
           }
           this.mergeUnknownFields(other.getUnknownFields());
           onChanged();
@@ -4529,6 +4573,11 @@ public final class Messages {
                   input.popLimit(oldLimit);
                   break;
                 } // case 10
+                case 16: {
+                  partialWriteResults_ = input.readBool();
+                  bitField0_ |= 0x00000002;
+                  break;
+                } // case 16
                 default: {
                   if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                     done = true; // was an endgroup tag
@@ -4682,6 +4731,50 @@ public final class Messages {
           for (int value : values) {
             supportedDataTypes_.addInt(value);
           }
+          onChanged();
+          return this;
+        }
+
+        private boolean partialWriteResults_ ;
+        /**
+         * <pre>
+         * Whether the connector can return individual failures from WriteData and WriteUpdates
+         * </pre>
+         *
+         * <code>bool partial_write_results = 2 [json_name = "partialWriteResults"];</code>
+         * @return The partialWriteResults.
+         */
+        @java.lang.Override
+        public boolean getPartialWriteResults() {
+          return partialWriteResults_;
+        }
+        /**
+         * <pre>
+         * Whether the connector can return individual failures from WriteData and WriteUpdates
+         * </pre>
+         *
+         * <code>bool partial_write_results = 2 [json_name = "partialWriteResults"];</code>
+         * @param value The partialWriteResults to set.
+         * @return This builder for chaining.
+         */
+        public Builder setPartialWriteResults(boolean value) {
+
+          partialWriteResults_ = value;
+          bitField0_ |= 0x00000002;
+          onChanged();
+          return this;
+        }
+        /**
+         * <pre>
+         * Whether the connector can return individual failures from WriteData and WriteUpdates
+         * </pre>
+         *
+         * <code>bool partial_write_results = 2 [json_name = "partialWriteResults"];</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearPartialWriteResults() {
+          bitField0_ = (bitField0_ & ~0x00000002);
+          partialWriteResults_ = false;
           onChanged();
           return this;
         }
@@ -12411,6 +12504,16 @@ public final class Messages {
      * @return The type.
      */
     adiom.v1.Messages.DataType getType();
+
+    /**
+     * <pre>
+     * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+     * </pre>
+     *
+     * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+     * @return The partialWriteResults.
+     */
+    boolean getPartialWriteResults();
   }
   /**
    * Protobuf type {@code adiom.v1.WriteDataRequest}
@@ -12538,6 +12641,21 @@ public final class Messages {
       return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
     }
 
+    public static final int PARTIAL_WRITE_RESULTS_FIELD_NUMBER = 4;
+    private boolean partialWriteResults_ = false;
+    /**
+     * <pre>
+     * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+     * </pre>
+     *
+     * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+     * @return The partialWriteResults.
+     */
+    @java.lang.Override
+    public boolean getPartialWriteResults() {
+      return partialWriteResults_;
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -12560,6 +12678,9 @@ public final class Messages {
       }
       if (type_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
         output.writeEnum(3, type_);
+      }
+      if (partialWriteResults_ != false) {
+        output.writeBool(4, partialWriteResults_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -12586,6 +12707,10 @@ public final class Messages {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(3, type_);
       }
+      if (partialWriteResults_ != false) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(4, partialWriteResults_);
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -12606,6 +12731,8 @@ public final class Messages {
       if (!getDataList()
           .equals(other.getDataList())) return false;
       if (type_ != other.type_) return false;
+      if (getPartialWriteResults()
+          != other.getPartialWriteResults()) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -12625,6 +12752,9 @@ public final class Messages {
       }
       hash = (37 * hash) + TYPE_FIELD_NUMBER;
       hash = (53 * hash) + type_;
+      hash = (37 * hash) + PARTIAL_WRITE_RESULTS_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
+          getPartialWriteResults());
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -12759,6 +12889,7 @@ public final class Messages {
         namespace_ = "";
         data_ = emptyList(com.google.protobuf.ByteString.class);
         type_ = 0;
+        partialWriteResults_ = false;
         return this;
       }
 
@@ -12802,6 +12933,9 @@ public final class Messages {
         if (((from_bitField0_ & 0x00000004) != 0)) {
           result.type_ = type_;
         }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          result.partialWriteResults_ = partialWriteResults_;
+        }
       }
 
       @java.lang.Override
@@ -12834,6 +12968,9 @@ public final class Messages {
         }
         if (other.type_ != 0) {
           setTypeValue(other.getTypeValue());
+        }
+        if (other.getPartialWriteResults() != false) {
+          setPartialWriteResults(other.getPartialWriteResults());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
@@ -12877,6 +13014,11 @@ public final class Messages {
                 bitField0_ |= 0x00000004;
                 break;
               } // case 24
+              case 32: {
+                partialWriteResults_ = input.readBool();
+                bitField0_ |= 0x00000008;
+                break;
+              } // case 32
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -13103,6 +13245,50 @@ public final class Messages {
         return this;
       }
 
+      private boolean partialWriteResults_ ;
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @return The partialWriteResults.
+       */
+      @java.lang.Override
+      public boolean getPartialWriteResults() {
+        return partialWriteResults_;
+      }
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @param value The partialWriteResults to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartialWriteResults(boolean value) {
+
+        partialWriteResults_ = value;
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPartialWriteResults() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        partialWriteResults_ = false;
+        onChanged();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:adiom.v1.WriteDataRequest)
     }
 
@@ -13157,6 +13343,50 @@ public final class Messages {
   public interface WriteDataResponseOrBuilder extends
       // @@protoc_insertion_point(interface_extends:adiom.v1.WriteDataResponse)
       com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    java.util.List<adiom.v1.Messages.WriteFailure>
+        getFailuresList();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    adiom.v1.Messages.WriteFailure getFailures(int index);
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    int getFailuresCount();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+        getFailuresOrBuilderList();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+        int index);
   }
   /**
    * Protobuf type {@code adiom.v1.WriteDataResponse}
@@ -13180,6 +13410,7 @@ public final class Messages {
       super(builder);
     }
     private WriteDataResponse() {
+      failures_ = java.util.Collections.emptyList();
     }
 
     public static final com.google.protobuf.Descriptors.Descriptor
@@ -13193,6 +13424,67 @@ public final class Messages {
       return adiom.v1.Messages.internal_static_adiom_v1_WriteDataResponse_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
               adiom.v1.Messages.WriteDataResponse.class, adiom.v1.Messages.WriteDataResponse.Builder.class);
+    }
+
+    public static final int FAILURES_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private java.util.List<adiom.v1.Messages.WriteFailure> failures_;
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<adiom.v1.Messages.WriteFailure> getFailuresList() {
+      return failures_;
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+        getFailuresOrBuilderList() {
+      return failures_;
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public int getFailuresCount() {
+      return failures_.size();
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.WriteFailure getFailures(int index) {
+      return failures_.get(index);
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+        int index) {
+      return failures_.get(index);
     }
 
     private byte memoizedIsInitialized = -1;
@@ -13209,6 +13501,9 @@ public final class Messages {
     @java.lang.Override
     public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
+      for (int i = 0; i < failures_.size(); i++) {
+        output.writeMessage(1, failures_.get(i));
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -13218,6 +13513,10 @@ public final class Messages {
       if (size != -1) return size;
 
       size = 0;
+      for (int i = 0; i < failures_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, failures_.get(i));
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -13233,6 +13532,8 @@ public final class Messages {
       }
       adiom.v1.Messages.WriteDataResponse other = (adiom.v1.Messages.WriteDataResponse) obj;
 
+      if (!getFailuresList()
+          .equals(other.getFailuresList())) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -13244,6 +13545,10 @@ public final class Messages {
       }
       int hash = 41;
       hash = (19 * hash) + getDescriptor().hashCode();
+      if (getFailuresCount() > 0) {
+        hash = (37 * hash) + FAILURES_FIELD_NUMBER;
+        hash = (53 * hash) + getFailuresList().hashCode();
+      }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -13374,6 +13679,14 @@ public final class Messages {
       @java.lang.Override
       public Builder clear() {
         super.clear();
+        bitField0_ = 0;
+        if (failuresBuilder_ == null) {
+          failures_ = java.util.Collections.emptyList();
+        } else {
+          failures_ = null;
+          failuresBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
         return this;
       }
 
@@ -13400,8 +13713,26 @@ public final class Messages {
       @java.lang.Override
       public adiom.v1.Messages.WriteDataResponse buildPartial() {
         adiom.v1.Messages.WriteDataResponse result = new adiom.v1.Messages.WriteDataResponse(this);
+        buildPartialRepeatedFields(result);
+        if (bitField0_ != 0) { buildPartial0(result); }
         onBuilt();
         return result;
+      }
+
+      private void buildPartialRepeatedFields(adiom.v1.Messages.WriteDataResponse result) {
+        if (failuresBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            failures_ = java.util.Collections.unmodifiableList(failures_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.failures_ = failures_;
+        } else {
+          result.failures_ = failuresBuilder_.build();
+        }
+      }
+
+      private void buildPartial0(adiom.v1.Messages.WriteDataResponse result) {
+        int from_bitField0_ = bitField0_;
       }
 
       @java.lang.Override
@@ -13416,6 +13747,32 @@ public final class Messages {
 
       public Builder mergeFrom(adiom.v1.Messages.WriteDataResponse other) {
         if (other == adiom.v1.Messages.WriteDataResponse.getDefaultInstance()) return this;
+        if (failuresBuilder_ == null) {
+          if (!other.failures_.isEmpty()) {
+            if (failures_.isEmpty()) {
+              failures_ = other.failures_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureFailuresIsMutable();
+              failures_.addAll(other.failures_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.failures_.isEmpty()) {
+            if (failuresBuilder_.isEmpty()) {
+              failuresBuilder_.dispose();
+              failuresBuilder_ = null;
+              failures_ = other.failures_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              failuresBuilder_ =
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getFailuresFieldBuilder() : null;
+            } else {
+              failuresBuilder_.addAllMessages(other.failures_);
+            }
+          }
+        }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
@@ -13442,6 +13799,19 @@ public final class Messages {
               case 0:
                 done = true;
                 break;
+              case 10: {
+                adiom.v1.Messages.WriteFailure m =
+                    input.readMessage(
+                        adiom.v1.Messages.WriteFailure.parser(),
+                        extensionRegistry);
+                if (failuresBuilder_ == null) {
+                  ensureFailuresIsMutable();
+                  failures_.add(m);
+                } else {
+                  failuresBuilder_.addMessage(m);
+                }
+                break;
+              } // case 10
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -13456,6 +13826,319 @@ public final class Messages {
           onChanged();
         } // finally
         return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<adiom.v1.Messages.WriteFailure> failures_ =
+        java.util.Collections.emptyList();
+      private void ensureFailuresIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          failures_ = new java.util.ArrayList<adiom.v1.Messages.WriteFailure>(failures_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder> failuresBuilder_;
+
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.WriteFailure> getFailuresList() {
+        if (failuresBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(failures_);
+        } else {
+          return failuresBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public int getFailuresCount() {
+        if (failuresBuilder_ == null) {
+          return failures_.size();
+        } else {
+          return failuresBuilder_.getCount();
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure getFailures(int index) {
+        if (failuresBuilder_ == null) {
+          return failures_.get(index);
+        } else {
+          return failuresBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder setFailures(
+          int index, adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.set(index, value);
+          onChanged();
+        } else {
+          failuresBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder setFailures(
+          int index, adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.add(value);
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          int index, adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.add(index, value);
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.add(builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          int index, adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addAllFailures(
+          java.lang.Iterable<? extends adiom.v1.Messages.WriteFailure> values) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, failures_);
+          onChanged();
+        } else {
+          failuresBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder clearFailures() {
+        if (failuresBuilder_ == null) {
+          failures_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          failuresBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder removeFailures(int index) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.remove(index);
+          onChanged();
+        } else {
+          failuresBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder getFailuresBuilder(
+          int index) {
+        return getFailuresFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+          int index) {
+        if (failuresBuilder_ == null) {
+          return failures_.get(index);  } else {
+          return failuresBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+           getFailuresOrBuilderList() {
+        if (failuresBuilder_ != null) {
+          return failuresBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(failures_);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder addFailuresBuilder() {
+        return getFailuresFieldBuilder().addBuilder(
+            adiom.v1.Messages.WriteFailure.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder addFailuresBuilder(
+          int index) {
+        return getFailuresFieldBuilder().addBuilder(
+            index, adiom.v1.Messages.WriteFailure.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.WriteFailure.Builder>
+           getFailuresBuilderList() {
+        return getFailuresFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder>
+          getFailuresFieldBuilder() {
+        if (failuresBuilder_ == null) {
+          failuresBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder>(
+                  failures_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          failures_ = null;
+        }
+        return failuresBuilder_;
       }
 
       // @@protoc_insertion_point(builder_scope:adiom.v1.WriteDataResponse)
@@ -13559,6 +14242,16 @@ public final class Messages {
      * @return The type.
      */
     adiom.v1.Messages.DataType getType();
+
+    /**
+     * <pre>
+     * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+     * </pre>
+     *
+     * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+     * @return The partialWriteResults.
+     */
+    boolean getPartialWriteResults();
   }
   /**
    * Protobuf type {@code adiom.v1.WriteUpdatesRequest}
@@ -13698,6 +14391,21 @@ public final class Messages {
       return result == null ? adiom.v1.Messages.DataType.UNRECOGNIZED : result;
     }
 
+    public static final int PARTIAL_WRITE_RESULTS_FIELD_NUMBER = 4;
+    private boolean partialWriteResults_ = false;
+    /**
+     * <pre>
+     * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+     * </pre>
+     *
+     * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+     * @return The partialWriteResults.
+     */
+    @java.lang.Override
+    public boolean getPartialWriteResults() {
+      return partialWriteResults_;
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -13721,6 +14429,9 @@ public final class Messages {
       if (type_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
         output.writeEnum(3, type_);
       }
+      if (partialWriteResults_ != false) {
+        output.writeBool(4, partialWriteResults_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -13740,6 +14451,10 @@ public final class Messages {
       if (type_ != adiom.v1.Messages.DataType.DATA_TYPE_UNKNOWN.getNumber()) {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(3, type_);
+      }
+      if (partialWriteResults_ != false) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(4, partialWriteResults_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
@@ -13761,6 +14476,8 @@ public final class Messages {
       if (!getUpdatesList()
           .equals(other.getUpdatesList())) return false;
       if (type_ != other.type_) return false;
+      if (getPartialWriteResults()
+          != other.getPartialWriteResults()) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -13780,6 +14497,9 @@ public final class Messages {
       }
       hash = (37 * hash) + TYPE_FIELD_NUMBER;
       hash = (53 * hash) + type_;
+      hash = (37 * hash) + PARTIAL_WRITE_RESULTS_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
+          getPartialWriteResults());
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -13920,6 +14640,7 @@ public final class Messages {
         }
         bitField0_ = (bitField0_ & ~0x00000002);
         type_ = 0;
+        partialWriteResults_ = false;
         return this;
       }
 
@@ -13972,6 +14693,9 @@ public final class Messages {
         if (((from_bitField0_ & 0x00000004) != 0)) {
           result.type_ = type_;
         }
+        if (((from_bitField0_ & 0x00000008) != 0)) {
+          result.partialWriteResults_ = partialWriteResults_;
+        }
       }
 
       @java.lang.Override
@@ -14019,6 +14743,9 @@ public final class Messages {
         }
         if (other.type_ != 0) {
           setTypeValue(other.getTypeValue());
+        }
+        if (other.getPartialWriteResults() != false) {
+          setPartialWriteResults(other.getPartialWriteResults());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
@@ -14069,6 +14796,11 @@ public final class Messages {
                 bitField0_ |= 0x00000004;
                 break;
               } // case 24
+              case 32: {
+                partialWriteResults_ = input.readBool();
+                bitField0_ |= 0x00000008;
+                break;
+              } // case 32
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -14451,6 +15183,50 @@ public final class Messages {
         return this;
       }
 
+      private boolean partialWriteResults_ ;
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @return The partialWriteResults.
+       */
+      @java.lang.Override
+      public boolean getPartialWriteResults() {
+        return partialWriteResults_;
+      }
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @param value The partialWriteResults to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPartialWriteResults(boolean value) {
+
+        partialWriteResults_ = value;
+        bitField0_ |= 0x00000008;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+       * </pre>
+       *
+       * <code>bool partial_write_results = 4 [json_name = "partialWriteResults"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPartialWriteResults() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        partialWriteResults_ = false;
+        onChanged();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:adiom.v1.WriteUpdatesRequest)
     }
 
@@ -14505,6 +15281,50 @@ public final class Messages {
   public interface WriteUpdatesResponseOrBuilder extends
       // @@protoc_insertion_point(interface_extends:adiom.v1.WriteUpdatesResponse)
       com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    java.util.List<adiom.v1.Messages.WriteFailure>
+        getFailuresList();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    adiom.v1.Messages.WriteFailure getFailures(int index);
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    int getFailuresCount();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+        getFailuresOrBuilderList();
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+        int index);
   }
   /**
    * Protobuf type {@code adiom.v1.WriteUpdatesResponse}
@@ -14528,6 +15348,7 @@ public final class Messages {
       super(builder);
     }
     private WriteUpdatesResponse() {
+      failures_ = java.util.Collections.emptyList();
     }
 
     public static final com.google.protobuf.Descriptors.Descriptor
@@ -14541,6 +15362,67 @@ public final class Messages {
       return adiom.v1.Messages.internal_static_adiom_v1_WriteUpdatesResponse_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
               adiom.v1.Messages.WriteUpdatesResponse.class, adiom.v1.Messages.WriteUpdatesResponse.Builder.class);
+    }
+
+    public static final int FAILURES_FIELD_NUMBER = 1;
+    @SuppressWarnings("serial")
+    private java.util.List<adiom.v1.Messages.WriteFailure> failures_;
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<adiom.v1.Messages.WriteFailure> getFailuresList() {
+      return failures_;
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+        getFailuresOrBuilderList() {
+      return failures_;
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public int getFailuresCount() {
+      return failures_.size();
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.WriteFailure getFailures(int index) {
+      return failures_.get(index);
+    }
+    /**
+     * <pre>
+     * Every request index omitted from this list succeeded
+     * </pre>
+     *
+     * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+     */
+    @java.lang.Override
+    public adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+        int index) {
+      return failures_.get(index);
     }
 
     private byte memoizedIsInitialized = -1;
@@ -14557,6 +15439,9 @@ public final class Messages {
     @java.lang.Override
     public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
+      for (int i = 0; i < failures_.size(); i++) {
+        output.writeMessage(1, failures_.get(i));
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -14566,6 +15451,10 @@ public final class Messages {
       if (size != -1) return size;
 
       size = 0;
+      for (int i = 0; i < failures_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, failures_.get(i));
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -14581,6 +15470,8 @@ public final class Messages {
       }
       adiom.v1.Messages.WriteUpdatesResponse other = (adiom.v1.Messages.WriteUpdatesResponse) obj;
 
+      if (!getFailuresList()
+          .equals(other.getFailuresList())) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -14592,6 +15483,10 @@ public final class Messages {
       }
       int hash = 41;
       hash = (19 * hash) + getDescriptor().hashCode();
+      if (getFailuresCount() > 0) {
+        hash = (37 * hash) + FAILURES_FIELD_NUMBER;
+        hash = (53 * hash) + getFailuresList().hashCode();
+      }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -14722,6 +15617,14 @@ public final class Messages {
       @java.lang.Override
       public Builder clear() {
         super.clear();
+        bitField0_ = 0;
+        if (failuresBuilder_ == null) {
+          failures_ = java.util.Collections.emptyList();
+        } else {
+          failures_ = null;
+          failuresBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
         return this;
       }
 
@@ -14748,8 +15651,26 @@ public final class Messages {
       @java.lang.Override
       public adiom.v1.Messages.WriteUpdatesResponse buildPartial() {
         adiom.v1.Messages.WriteUpdatesResponse result = new adiom.v1.Messages.WriteUpdatesResponse(this);
+        buildPartialRepeatedFields(result);
+        if (bitField0_ != 0) { buildPartial0(result); }
         onBuilt();
         return result;
+      }
+
+      private void buildPartialRepeatedFields(adiom.v1.Messages.WriteUpdatesResponse result) {
+        if (failuresBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            failures_ = java.util.Collections.unmodifiableList(failures_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.failures_ = failures_;
+        } else {
+          result.failures_ = failuresBuilder_.build();
+        }
+      }
+
+      private void buildPartial0(adiom.v1.Messages.WriteUpdatesResponse result) {
+        int from_bitField0_ = bitField0_;
       }
 
       @java.lang.Override
@@ -14764,6 +15685,32 @@ public final class Messages {
 
       public Builder mergeFrom(adiom.v1.Messages.WriteUpdatesResponse other) {
         if (other == adiom.v1.Messages.WriteUpdatesResponse.getDefaultInstance()) return this;
+        if (failuresBuilder_ == null) {
+          if (!other.failures_.isEmpty()) {
+            if (failures_.isEmpty()) {
+              failures_ = other.failures_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureFailuresIsMutable();
+              failures_.addAll(other.failures_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.failures_.isEmpty()) {
+            if (failuresBuilder_.isEmpty()) {
+              failuresBuilder_.dispose();
+              failuresBuilder_ = null;
+              failures_ = other.failures_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              failuresBuilder_ =
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getFailuresFieldBuilder() : null;
+            } else {
+              failuresBuilder_.addAllMessages(other.failures_);
+            }
+          }
+        }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
@@ -14790,6 +15737,19 @@ public final class Messages {
               case 0:
                 done = true;
                 break;
+              case 10: {
+                adiom.v1.Messages.WriteFailure m =
+                    input.readMessage(
+                        adiom.v1.Messages.WriteFailure.parser(),
+                        extensionRegistry);
+                if (failuresBuilder_ == null) {
+                  ensureFailuresIsMutable();
+                  failures_.add(m);
+                } else {
+                  failuresBuilder_.addMessage(m);
+                }
+                break;
+              } // case 10
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -14804,6 +15764,319 @@ public final class Messages {
           onChanged();
         } // finally
         return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<adiom.v1.Messages.WriteFailure> failures_ =
+        java.util.Collections.emptyList();
+      private void ensureFailuresIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          failures_ = new java.util.ArrayList<adiom.v1.Messages.WriteFailure>(failures_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder> failuresBuilder_;
+
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.WriteFailure> getFailuresList() {
+        if (failuresBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(failures_);
+        } else {
+          return failuresBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public int getFailuresCount() {
+        if (failuresBuilder_ == null) {
+          return failures_.size();
+        } else {
+          return failuresBuilder_.getCount();
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure getFailures(int index) {
+        if (failuresBuilder_ == null) {
+          return failures_.get(index);
+        } else {
+          return failuresBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder setFailures(
+          int index, adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.set(index, value);
+          onChanged();
+        } else {
+          failuresBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder setFailures(
+          int index, adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.add(value);
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          int index, adiom.v1.Messages.WriteFailure value) {
+        if (failuresBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureFailuresIsMutable();
+          failures_.add(index, value);
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.add(builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addFailures(
+          int index, adiom.v1.Messages.WriteFailure.Builder builderForValue) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          failuresBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder addAllFailures(
+          java.lang.Iterable<? extends adiom.v1.Messages.WriteFailure> values) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, failures_);
+          onChanged();
+        } else {
+          failuresBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder clearFailures() {
+        if (failuresBuilder_ == null) {
+          failures_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          failuresBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public Builder removeFailures(int index) {
+        if (failuresBuilder_ == null) {
+          ensureFailuresIsMutable();
+          failures_.remove(index);
+          onChanged();
+        } else {
+          failuresBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder getFailuresBuilder(
+          int index) {
+        return getFailuresFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailureOrBuilder getFailuresOrBuilder(
+          int index) {
+        if (failuresBuilder_ == null) {
+          return failures_.get(index);  } else {
+          return failuresBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<? extends adiom.v1.Messages.WriteFailureOrBuilder>
+           getFailuresOrBuilderList() {
+        if (failuresBuilder_ != null) {
+          return failuresBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(failures_);
+        }
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder addFailuresBuilder() {
+        return getFailuresFieldBuilder().addBuilder(
+            adiom.v1.Messages.WriteFailure.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public adiom.v1.Messages.WriteFailure.Builder addFailuresBuilder(
+          int index) {
+        return getFailuresFieldBuilder().addBuilder(
+            index, adiom.v1.Messages.WriteFailure.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Every request index omitted from this list succeeded
+       * </pre>
+       *
+       * <code>repeated .adiom.v1.WriteFailure failures = 1 [json_name = "failures"];</code>
+       */
+      public java.util.List<adiom.v1.Messages.WriteFailure.Builder>
+           getFailuresBuilderList() {
+        return getFailuresFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder>
+          getFailuresFieldBuilder() {
+        if (failuresBuilder_ == null) {
+          failuresBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              adiom.v1.Messages.WriteFailure, adiom.v1.Messages.WriteFailure.Builder, adiom.v1.Messages.WriteFailureOrBuilder>(
+                  failures_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          failures_ = null;
+        }
+        return failuresBuilder_;
       }
 
       // @@protoc_insertion_point(builder_scope:adiom.v1.WriteUpdatesResponse)
@@ -26749,7 +28022,7 @@ public final class Messages {
        *
        * <code>repeated .adiom.v1.TransformResponse responses = 4 [json_name = "responses"];</code>
        */
-      public java.util.List<? extends adiom.v1.Messages.TransformResponseOrBuilder> 
+      public java.util.List<? extends adiom.v1.Messages.TransformResponseOrBuilder>
            getResponsesOrBuilderList() {
         if (responsesBuilder_ != null) {
           return responsesBuilder_.getMessageOrBuilderList();
@@ -26787,12 +28060,12 @@ public final class Messages {
        *
        * <code>repeated .adiom.v1.TransformResponse responses = 4 [json_name = "responses"];</code>
        */
-      public java.util.List<adiom.v1.Messages.TransformResponse.Builder> 
+      public java.util.List<adiom.v1.Messages.TransformResponse.Builder>
            getResponsesBuilderList() {
         return getResponsesFieldBuilder().getBuilderList();
       }
       private com.google.protobuf.RepeatedFieldBuilder<
-          adiom.v1.Messages.TransformResponse, adiom.v1.Messages.TransformResponse.Builder, adiom.v1.Messages.TransformResponseOrBuilder> 
+          adiom.v1.Messages.TransformResponse, adiom.v1.Messages.TransformResponse.Builder, adiom.v1.Messages.TransformResponseOrBuilder>
           getResponsesFieldBuilder() {
         if (responsesBuilder_ == null) {
           responsesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
@@ -26852,6 +28125,644 @@ public final class Messages {
 
     @java.lang.Override
     public adiom.v1.Messages.GetTransformResponse getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface WriteFailureOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:adiom.v1.WriteFailure)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Zero-based index into the request's data or updates field
+     * </pre>
+     *
+     * <code>uint32 index = 1 [json_name = "index"];</code>
+     * @return The index.
+     */
+    int getIndex();
+
+    /**
+     * <pre>
+     * Optional diagnostic information
+     * </pre>
+     *
+     * <code>string message = 2 [json_name = "message"];</code>
+     * @return The message.
+     */
+    java.lang.String getMessage();
+    /**
+     * <pre>
+     * Optional diagnostic information
+     * </pre>
+     *
+     * <code>string message = 2 [json_name = "message"];</code>
+     * @return The bytes for message.
+     */
+    com.google.protobuf.ByteString
+        getMessageBytes();
+  }
+  /**
+   * Protobuf type {@code adiom.v1.WriteFailure}
+   */
+  public static final class WriteFailure extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:adiom.v1.WriteFailure)
+      WriteFailureOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 29,
+        /* patch= */ 1,
+        /* suffix= */ "",
+        WriteFailure.class.getName());
+    }
+    // Use WriteFailure.newBuilder() to construct.
+    private WriteFailure(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private WriteFailure() {
+      message_ = "";
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return adiom.v1.Messages.internal_static_adiom_v1_WriteFailure_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return adiom.v1.Messages.internal_static_adiom_v1_WriteFailure_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              adiom.v1.Messages.WriteFailure.class, adiom.v1.Messages.WriteFailure.Builder.class);
+    }
+
+    public static final int INDEX_FIELD_NUMBER = 1;
+    private int index_ = 0;
+    /**
+     * <pre>
+     * Zero-based index into the request's data or updates field
+     * </pre>
+     *
+     * <code>uint32 index = 1 [json_name = "index"];</code>
+     * @return The index.
+     */
+    @java.lang.Override
+    public int getIndex() {
+      return index_;
+    }
+
+    public static final int MESSAGE_FIELD_NUMBER = 2;
+    @SuppressWarnings("serial")
+    private volatile java.lang.Object message_ = "";
+    /**
+     * <pre>
+     * Optional diagnostic information
+     * </pre>
+     *
+     * <code>string message = 2 [json_name = "message"];</code>
+     * @return The message.
+     */
+    @java.lang.Override
+    public java.lang.String getMessage() {
+      java.lang.Object ref = message_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        message_ = s;
+        return s;
+      }
+    }
+    /**
+     * <pre>
+     * Optional diagnostic information
+     * </pre>
+     *
+     * <code>string message = 2 [json_name = "message"];</code>
+     * @return The bytes for message.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getMessageBytes() {
+      java.lang.Object ref = message_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b =
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        message_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (index_ != 0) {
+        output.writeUInt32(1, index_);
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(message_)) {
+        com.google.protobuf.GeneratedMessage.writeString(output, 2, message_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (index_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeUInt32Size(1, index_);
+      }
+      if (!com.google.protobuf.GeneratedMessage.isStringEmpty(message_)) {
+        size += com.google.protobuf.GeneratedMessage.computeStringSize(2, message_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof adiom.v1.Messages.WriteFailure)) {
+        return super.equals(obj);
+      }
+      adiom.v1.Messages.WriteFailure other = (adiom.v1.Messages.WriteFailure) obj;
+
+      if (getIndex()
+          != other.getIndex()) return false;
+      if (!getMessage()
+          .equals(other.getMessage())) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + INDEX_FIELD_NUMBER;
+      hash = (53 * hash) + getIndex();
+      hash = (37 * hash) + MESSAGE_FIELD_NUMBER;
+      hash = (53 * hash) + getMessage().hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static adiom.v1.Messages.WriteFailure parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static adiom.v1.Messages.WriteFailure parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static adiom.v1.Messages.WriteFailure parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(adiom.v1.Messages.WriteFailure prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code adiom.v1.WriteFailure}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:adiom.v1.WriteFailure)
+        adiom.v1.Messages.WriteFailureOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return adiom.v1.Messages.internal_static_adiom_v1_WriteFailure_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return adiom.v1.Messages.internal_static_adiom_v1_WriteFailure_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                adiom.v1.Messages.WriteFailure.class, adiom.v1.Messages.WriteFailure.Builder.class);
+      }
+
+      // Construct using adiom.v1.Messages.WriteFailure.newBuilder()
+      private Builder() {
+
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        index_ = 0;
+        message_ = "";
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return adiom.v1.Messages.internal_static_adiom_v1_WriteFailure_descriptor;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.WriteFailure getDefaultInstanceForType() {
+        return adiom.v1.Messages.WriteFailure.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.WriteFailure build() {
+        adiom.v1.Messages.WriteFailure result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public adiom.v1.Messages.WriteFailure buildPartial() {
+        adiom.v1.Messages.WriteFailure result = new adiom.v1.Messages.WriteFailure(this);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartial0(adiom.v1.Messages.WriteFailure result) {
+        int from_bitField0_ = bitField0_;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          result.index_ = index_;
+        }
+        if (((from_bitField0_ & 0x00000002) != 0)) {
+          result.message_ = message_;
+        }
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof adiom.v1.Messages.WriteFailure) {
+          return mergeFrom((adiom.v1.Messages.WriteFailure)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(adiom.v1.Messages.WriteFailure other) {
+        if (other == adiom.v1.Messages.WriteFailure.getDefaultInstance()) return this;
+        if (other.getIndex() != 0) {
+          setIndex(other.getIndex());
+        }
+        if (!other.getMessage().isEmpty()) {
+          message_ = other.message_;
+          bitField0_ |= 0x00000002;
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 8: {
+                index_ = input.readUInt32();
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 8
+              case 18: {
+                message_ = input.readStringRequireUtf8();
+                bitField0_ |= 0x00000002;
+                break;
+              } // case 18
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private int index_ ;
+      /**
+       * <pre>
+       * Zero-based index into the request's data or updates field
+       * </pre>
+       *
+       * <code>uint32 index = 1 [json_name = "index"];</code>
+       * @return The index.
+       */
+      @java.lang.Override
+      public int getIndex() {
+        return index_;
+      }
+      /**
+       * <pre>
+       * Zero-based index into the request's data or updates field
+       * </pre>
+       *
+       * <code>uint32 index = 1 [json_name = "index"];</code>
+       * @param value The index to set.
+       * @return This builder for chaining.
+       */
+      public Builder setIndex(int value) {
+
+        index_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Zero-based index into the request's data or updates field
+       * </pre>
+       *
+       * <code>uint32 index = 1 [json_name = "index"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearIndex() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        index_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object message_ = "";
+      /**
+       * <pre>
+       * Optional diagnostic information
+       * </pre>
+       *
+       * <code>string message = 2 [json_name = "message"];</code>
+       * @return The message.
+       */
+      public java.lang.String getMessage() {
+        java.lang.Object ref = message_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          message_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <pre>
+       * Optional diagnostic information
+       * </pre>
+       *
+       * <code>string message = 2 [json_name = "message"];</code>
+       * @return The bytes for message.
+       */
+      public com.google.protobuf.ByteString
+          getMessageBytes() {
+        java.lang.Object ref = message_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b =
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          message_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <pre>
+       * Optional diagnostic information
+       * </pre>
+       *
+       * <code>string message = 2 [json_name = "message"];</code>
+       * @param value The message to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMessage(
+          java.lang.String value) {
+        if (value == null) { throw new NullPointerException(); }
+        message_ = value;
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Optional diagnostic information
+       * </pre>
+       *
+       * <code>string message = 2 [json_name = "message"];</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearMessage() {
+        message_ = getDefaultInstance().getMessage();
+        bitField0_ = (bitField0_ & ~0x00000002);
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Optional diagnostic information
+       * </pre>
+       *
+       * <code>string message = 2 [json_name = "message"];</code>
+       * @param value The bytes for message to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMessageBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) { throw new NullPointerException(); }
+        checkByteStringIsUtf8(value);
+        message_ = value;
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:adiom.v1.WriteFailure)
+    }
+
+    // @@protoc_insertion_point(class_scope:adiom.v1.WriteFailure)
+    private static final adiom.v1.Messages.WriteFailure DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new adiom.v1.Messages.WriteFailure();
+    }
+
+    public static adiom.v1.Messages.WriteFailure getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<WriteFailure>
+        PARSER = new com.google.protobuf.AbstractParser<WriteFailure>() {
+      @java.lang.Override
+      public WriteFailure parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<WriteFailure> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<WriteFailure> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public adiom.v1.Messages.WriteFailure getDefaultInstanceForType() {
       return DEFAULT_INSTANCE;
     }
 
@@ -27022,6 +28933,11 @@ public final class Messages {
   private static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_adiom_v1_GetTransformResponse_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_adiom_v1_WriteFailure_descriptor;
+  private static final
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_adiom_v1_WriteFailure_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -27043,7 +28959,7 @@ public final class Messages {
       "header\030\002 \001(\tR\017partitionHeader\022\'\n\017partiti" +
       "on_value\030\003 \001(\tR\016partitionValue\022\026\n\006cursor" +
       "\030\004 \001(\014R\006cursor\022\'\n\017estimated_count\030\005 \001(\004R" +
-      "\016estimatedCount\"\247\003\n\014Capabilities\0225\n\006sour" +
+      "\016estimatedCount\"\334\003\n\014Capabilities\0225\n\006sour" +
       "ce\030\001 \001(\0132\035.adiom.v1.Capabilities.SourceR" +
       "\006source\022/\n\004sink\030\002 \001(\0132\033.adiom.v1.Capabil" +
       "ities.SinkR\004sink\032\340\001\n\006Source\022D\n\024supported" +
@@ -27052,87 +28968,95 @@ public final class Messages {
       "snStream\0220\n\024multi_namespace_plan\030\003 \001(\010R\022" +
       "multiNamespacePlan\022!\n\014default_plan\030\004 \001(\010" +
       "R\013defaultPlan\022\034\n\nget_by_ids\030\005 \001(\010R\010getBy" +
-      "Ids\032L\n\004Sink\022D\n\024supported_data_types\030\001 \003(" +
-      "\0162\022.adiom.v1.DataTypeR\022supportedDataType" +
-      "s\"\020\n\016GetInfoRequest\"\244\001\n\017GetInfoResponse\022" +
-      "\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030\002 \001(\tR\006dbType" +
-      "\022\030\n\007version\030\003 \001(\tR\007version\022\022\n\004spec\030\004 \001(\t" +
-      "R\004spec\022:\n\014capabilities\030\005 \001(\0132\026.adiom.v1." +
-      "CapabilitiesR\014capabilities\";\n\033GetNamespa" +
-      "ceMetadataRequest\022\034\n\tnamespace\030\001 \001(\tR\tna" +
-      "mespace\"4\n\034GetNamespaceMetadataResponse\022" +
-      "\024\n\005count\030\001 \001(\004R\005count\"r\n\023GeneratePlanReq" +
-      "uest\022\036\n\nnamespaces\030\001 \003(\tR\nnamespaces\022!\n\014" +
-      "initial_sync\030\002 \001(\010R\013initialSync\022\030\n\007updat" +
-      "es\030\003 \001(\010R\007updates\"\226\001\n\024GeneratePlanRespon" +
-      "se\0223\n\npartitions\030\001 \003(\0132\023.adiom.v1.Partit" +
-      "ionR\npartitions\022I\n\022updates_partitions\030\002 " +
-      "\003(\0132\032.adiom.v1.UpdatesPartitionR\021updates" +
-      "Partitions\"\235\001\n\006Update\022#\n\002id\030\001 \003(\0132\023.adio" +
-      "m.v1.BsonValueR\002id\022(\n\004type\030\002 \001(\0162\024.adiom" +
-      ".v1.UpdateTypeR\004type\022\022\n\004data\030\003 \001(\014R\004data" +
-      "\0220\n\024partial_update_unset\030\004 \003(\tR\022partialU" +
-      "pdateUnset\"\204\001\n\017ListDataRequest\0221\n\tpartit" +
-      "ion\030\001 \001(\0132\023.adiom.v1.PartitionR\tpartitio" +
-      "n\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTypeR\004typ" +
-      "e\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G\n\020ListDataRes" +
-      "ponse\022\022\n\004data\030\001 \003(\014R\004data\022\037\n\013next_cursor" +
-      "\030\002 \001(\014R\nnextCursor\"l\n\020WriteDataRequest\022\034" +
-      "\n\tnamespace\030\001 \001(\tR\tnamespace\022\022\n\004data\030\002 \003" +
-      "(\014R\004data\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTy" +
-      "peR\004type\"\023\n\021WriteDataResponse\"\207\001\n\023WriteU" +
-      "pdatesRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamesp" +
-      "ace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007" +
-      "updates\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTyp" +
-      "eR\004type\"\026\n\024WriteUpdatesResponse\"v\n\024Strea" +
-      "mUpdatesRequest\022\036\n\nnamespaces\030\001 \003(\tR\nnam" +
-      "espaces\022&\n\004type\030\002 \001(\0162\022.adiom.v1.DataTyp" +
-      "eR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"\262\001\n\025Stre" +
-      "amUpdatesResponse\022*\n\007updates\030\001 \003(\0132\020.adi" +
-      "om.v1.UpdateR\007updates\022\034\n\tnamespace\030\002 \001(\t" +
-      "R\tnamespace\022\037\n\013next_cursor\030\003 \001(\014R\nnextCu" +
-      "rsor\022.\n\004time\030\004 \001(\0132\032.google.protobuf.Tim" +
-      "estampR\004time\"J\n\020StreamLSNRequest\022\036\n\nname" +
-      "spaces\030\001 \003(\tR\nnamespaces\022\026\n\006cursor\030\002 \001(\014" +
-      "R\006cursor\"F\n\021StreamLSNResponse\022\020\n\003lsn\030\001 \001" +
-      "(\004R\003lsn\022\037\n\013next_cursor\030\002 \001(\014R\nnextCursor" +
-      "\"\300\001\n\017GetByIdsRequest\022\034\n\tnamespace\030\001 \001(\tR" +
-      "\tnamespace\0225\n\003ids\030\002 \003(\0132#.adiom.v1.GetBy" +
-      "IdsRequest.IdRequestR\003ids\022&\n\004type\030\003 \001(\0162" +
-      "\022.adiom.v1.DataTypeR\004type\0320\n\tIdRequest\022#" +
-      "\n\002id\030\001 \003(\0132\023.adiom.v1.BsonValueR\002id\"s\n\020G" +
-      "etByIdsResponse\022;\n\004data\030\001 \003(\0132\'.adiom.v1" +
-      ".GetByIdsResponse.ResponseItemR\004data\032\"\n\014" +
-      "ResponseItem\022\022\n\004data\030\001 \001(\014R\004data\"\031\n\027GetT" +
-      "ransformInfoRequest\"\246\002\n\030GetTransformInfo" +
-      "Response\022P\n\ntransforms\030\001 \003(\01320.adiom.v1." +
-      "GetTransformInfoResponse.TransformInfoR\n" +
-      "transforms\0224\n\026use_multiple_responses\030\002 \001" +
-      "(\010R\024useMultipleResponses\032\201\001\n\rTransformIn" +
-      "fo\0225\n\014request_type\030\001 \001(\0162\022.adiom.v1.Data" +
-      "TypeR\013requestType\0229\n\016response_types\030\002 \003(" +
-      "\0162\022.adiom.v1.DataTypeR\rresponseTypes\"\343\001\n" +
-      "\023GetTransformRequest\022\034\n\tnamespace\030\001 \001(\tR" +
-      "\tnamespace\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.U" +
-      "pdateR\007updates\022\022\n\004data\030\003 \003(\014R\004data\0225\n\014re" +
-      "quest_type\030\004 \001(\0162\022.adiom.v1.DataTypeR\013re" +
-      "questType\0227\n\rresponse_type\030\005 \001(\0162\022.adiom" +
-      ".v1.DataTypeR\014responseType\"q\n\021TransformR" +
-      "esponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n" +
-      "\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007update" +
-      "s\022\022\n\004data\030\003 \003(\014R\004data\"\257\001\n\024GetTransformRe" +
-      "sponse\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007" +
-      "updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates" +
-      "\022\022\n\004data\030\003 \003(\014R\004data\0229\n\tresponses\030\004 \003(\0132" +
-      "\033.adiom.v1.TransformResponseR\tresponses*" +
-      "R\n\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020\000\022\030\n\024DA" +
-      "TA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE_JSON_I" +
-      "D\020\002*\215\001\n\nUpdateType\022\027\n\023UPDATE_TYPE_UNKNOW" +
-      "N\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPDATE_TY" +
-      "PE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020\003\022\036\n\032U" +
-      "PDATE_TYPE_PARTIAL_UPDATE\020\004B2Z0github.co" +
-      "m/adiom-data/dsync/gen/adiom/v1;adiomv1b" +
-      "\006proto3"
+      "Ids\032\200\001\n\004Sink\022D\n\024supported_data_types\030\001 \003" +
+      "(\0162\022.adiom.v1.DataTypeR\022supportedDataTyp" +
+      "es\0222\n\025partial_write_results\030\002 \001(\010R\023parti" +
+      "alWriteResults\"\020\n\016GetInfoRequest\"\244\001\n\017Get" +
+      "InfoResponse\022\016\n\002id\030\001 \001(\tR\002id\022\027\n\007db_type\030" +
+      "\002 \001(\tR\006dbType\022\030\n\007version\030\003 \001(\tR\007version\022" +
+      "\022\n\004spec\030\004 \001(\tR\004spec\022:\n\014capabilities\030\005 \001(" +
+      "\0132\026.adiom.v1.CapabilitiesR\014capabilities\"" +
+      ";\n\033GetNamespaceMetadataRequest\022\034\n\tnamesp" +
+      "ace\030\001 \001(\tR\tnamespace\"4\n\034GetNamespaceMeta" +
+      "dataResponse\022\024\n\005count\030\001 \001(\004R\005count\"r\n\023Ge" +
+      "neratePlanRequest\022\036\n\nnamespaces\030\001 \003(\tR\nn" +
+      "amespaces\022!\n\014initial_sync\030\002 \001(\010R\013initial" +
+      "Sync\022\030\n\007updates\030\003 \001(\010R\007updates\"\226\001\n\024Gener" +
+      "atePlanResponse\0223\n\npartitions\030\001 \003(\0132\023.ad" +
+      "iom.v1.PartitionR\npartitions\022I\n\022updates_" +
+      "partitions\030\002 \003(\0132\032.adiom.v1.UpdatesParti" +
+      "tionR\021updatesPartitions\"\235\001\n\006Update\022#\n\002id" +
+      "\030\001 \003(\0132\023.adiom.v1.BsonValueR\002id\022(\n\004type\030" +
+      "\002 \001(\0162\024.adiom.v1.UpdateTypeR\004type\022\022\n\004dat" +
+      "a\030\003 \001(\014R\004data\0220\n\024partial_update_unset\030\004 " +
+      "\003(\tR\022partialUpdateUnset\"\204\001\n\017ListDataRequ" +
+      "est\0221\n\tpartition\030\001 \001(\0132\023.adiom.v1.Partit" +
+      "ionR\tpartition\022&\n\004type\030\002 \001(\0162\022.adiom.v1." +
+      "DataTypeR\004type\022\026\n\006cursor\030\003 \001(\014R\006cursor\"G" +
+      "\n\020ListDataResponse\022\022\n\004data\030\001 \003(\014R\004data\022\037" +
+      "\n\013next_cursor\030\002 \001(\014R\nnextCursor\"\240\001\n\020Writ" +
+      "eDataRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespa" +
+      "ce\022\022\n\004data\030\002 \003(\014R\004data\022&\n\004type\030\003 \001(\0162\022.a" +
+      "diom.v1.DataTypeR\004type\0222\n\025partial_write_" +
+      "results\030\004 \001(\010R\023partialWriteResults\"G\n\021Wr" +
+      "iteDataResponse\0222\n\010failures\030\001 \003(\0132\026.adio" +
+      "m.v1.WriteFailureR\010failures\"\273\001\n\023WriteUpd" +
+      "atesRequest\022\034\n\tnamespace\030\001 \001(\tR\tnamespac" +
+      "e\022*\n\007updates\030\002 \003(\0132\020.adiom.v1.UpdateR\007up" +
+      "dates\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTypeR" +
+      "\004type\0222\n\025partial_write_results\030\004 \001(\010R\023pa" +
+      "rtialWriteResults\"J\n\024WriteUpdatesRespons" +
+      "e\0222\n\010failures\030\001 \003(\0132\026.adiom.v1.WriteFail" +
+      "ureR\010failures\"v\n\024StreamUpdatesRequest\022\036\n" +
+      "\nnamespaces\030\001 \003(\tR\nnamespaces\022&\n\004type\030\002 " +
+      "\001(\0162\022.adiom.v1.DataTypeR\004type\022\026\n\006cursor\030" +
+      "\003 \001(\014R\006cursor\"\262\001\n\025StreamUpdatesResponse\022" +
+      "*\n\007updates\030\001 \003(\0132\020.adiom.v1.UpdateR\007upda" +
+      "tes\022\034\n\tnamespace\030\002 \001(\tR\tnamespace\022\037\n\013nex" +
+      "t_cursor\030\003 \001(\014R\nnextCursor\022.\n\004time\030\004 \001(\013" +
+      "2\032.google.protobuf.TimestampR\004time\"J\n\020St" +
+      "reamLSNRequest\022\036\n\nnamespaces\030\001 \003(\tR\nname" +
+      "spaces\022\026\n\006cursor\030\002 \001(\014R\006cursor\"F\n\021Stream" +
+      "LSNResponse\022\020\n\003lsn\030\001 \001(\004R\003lsn\022\037\n\013next_cu" +
+      "rsor\030\002 \001(\014R\nnextCursor\"\300\001\n\017GetByIdsReque" +
+      "st\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\0225\n\003ids\030" +
+      "\002 \003(\0132#.adiom.v1.GetByIdsRequest.IdReque" +
+      "stR\003ids\022&\n\004type\030\003 \001(\0162\022.adiom.v1.DataTyp" +
+      "eR\004type\0320\n\tIdRequest\022#\n\002id\030\001 \003(\0132\023.adiom" +
+      ".v1.BsonValueR\002id\"s\n\020GetByIdsResponse\022;\n" +
+      "\004data\030\001 \003(\0132\'.adiom.v1.GetByIdsResponse." +
+      "ResponseItemR\004data\032\"\n\014ResponseItem\022\022\n\004da" +
+      "ta\030\001 \001(\014R\004data\"\031\n\027GetTransformInfoReques" +
+      "t\"\246\002\n\030GetTransformInfoResponse\022P\n\ntransf" +
+      "orms\030\001 \003(\01320.adiom.v1.GetTransformInfoRe" +
+      "sponse.TransformInfoR\ntransforms\0224\n\026use_" +
+      "multiple_responses\030\002 \001(\010R\024useMultipleRes" +
+      "ponses\032\201\001\n\rTransformInfo\0225\n\014request_type" +
+      "\030\001 \001(\0162\022.adiom.v1.DataTypeR\013requestType\022" +
+      "9\n\016response_types\030\002 \003(\0162\022.adiom.v1.DataT" +
+      "ypeR\rresponseTypes\"\343\001\n\023GetTransformReque" +
+      "st\022\034\n\tnamespace\030\001 \001(\tR\tnamespace\022*\n\007upda" +
+      "tes\030\002 \003(\0132\020.adiom.v1.UpdateR\007updates\022\022\n\004" +
+      "data\030\003 \003(\014R\004data\0225\n\014request_type\030\004 \001(\0162\022" +
+      ".adiom.v1.DataTypeR\013requestType\0227\n\rrespo" +
+      "nse_type\030\005 \001(\0162\022.adiom.v1.DataTypeR\014resp" +
+      "onseType\"q\n\021TransformResponse\022\034\n\tnamespa" +
+      "ce\030\001 \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.a" +
+      "diom.v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004d" +
+      "ata\"\257\001\n\024GetTransformResponse\022\034\n\tnamespac" +
+      "e\030\001 \001(\tR\tnamespace\022*\n\007updates\030\002 \003(\0132\020.ad" +
+      "iom.v1.UpdateR\007updates\022\022\n\004data\030\003 \003(\014R\004da" +
+      "ta\0229\n\tresponses\030\004 \003(\0132\033.adiom.v1.Transfo" +
+      "rmResponseR\tresponses\">\n\014WriteFailure\022\024\n" +
+      "\005index\030\001 \001(\rR\005index\022\030\n\007message\030\002 \001(\tR\007me" +
+      "ssage*R\n\010DataType\022\025\n\021DATA_TYPE_UNKNOWN\020\000" +
+      "\022\030\n\024DATA_TYPE_MONGO_BSON\020\001\022\025\n\021DATA_TYPE_" +
+      "JSON_ID\020\002*\215\001\n\nUpdateType\022\027\n\023UPDATE_TYPE_" +
+      "UNKNOWN\020\000\022\026\n\022UPDATE_TYPE_INSERT\020\001\022\026\n\022UPD" +
+      "ATE_TYPE_UPDATE\020\002\022\026\n\022UPDATE_TYPE_DELETE\020" +
+      "\003\022\036\n\032UPDATE_TYPE_PARTIAL_UPDATE\020\004B2Z0git" +
+      "hub.com/adiom-data/dsync/gen/adiom/v1;ad" +
+      "iomv1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -27174,7 +29098,7 @@ public final class Messages {
     internal_static_adiom_v1_Capabilities_Sink_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_Capabilities_Sink_descriptor,
-        new java.lang.String[] { "SupportedDataTypes", });
+        new java.lang.String[] { "SupportedDataTypes", "PartialWriteResults", });
     internal_static_adiom_v1_GetInfoRequest_descriptor =
       getDescriptor().getMessageTypes().get(4);
     internal_static_adiom_v1_GetInfoRequest_fieldAccessorTable = new
@@ -27234,25 +29158,25 @@ public final class Messages {
     internal_static_adiom_v1_WriteDataRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteDataRequest_descriptor,
-        new java.lang.String[] { "Namespace", "Data", "Type", });
+        new java.lang.String[] { "Namespace", "Data", "Type", "PartialWriteResults", });
     internal_static_adiom_v1_WriteDataResponse_descriptor =
       getDescriptor().getMessageTypes().get(14);
     internal_static_adiom_v1_WriteDataResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteDataResponse_descriptor,
-        new java.lang.String[] { });
+        new java.lang.String[] { "Failures", });
     internal_static_adiom_v1_WriteUpdatesRequest_descriptor =
       getDescriptor().getMessageTypes().get(15);
     internal_static_adiom_v1_WriteUpdatesRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteUpdatesRequest_descriptor,
-        new java.lang.String[] { "Namespace", "Updates", "Type", });
+        new java.lang.String[] { "Namespace", "Updates", "Type", "PartialWriteResults", });
     internal_static_adiom_v1_WriteUpdatesResponse_descriptor =
       getDescriptor().getMessageTypes().get(16);
     internal_static_adiom_v1_WriteUpdatesResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_WriteUpdatesResponse_descriptor,
-        new java.lang.String[] { });
+        new java.lang.String[] { "Failures", });
     internal_static_adiom_v1_StreamUpdatesRequest_descriptor =
       getDescriptor().getMessageTypes().get(17);
     internal_static_adiom_v1_StreamUpdatesRequest_fieldAccessorTable = new
@@ -27337,6 +29261,12 @@ public final class Messages {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_adiom_v1_GetTransformResponse_descriptor,
         new java.lang.String[] { "Namespace", "Updates", "Data", "Responses", });
+    internal_static_adiom_v1_WriteFailure_descriptor =
+      getDescriptor().getMessageTypes().get(28);
+    internal_static_adiom_v1_WriteFailure_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_adiom_v1_WriteFailure_descriptor,
+        new java.lang.String[] { "Index", "Message", });
     descriptor.resolveAllFeaturesImmutable();
     com.google.protobuf.TimestampProto.getDescriptor();
   }

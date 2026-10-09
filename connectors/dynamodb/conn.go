@@ -169,7 +169,7 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	if len(partitions) > 0 {
 		slog.Debug("shuffling partitions")
-		rand.Shuffle(len(partitions), func(i, j int) {
+		rand.Shuffle(len(partitions), func(i, j int) { // #nosec G404 -- partition scheduling does not require cryptographic randomness
 			partitions[i], partitions[j] = partitions[j], partitions[i]
 		})
 	}

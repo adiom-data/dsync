@@ -61,6 +61,8 @@ message Capabilities {
     }
     message Sink {
         repeated DataType supported_data_types = 1;
+        // Whether the connector can return individual failures from WriteData and WriteUpdates
+        bool partial_write_results = 2;
     }
     Source source = 1;
     Sink sink = 2;
@@ -127,17 +129,27 @@ message WriteDataRequest {
     string namespace = 1;
     repeated bytes data = 2;
     DataType type = 3;
+    // If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+    bool partial_write_results = 4;
 }
 
-message WriteDataResponse {}
+message WriteDataResponse {
+    // Every request index omitted from this list succeeded
+    repeated WriteFailure failures = 1;
+}
 
 message WriteUpdatesRequest {
     string namespace = 1;
     repeated Update updates = 2;
     DataType type = 3;
+    // If true, known item failures are returned in the response; otherwise any item failure fails the RPC
+    bool partial_write_results = 4;
 }
 
-message WriteUpdatesResponse {}
+message WriteUpdatesResponse {
+    // Every request index omitted from this list succeeded
+    repeated WriteFailure failures = 1;
+}
 
 message StreamUpdatesRequest {
     repeated string namespaces = 1;
@@ -208,4 +220,11 @@ message GetTransformResponse {
     repeated Update updates = 2;
     repeated bytes data = 3;
     repeated TransformResponse responses = 4; // If `use_multiple_responses` is true, use this
+}
+
+message WriteFailure {
+    // Zero-based index into the request's data or updates field
+    uint32 index = 1;
+    // Optional diagnostic information
+    string message = 2;
 }
