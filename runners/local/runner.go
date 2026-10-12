@@ -225,11 +225,15 @@ func (r *RunnerLocal) Run() error {
 		slog.Error("Failed to create flow", "err", err)
 		return err
 	}
+	r.rpMutex.Lock()
 	r.activeFlowID = flowID
+	if r.settings.VerifyRequestedFlag {
+		r.runnerProgress.SyncState = iface.VerifySyncState
+	}
+	r.rpMutex.Unlock()
 
 	//don't start the flow if the verify flag is set
 	if r.settings.VerifyRequestedFlag {
-		r.runnerProgress.SyncState = "Verify"
 		integrityCheckRes, err := r.coord.PerformFlowIntegrityCheck(r.integrityCtx, flowID, iface.IntegrityCheckOptions{QuickCount: r.settings.VerifyQuickCountFlag, MaxTasks: r.settings.VerifyMaxTasks, MemVerify: r.settings.VerifyMemFlag})
 		if err != nil {
 			r.runnerProgress.VerificationResult = "ERROR"

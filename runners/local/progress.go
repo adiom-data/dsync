@@ -94,16 +94,18 @@ func (r *RunnerLocal) UpdateRunnerProgress() {
 	}
 	r.runnerProgress.NsProgressMap = srcStatus.ProgressMetrics.NamespaceProgress
 
-	r.runnerProgress.NumNamespacesCompleted = 0
-	for ns, m := range flowStatus.StatusByNamespace {
-		progress := r.runnerProgress.NsProgressMap[ns]
-		if progress == nil {
-			slog.Warn("progress map does not exist- skipping", "ns", ns)
-			continue
-		}
-		progress.TasksCompleted = m.TasksDone
-		if m.TasksDone == m.TasksTotal {
-			r.runnerProgress.NumNamespacesCompleted += 1
+	if r.runnerProgress.SyncState != iface.VerifySyncState {
+		r.runnerProgress.NumNamespacesCompleted = 0
+		for ns, m := range flowStatus.StatusByNamespace {
+			progress := r.runnerProgress.NsProgressMap[ns]
+			if progress == nil {
+				slog.Warn("progress map does not exist- skipping", "ns", ns)
+				continue
+			}
+			progress.TasksCompleted = m.TasksDone
+			if m.TasksDone == m.TasksTotal {
+				r.runnerProgress.NumNamespacesCompleted += 1
+			}
 		}
 	}
 
