@@ -880,12 +880,11 @@ func (x *ListDataResponse) GetNextCursor() []byte {
 }
 
 type WriteDataRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Namespace string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Data      [][]byte               `protobuf:"bytes,2,rep,name=data,proto3" json:"data,omitempty"`
-	Type      DataType               `protobuf:"varint,3,opt,name=type,proto3,enum=adiom.v1.DataType" json:"type,omitempty"`
-	// If true, known item failures are returned in the response; otherwise any item failure fails the RPC
-	PartialWriteResults bool `protobuf:"varint,4,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Namespace           string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Data                [][]byte               `protobuf:"bytes,2,rep,name=data,proto3" json:"data,omitempty"`
+	Type                DataType               `protobuf:"varint,3,opt,name=type,proto3,enum=adiom.v1.DataType" json:"type,omitempty"`
+	PartialWriteResults bool                   `protobuf:"varint,4,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -949,9 +948,8 @@ func (x *WriteDataRequest) GetPartialWriteResults() bool {
 }
 
 type WriteDataResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Every request index omitted from this list succeeded
-	Failures      []*WriteFailure `protobuf:"bytes,1,rep,name=failures,proto3" json:"failures,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Failures      []*ItemFailure         `protobuf:"bytes,1,rep,name=failures,proto3" json:"failures,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -986,7 +984,7 @@ func (*WriteDataResponse) Descriptor() ([]byte, []int) {
 	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *WriteDataResponse) GetFailures() []*WriteFailure {
+func (x *WriteDataResponse) GetFailures() []*ItemFailure {
 	if x != nil {
 		return x.Failures
 	}
@@ -994,12 +992,11 @@ func (x *WriteDataResponse) GetFailures() []*WriteFailure {
 }
 
 type WriteUpdatesRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Namespace string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Updates   []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
-	Type      DataType               `protobuf:"varint,3,opt,name=type,proto3,enum=adiom.v1.DataType" json:"type,omitempty"`
-	// If true, known item failures are returned in the response; otherwise any item failure fails the RPC
-	PartialWriteResults bool `protobuf:"varint,4,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Namespace           string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates             []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Type                DataType               `protobuf:"varint,3,opt,name=type,proto3,enum=adiom.v1.DataType" json:"type,omitempty"`
+	PartialWriteResults bool                   `protobuf:"varint,4,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1063,9 +1060,8 @@ func (x *WriteUpdatesRequest) GetPartialWriteResults() bool {
 }
 
 type WriteUpdatesResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Every request index omitted from this list succeeded
-	Failures      []*WriteFailure `protobuf:"bytes,1,rep,name=failures,proto3" json:"failures,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Failures      []*ItemFailure         `protobuf:"bytes,1,rep,name=failures,proto3" json:"failures,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1100,7 +1096,7 @@ func (*WriteUpdatesResponse) Descriptor() ([]byte, []int) {
 	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *WriteUpdatesResponse) GetFailures() []*WriteFailure {
+func (x *WriteUpdatesResponse) GetFailures() []*ItemFailure {
 	if x != nil {
 		return x.Failures
 	}
@@ -1480,11 +1476,12 @@ func (*GetTransformInfoRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetTransformInfoResponse struct {
-	state                protoimpl.MessageState                    `protogen:"open.v1"`
-	Transforms           []*GetTransformInfoResponse_TransformInfo `protobuf:"bytes,1,rep,name=transforms,proto3" json:"transforms,omitempty"`
-	UseMultipleResponses bool                                      `protobuf:"varint,2,opt,name=use_multiple_responses,json=useMultipleResponses,proto3" json:"use_multiple_responses,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                   protoimpl.MessageState                    `protogen:"open.v1"`
+	Transforms              []*GetTransformInfoResponse_TransformInfo `protobuf:"bytes,1,rep,name=transforms,proto3" json:"transforms,omitempty"`
+	UseMultipleResponses    bool                                      `protobuf:"varint,2,opt,name=use_multiple_responses,json=useMultipleResponses,proto3" json:"use_multiple_responses,omitempty"`
+	PartialTransformResults bool                                      `protobuf:"varint,3,opt,name=partial_transform_results,json=partialTransformResults,proto3" json:"partial_transform_results,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *GetTransformInfoResponse) Reset() {
@@ -1531,15 +1528,23 @@ func (x *GetTransformInfoResponse) GetUseMultipleResponses() bool {
 	return false
 }
 
+func (x *GetTransformInfoResponse) GetPartialTransformResults() bool {
+	if x != nil {
+		return x.PartialTransformResults
+	}
+	return false
+}
+
 type GetTransformRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Updates       []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
-	Data          [][]byte               `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
-	RequestType   DataType               `protobuf:"varint,4,opt,name=request_type,json=requestType,proto3,enum=adiom.v1.DataType" json:"request_type,omitempty"`
-	ResponseType  DataType               `protobuf:"varint,5,opt,name=response_type,json=responseType,proto3,enum=adiom.v1.DataType" json:"response_type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Namespace               string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates                 []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data                    [][]byte               `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	RequestType             DataType               `protobuf:"varint,4,opt,name=request_type,json=requestType,proto3,enum=adiom.v1.DataType" json:"request_type,omitempty"`
+	ResponseType            DataType               `protobuf:"varint,5,opt,name=response_type,json=responseType,proto3,enum=adiom.v1.DataType" json:"response_type,omitempty"`
+	PartialTransformResults bool                   `protobuf:"varint,6,opt,name=partial_transform_results,json=partialTransformResults,proto3" json:"partial_transform_results,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *GetTransformRequest) Reset() {
@@ -1607,6 +1612,13 @@ func (x *GetTransformRequest) GetResponseType() DataType {
 	return DataType_DATA_TYPE_UNKNOWN
 }
 
+func (x *GetTransformRequest) GetPartialTransformResults() bool {
+	if x != nil {
+		return x.PartialTransformResults
+	}
+	return false
+}
+
 type TransformResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
@@ -1668,13 +1680,15 @@ func (x *TransformResponse) GetData() [][]byte {
 }
 
 type GetTransformResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Updates       []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
-	Data          [][]byte               `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
-	Responses     []*TransformResponse   `protobuf:"bytes,4,rep,name=responses,proto3" json:"responses,omitempty"` // If `use_multiple_responses` is true, use this
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Namespace      string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Updates        []*Update              `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+	Data           [][]byte               `protobuf:"bytes,3,rep,name=data,proto3" json:"data,omitempty"`
+	Responses      []*TransformResponse   `protobuf:"bytes,4,rep,name=responses,proto3" json:"responses,omitempty"` // If `use_multiple_responses` is true, use this
+	DataFailures   []*ItemFailure         `protobuf:"bytes,5,rep,name=data_failures,json=dataFailures,proto3" json:"data_failures,omitempty"`
+	UpdateFailures []*ItemFailure         `protobuf:"bytes,6,rep,name=update_failures,json=updateFailures,proto3" json:"update_failures,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetTransformResponse) Reset() {
@@ -1735,30 +1749,42 @@ func (x *GetTransformResponse) GetResponses() []*TransformResponse {
 	return nil
 }
 
-type WriteFailure struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Zero-based index into the request's data or updates field
-	Index uint32 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
-	// Optional diagnostic information
-	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+func (x *GetTransformResponse) GetDataFailures() []*ItemFailure {
+	if x != nil {
+		return x.DataFailures
+	}
+	return nil
+}
+
+func (x *GetTransformResponse) GetUpdateFailures() []*ItemFailure {
+	if x != nil {
+		return x.UpdateFailures
+	}
+	return nil
+}
+
+type ItemFailure struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WriteFailure) Reset() {
-	*x = WriteFailure{}
+func (x *ItemFailure) Reset() {
+	*x = ItemFailure{}
 	mi := &file_adiom_v1_messages_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WriteFailure) String() string {
+func (x *ItemFailure) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WriteFailure) ProtoMessage() {}
+func (*ItemFailure) ProtoMessage() {}
 
-func (x *WriteFailure) ProtoReflect() protoreflect.Message {
+func (x *ItemFailure) ProtoReflect() protoreflect.Message {
 	mi := &file_adiom_v1_messages_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1770,19 +1796,19 @@ func (x *WriteFailure) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WriteFailure.ProtoReflect.Descriptor instead.
-func (*WriteFailure) Descriptor() ([]byte, []int) {
+// Deprecated: Use ItemFailure.ProtoReflect.Descriptor instead.
+func (*ItemFailure) Descriptor() ([]byte, []int) {
 	return file_adiom_v1_messages_proto_rawDescGZIP(), []int{28}
 }
 
-func (x *WriteFailure) GetIndex() uint32 {
+func (x *ItemFailure) GetIndex() uint32 {
 	if x != nil {
 		return x.Index
 	}
 	return 0
 }
 
-func (x *WriteFailure) GetMessage() string {
+func (x *ItemFailure) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -1873,10 +1899,9 @@ func (x *Capabilities_Source) GetGetByIds() bool {
 }
 
 type Capabilities_Sink struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	SupportedDataTypes []DataType             `protobuf:"varint,1,rep,packed,name=supported_data_types,json=supportedDataTypes,proto3,enum=adiom.v1.DataType" json:"supported_data_types,omitempty"`
-	// Whether the connector can return individual failures from WriteData and WriteUpdates
-	PartialWriteResults bool `protobuf:"varint,2,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	SupportedDataTypes  []DataType             `protobuf:"varint,1,rep,packed,name=supported_data_types,json=supportedDataTypes,proto3,enum=adiom.v1.DataType" json:"supported_data_types,omitempty"`
+	PartialWriteResults bool                   `protobuf:"varint,2,opt,name=partial_write_results,json=partialWriteResults,proto3" json:"partial_write_results,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -2140,16 +2165,16 @@ const file_adiom_v1_messages_proto_rawDesc = "" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
 	"\x04data\x18\x02 \x03(\fR\x04data\x12&\n" +
 	"\x04type\x18\x03 \x01(\x0e2\x12.adiom.v1.DataTypeR\x04type\x122\n" +
-	"\x15partial_write_results\x18\x04 \x01(\bR\x13partialWriteResults\"G\n" +
-	"\x11WriteDataResponse\x122\n" +
-	"\bfailures\x18\x01 \x03(\v2\x16.adiom.v1.WriteFailureR\bfailures\"\xbb\x01\n" +
+	"\x15partial_write_results\x18\x04 \x01(\bR\x13partialWriteResults\"F\n" +
+	"\x11WriteDataResponse\x121\n" +
+	"\bfailures\x18\x01 \x03(\v2\x15.adiom.v1.ItemFailureR\bfailures\"\xbb\x01\n" +
 	"\x13WriteUpdatesRequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12&\n" +
 	"\x04type\x18\x03 \x01(\x0e2\x12.adiom.v1.DataTypeR\x04type\x122\n" +
-	"\x15partial_write_results\x18\x04 \x01(\bR\x13partialWriteResults\"J\n" +
-	"\x14WriteUpdatesResponse\x122\n" +
-	"\bfailures\x18\x01 \x03(\v2\x16.adiom.v1.WriteFailureR\bfailures\"v\n" +
+	"\x15partial_write_results\x18\x04 \x01(\bR\x13partialWriteResults\"I\n" +
+	"\x14WriteUpdatesResponse\x121\n" +
+	"\bfailures\x18\x01 \x03(\v2\x15.adiom.v1.ItemFailureR\bfailures\"v\n" +
 	"\x14StreamUpdatesRequest\x12\x1e\n" +
 	"\n" +
 	"namespaces\x18\x01 \x03(\tR\n" +
@@ -2181,31 +2206,35 @@ const file_adiom_v1_messages_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x03(\v2'.adiom.v1.GetByIdsResponse.ResponseItemR\x04data\x1a\"\n" +
 	"\fResponseItem\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"\x19\n" +
-	"\x17GetTransformInfoRequest\"\xa6\x02\n" +
+	"\x17GetTransformInfoRequest\"\xe2\x02\n" +
 	"\x18GetTransformInfoResponse\x12P\n" +
 	"\n" +
 	"transforms\x18\x01 \x03(\v20.adiom.v1.GetTransformInfoResponse.TransformInfoR\n" +
 	"transforms\x124\n" +
-	"\x16use_multiple_responses\x18\x02 \x01(\bR\x14useMultipleResponses\x1a\x81\x01\n" +
+	"\x16use_multiple_responses\x18\x02 \x01(\bR\x14useMultipleResponses\x12:\n" +
+	"\x19partial_transform_results\x18\x03 \x01(\bR\x17partialTransformResults\x1a\x81\x01\n" +
 	"\rTransformInfo\x125\n" +
 	"\frequest_type\x18\x01 \x01(\x0e2\x12.adiom.v1.DataTypeR\vrequestType\x129\n" +
-	"\x0eresponse_types\x18\x02 \x03(\x0e2\x12.adiom.v1.DataTypeR\rresponseTypes\"\xe3\x01\n" +
+	"\x0eresponse_types\x18\x02 \x03(\x0e2\x12.adiom.v1.DataTypeR\rresponseTypes\"\x9f\x02\n" +
 	"\x13GetTransformRequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
 	"\x04data\x18\x03 \x03(\fR\x04data\x125\n" +
 	"\frequest_type\x18\x04 \x01(\x0e2\x12.adiom.v1.DataTypeR\vrequestType\x127\n" +
-	"\rresponse_type\x18\x05 \x01(\x0e2\x12.adiom.v1.DataTypeR\fresponseType\"q\n" +
+	"\rresponse_type\x18\x05 \x01(\x0e2\x12.adiom.v1.DataTypeR\fresponseType\x12:\n" +
+	"\x19partial_transform_results\x18\x06 \x01(\bR\x17partialTransformResults\"q\n" +
 	"\x11TransformResponse\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
-	"\x04data\x18\x03 \x03(\fR\x04data\"\xaf\x01\n" +
+	"\x04data\x18\x03 \x03(\fR\x04data\"\xab\x02\n" +
 	"\x14GetTransformResponse\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\aupdates\x18\x02 \x03(\v2\x10.adiom.v1.UpdateR\aupdates\x12\x12\n" +
 	"\x04data\x18\x03 \x03(\fR\x04data\x129\n" +
-	"\tresponses\x18\x04 \x03(\v2\x1b.adiom.v1.TransformResponseR\tresponses\">\n" +
-	"\fWriteFailure\x12\x14\n" +
+	"\tresponses\x18\x04 \x03(\v2\x1b.adiom.v1.TransformResponseR\tresponses\x12:\n" +
+	"\rdata_failures\x18\x05 \x03(\v2\x15.adiom.v1.ItemFailureR\fdataFailures\x12>\n" +
+	"\x0fupdate_failures\x18\x06 \x03(\v2\x15.adiom.v1.ItemFailureR\x0eupdateFailures\"=\n" +
+	"\vItemFailure\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage*R\n" +
 	"\bDataType\x12\x15\n" +
@@ -2265,7 +2294,7 @@ var file_adiom_v1_messages_proto_goTypes = []any{
 	(*GetTransformRequest)(nil),                    // 27: adiom.v1.GetTransformRequest
 	(*TransformResponse)(nil),                      // 28: adiom.v1.TransformResponse
 	(*GetTransformResponse)(nil),                   // 29: adiom.v1.GetTransformResponse
-	(*WriteFailure)(nil),                           // 30: adiom.v1.WriteFailure
+	(*ItemFailure)(nil),                            // 30: adiom.v1.ItemFailure
 	(*Capabilities_Source)(nil),                    // 31: adiom.v1.Capabilities.Source
 	(*Capabilities_Sink)(nil),                      // 32: adiom.v1.Capabilities.Sink
 	(*GetByIdsRequest_IdRequest)(nil),              // 33: adiom.v1.GetByIdsRequest.IdRequest
@@ -2284,10 +2313,10 @@ var file_adiom_v1_messages_proto_depIdxs = []int32{
 	4,  // 7: adiom.v1.ListDataRequest.partition:type_name -> adiom.v1.Partition
 	0,  // 8: adiom.v1.ListDataRequest.type:type_name -> adiom.v1.DataType
 	0,  // 9: adiom.v1.WriteDataRequest.type:type_name -> adiom.v1.DataType
-	30, // 10: adiom.v1.WriteDataResponse.failures:type_name -> adiom.v1.WriteFailure
+	30, // 10: adiom.v1.WriteDataResponse.failures:type_name -> adiom.v1.ItemFailure
 	12, // 11: adiom.v1.WriteUpdatesRequest.updates:type_name -> adiom.v1.Update
 	0,  // 12: adiom.v1.WriteUpdatesRequest.type:type_name -> adiom.v1.DataType
-	30, // 13: adiom.v1.WriteUpdatesResponse.failures:type_name -> adiom.v1.WriteFailure
+	30, // 13: adiom.v1.WriteUpdatesResponse.failures:type_name -> adiom.v1.ItemFailure
 	0,  // 14: adiom.v1.StreamUpdatesRequest.type:type_name -> adiom.v1.DataType
 	12, // 15: adiom.v1.StreamUpdatesResponse.updates:type_name -> adiom.v1.Update
 	36, // 16: adiom.v1.StreamUpdatesResponse.time:type_name -> google.protobuf.Timestamp
@@ -2301,16 +2330,18 @@ var file_adiom_v1_messages_proto_depIdxs = []int32{
 	12, // 24: adiom.v1.TransformResponse.updates:type_name -> adiom.v1.Update
 	12, // 25: adiom.v1.GetTransformResponse.updates:type_name -> adiom.v1.Update
 	28, // 26: adiom.v1.GetTransformResponse.responses:type_name -> adiom.v1.TransformResponse
-	0,  // 27: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
-	0,  // 28: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
-	2,  // 29: adiom.v1.GetByIdsRequest.IdRequest.id:type_name -> adiom.v1.BsonValue
-	0,  // 30: adiom.v1.GetTransformInfoResponse.TransformInfo.request_type:type_name -> adiom.v1.DataType
-	0,  // 31: adiom.v1.GetTransformInfoResponse.TransformInfo.response_types:type_name -> adiom.v1.DataType
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	30, // 27: adiom.v1.GetTransformResponse.data_failures:type_name -> adiom.v1.ItemFailure
+	30, // 28: adiom.v1.GetTransformResponse.update_failures:type_name -> adiom.v1.ItemFailure
+	0,  // 29: adiom.v1.Capabilities.Source.supported_data_types:type_name -> adiom.v1.DataType
+	0,  // 30: adiom.v1.Capabilities.Sink.supported_data_types:type_name -> adiom.v1.DataType
+	2,  // 31: adiom.v1.GetByIdsRequest.IdRequest.id:type_name -> adiom.v1.BsonValue
+	0,  // 32: adiom.v1.GetTransformInfoResponse.TransformInfo.request_type:type_name -> adiom.v1.DataType
+	0,  // 33: adiom.v1.GetTransformInfoResponse.TransformInfo.response_types:type_name -> adiom.v1.DataType
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_adiom_v1_messages_proto_init() }

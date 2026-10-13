@@ -852,7 +852,7 @@ type indexedDocument struct {
 // to specific operations are returned as item failures. Otherwise the first
 // such error fails the batch. Errors with ambiguous outcomes always fail the
 // batch.
-func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []indexedDocument, skipBatchOverwrite, partialResults bool) ([]*adiomv1.WriteFailure, error) {
+func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, documents []indexedDocument, skipBatchOverwrite, partialResults bool) ([]*adiomv1.ItemFailure, error) {
 	if len(documents) == 0 {
 		return nil, nil
 	}
@@ -872,7 +872,7 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 		if isBSONObjectTooLargeError(insertErr) {
 			if len(documents) == 1 {
 				if partialResults {
-					return []*adiomv1.WriteFailure{{Index: documents[0].index, Message: insertErr.Error()}}, nil
+					return []*adiomv1.ItemFailure{{Index: documents[0].index, Message: insertErr.Error()}}, nil
 				}
 				return nil, insertErr
 			}
@@ -893,7 +893,7 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 		return nil, insertErr
 	}
 
-	failures := make([]*adiomv1.WriteFailure, 0, len(bulkErr.WriteErrors))
+	failures := make([]*adiomv1.ItemFailure, 0, len(bulkErr.WriteErrors))
 	replacements := make([]mongo.WriteModel, 0, len(bulkErr.WriteErrors))
 	replacementDocuments := make([]indexedDocument, 0, len(bulkErr.WriteErrors))
 	for _, writeErr := range bulkErr.WriteErrors {
@@ -913,7 +913,7 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 		if !partialResults {
 			return nil, insertErr
 		}
-		failures = append(failures, &adiomv1.WriteFailure{Index: document.index, Message: writeErr.Error()})
+		failures = append(failures, &adiomv1.ItemFailure{Index: document.index, Message: writeErr.Error()})
 	}
 
 	if len(replacements) == 0 {
@@ -936,13 +936,13 @@ func insertBatchOverwrite(ctx context.Context, collection *mongo.Collection, doc
 			return nil, fmt.Errorf("MongoDB returned out-of-range replacement error index %d for %d documents", writeErr.Index, len(replacementDocuments))
 		}
 		document := replacementDocuments[writeErr.Index]
-		failures = append(failures, &adiomv1.WriteFailure{Index: document.index, Message: writeErr.Error()})
+		failures = append(failures, &adiomv1.ItemFailure{Index: document.index, Message: writeErr.Error()})
 	}
 	return failures, nil
 }
 
-func normalizeWriteFailures(failures []*adiomv1.WriteFailure) []*adiomv1.WriteFailure {
-	slices.SortFunc(failures, func(a, b *adiomv1.WriteFailure) int {
+func normalizeWriteFailures(failures []*adiomv1.ItemFailure) []*adiomv1.ItemFailure {
+	slices.SortFunc(failures, func(a, b *adiomv1.ItemFailure) int {
 		if a.GetIndex() < b.GetIndex() {
 			return -1
 		}
@@ -972,7 +972,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("namespace should be fully qualified"))
 	}
 	partialResults := r.Msg.GetPartialWriteResults()
-	var failures []*adiomv1.WriteFailure
+	var failures []*adiomv1.ItemFailure
 	var batch []indexedDocument
 	flush := func() error {
 		currentBatch := batch
@@ -984,7 +984,7 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 			}
 			message := fmt.Sprintf("batch write failed: %v", err)
 			for _, document := range currentBatch {
-				failures = append(failures, &adiomv1.WriteFailure{Index: document.index, Message: message})
+				failures = append(failures, &adiomv1.ItemFailure{Index: document.index, Message: message})
 			}
 			return nil
 		}
@@ -1193,13 +1193,13 @@ func (c *conn) buildBulkModels(updates []*adiomv1.Update) ([]mongo.WriteModel, b
 	return models, ordered, nil
 }
 
-func failuresFromBulkWrite(err error, models []indexedWriteModel, ordered bool) ([]*adiomv1.WriteFailure, bool) {
+func failuresFromBulkWrite(err error, models []indexedWriteModel, ordered bool) ([]*adiomv1.ItemFailure, bool) {
 	var bulkErr mongo.BulkWriteException
 	if !errors.As(err, &bulkErr) || bulkErr.WriteConcernError != nil || len(bulkErr.WriteErrors) == 0 {
 		return nil, false
 	}
 
-	var failures []*adiomv1.WriteFailure
+	var failures []*adiomv1.ItemFailure
 	if ordered {
 		firstFailed := len(models)
 		message := err.Error()
@@ -1218,7 +1218,7 @@ func failuresFromBulkWrite(err error, models []indexedWriteModel, ordered bool) 
 				failureMessage = message
 			}
 			for _, index := range models[i].indices {
-				failures = append(failures, &adiomv1.WriteFailure{Index: index, Message: failureMessage})
+				failures = append(failures, &adiomv1.ItemFailure{Index: index, Message: failureMessage})
 			}
 		}
 		return failures, true
@@ -1229,7 +1229,7 @@ func failuresFromBulkWrite(err error, models []indexedWriteModel, ordered bool) 
 			return nil, false
 		}
 		for _, index := range models[writeErr.Index].indices {
-			failures = append(failures, &adiomv1.WriteFailure{Index: index, Message: writeErr.Error()})
+			failures = append(failures, &adiomv1.ItemFailure{Index: index, Message: writeErr.Error()})
 		}
 	}
 	return failures, true
