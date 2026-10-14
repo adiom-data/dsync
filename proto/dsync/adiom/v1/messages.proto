@@ -61,6 +61,7 @@ message Capabilities {
     }
     message Sink {
         repeated DataType supported_data_types = 1;
+        bool partial_write_results = 2;
     }
     Source source = 1;
     Sink sink = 2;
@@ -127,17 +128,23 @@ message WriteDataRequest {
     string namespace = 1;
     repeated bytes data = 2;
     DataType type = 3;
+    bool partial_write_results = 4;
 }
 
-message WriteDataResponse {}
+message WriteDataResponse {
+    repeated ItemFailure failures = 1;
+}
 
 message WriteUpdatesRequest {
     string namespace = 1;
     repeated Update updates = 2;
     DataType type = 3;
+    bool partial_write_results = 4;
 }
 
-message WriteUpdatesResponse {}
+message WriteUpdatesResponse {
+    repeated ItemFailure failures = 1;
+}
 
 message StreamUpdatesRequest {
     repeated string namespaces = 1;
@@ -187,6 +194,7 @@ message GetTransformInfoResponse {
     }
     repeated TransformInfo transforms = 1;
     bool use_multiple_responses = 2;
+    bool partial_transform_results = 3;
 }
 
 message GetTransformRequest {
@@ -195,6 +203,7 @@ message GetTransformRequest {
     repeated bytes data = 3;
     DataType request_type = 4;
     DataType response_type = 5;
+    bool partial_transform_results = 6;
 }
 
 message TransformResponse {
@@ -208,4 +217,11 @@ message GetTransformResponse {
     repeated Update updates = 2;
     repeated bytes data = 3;
     repeated TransformResponse responses = 4; // If `use_multiple_responses` is true, use this
+    repeated ItemFailure data_failures = 5;
+    repeated ItemFailure update_failures = 6;
+}
+
+message ItemFailure {
+    uint32 index = 1;
+    string message = 2;
 }

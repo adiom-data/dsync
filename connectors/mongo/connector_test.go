@@ -23,6 +23,7 @@ import (
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/adiom-data/dsync/protocol/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -192,6 +193,150 @@ func TestMongoConnectorUpdates(t *testing.T) {
 	assertDoc(t, col, map[string]string{"_id": "id2", "a": "b"})
 	assertDoc(t, col, map[string]string{"_id": "id3", "a": "a"})
 	assertNoDoc(t, col, "id4")
+}
+
+func TestMongoConnectorPartialWriteResults(t *testing.T) {
+	client, err := MongoClient(context.Background(), ConnectorSettings{ConnectionString: TestMongoConnectionString})
+	require.NoError(t, err)
+	defer client.Disconnect(context.Background())
+
+	col := client.Database(DBString()).Collection("partial_write_results")
+	require.NoError(t, col.Drop(t.Context()))
+	defer col.Drop(t.Context())
+
+	_, err = col.Indexes().CreateOne(t.Context(), mongo.IndexModel{
+		Keys:    bson.D{{Key: "unique", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	require.NoError(t, err)
+	_, err = col.InsertOne(t.Context(), bson.M{"_id": "existing", "unique": "taken"})
+	require.NoError(t, err)
+
+	connector := NewConnWithClient(client, ConnectorSettings{ConnectionString: TestMongoConnectionString})
+	info, err := connector.GetInfo(t.Context(), connect.NewRequest(&adiomv1.GetInfoRequest{}))
+	require.NoError(t, err)
+	assert.True(t, info.Msg.GetCapabilities().GetSink().GetPartialWriteResults())
+
+	namespace := fmt.Sprintf("%s.%s", DBString(), col.Name())
+	_, err = connector.WriteData(t.Context(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace: namespace,
+		Data: [][]byte{
+			toBson(t, bson.M{"_id": "legacy-bad-data", "unique": "taken"}),
+		},
+	}))
+	require.Error(t, err)
+	assertNoDoc(t, col, "legacy-bad-data")
+
+	_, err = connector.WriteUpdates(t.Context(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+		Namespace: namespace,
+		Updates: []*adiomv1.Update{
+			{
+				Id:   toBsonID(t, "legacy-bad-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
+				Data: toBson(t, bson.M{"_id": "legacy-bad-update", "unique": "taken"}),
+			},
+		},
+	}))
+	require.Error(t, err)
+	assertNoDoc(t, col, "legacy-bad-update")
+
+	dataResponse, err := connector.WriteData(t.Context(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Data: [][]byte{
+			toBson(t, bson.M{"_id": "good-data", "unique": "free-data"}),
+			toBson(t, bson.M{"_id": "bad-data", "unique": "taken"}),
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, dataResponse.Msg.GetFailures(), 1)
+	assert.Equal(t, uint32(1), dataResponse.Msg.GetFailures()[0].GetIndex())
+	assertDoc(t, col, map[string]string{"_id": "good-data", "unique": "free-data"})
+	assertNoDoc(t, col, "bad-data")
+
+	chunkedConnector := NewConnWithClient(client, ConnectorSettings{
+		ConnectionString:   TestMongoConnectionString,
+		WriterMaxBatchSize: 1,
+	})
+	chunkedResponse, err := chunkedConnector.WriteData(t.Context(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Data: [][]byte{
+			[]byte("not bson"),
+			toBson(t, bson.M{"_id": "good-after-batch-error", "unique": "free-after-batch-error"}),
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, chunkedResponse.Msg.GetFailures(), 1)
+	assert.Equal(t, uint32(0), chunkedResponse.Msg.GetFailures()[0].GetIndex())
+	assertDoc(t, col, map[string]string{"_id": "good-after-batch-error", "unique": "free-after-batch-error"})
+
+	updatesResponse, err := connector.WriteUpdates(t.Context(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Updates: []*adiomv1.Update{
+			{
+				Id:   toBsonID(t, "good-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
+				Data: toBson(t, bson.M{"_id": "good-update", "unique": "free-update"}),
+			},
+			{
+				Id:   toBsonID(t, "bad-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT,
+				Data: toBson(t, bson.M{"_id": "bad-update", "unique": "taken"}),
+			},
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, updatesResponse.Msg.GetFailures(), 1)
+	assert.Equal(t, uint32(1), updatesResponse.Msg.GetFailures()[0].GetIndex())
+	assertDoc(t, col, map[string]string{"_id": "good-update", "unique": "free-update"})
+	assertNoDoc(t, col, "bad-update")
+
+	compressedResponse, err := connector.WriteUpdates(t.Context(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Updates: []*adiomv1.Update{
+			{
+				Id:   toBsonID(t, "compressed-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
+				Data: toBson(t, bson.M{"_id": "compressed-update", "unique": "superseded"}),
+			},
+			{
+				Id:   toBsonID(t, "compressed-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
+				Data: toBson(t, bson.M{"_id": "compressed-update", "unique": "taken"}),
+			},
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, compressedResponse.Msg.GetFailures(), 2)
+	assert.Equal(t, uint32(0), compressedResponse.Msg.GetFailures()[0].GetIndex())
+	assert.Equal(t, uint32(1), compressedResponse.Msg.GetFailures()[1].GetIndex())
+	assertNoDoc(t, col, "compressed-update")
+
+	orderedResponse, err := connector.WriteUpdates(t.Context(), connect.NewRequest(&adiomv1.WriteUpdatesRequest{
+		Namespace:           namespace,
+		PartialWriteResults: true,
+		Updates: []*adiomv1.Update{
+			{
+				Id:   toBsonID(t, "ordered-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_UPDATE,
+				Data: toBson(t, bson.M{"_id": "ordered-update", "unique": "taken"}),
+			},
+			{
+				Id:   toBsonID(t, "ordered-update"),
+				Type: adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE,
+				Data: toBson(t, bson.M{"after": true}),
+			},
+		},
+	}))
+	require.NoError(t, err)
+	require.Len(t, orderedResponse.Msg.GetFailures(), 2)
+	assert.Equal(t, uint32(0), orderedResponse.Msg.GetFailures()[0].GetIndex())
+	assert.Equal(t, uint32(1), orderedResponse.Msg.GetFailures()[1].GetIndex())
+	assert.Contains(t, orderedResponse.Msg.GetFailures()[1].GetMessage(), "not attempted")
+	assertNoDoc(t, col, "ordered-update")
 }
 
 func TestMongoConnectorSuite2(t *testing.T) {

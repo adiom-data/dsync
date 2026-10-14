@@ -361,3 +361,83 @@ func TestBuildBulkModels_ErrorPropagates(t *testing.T) {
 	_, _, err := c.buildBulkModels([]*adiomv1.Update{{Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT}})
 	assert.ErrorContains(t, err, "unexpected empty id")
 }
+
+func TestBuildIndexedBulkModels_DedupMapsSupersededInputs(t *testing.T) {
+	c := &conn{}
+	models, ordered, err := c.buildIndexedBulkModels([]*adiomv1.Update{
+		insertU(t, "a", bson.M{"v": 1}),
+		insertU(t, "a", bson.M{"v": 2}),
+		insertU(t, "a", bson.M{"v": 3}),
+	})
+	require.NoError(t, err)
+	assert.False(t, ordered)
+	require.Len(t, models, 1)
+	assert.ElementsMatch(t, []uint32{0, 1, 2}, models[0].indices)
+}
+
+func TestBuildIndexedBulkModels_PartialChainKeepsInputMapping(t *testing.T) {
+	c := &conn{}
+	models, ordered, err := c.buildIndexedBulkModels([]*adiomv1.Update{
+		insertU(t, "a", bson.M{"v": 1}),
+		partialU(t, "a", bson.M{"w": 2}),
+	})
+	require.NoError(t, err)
+	assert.True(t, ordered)
+	require.Len(t, models, 2)
+	assert.Equal(t, []uint32{0}, models[0].indices)
+	assert.Equal(t, []uint32{1}, models[1].indices)
+}
+
+func TestBuildIndexedBulkModels_InvalidUpdateFailsBatch(t *testing.T) {
+	c := &conn{}
+	_, _, err := c.buildIndexedBulkModels([]*adiomv1.Update{
+		{Type: adiomv1.UpdateType_UPDATE_TYPE_INSERT},
+		insertU(t, "a", bson.M{"v": 1}),
+	})
+	assert.Error(t, err)
+}
+
+func TestFailuresFromBulkWrite_UnorderedMapsOriginalInputs(t *testing.T) {
+	models := []indexedWriteModel{
+		{indices: []uint32{4, 1}},
+		{indices: []uint32{7}},
+	}
+	err := mongo.BulkWriteException{WriteErrors: []mongo.BulkWriteError{{
+		WriteError: mongo.WriteError{Index: 0, Code: 121, Message: "validation failed"},
+	}}}
+
+	failures, ok := failuresFromBulkWrite(err, models, false)
+	require.True(t, ok)
+	require.Len(t, failures, 2)
+	assert.Equal(t, uint32(4), failures[0].GetIndex())
+	assert.Equal(t, uint32(1), failures[1].GetIndex())
+}
+
+func TestFailuresFromBulkWrite_OrderedMarksUnattemptedSuffix(t *testing.T) {
+	models := []indexedWriteModel{
+		{indices: []uint32{0}},
+		{indices: []uint32{1}},
+		{indices: []uint32{2, 3}},
+	}
+	err := mongo.BulkWriteException{WriteErrors: []mongo.BulkWriteError{{
+		WriteError: mongo.WriteError{Index: 1, Code: 121, Message: "validation failed"},
+	}}}
+
+	failures, ok := failuresFromBulkWrite(err, models, true)
+	require.True(t, ok)
+	require.Len(t, failures, 3)
+	assert.Equal(t, uint32(1), failures[0].GetIndex())
+	assert.Equal(t, uint32(2), failures[1].GetIndex())
+	assert.Equal(t, uint32(3), failures[2].GetIndex())
+	assert.Contains(t, failures[0].GetMessage(), "validation failed")
+	assert.Contains(t, failures[1].GetMessage(), "not attempted")
+}
+
+func TestFailuresFromBulkWrite_WriteConcernIsRequestError(t *testing.T) {
+	err := mongo.BulkWriteException{
+		WriteConcernError: &mongo.WriteConcernError{Code: 64, Message: "write concern failed"},
+		WriteErrors:       []mongo.BulkWriteError{{WriteError: mongo.WriteError{Index: 0, Code: 121}}},
+	}
+	_, ok := failuresFromBulkWrite(err, []indexedWriteModel{{indices: []uint32{0}}}, false)
+	assert.False(t, ok)
+}
