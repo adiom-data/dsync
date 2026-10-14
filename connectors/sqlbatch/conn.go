@@ -18,12 +18,13 @@ import (
 	"github.com/adiom-data/dsync/connectors/sqlbatch/dialects"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/internal/gobregister"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
 
 func init() {
-	gob.Register(time.Time{})
+	gobregister.RegisterCursorTypes()
 }
 
 type ChangeMapping struct {
