@@ -34,6 +34,14 @@ func bsonID(t *testing.T, name string, v interface{}) *adiomv1.BsonValue {
 	return &adiomv1.BsonValue{Name: name, Type: uint32(typ), Data: data}
 }
 
+func TestMongoIDPartUsesLastPart(t *testing.T) {
+	shard := bsonID(t, "tenant", "acme")
+	id := bsonID(t, "_id", "item")
+	if got := mongoIDPart([]*adiomv1.BsonValue{shard, id}); got != id {
+		t.Fatalf("mongoIDPart() = %#v, want last part", got)
+	}
+}
+
 func TestPlanningFanoutLimit(t *testing.T) {
 	assert.Equal(t, defaultNamespaceFanoutLimit, (&conn{flavor: FlavorMongoDB}).planningFanoutLimit())
 	assert.Equal(t, defaultNamespaceFanoutLimit, (&conn{flavor: FlavorDocumentDB}).planningFanoutLimit())
@@ -395,6 +403,20 @@ func TestBuildIndexedBulkModels_InvalidUpdateFailsBatch(t *testing.T) {
 		insertU(t, "a", bson.M{"v": 1}),
 	})
 	assert.Error(t, err)
+}
+
+func TestBuildIndexedBulkModels_UnknownUpdateDoesNotSuppressWrite(t *testing.T) {
+	c := &conn{}
+	unknown := insertU(t, "a", bson.M{"ignored": true})
+	unknown.Type = adiomv1.UpdateType_UPDATE_TYPE_UNKNOWN
+	models, ordered, err := c.buildIndexedBulkModels([]*adiomv1.Update{
+		insertU(t, "a", bson.M{"v": 1}),
+		unknown,
+	})
+	require.NoError(t, err)
+	assert.False(t, ordered)
+	require.Len(t, models, 1)
+	assert.Equal(t, []uint32{0}, models[0].indices)
 }
 
 func TestFailuresFromBulkWrite_UnorderedMapsOriginalInputs(t *testing.T) {

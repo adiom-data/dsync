@@ -12,7 +12,24 @@ import (
 var (
 	tDecimal = reflect.TypeOf(decimal.Decimal{})
 	tTime    = reflect.TypeOf(time.Time{})
+	tUUID    = reflect.TypeOf([16]byte{})
 )
+
+type uuidCodec struct{}
+
+var _ bson.ValueEncoder = uuidCodec{}
+
+func (uuidCodec) EncodeValue(_ bson.EncodeContext, vw bson.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != tUUID {
+		return bson.ValueEncoderError{
+			Name:     "UUIDEncodeValue",
+			Types:    []reflect.Type{tUUID},
+			Received: val,
+		}
+	}
+	uuid := val.Interface().([16]byte)
+	return vw.WriteBinaryWithSubtype(uuid[:], bson.TypeBinaryUUID)
+}
 
 // decimalCodec handles encoding/decoding between decimal.Decimal and bson.Decimal128
 type decimalCodec struct{}
@@ -163,6 +180,7 @@ func NewBSONRegistry() *bson.Registry {
 
 	reg.RegisterTypeMapEntry(bson.TypeDateTime, tTime)
 	reg.RegisterTypeMapEntry(bson.TypeDecimal128, tDecimal)
+	reg.RegisterTypeEncoder(tUUID, uuidCodec{})
 
 	return reg
 }
