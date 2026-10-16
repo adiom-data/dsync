@@ -21,10 +21,37 @@ func TestChangeStreamLiveToastAndTruncate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close(ctx)
 
 	const publication = "dsync_live_publication"
 	const slot = "dsync_live_slot"
+	var cancelStream context.CancelFunc
+	var streamDone <-chan struct{}
+	t.Cleanup(func() {
+		if cancelStream != nil {
+			cancelStream()
+			select {
+			case <-streamDone:
+			case <-time.After(5 * time.Second):
+				t.Error("timed out waiting for replication stream to stop")
+			}
+		}
+
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for _, statement := range []string{
+			`SELECT pg_drop_replication_slot('dsync_live_slot') FROM pg_replication_slots WHERE slot_name = 'dsync_live_slot'`,
+			`DROP PUBLICATION IF EXISTS dsync_live_publication`,
+			`DROP SCHEMA IF EXISTS dsync_stream_live CASCADE`,
+		} {
+			if _, err := admin.Exec(cleanupCtx, statement); err != nil {
+				t.Errorf("cleanup %s: %v", statement, err)
+			}
+		}
+		if err := admin.Close(cleanupCtx); err != nil {
+			t.Errorf("close admin connection: %v", err)
+		}
+	})
+
 	for _, statement := range []string{
 		`DROP PUBLICATION IF EXISTS dsync_live_publication`,
 		`SELECT pg_drop_replication_slot('dsync_live_slot') FROM pg_replication_slots WHERE slot_name = 'dsync_live_slot'`,
@@ -57,10 +84,13 @@ func TestChangeStreamLiveToastAndTruncate(t *testing.T) {
 	replicationURL.RawQuery = query.Encode()
 
 	streamCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	cancelStream = cancel
+	done := make(chan struct{})
+	streamDone = done
 	updates := make(chan UpdateBatch, 4)
 	streamErrors := make(chan error, 1)
 	go func() {
+		defer close(done)
 		streamErrors <- (&ChangeStream{
 			ReplicationURL:        replicationURL.String(),
 			ReplicationSlotName:   slot,
