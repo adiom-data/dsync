@@ -108,11 +108,11 @@ func TestSQLServerDriverValuesUseUnambiguousJSONTypes(t *testing.T) {
 }
 
 func upsertQuery(t *testing.T, dialect interface {
-	UpsertQuery(string, []string, []string, []string, []string, int, bool) (string, error)
+	UpsertQuery(string, []string, []string, []string, []string, []string, int, bool) (string, error)
 }, namespace string, keys, columns, defaultColumns []string, count int, overrideIdentity bool) string {
 	t.Helper()
 	columnTypes := make([]string, len(columns))
-	query, err := dialect.UpsertQuery(namespace, keys, columns, columnTypes, defaultColumns, count, overrideIdentity)
+	query, err := dialect.UpsertQuery(namespace, keys, columns, columnTypes, defaultColumns, nil, count, overrideIdentity)
 	assert.NoError(t, err)
 	return query
 }
@@ -204,8 +204,37 @@ func TestGeneratedIdentityWriteQueries(t *testing.T) {
 		upsertQuery(t, dialects.SQLServer{}, "items", []string{"id"}, []string{"id", "name"}, nil, 1, true),
 		`SET IDENTITY_INSERT "items" ON; BEGIN TRY MERGE`,
 	)
-	_, err := (dialects.Oracle{}).UpsertQuery("ITEMS", []string{"ID"}, []string{"ID"}, []string{"NUMBER"}, nil, 1, true)
+	_, err := (dialects.Oracle{}).UpsertQuery("ITEMS", []string{"ID"}, []string{"ID"}, []string{"NUMBER"}, nil, []string{"ID"}, 1, true)
 	assert.ErrorContains(t, err, "cannot be written explicitly")
+}
+
+func TestIdentityColumnsAreInsertOnly(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		dialect interface {
+			UpsertQuery(string, []string, []string, []string, []string, []string, int, bool) (string, error)
+		}
+	}{
+		{name: "Postgres", dialect: dialects.Postgres{}},
+		{name: "SQL Server", dialect: dialects.SQLServer{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			query, err := test.dialect.UpsertQuery(
+				"items",
+				[]string{"id"},
+				[]string{"id", "sequence", "name"},
+				[]string{"bigint", "bigint", "text"},
+				nil,
+				[]string{"sequence"},
+				1,
+				true,
+			)
+			assert.NoError(t, err)
+			assert.NotContains(t, query, `target."sequence" = source."sequence"`)
+			assert.NotContains(t, query, `"sequence" = EXCLUDED."sequence"`)
+			assert.Contains(t, query, `"sequence"`)
+		})
+	}
 }
 
 func TestSQLServerCastsBinaryParameters(t *testing.T) {
@@ -214,6 +243,7 @@ func TestSQLServerCastsBinaryParameters(t *testing.T) {
 		[]string{"id"},
 		[]string{"id", "payload"},
 		[]string{"bigint", "varbinary"},
+		nil,
 		nil,
 		2,
 		false,
@@ -229,12 +259,84 @@ func TestOracleConvertsBlobParameters(t *testing.T) {
 		[]string{"ID", "PAYLOAD"},
 		[]string{"NUMBER", "BLOB"},
 		nil,
+		nil,
 		2,
 		false,
 	)
 	assert.NoError(t, err)
-	assert.Contains(t, query, `SELECT :1 AS "ID", TO_BLOB(:2) AS "PAYLOAD" FROM DUAL`)
-	assert.Contains(t, query, `SELECT :3 AS "ID", TO_BLOB(:4) AS "PAYLOAD" FROM DUAL`)
+	assert.Contains(t, query, `SELECT CAST(:1 AS NUMBER) AS "ID", TO_BLOB(:2) AS "PAYLOAD" FROM DUAL`)
+	assert.Contains(t, query, `SELECT CAST(:3 AS NUMBER) AS "ID", TO_BLOB(:4) AS "PAYLOAD" FROM DUAL`)
+}
+
+func TestOracleCastsNumericParameters(t *testing.T) {
+	query, err := (dialects.Oracle{}).UpsertQuery(
+		"ITEMS",
+		[]string{"ID"},
+		[]string{"ID", "AMOUNT"},
+		[]string{"NUMBER", "BINARY_DOUBLE"},
+		nil,
+		nil,
+		2,
+		false,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, query, `SELECT CAST(:1 AS NUMBER) AS "ID", CAST(:2 AS BINARY_DOUBLE) AS "AMOUNT" FROM DUAL`)
+	assert.Contains(t, query, `SELECT CAST(:3 AS NUMBER) AS "ID", CAST(:4 AS BINARY_DOUBLE) AS "AMOUNT" FROM DUAL`)
+}
+
+func TestOracleTemporalConversionAndDeferredTypes(t *testing.T) {
+	dialect := dialects.Oracle{}
+	value, err := dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "PAYLOAD", DatabaseType: "RAW"}, nil)
+	assert.NoError(t, err)
+	assert.IsType(t, []byte(nil), value)
+
+	value, err = dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "CREATED_AT", DatabaseType: "TIMESTAMP(6)"}, "2026-10-19T12:34:56+05:30")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 10, 19, 7, 4, 56, 0, time.UTC), value)
+	value, err = dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "EVENT_AT", DatabaseType: "DATE"}, "2026-10-19T12:34:56+05:30")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 10, 19, 7, 4, 56, 0, time.UTC), value)
+	value, err = dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "EVENT_AT", DatabaseType: "DATE"}, "2026-10-19")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC), value)
+	value, err = dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "CREATED_AT", DatabaseType: "TIMESTAMP(6) WITH TIME ZONE"}, "2026-10-19T12:34:56+05:30")
+	assert.NoError(t, err)
+	assert.Equal(t, 5*60+30, offsetMinutes(value.(time.Time)))
+	_, err = dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "LEGACY", DatabaseType: "LONG RAW"}, "AAE=")
+	assert.ErrorContains(t, err, "does not support supplied values")
+}
+
+func TestOraclePreservesTimestampPrecisionInCasts(t *testing.T) {
+	query, err := (dialects.Oracle{}).UpsertQuery(
+		"ITEMS",
+		[]string{"ID"},
+		[]string{"ID", "PLAIN", "ZONED", "LOCAL_ZONED"},
+		[]string{"NUMBER", "TIMESTAMP(9)", "TIMESTAMP(9) WITH TIME ZONE", "TIMESTAMP(9) WITH LOCAL TIME ZONE"},
+		nil,
+		nil,
+		1,
+		false,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, query, `CAST(:2 AS TIMESTAMP(9)) AS "PLAIN"`)
+	assert.Contains(t, query, `CAST(:3 AS TIMESTAMP(9) WITH TIME ZONE) AS "ZONED"`)
+	assert.Contains(t, query, `CAST(:4 AS TIMESTAMP(9) WITH LOCAL TIME ZONE) AS "LOCAL_ZONED"`)
+}
+
+func offsetMinutes(value time.Time) int {
+	_, offset := value.Zone()
+	return offset / 60
+}
+
+func TestSQLServerTemporalConversion(t *testing.T) {
+	dialect := dialects.SQLServer{}
+	value, err := dialect.ConvertJSONValue(dialects.ColumnMetadata{Name: "created_at", DatabaseType: "datetime2"}, "2026-10-19T12:34:56+05:30")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 10, 19, 7, 4, 56, 0, time.UTC), value)
+
+	query, err := dialect.UpsertQuery("items", []string{"id"}, []string{"id", "created_at"}, []string{"bigint", "datetime2"}, nil, nil, 2, false)
+	assert.NoError(t, err)
+	assert.Contains(t, query, `VALUES (@p1, CAST(@p2 AS datetime2)), (@p3, CAST(@p4 AS datetime2))`)
 }
 
 func TestQuoteNamespaceEscapesIdentifiers(t *testing.T) {

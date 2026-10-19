@@ -47,6 +47,10 @@ func (SQLServer) MaxQueryParameters() int {
 	return 2000
 }
 
+func (SQLServer) SupportsIdentityOverride() bool {
+	return true
+}
+
 func (d SQLServer) InspectTable(ctx context.Context, db *sql.DB, namespace string) (TableMetadata, error) {
 	schema, table, err := SplitNamespace(namespace)
 	if err != nil {
@@ -89,7 +93,12 @@ func (d SQLServer) InspectTable(ctx context.Context, db *sql.DB, namespace strin
 }
 
 func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error) {
-	value, err := ConvertJSONValue(column, value, "binary", "varbinary", "image", "timestamp", "rowversion")
+	value, err := convertJSONValue(
+		column,
+		value,
+		[]string{"binary", "varbinary", "image", "timestamp", "rowversion"},
+		[]string{"decimal", "numeric", "money", "smallmoney", "float", "real"},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -103,13 +112,38 @@ func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error)
 			value = identifier
 		}
 	}
-	return ConvertRFC3339Value(column, value, "date", "datetime", "datetime2", "smalldatetime", "datetimeoffset")
+	if temporalType, dateOnly, timeOnly, preserveOffset := sqlServerTemporalType(column.DatabaseType); temporalType != "" {
+		kind := temporalTimestamp
+		switch {
+		case dateOnly:
+			kind = temporalDate
+		case timeOnly:
+			kind = temporalTime
+		}
+		return convertTemporalValue(column, value, kind, preserveOffset)
+	}
+	return value, nil
 }
 
-func (d SQLServer) UpsertQuery(namespace string, keys, columns, columnTypes, defaultColumns []string, count int, overrideIdentity bool) (string, error) {
+func sqlServerTemporalType(databaseType string) (sqlType string, dateOnly, timeOnly, preserveOffset bool) {
+	switch strings.ToLower(databaseType) {
+	case "date":
+		return "date", true, false, false
+	case "time":
+		return "time", false, true, false
+	case "datetime", "datetime2", "smalldatetime":
+		return strings.ToLower(databaseType), false, false, false
+	case "datetimeoffset":
+		return "datetimeoffset", false, false, true
+	default:
+		return "", false, false, false
+	}
+}
+
+func (d SQLServer) UpsertQuery(namespace string, keys, columns, columnTypes, defaultColumns, identityColumns []string, count int, overrideIdentity bool) (string, error) {
 	nonKeys := make([]string, 0, len(columns))
 	for _, column := range columns {
-		if !slices.Contains(keys, column) {
+		if !slices.Contains(keys, column) && !slices.Contains(identityColumns, column) {
 			nonKeys = append(nonKeys, column)
 		}
 	}
@@ -139,9 +173,13 @@ func (d SQLServer) valueRows(columnTypes []string, count int) string {
 		values := make([]string, len(columnTypes))
 		for column, databaseType := range columnTypes {
 			value := d.Placeholder(row*len(columnTypes) + column)
-			switch strings.ToLower(databaseType) {
-			case "binary", "varbinary", "image":
-				value = "CAST(" + value + " AS varbinary(max))"
+			if temporalType, _, _, _ := sqlServerTemporalType(databaseType); temporalType != "" {
+				value = "CAST(" + value + " AS " + temporalType + ")"
+			} else {
+				switch strings.ToLower(databaseType) {
+				case "binary", "varbinary", "image":
+					value = "CAST(" + value + " AS varbinary(max))"
+				}
 			}
 			values[column] = value
 		}

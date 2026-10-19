@@ -92,8 +92,20 @@ func ScanTableMetadata(rows *sql.Rows) (TableMetadata, error) {
 }
 
 func ConvertJSONValue(column ColumnMetadata, value any, binaryTypes ...string) (any, error) {
+	return convertJSONValue(column, value, binaryTypes, nil)
+}
+
+func convertJSONValue(column ColumnMetadata, value any, binaryTypes, numericTextTypes []string) (any, error) {
 	switch value := value.(type) {
 	case json.Number:
+		for _, numericType := range numericTextTypes {
+			if strings.EqualFold(column.DatabaseType, numericType) {
+				// Keep every value for a decimal-capable column in the same exact
+				// representation so a batched row source does not have to reconcile
+				// integer and string bind types for one column.
+				return value.String(), nil
+			}
+		}
 		if integer, err := value.Int64(); err == nil {
 			return integer, nil
 		}
@@ -137,6 +149,59 @@ func ConvertRFC3339Value(column ColumnMetadata, value any, temporalTypes ...stri
 		return parsed, nil
 	}
 	return value, nil
+}
+
+type temporalValueKind int
+
+const (
+	temporalTimestamp temporalValueKind = iota
+	temporalDate
+	temporalOracleDate
+	temporalTime
+)
+
+func convertTemporalValue(column ColumnMetadata, value any, kind temporalValueKind, preserveOffset bool) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
+	var parsed time.Time
+	switch value := value.(type) {
+	case time.Time:
+		parsed = value
+	case string:
+		var err error
+		switch {
+		case (kind == temporalDate || kind == temporalOracleDate) && len(value) == len(time.DateOnly):
+			parsed, err = time.Parse(time.DateOnly, value)
+		case kind == temporalTime:
+			for _, layout := range []string{"15:04:05Z07:00", "15:04:05"} {
+				parsed, err = time.Parse(layout, value)
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				parsed, err = time.Parse(time.RFC3339Nano, value)
+			}
+		default:
+			parsed, err = time.Parse(time.RFC3339Nano, value)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse temporal column %q of type %s: %w", column.Name, column.DatabaseType, err)
+		}
+	default:
+		return nil, fmt.Errorf("temporal column %q of type %s requires an RFC3339 string, date-only string, or BSON datetime; got %T", column.Name, column.DatabaseType, value)
+	}
+	if !preserveOffset {
+		parsed = parsed.UTC()
+	}
+	if kind == temporalDate {
+		return time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC), nil
+	}
+	if kind == temporalTime {
+		return time.Date(1, time.January, 1, parsed.Hour(), parsed.Minute(), parsed.Second(), parsed.Nanosecond(), time.UTC), nil
+	}
+	return parsed, nil
 }
 
 func QuoteIdentifier(identifier string) string {
