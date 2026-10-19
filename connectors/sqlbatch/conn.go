@@ -94,9 +94,10 @@ type SQLDialect interface {
 	InspectTable(context.Context, *sql.DB, string) (dialects.TableMetadata, error)
 	ConvertJSONValue(dialects.ColumnMetadata, any) (any, error)
 	ConvertDriverValue(dialects.ColumnMetadata, any) (any, error)
-	UpsertQuery(namespace string, keys, columns, columnTypes, defaultColumns []string, count int, overrideIdentity bool) (string, error)
+	UpsertQuery(namespace string, keys, columns, columnTypes, defaultColumns, identityColumns []string, count int, overrideIdentity bool) (string, error)
 	DeleteQuery(namespace string, keys []string, count int) string
 	MaxQueryParameters() int
+	SupportsIdentityOverride() bool
 }
 
 func parseConfigFromFile(file string) (Config, error) {

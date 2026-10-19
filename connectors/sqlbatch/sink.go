@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +47,16 @@ func decodeJSONDocument(data []byte, columns map[string]dialects.ColumnMetadata,
 		}
 		document[key] = converted
 	}
+	for key, column := range columns {
+		if _, exists := document[key]; exists || !column.Nullable || column.HasDefault || column.Generated || column.Identity {
+			continue
+		}
+		converted, err := dialect.ConvertJSONValue(column, nil)
+		if err != nil {
+			return nil, err
+		}
+		document[key] = converted
+	}
 	return document, nil
 }
 
@@ -72,6 +84,21 @@ func sqlValue(value any) any {
 	return value
 }
 
+func numericJSONValue(value any) (json.Number, bool) {
+	switch value := value.(type) {
+	case int32:
+		return json.Number(strconv.FormatInt(int64(value), 10)), true
+	case int64:
+		return json.Number(strconv.FormatInt(value, 10)), true
+	case float64:
+		return json.Number(strconv.FormatFloat(value, 'g', -1, 64)), true
+	case bson.Decimal128:
+		return json.Number(value.String()), true
+	default:
+		return "", false
+	}
+}
+
 func documentValues(document map[string]any, columns []string) []any {
 	values := make([]any, len(columns))
 	for i, column := range columns {
@@ -91,6 +118,10 @@ func updateKeyValues(update *adiomv1.Update, metadata dialects.TableMetadata, di
 	}
 	values := make([]any, len(keys))
 	for i, key := range keys {
+		column, exists := columns[key]
+		if !exists {
+			return nil, fmt.Errorf("primary key field %q is not present in table metadata", key)
+		}
 		part, exists := parts[key]
 		if !exists {
 			return nil, fmt.Errorf("update ID is missing key field %q", key)
@@ -99,18 +130,23 @@ func updateKeyValues(update *adiomv1.Update, metadata dialects.TableMetadata, di
 		if err := bson.UnmarshalValue(bson.Type(part.GetType()), part.GetData(), &value); err != nil {
 			return nil, fmt.Errorf("decode key field %q: %w", key, err)
 		}
-		column, exists := columns[key]
-		if !exists {
-			return nil, fmt.Errorf("primary key field %q is not present in table metadata", key)
-		}
 		if binary, ok := value.(bson.Binary); ok && binary.Subtype == bson.TypeBinaryUUIDOld &&
 			(strings.EqualFold(column.DatabaseType, "uuid") || strings.EqualFold(column.DatabaseType, "uniqueidentifier")) {
 			return nil, fmt.Errorf("legacy BSON UUID subtype 3 is not supported for key field %q", key)
 		}
-		value = sqlValue(value)
-		value, err := dialect.ConvertJSONValue(column, value)
-		if err != nil {
-			return nil, fmt.Errorf("convert key field %q: %w", key, err)
+		if number, ok := numericJSONValue(value); ok {
+			converted, err := dialect.ConvertJSONValue(column, number)
+			if err != nil {
+				return nil, fmt.Errorf("convert key field %q: %w", key, err)
+			}
+			value = converted
+		} else {
+			value = sqlValue(value)
+			converted, err := dialect.ConvertJSONValue(column, value)
+			if err != nil {
+				return nil, fmt.Errorf("convert key field %q: %w", key, err)
+			}
+			value = converted
 		}
 		if value == nil {
 			return nil, fmt.Errorf("update ID has null key field %q", key)
@@ -154,14 +190,68 @@ type writeOperation struct {
 	columns          []string
 	columnTypes      []string
 	defaultColumns   []string
+	identityColumns  []string
 	values           []any
 	key              string
 }
 
-func operationKey(values []any) string {
-	encoded, err := json.Marshal(values)
+func numericDatabaseType(databaseType string) bool {
+	switch strings.ToLower(databaseType) {
+	case "tinyint", "smallint", "int", "integer", "bigint",
+		"int2", "int4", "int8", "numeric", "decimal", "money", "smallmoney",
+		"real", "float", "float4", "float8", "double precision",
+		"number", "binary_float", "binary_double":
+		return true
+	default:
+		return false
+	}
+}
+
+func canonicalNumericKey(value any) (string, bool) {
+	var text string
+	switch value := value.(type) {
+	case string:
+		text = value
+	case int:
+		text = strconv.FormatInt(int64(value), 10)
+	case int32:
+		text = strconv.FormatInt(int64(value), 10)
+	case int64:
+		text = strconv.FormatInt(value, 10)
+	case float32:
+		text = strconv.FormatFloat(float64(value), 'g', -1, 32)
+	case float64:
+		text = strconv.FormatFloat(value, 'g', -1, 64)
+	case json.Number:
+		text = value.String()
+	case interface{ String() (string, error) }:
+		var err error
+		text, err = value.String()
+		if err != nil {
+			return "", false
+		}
+	default:
+		return "", false
+	}
+	if number, ok := new(big.Rat).SetString(text); ok {
+		return number.RatString(), true
+	}
+	return "", false
+}
+
+func operationKey(values []any, columns []dialects.ColumnMetadata) string {
+	normalized := make([]any, len(values))
+	for i, value := range values {
+		normalized[i] = value
+		if i < len(columns) && numericDatabaseType(columns[i].DatabaseType) {
+			if number, ok := canonicalNumericKey(value); ok {
+				normalized[i] = []string{"numeric", number}
+			}
+		}
+	}
+	encoded, err := json.Marshal(normalized)
 	if err != nil {
-		return fmt.Sprint(values)
+		return fmt.Sprint(normalized)
 	}
 	return string(encoded)
 }
@@ -171,7 +261,10 @@ func upsertOperation(metadata dialects.TableMetadata, document map[string]any) (
 	columns := make([]string, 0, len(metadata.Columns))
 	columnTypes := make([]string, 0, len(metadata.Columns))
 	defaultColumns := make([]string, 0, len(metadata.Columns))
+	identityColumns := make([]string, 0, len(metadata.Columns))
 	keyValues := make([]any, len(keys))
+	keyColumns := make([]dialects.ColumnMetadata, len(keys))
+	overrideIdentity := false
 	for i, key := range keys {
 		var keyMetadata *dialects.ColumnMetadata
 		for columnIndex := range metadata.Columns {
@@ -193,18 +286,36 @@ func upsertOperation(metadata dialects.TableMetadata, document map[string]any) (
 		columns = append(columns, key)
 		columnTypes = append(columnTypes, keyMetadata.DatabaseType)
 		keyValues[i] = value
+		keyColumns[i] = *keyMetadata
+		if keyMetadata.Identity {
+			identityColumns = append(identityColumns, key)
+			overrideIdentity = overrideIdentity || strings.EqualFold(keyMetadata.IdentityGeneration, "ALWAYS")
+		}
 	}
 	for _, column := range metadata.Columns {
 		if slices.Contains(keys, column.Name) {
 			continue
 		}
-		if column.Generated || column.Identity {
-			if _, exists := document[column.Name]; exists {
-				return writeOperation{}, fmt.Errorf("column %q is generated by the destination and cannot be supplied", column.Name)
+		value, exists := document[column.Name]
+		if column.Generated && !column.Identity {
+			if exists {
+				return writeOperation{}, fmt.Errorf("generated column %q cannot be written explicitly", column.Name)
 			}
 			continue
 		}
-		value, exists := document[column.Name]
+		if column.Identity {
+			if !exists {
+				continue
+			}
+			if value == nil {
+				return writeOperation{}, fmt.Errorf("identity column %q cannot be null", column.Name)
+			}
+			columns = append(columns, column.Name)
+			columnTypes = append(columnTypes, column.DatabaseType)
+			identityColumns = append(identityColumns, column.Name)
+			overrideIdentity = overrideIdentity || strings.EqualFold(column.IdentityGeneration, "ALWAYS")
+			continue
+		}
 		if exists {
 			if value == nil && !column.Nullable {
 				return writeOperation{}, fmt.Errorf("column %q is required and cannot be null", column.Name)
@@ -225,15 +336,21 @@ func upsertOperation(metadata dialects.TableMetadata, document map[string]any) (
 		columnTypes = append(columnTypes, column.DatabaseType)
 	}
 	return writeOperation{
-		overrideIdentity: slices.ContainsFunc(metadata.Columns, func(column dialects.ColumnMetadata) bool {
-			return slices.Contains(keys, column.Name) && column.Identity && strings.EqualFold(column.IdentityGeneration, "ALWAYS")
-		}),
-		columns:        columns,
-		columnTypes:    columnTypes,
-		defaultColumns: defaultColumns,
-		values:         documentValues(document, columns),
-		key:            operationKey(keyValues),
+		overrideIdentity: overrideIdentity,
+		columns:          columns,
+		columnTypes:      columnTypes,
+		defaultColumns:   defaultColumns,
+		identityColumns:  identityColumns,
+		values:           documentValues(document, columns),
+		key:              operationKey(keyValues, keyColumns),
 	}, nil
+}
+
+func validateIdentityOverride(dialect SQLDialect, operation writeOperation) error {
+	if operation.overrideIdentity && !dialect.SupportsIdentityOverride() {
+		return fmt.Errorf("destination does not support explicitly writing GENERATED ALWAYS identity columns %v", operation.identityColumns)
+	}
+	return nil
 }
 
 func writeBatchSize(configured, maxParameters, parametersPerRow int) (int, error) {
@@ -275,7 +392,7 @@ func (c *conn) executeWriteOperations(ctx context.Context, namespace string, key
 			query = c.dialect.DeleteQuery(namespace, keys, len(pending))
 		} else {
 			var err error
-			query, err = c.dialect.UpsertQuery(namespace, keys, pending[0].columns, pending[0].columnTypes, pending[0].defaultColumns, len(pending), pending[0].overrideIdentity)
+			query, err = c.dialect.UpsertQuery(namespace, keys, pending[0].columns, pending[0].columnTypes, pending[0].defaultColumns, pending[0].identityColumns, len(pending), pending[0].overrideIdentity)
 			if err != nil {
 				return err
 			}
@@ -301,7 +418,8 @@ func (c *conn) executeWriteOperations(ctx context.Context, namespace string, key
 			pending[0].overrideIdentity != operation.overrideIdentity ||
 			!slices.Equal(pending[0].columns, operation.columns) ||
 			!slices.Equal(pending[0].columnTypes, operation.columnTypes) ||
-			!slices.Equal(pending[0].defaultColumns, operation.defaultColumns))
+			!slices.Equal(pending[0].defaultColumns, operation.defaultColumns) ||
+			!slices.Equal(pending[0].identityColumns, operation.identityColumns))
 		if len(pending) >= batchSize || incompatible || duplicate {
 			if err := flush(); err != nil {
 				return err
@@ -334,6 +452,9 @@ func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDa
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("document %d: %w", i, err))
 		}
+		if err := validateIdentityOverride(c.dialect, operation); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("document %d: %w", i, err))
+		}
 		operations = append(operations, operation)
 	}
 	if err := c.executeWriteOperations(ctx, namespace, metadata.PrimaryKey, operations); err != nil {
@@ -353,6 +474,10 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	columns := columnMetadataByName(metadata)
+	keyColumns := make([]dialects.ColumnMetadata, len(metadata.PrimaryKey))
+	for i, key := range metadata.PrimaryKey {
+		keyColumns[i] = columns[key]
+	}
 	for _, update := range r.Msg.GetUpdates() {
 		if update.GetType() == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partial updates are not supported by sqlbatch"))
@@ -381,9 +506,12 @@ func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.Writ
 			if err != nil {
 				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: %w", i, err))
 			}
+			if err := validateIdentityOverride(c.dialect, operation); err != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: %w", i, err))
+			}
 			operations = append(operations, operation)
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			operations = append(operations, writeOperation{delete: true, values: keyValues, key: operationKey(keyValues)})
+			operations = append(operations, writeOperation{delete: true, values: keyValues, key: operationKey(keyValues, keyColumns)})
 		default:
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unsupported update type %v", update.GetType()))
 		}

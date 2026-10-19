@@ -22,6 +22,10 @@ func (Postgres) MaxQueryParameters() int {
 	return 65535
 }
 
+func (Postgres) SupportsIdentityOverride() bool {
+	return true
+}
+
 func (d Postgres) InspectTable(ctx context.Context, db *sql.DB, namespace string) (TableMetadata, error) {
 	schema, table, err := SplitNamespace(namespace)
 	if err != nil {
@@ -78,10 +82,10 @@ func (Postgres) ConvertJSONValue(column ColumnMetadata, value any) (any, error) 
 	return ConvertRFC3339Value(column, value, "date", "timestamp", "timestamptz")
 }
 
-func (d Postgres) UpsertQuery(namespace string, keys, columns, _ []string, defaultColumns []string, count int, overrideIdentity bool) (string, error) {
+func (d Postgres) UpsertQuery(namespace string, keys, columns, _ []string, defaultColumns, identityColumns []string, count int, overrideIdentity bool) (string, error) {
 	nonKeys := make([]string, 0, len(columns))
 	for _, column := range columns {
-		if !slices.Contains(keys, column) {
+		if !slices.Contains(keys, column) && !slices.Contains(identityColumns, column) {
 			nonKeys = append(nonKeys, column)
 		}
 	}

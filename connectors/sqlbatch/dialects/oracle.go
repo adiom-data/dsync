@@ -3,12 +3,14 @@ package dialects
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
-	_ "github.com/sijms/go-ora/v2"
+	go_ora "github.com/sijms/go-ora/v2"
 )
 
 type Oracle struct{}
@@ -17,8 +19,14 @@ func (Oracle) ConvertDriverValue(column ColumnMetadata, value any) (any, error) 
 	return ConvertDriverValue(column, value)
 }
 
+var oracleTimestampTypePattern = regexp.MustCompile(`(?i)^timestamp(?:\([0-9]+\))?(?: with (?:local )?time zone)?$`)
+
 func (Oracle) MaxQueryParameters() int {
 	return 65535
+}
+
+func (Oracle) SupportsIdentityOverride() bool {
+	return false
 }
 
 func (d Oracle) InspectTable(ctx context.Context, db *sql.DB, namespace string) (TableMetadata, error) {
@@ -63,27 +71,70 @@ func (d Oracle) InspectTable(ctx context.Context, db *sql.DB, namespace string) 
 }
 
 func (Oracle) ConvertJSONValue(column ColumnMetadata, value any) (any, error) {
-	value, err := ConvertJSONValue(column, value, "raw", "long raw", "blob")
-	if err != nil {
-		return nil, err
-	}
-	// Oracle includes fractional-second precision in timestamp metadata (for
-	// example, TIMESTAMP(6) WITH TIME ZONE), so match the type family rather
-	// than enumerating exact spellings.
 	databaseType := strings.ToLower(column.DatabaseType)
-	if databaseType == "date" || strings.HasPrefix(databaseType, "timestamp") {
-		return ConvertRFC3339Value(column, value, column.DatabaseType)
+	if temporalType, preserveOffset := oracleTemporalType(column.DatabaseType); temporalType != "" {
+		kind := temporalTimestamp
+		if temporalType == "DATE" {
+			// Unlike a SQL DATE, Oracle DATE also stores hours, minutes, and seconds.
+			// Accept a date-only value as midnight, but preserve a supplied timestamp.
+			kind = temporalOracleDate
+		}
+		return convertTemporalValue(column, value, kind, preserveOffset)
 	}
-	return value, nil
+	if value != nil && strings.HasPrefix(databaseType, "interval") {
+		return nil, fmt.Errorf("Oracle sink does not yet support supplied values for interval column %q of type %s", column.Name, column.DatabaseType)
+	}
+	if value != nil && (databaseType == "long" || databaseType == "long raw") {
+		return nil, fmt.Errorf("Oracle sink does not support supplied values for column %q of type %s", column.Name, column.DatabaseType)
+	}
+	if value == nil && databaseType == "raw" {
+		// go-ora otherwise describes an untyped nil as NCHAR, which cannot be
+		// combined with non-null RAW binds in the UNION ALL row source.
+		return []byte(nil), nil
+	}
+	if number, ok := value.(json.Number); ok && oracleNumericType(column.DatabaseType) != "" {
+		return go_ora.NewNumberFromString(number.String())
+	}
+	return ConvertJSONValue(column, value, "raw", "long raw", "blob")
 }
 
-func (d Oracle) UpsertQuery(namespace string, keys, columns, columnTypes []string, defaultColumns []string, count int, overrideIdentity bool) (string, error) {
+func oracleTemporalType(databaseType string) (string, bool) {
+	databaseType = strings.TrimSpace(databaseType)
+	lowerType := strings.ToLower(databaseType)
+	switch {
+	case lowerType == "date":
+		return "DATE", false
+	case oracleTimestampTypePattern.MatchString(databaseType):
+		// DATA_TYPE comes from Oracle metadata. Validate its shape before using it
+		// as a cast target, and retain any declared fractional-second precision.
+		return strings.ToUpper(databaseType), strings.Contains(lowerType, "with time zone")
+	default:
+		return "", false
+	}
+}
+
+func oracleNumericType(databaseType string) string {
+	switch strings.ToLower(databaseType) {
+	case "number", "decimal", "numeric":
+		return "NUMBER"
+	case "float":
+		return "FLOAT"
+	case "binary_float":
+		return "BINARY_FLOAT"
+	case "binary_double":
+		return "BINARY_DOUBLE"
+	default:
+		return ""
+	}
+}
+
+func (d Oracle) UpsertQuery(namespace string, keys, columns, columnTypes []string, defaultColumns, identityColumns []string, count int, overrideIdentity bool) (string, error) {
 	if overrideIdentity {
-		return "", fmt.Errorf("Oracle GENERATED ALWAYS identity keys cannot be written explicitly")
+		return "", fmt.Errorf("Oracle GENERATED ALWAYS identity columns cannot be written explicitly")
 	}
 	nonKeys := make([]string, 0, len(columns))
 	for _, column := range columns {
-		if !slices.Contains(keys, column) {
+		if !slices.Contains(keys, column) && !slices.Contains(identityColumns, column) {
 			nonKeys = append(nonKeys, column)
 		}
 	}
@@ -92,10 +143,18 @@ func (d Oracle) UpsertQuery(namespace string, keys, columns, columnTypes []strin
 		selects := make([]string, len(columns))
 		for i, column := range columns {
 			value := d.Placeholder(row*len(columns) + i)
-			if i < len(columnTypes) && strings.EqualFold(columnTypes[i], "blob") {
-				// Oracle otherwise infers a NULL BLOB bind as a character value,
-				// making batched UNION ALL sources fail with ORA-01790.
-				value = "TO_BLOB(" + value + ")"
+			if i < len(columnTypes) {
+				if temporalType, _ := oracleTemporalType(columnTypes[i]); temporalType != "" {
+					value = "CAST(" + value + " AS " + temporalType + ")"
+				} else if numericType := oracleNumericType(columnTypes[i]); numericType != "" {
+					// Besides making every UNION ALL branch agree, the cast gives an
+					// untyped nil bind the destination's numeric family.
+					value = "CAST(" + value + " AS " + numericType + ")"
+				} else if strings.EqualFold(columnTypes[i], "blob") {
+					// Oracle otherwise infers a NULL BLOB bind as a character value,
+					// making batched UNION ALL sources fail with ORA-01790.
+					value = "TO_BLOB(" + value + ")"
+				}
 			}
 			selects[i] = value + " AS " + QuoteIdentifier(column)
 		}
