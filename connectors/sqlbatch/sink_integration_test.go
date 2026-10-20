@@ -292,11 +292,12 @@ func TestSQLServerSinkLive(t *testing.T) {
 		Data: [][]byte{
 			[]byte(`{"tenant":"c","id":3,"name":"whole","amount":1}`),
 			[]byte(`{"tenant":"d","id":4,"name":"fractional","amount":1.5}`),
+			[]byte(`{"tenant":"exponent","id":5,"name":"exponent","amount":1.25e2}`),
 		},
 	})); err != nil {
 		t.Fatalf("mixed decimal insert batch: %v", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dbo.sqlbatch_live_items WHERE (tenant = 'c' AND amount = 1) OR (tenant = 'd' AND amount = 1.5)`).Scan(&count); err != nil || count != 2 {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dbo.sqlbatch_live_items WHERE (tenant = 'c' AND amount = 1) OR (tenant = 'd' AND amount = 1.5) OR (tenant = 'exponent' AND amount = 125)`).Scan(&count); err != nil || count != 3 {
 		t.Fatalf("mixed decimal insert count=%d err=%v", count, err)
 	}
 

@@ -3,12 +3,14 @@ package dialects
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 
 	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/shopspring/decimal"
 )
 
 type SQLServer struct {
@@ -93,6 +95,13 @@ func (d SQLServer) InspectTable(ctx context.Context, db *sql.DB, namespace strin
 }
 
 func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error) {
+	if sqlServerExactNumericType(column.DatabaseType) {
+		var err error
+		value, err = normalizeExactNumericExponent(value)
+		if err != nil {
+			return nil, fmt.Errorf("normalize exact numeric column %q: %w", column.Name, err)
+		}
+	}
 	value, err := convertJSONValue(
 		column,
 		value,
@@ -123,6 +132,69 @@ func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error)
 		return convertTemporalValue(column, value, kind, preserveOffset)
 	}
 	return value, nil
+}
+
+func sqlServerExactNumericType(databaseType string) bool {
+	switch strings.ToLower(databaseType) {
+	case "decimal", "numeric", "money", "smallmoney":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeExactNumericExponent(value any) (any, error) {
+	var text string
+	switch value := value.(type) {
+	case json.Number:
+		text = value.String()
+	case string:
+		text = value
+	default:
+		return value, nil
+	}
+	if !strings.ContainsAny(text, "eE") {
+		return value, nil
+	}
+
+	parsed, err := decimal.NewFromString(text)
+	if err != nil {
+		return nil, fmt.Errorf("parse exponent-form number %q: %w", text, err)
+	}
+	if parsed.IsZero() {
+		return json.Number("0"), nil
+	}
+	// Decimal.String materializes exponent padding, so bound the rendered form
+	// before calling it. SQL Server exact numerics are at most 38 digits; this
+	// leaves ample room while preventing a tiny input from causing a huge allocation.
+	const maxExpandedDecimalLength = 4096
+	if decimalExpansionLength(parsed) > maxExpandedDecimalLength {
+		return nil, fmt.Errorf("exponent-form number %q is too large to expand", text)
+	}
+	return json.Number(parsed.String()), nil
+}
+
+func decimalExpansionLength(value decimal.Decimal) int64 {
+	coefficient := value.Coefficient()
+	negative := coefficient.Sign() < 0
+	if negative {
+		coefficient.Neg(coefficient)
+	}
+	digits := int64(len(coefficient.String()))
+	exponent := int64(value.Exponent())
+
+	length := digits
+	if exponent >= 0 {
+		length += exponent
+	} else if scale := -exponent; digits > scale {
+		length++ // decimal point
+	} else {
+		length = scale + 2 // "0.", leading fractional zeros, and digits
+	}
+	if negative {
+		length++
+	}
+	return length
 }
 
 func sqlServerTemporalType(databaseType string) (sqlType string, dateOnly, timeOnly, preserveOffset bool) {

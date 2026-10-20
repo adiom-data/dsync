@@ -2,6 +2,7 @@ package dialects_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -105,6 +106,50 @@ func TestSQLServerDriverValuesUseUnambiguousJSONTypes(t *testing.T) {
 	if !bytes.Equal(got.([]byte), binary) {
 		t.Fatalf("binary = %#v", got)
 	}
+}
+
+func TestSQLServerExactNumericValuesExpandExponentNotation(t *testing.T) {
+	dialect := dialects.SQLServer{}
+	for _, test := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{name: "positive exponent", value: json.Number("1e3"), want: "1000"},
+		{name: "fractional mantissa", value: json.Number("1.25E+2"), want: "125"},
+		{name: "negative exponent", value: json.Number("1e-3"), want: "0.001"},
+		{name: "negative value", value: json.Number("-1.20e-2"), want: "-0.012"},
+		{name: "numeric string", value: "2.5e1", want: "25"},
+		{name: "zero", value: json.Number("0e999999999"), want: "0"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := dialect.ConvertJSONValue(
+				dialects.ColumnMetadata{Name: "amount", DatabaseType: "decimal"},
+				test.value,
+			)
+			assert.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+
+	got, err := dialect.ConvertJSONValue(
+		dialects.ColumnMetadata{Name: "measurement", DatabaseType: "float"},
+		json.Number("1e3"),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, "1e3", got)
+
+	_, err = dialect.ConvertJSONValue(
+		dialects.ColumnMetadata{Name: "amount", DatabaseType: "numeric"},
+		json.Number("1e999999999"),
+	)
+	assert.ErrorContains(t, err, "too large to expand")
+
+	_, err = dialect.ConvertJSONValue(
+		dialects.ColumnMetadata{Name: "amount", DatabaseType: "numeric"},
+		"1einvalid",
+	)
+	assert.ErrorContains(t, err, "parse exponent-form number")
 }
 
 func upsertQuery(t *testing.T, dialect interface {
