@@ -1139,6 +1139,11 @@ func (c *conn) buildIndexedBulkModels(updates []*adiomv1.Update) ([]indexedWrite
 		if err != nil {
 			return nil, false, err
 		}
+		// Unknown update types and empty partial updates preserve the legacy
+		// successful-noop behavior and must not participate in deduplication.
+		if model == nil {
+			continue
+		}
 		compiled = append(compiled, compiledUpdate{model: model, idKey: idKey, typ: update.GetType(), index: uint32(i)}) // #nosec G115 -- protobuf messages cannot contain more than uint32 items
 	}
 
@@ -1156,9 +1161,6 @@ func (c *conn) buildIndexedBulkModels(updates []*adiomv1.Update) ([]indexedWrite
 			lastType = update.typ
 		}
 
-		if update.model == nil {
-			continue
-		}
 		indexed := indexedWriteModel{model: update.model, indices: []uint32{update.index}, idKey: update.idKey}
 		if isNew {
 			models = append(models, indexed)
@@ -1355,6 +1357,15 @@ func maybeUnavailableError(err error) error {
 	return connect.NewError(connect.CodeInternal, err)
 }
 
+func mongoIDPart(id []*adiomv1.BsonValue) *adiomv1.BsonValue {
+	if len(id) == 0 {
+		return nil
+	}
+	// The BSON ID contract places MongoDB's _id last. Single-part legacy IDs
+	// are therefore handled by the same rule without relying on the name.
+	return id[len(id)-1]
+}
+
 // GetByIds implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) GetByIds(ctx context.Context, r *connect.Request[adiomv1.GetByIdsRequest]) (*connect.Response[adiomv1.GetByIdsResponse], error) {
 	col, _, ok := GetCol(c.client, r.Msg.GetNamespace())
@@ -1371,7 +1382,7 @@ func (c *conn) GetByIds(ctx context.Context, r *connect.Request[adiomv1.GetByIds
 				res[i] = &adiomv1.GetByIdsResponse_ResponseItem{}
 				return nil
 			}
-			bv := id.GetId()[0]
+			bv := mongoIDPart(id.GetId())
 			rawVal := bson.RawValue{
 				Type:  bson.Type(bv.GetType()),
 				Value: bv.GetData(),

@@ -17,6 +17,7 @@ import (
 	"github.com/adiom-data/dsync/connectors/postgres/pglib"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
+	"github.com/adiom-data/dsync/internal/gobregister"
 	"github.com/cespare/xxhash"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -48,15 +49,61 @@ type PostgresSettings struct {
 	EnableReplicaMode bool
 }
 
+func init() {
+	gobregister.RegisterCursorTypes()
+}
+
 type conn struct {
 	adiomv1connect.UnimplementedConnectorServiceHandler
 	replicationUrl string
 	id             uint64
 	c              *pgxpool.Pool
 
-	pkeys        map[string][]string
+	pkeys map[string][]string
+	// sinkMetadata is a connection-time snapshot. Schemas are expected to stay
+	// unchanged for the lifetime of the connector.
+	sinkMetadata map[string]sinkTableMetadata
+	hasIDColumn  map[string]bool
+	idAliases    map[string]string
 	settings     PostgresSettings
 	bsonRegistry *bson.Registry
+}
+
+type batchSender interface {
+	SendBatch(context.Context, *pgx.Batch) pgx.BatchResults
+}
+
+func (c *conn) sendSinkBatch(ctx context.Context, batch *pgx.Batch, count int, onError func(int, error)) error {
+	var sender batchSender = c.c
+	var tx pgx.Tx
+	if c.settings.EnableReplicaMode {
+		var err error
+		tx, err = c.c.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, "SET LOCAL session_replication_role = 'replica'"); err != nil {
+			return fmt.Errorf("failed to set session_replication_role: %w", err)
+		}
+		sender = tx
+	}
+
+	results := sender.SendBatch(ctx, batch)
+	for i := 0; i < count; i++ {
+		if _, err := results.Exec(); err != nil {
+			onError(i, err)
+			_ = results.Close()
+			return err
+		}
+	}
+	if err := results.Close(); err != nil {
+		return err
+	}
+	if tx != nil {
+		return tx.Commit(ctx)
+	}
+	return nil
 }
 
 func (c *conn) Teardown() {
@@ -124,6 +171,29 @@ type pkeyRow struct {
 	ColumnName  string
 }
 
+type columnRow struct {
+	TableSchema string
+	TableName   string
+	ColumnName  string
+}
+
+type sinkColumnMetadata struct {
+	TableSchema        string
+	TableName          string
+	Name               string
+	DatabaseType       string
+	Nullable           bool
+	HasDefault         bool
+	Generated          bool
+	Identity           bool
+	IdentityGeneration string
+}
+
+type sinkTableMetadata struct {
+	Columns    []sinkColumnMetadata
+	PrimaryKey []string
+}
+
 func getPrimaryKey(primaryKeys []string, data map[string]interface{}) []interface{} {
 	var res []interface{}
 	for _, col := range primaryKeys {
@@ -133,7 +203,18 @@ func getPrimaryKey(primaryKeys []string, data map[string]interface{}) []interfac
 }
 
 func getTablePrimaryKeySchema(ctx context.Context, c *pgxpool.Pool) (map[string][]string, error) {
-	rows, err := c.Query(ctx, "SELECT t.table_schema, t.table_name, c.column_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.constraint_type = 'PRIMARY KEY' AND t.table_schema != 'pg_catalog' order by t.table_schema, t.table_name, c.ordinal_position;")
+	rows, err := c.Query(ctx, `
+		SELECT t.table_schema, t.table_name, c.column_name
+		FROM information_schema.table_constraints AS t
+		JOIN information_schema.key_column_usage AS c
+		  ON c.constraint_catalog = t.constraint_catalog
+		 AND c.constraint_schema = t.constraint_schema
+		 AND c.constraint_name = t.constraint_name
+		 AND c.table_schema = t.table_schema
+		 AND c.table_name = t.table_name
+		WHERE t.constraint_type = 'PRIMARY KEY'
+		  AND t.table_schema != 'pg_catalog'
+		ORDER BY t.table_schema, t.table_name, c.ordinal_position`)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +228,88 @@ func getTablePrimaryKeySchema(ctx context.Context, c *pgxpool.Pool) (map[string]
 		pkeys[k] = append(pkeys[k], pkRow.ColumnName)
 	}
 	return pkeys, nil
+}
+
+func getTableColumns(ctx context.Context, c *pgxpool.Pool) (map[string]map[string]struct{}, error) {
+	rows, err := c.Query(ctx, `
+		SELECT n.nspname AS table_schema, c.relname AS table_name, a.attname AS column_name
+		FROM pg_catalog.pg_attribute AS a
+		JOIN pg_catalog.pg_class AS c ON c.oid = a.attrelid
+		JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+		WHERE a.attnum > 0
+		  AND NOT a.attisdropped
+		  AND c.relkind IN ('r', 'p')
+		  AND n.nspname != 'pg_catalog'`)
+	if err != nil {
+		return nil, err
+	}
+	columnRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[columnRow])
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]map[string]struct{}{}
+	for _, row := range columnRows {
+		namespace := row.TableSchema + "." + row.TableName
+		if result[namespace] == nil {
+			result[namespace] = map[string]struct{}{}
+		}
+		result[namespace][row.ColumnName] = struct{}{}
+	}
+	return result, nil
+}
+
+func getSinkTableMetadata(ctx context.Context, c *pgxpool.Pool, pkeys map[string][]string) (map[string]sinkTableMetadata, error) {
+	rows, err := c.Query(ctx, `
+		SELECT table_schema,
+		       table_name,
+		       column_name AS name,
+		       udt_name AS database_type,
+		       is_nullable = 'YES' AS nullable,
+		       column_default IS NOT NULL AS has_default,
+		       is_generated <> 'NEVER' AS generated,
+		       is_identity = 'YES' AS identity,
+		       COALESCE(identity_generation, '') AS identity_generation
+		FROM information_schema.columns
+		WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+		ORDER BY table_schema, table_name, ordinal_position`)
+	if err != nil {
+		return nil, err
+	}
+	columnRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[sinkColumnMetadata])
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]sinkTableMetadata{}
+	for _, row := range columnRows {
+		namespace := row.TableSchema + "." + row.TableName
+		metadata := result[namespace]
+		metadata.Columns = append(metadata.Columns, row)
+		metadata.PrimaryKey = pkeys[namespace]
+		result[namespace] = metadata
+	}
+	return result, nil
+}
+
+func idColumnMetadata(columns map[string]map[string]struct{}, pkeys map[string][]string) (map[string]bool, map[string]string) {
+	hasIDColumn := map[string]bool{}
+	idAliases := map[string]string{}
+	for namespace, tableColumns := range columns {
+		if _, exists := tableColumns["_id"]; !exists {
+			continue
+		}
+		hasIDColumn[namespace] = true
+		if slices.Contains(pkeys[namespace], "_id") {
+			continue
+		}
+		for suffix := 2; ; suffix++ {
+			alias := "_id" + strconv.Itoa(suffix)
+			if _, exists := tableColumns[alias]; !exists {
+				idAliases[namespace] = alias
+				break
+			}
+		}
+	}
+	return hasIDColumn, idAliases
 }
 
 func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
@@ -171,14 +334,6 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 
 	afterConnect := func(ctx context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
-
-		// Enable replica mode for sink operations if requested
-		if settings.EnableReplicaMode {
-			if _, err := conn.Exec(ctx, "SET session_replication_role = 'replica'"); err != nil {
-				return fmt.Errorf("failed to set session_replication_role: %w", err)
-			}
-		}
-
 		return nil
 	}
 	config, err := pgxpool.ParseConfig(url)
@@ -193,8 +348,20 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 
 	pkeys, err := getTablePrimaryKeySchema(ctx, c)
 	if err != nil {
+		c.Close()
 		return nil, err
 	}
+	columns, err := getTableColumns(ctx, c)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	sinkMetadata, err := getSinkTableMetadata(ctx, c, pkeys)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	hasIDColumn, idAliases := idColumnMetadata(columns, pkeys)
 
 	// Create BSON registry with decimal support
 	bsonRegistry := NewBSONRegistry()
@@ -204,6 +371,9 @@ func NewConn(ctx context.Context, settings PostgresSettings) (*conn, error) {
 		replicationUrl: rUrl,
 		c:              c,
 		pkeys:          pkeys,
+		sinkMetadata:   sinkMetadata,
+		hasIDColumn:    hasIDColumn,
+		idAliases:      idAliases,
 		settings:       settings,
 		bsonRegistry:   bsonRegistry,
 	}, nil
@@ -214,6 +384,11 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	namespaces := r.Msg.GetNamespaces()
 	if len(namespaces) < 1 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("must specify at least one namespace"))
+	}
+	for _, namespace := range namespaces {
+		if len(c.pkeys[namespace]) == 0 {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+		}
 	}
 
 	var partitions []*adiomv1.Partition
@@ -371,6 +546,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 	partition := r.Msg.GetPartition()
 	namespace := partition.GetNamespace()
 	keys := c.pkeys[namespace]
+	if len(keys) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+	}
 	rawCursor := r.Msg.GetCursor()
 	if rawCursor == nil {
 		rawCursor = partition.GetCursor()
@@ -432,12 +610,9 @@ func (c *conn) ListData(ctx context.Context, r *connect.Request[adiomv1.ListData
 		if i >= limit {
 			break
 		}
-		keys := getPrimaryKey(c.pkeys[namespace], m)
-		_, b, err := toMongoID(c.bsonRegistry, keys)
-		if err != nil {
+		if err := c.prepareSourceDocument(namespace, m); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-		m["_id"] = b
 		marshalled, err := marshalWithRegistry(c.bsonRegistry, m)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
@@ -503,16 +678,68 @@ func toMongoID(reg *bson.Registry, in []interface{}) ([]*adiomv1.BsonValue, inte
 	}}, b, nil
 }
 
-func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
-	ns := update.Namespace + "." + update.TableName
-	primaryKeys := c.pkeys[ns]
-	switch update.Type {
-	case pglib.UpdateTypeInsert:
-		keys, b, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.New))
+func toNamedID(reg *bson.Registry, names []string, values map[string]interface{}) ([]*adiomv1.BsonValue, error) {
+	result := make([]*adiomv1.BsonValue, 0, len(names))
+	for _, name := range names {
+		typ, data, err := marshalValueWithRegistry(reg, values[name])
 		if err != nil {
 			return nil, err
 		}
-		update.New["_id"] = b
+		result = append(result, &adiomv1.BsonValue{Name: name, Type: uint32(typ), Data: data})
+	}
+	return result, nil
+}
+
+func idLast(primaryKeys []string) []string {
+	result := make([]string, 0, len(primaryKeys))
+	for _, key := range primaryKeys {
+		if key != "_id" {
+			result = append(result, key)
+		}
+	}
+	if slices.Contains(primaryKeys, "_id") {
+		result = append(result, "_id")
+	}
+	return result
+}
+
+func (c *conn) sourceUpdateID(namespace string, values map[string]interface{}) ([]*adiomv1.BsonValue, error) {
+	primaryKeys := c.pkeys[namespace]
+	if c.hasIDColumn[namespace] && slices.Contains(primaryKeys, "_id") {
+		return toNamedID(c.bsonRegistry, idLast(primaryKeys), values)
+	}
+	keys, _, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, values))
+	return keys, err
+}
+
+func (c *conn) prepareSourceDocument(namespace string, values map[string]interface{}) error {
+	primaryKeys := c.pkeys[namespace]
+	if alias := c.idAliases[namespace]; alias != "" {
+		values[alias] = values["_id"]
+		delete(values, "_id")
+	}
+	if c.hasIDColumn[namespace] && slices.Contains(primaryKeys, "_id") {
+		return nil
+	}
+	_, id, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, values))
+	if err != nil {
+		return err
+	}
+	values["_id"] = id
+	return nil
+}
+
+func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
+	ns := update.Namespace + "." + update.TableName
+	switch update.Type {
+	case pglib.UpdateTypeInsert:
+		keys, err := c.sourceUpdateID(ns, update.New)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.prepareSourceDocument(ns, update.New); err != nil {
+			return nil, err
+		}
 		marshalled, err := marshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
@@ -523,13 +750,13 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 			Data: marshalled,
 		}, nil
 	case pglib.UpdateTypeUpdate:
-		// Actually we'll ignore "old" and just accept breaking behavior
-		// since in the mongo format you can't edit the _id
-		keys, b, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.New))
+		keys, err := c.sourceUpdateID(ns, update.New)
 		if err != nil {
 			return nil, err
 		}
-		update.New["_id"] = b
+		if err := c.prepareSourceDocument(ns, update.New); err != nil {
+			return nil, err
+		}
 		marshalled, err := marshalWithRegistry(c.bsonRegistry, update.New)
 		if err != nil {
 			return nil, err
@@ -540,7 +767,7 @@ func (c *conn) toBsonAdiomUpdate(update pglib.Update) (*adiomv1.Update, error) {
 			Data: marshalled,
 		}, nil
 	case pglib.UpdateTypeDelete:
-		keys, _, err := toMongoID(c.bsonRegistry, getPrimaryKey(primaryKeys, update.Old))
+		keys, err := c.sourceUpdateID(ns, update.Old)
 		if err != nil {
 			return nil, err
 		}
@@ -578,7 +805,7 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 	maxBatchSize := c.settings.StreamMaxBatchSize
 	maxBatchWait := c.settings.StreamMaxBatchWait
 
-	ch := make(chan []pglib.Update, 10)
+	ch := make(chan pglib.UpdateBatch, 10)
 	eg.Go(func() error {
 		defer close(ch)
 		return cs.Run(ctx, ch)
@@ -615,11 +842,11 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 			select {
 			case <-ctx.Done():
 				return nil
-			case updates, ok := <-ch:
+			case updateBatch, ok := <-ch:
 				if !ok {
 					return nil
 				}
-				for _, update := range updates {
+				for _, update := range updateBatch.Updates {
 					up, err := c.toBsonAdiomUpdate(update)
 					if err != nil {
 						return err
@@ -633,7 +860,7 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 					}
 					batch = append(batch, up)
 				}
-				lastSafeLSN = updates[len(updates)-1].LSN
+				lastSafeLSN = max(lastSafeLSN, updateBatch.LSN)
 				if maxBatchSize > 0 && len(batch) > maxBatchSize {
 					if err := send(); err != nil {
 						return err
@@ -655,8 +882,107 @@ func (c *conn) StreamUpdates(ctx context.Context, req *connect.Request[adiomv1.S
 	return nil
 }
 
-// buildUpsertQuery creates an INSERT ... ON CONFLICT ... DO UPDATE query for postgres
-func buildUpsertQuery(namespace string, pkeys []string, columns []string) string {
+type postgresWriteOperation struct {
+	delete           bool
+	overrideIdentity bool
+	columns          []string
+	defaultColumns   []string
+	values           []interface{}
+	requestIndex     int
+	data             map[string]interface{}
+}
+
+func (c *conn) sinkTable(namespace string) (sinkTableMetadata, error) {
+	metadata, ok := c.sinkMetadata[namespace]
+	if !ok || len(metadata.Columns) == 0 {
+		return sinkTableMetadata{}, fmt.Errorf("namespace %s was not found or has no visible columns", namespace)
+	}
+	if len(metadata.PrimaryKey) == 0 {
+		return sinkTableMetadata{}, fmt.Errorf("no primary key found for namespace %s", namespace)
+	}
+	return metadata, nil
+}
+
+func planPostgresUpsert(metadata sinkTableMetadata, document map[string]interface{}, requestIndex int) (postgresWriteOperation, error) {
+	columnsByName := make(map[string]sinkColumnMetadata, len(metadata.Columns))
+	for _, column := range metadata.Columns {
+		columnsByName[column.Name] = column
+	}
+	for name := range document {
+		if _, ok := columnsByName[name]; !ok {
+			return postgresWriteOperation{}, fmt.Errorf("column %q does not exist in destination table", name)
+		}
+	}
+
+	columns := make([]string, 0, len(metadata.Columns))
+	values := make([]interface{}, 0, len(metadata.Columns))
+	defaultColumns := make([]string, 0, len(metadata.Columns))
+	for _, key := range metadata.PrimaryKey {
+		column, ok := columnsByName[key]
+		if !ok {
+			return postgresWriteOperation{}, fmt.Errorf("primary key field %q is not present in table metadata", key)
+		}
+		if column.Generated && !column.Identity {
+			return postgresWriteOperation{}, fmt.Errorf("generated primary key field %q cannot be written explicitly", key)
+		}
+		value, exists := document[key]
+		if !exists || value == nil {
+			return postgresWriteOperation{}, fmt.Errorf("document is missing non-null key field %q", key)
+		}
+		columns = append(columns, key)
+		values = append(values, value)
+	}
+
+	for _, column := range metadata.Columns {
+		if slices.Contains(metadata.PrimaryKey, column.Name) {
+			continue
+		}
+		if column.Generated || column.Identity {
+			if _, exists := document[column.Name]; exists {
+				return postgresWriteOperation{}, fmt.Errorf("column %q is generated by the destination and cannot be supplied", column.Name)
+			}
+			continue
+		}
+		value, exists := document[column.Name]
+		if exists {
+			if value == nil && !column.Nullable {
+				return postgresWriteOperation{}, fmt.Errorf("column %q is required and cannot be null", column.Name)
+			}
+			columns = append(columns, column.Name)
+			values = append(values, value)
+			continue
+		}
+		if column.HasDefault {
+			defaultColumns = append(defaultColumns, column.Name)
+			continue
+		}
+		if !column.Nullable {
+			return postgresWriteOperation{}, fmt.Errorf("document is missing required column %q", column.Name)
+		}
+		columns = append(columns, column.Name)
+		values = append(values, nil)
+	}
+
+	overrideIdentity := false
+	for _, key := range metadata.PrimaryKey {
+		column := columnsByName[key]
+		if column.Identity && strings.EqualFold(column.IdentityGeneration, "ALWAYS") {
+			overrideIdentity = true
+			break
+		}
+	}
+	return postgresWriteOperation{
+		overrideIdentity: overrideIdentity,
+		columns:          columns,
+		defaultColumns:   defaultColumns,
+		values:           values,
+		requestIndex:     requestIndex,
+		data:             document,
+	}, nil
+}
+
+// buildUpsertQuery creates an INSERT ... ON CONFLICT ... DO UPDATE query for postgres.
+func buildUpsertQuery(namespace string, pkeys, columns, defaultColumns []string, overrideIdentity bool) string {
 	sanitizedNamespace := SanitizeNamespace(namespace)
 
 	// Build column list
@@ -680,140 +1006,140 @@ func buildUpsertQuery(namespace string, pkeys []string, columns []string) string
 	}
 	conflictTarget := strings.Join(sanitizedPKeys, ", ")
 
-	// Build UPDATE SET clause (exclude primary keys)
+	// Build UPDATE SET clause (exclude primary keys).
 	var updateSet []string
 	for _, col := range columns {
-		// Skip primary key columns in the UPDATE clause
 		if !slices.Contains(pkeys, col) {
 			sanitizedCol := pgx.Identifier([]string{col}).Sanitize()
 			updateSet = append(updateSet, fmt.Sprintf("%s = EXCLUDED.%s", sanitizedCol, sanitizedCol))
 		}
 	}
+	for _, col := range defaultColumns {
+		updateSet = append(updateSet, fmt.Sprintf("%s = DEFAULT", pgx.Identifier([]string{col}).Sanitize()))
+	}
 
-	// If all columns are primary keys, just use DO NOTHING
+	identityClause := ""
+	if overrideIdentity {
+		identityClause = " OVERRIDING SYSTEM VALUE"
+	}
+
 	if len(updateSet) == 0 {
 		return fmt.Sprintf(
-			"INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO NOTHING",
-			sanitizedNamespace, columnList, valuesPlaceholder, conflictTarget,
+			"INSERT INTO %s (%s)%s VALUES %s ON CONFLICT (%s) DO NOTHING",
+			sanitizedNamespace, columnList, identityClause, valuesPlaceholder, conflictTarget,
 		)
 	}
 
 	return fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s",
-		sanitizedNamespace, columnList, valuesPlaceholder, conflictTarget, strings.Join(updateSet, ", "),
+		"INSERT INTO %s (%s)%s VALUES %s ON CONFLICT (%s) DO UPDATE SET %s",
+		sanitizedNamespace, columnList, identityClause, valuesPlaceholder, conflictTarget, strings.Join(updateSet, ", "),
 	)
+}
+
+func buildDeleteQuery(namespace string, pkeys []string) string {
+	whereClauses := make([]string, 0, len(pkeys))
+	for i, pk := range pkeys {
+		whereClauses = append(whereClauses, fmt.Sprintf("%s = $%d", pgx.Identifier([]string{pk}).Sanitize(), i+1))
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s", SanitizeNamespace(namespace), strings.Join(whereClauses, " AND "))
+}
+
+func (c *conn) executePostgresWrites(ctx context.Context, namespace string, pkeys []string, operations []postgresWriteOperation) error {
+	if len(operations) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, operation := range operations {
+		if operation.delete {
+			batch.Queue(buildDeleteQuery(namespace, pkeys), operation.values...)
+			continue
+		}
+		batch.Queue(buildUpsertQuery(namespace, pkeys, operation.columns, operation.defaultColumns, operation.overrideIdentity), operation.values...)
+	}
+	return c.sendSinkBatch(ctx, batch, len(operations), func(i int, err error) {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		operation := operations[i]
+		slog.Error("Failed to execute PostgreSQL sink operation", "index", operation.requestIndex, "error", err)
+		if operation.delete {
+			slog.Debug("Failed delete operation", "pkValues", operation.values)
+			return
+		}
+		for key, value := range operation.data {
+			slog.Debug("Operation field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
+		}
+	})
 }
 
 // WriteData implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteData(ctx context.Context, r *connect.Request[adiomv1.WriteDataRequest]) (*connect.Response[adiomv1.WriteDataResponse], error) {
+	if r.Msg.GetPartialWriteResults() {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partial write results are not supported by postgres"))
+	}
 	namespace := r.Msg.GetNamespace()
-	pkeys := c.pkeys[namespace]
-	if len(pkeys) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+	metadata, err := c.sinkTable(namespace)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	// Convert BSON documents to maps and collect all column names
-	var documents []map[string]interface{}
-	columnSet := make(map[string]bool)
-
-	for _, data := range r.Msg.GetData() {
-		m, err := bsonToMap(c.bsonRegistry, data)
+	operations := make([]postgresWriteOperation, 0, len(r.Msg.GetData()))
+	for i, data := range r.Msg.GetData() {
+		document, err := bsonToMap(c.bsonRegistry, data, c.hasIDColumn[namespace])
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to unmarshal BSON document: %v", err))
+				slog.Error("Failed to unmarshal BSON document", "index", i, "error", err)
 			}
-			return nil, connect.NewError(connect.CodeInternal, err)
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("decode document %d: %w", i, err))
 		}
-		documents = append(documents, m)
-		for col := range m {
-			columnSet[col] = true
-		}
-	}
-
-	// Build ordered column list (primary keys first for consistency)
-	//NOTE: for efficiency, we assume that all documents have the same set of columns
-	var columns []string
-	for _, pk := range pkeys {
-		if columnSet[pk] {
-			columns = append(columns, pk)
-		}
-	}
-	for col := range columnSet {
-		if !slices.Contains(pkeys, col) {
-			columns = append(columns, col)
-		}
-	}
-
-	if len(columns) == 0 {
-		return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
-	}
-
-	// Build upsert query
-	query := buildUpsertQuery(namespace, pkeys, columns)
-
-	// Use pgx batch for efficient bulk inserts
-	batch := &pgx.Batch{}
-	for _, doc := range documents {
-		var values []interface{}
-		for _, col := range columns {
-			values = append(values, doc[col])
-		}
-		batch.Queue(query, values...)
-	}
-
-	// Execute batch
-	br := c.c.SendBatch(ctx, batch)
-	defer br.Close()
-
-	// Process results
-	for i := 0; i < len(documents); i++ {
-		_, err := br.Exec()
+		operation, err := planPostgresUpsert(metadata, document, i)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to insert document %d: %v", i, err))
-				for key, value := range documents[i] {
-					slog.Debug("Document field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
-				}
-			}
-			return nil, connect.NewError(connect.CodeInternal, err)
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("document %d: %w", i, err))
 		}
+		operations = append(operations, operation)
+	}
+	if err := c.executePostgresWrites(ctx, namespace, metadata.PrimaryKey, operations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
-// dataIdIndex tracks the index of an update for deduplication
-type dataIdIndex struct {
-	dataId []byte
-	index  int
-}
-
-// addToIdIndexMap adds or updates an entry in the deduplication map
-func addToIdIndexMap(m map[int][]*dataIdIndex, update *adiomv1.Update) (*dataIdIndex, bool) {
-	hasher := xxhash.New()
-	_, _ = hasher.Write(update.GetId()[0].GetData())
-	h := int(hasher.Sum64())
-	items, found := m[h]
-	if found {
-		for _, item := range items {
-			if slices.Equal(item.dataId, update.GetId()[0].GetData()) {
-				return item, false
+// fromMongoID extracts the original primary key values from BSON ID
+func fromMongoID(reg *bson.Registry, id []*adiomv1.BsonValue, primaryKeys []string) ([]interface{}, error) {
+	if len(id) == 0 {
+		return nil, fmt.Errorf("expected at least one ID value")
+	}
+	if len(id) > 1 {
+		parts := make(map[string]*adiomv1.BsonValue, len(id))
+		for _, part := range id {
+			if part.GetName() != "" {
+				parts[part.GetName()] = part
 			}
 		}
-	}
-	item := &dataIdIndex{update.GetId()[0].GetData(), -1}
-	m[h] = append(items, item)
-	return item, true
-}
-
-// fromMongoID extracts the original primary key values from BSON ID
-func fromMongoID(id []*adiomv1.BsonValue) ([]interface{}, error) {
-	if len(id) != 1 {
-		return nil, fmt.Errorf("expected exactly one ID value")
+		values := make([]interface{}, 0, len(primaryKeys))
+		for _, primaryKey := range primaryKeys {
+			part, ok := parts[primaryKey]
+			if !ok {
+				return nil, fmt.Errorf("ID is missing primary key field %q", primaryKey)
+			}
+			var value interface{}
+			rawValue := bson.RawValue{Type: bson.Type(part.GetType()), Value: part.GetData()}
+			if err := rawValue.UnmarshalWithRegistry(reg, &value); err != nil {
+				return nil, err
+			}
+			value, err := bsonValueForPostgres(primaryKey, value)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, value)
+		}
+		return values, nil
 	}
 
 	var value interface{}
-	if err := bson.UnmarshalValue(bson.Type(id[0].GetType()), id[0].GetData(), &value); err != nil {
+	rawValue := bson.RawValue{Type: bson.Type(id[0].GetType()), Value: id[0].GetData()}
+	if err := rawValue.UnmarshalWithRegistry(reg, &value); err != nil {
 		return nil, err
 	}
 
@@ -822,144 +1148,76 @@ func fromMongoID(id []*adiomv1.BsonValue) ([]interface{}, error) {
 		var compositeKey []interface{}
 		br := bytes.NewReader(b.Data)
 		dec := gob.NewDecoder(br)
-		if err := dec.Decode(&compositeKey); err != nil {
-			return nil, err
+		if err := dec.Decode(&compositeKey); err == nil {
+			return compositeKey, nil
 		}
-		return compositeKey, nil
+		// Generic BSON binary is also how a scalar bytea key is represented.
+		// Legacy composite IDs are gob-encoded, so only treat the value as a
+		// composite when gob decoding succeeds.
+		value = b.Data
 	}
 
 	// Single key
+	value, err := bsonValueForPostgres(primaryKeys[0], value)
+	if err != nil {
+		return nil, err
+	}
 	return []interface{}{value}, nil
 }
 
 // WriteUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) WriteUpdates(ctx context.Context, r *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
+	if r.Msg.GetPartialWriteResults() {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partial write results are not supported by postgres"))
+	}
 	namespace := r.Msg.GetNamespace()
-	pkeys := c.pkeys[namespace]
-	if len(pkeys) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("no primary key found for namespace %s", namespace))
+	metadata, err := c.sinkTable(namespace)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-
-	// Deduplication map to ensure each document is only updated once
-	hashToDataIdIndex := map[int][]*dataIdIndex{}
-
-	// We'll store operations as either insert/update or delete
-	type operation struct {
-		isDelete bool
-		pkValues []interface{}
-		data     map[string]interface{}
-	}
-	var operations []operation
-
-	// Process updates with deduplication
 	for _, update := range r.Msg.GetUpdates() {
-		dii, isNew := addToIdIndexMap(hashToDataIdIndex, update)
+		if update.GetType() == adiomv1.UpdateType_UPDATE_TYPE_PARTIAL_UPDATE {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("partial updates are not supported by postgres"))
+		}
+	}
 
-		pkValues, err := fromMongoID(update.GetId())
+	operations := make([]postgresWriteOperation, 0, len(r.Msg.GetUpdates()))
+	for i, update := range r.Msg.GetUpdates() {
+		if update.GetType() == adiomv1.UpdateType_UPDATE_TYPE_UNKNOWN {
+			continue
+		}
+		pkValues, err := fromMongoID(c.bsonRegistry, update.GetId(), metadata.PrimaryKey)
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to extract primary key: %w", err))
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: failed to extract primary key: %w", i, err))
 		}
-
-		if len(pkValues) != len(pkeys) {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("primary key length mismatch: expected %d, got %d", len(pkeys), len(pkValues)))
+		if len(pkValues) != len(metadata.PrimaryKey) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: primary key length mismatch: expected %d, got %d", i, len(metadata.PrimaryKey), len(pkValues)))
 		}
-
-		var op operation
 		switch update.GetType() {
 		case adiomv1.UpdateType_UPDATE_TYPE_INSERT, adiomv1.UpdateType_UPDATE_TYPE_UPDATE:
-			data, err := bsonToMap(c.bsonRegistry, update.GetData())
+			document, err := bsonToMap(c.bsonRegistry, update.GetData(), c.hasIDColumn[namespace])
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
-					slog.Error(fmt.Sprintf("Failed to unmarshal BSON document: %v", err))
+					slog.Error("Failed to unmarshal BSON update", "index", i, "error", err)
 				}
-				return nil, connect.NewError(connect.CodeInternal, err)
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("decode update %d: %w", i, err))
 			}
-			op = operation{
-				isDelete: false,
-				pkValues: pkValues,
-				data:     data,
+			for keyIndex, key := range metadata.PrimaryKey {
+				document[key] = pkValues[keyIndex]
 			}
+			operation, err := planPostgresUpsert(metadata, document, i)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: %w", i, err))
+			}
+			operations = append(operations, operation)
 		case adiomv1.UpdateType_UPDATE_TYPE_DELETE:
-			op = operation{
-				isDelete: true,
-				pkValues: pkValues,
-			}
+			operations = append(operations, postgresWriteOperation{delete: true, values: pkValues, requestIndex: i})
 		default:
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unsupported update type: %v", update.GetType()))
-		}
-
-		if isNew {
-			dii.index = len(operations)
-			operations = append(operations, op)
-		} else {
-			// Replace the existing operation
-			operations[dii.index] = op
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("update %d: unsupported update type: %v", i, update.GetType()))
 		}
 	}
-
-	// Build and execute batched operations
-	batch := &pgx.Batch{}
-	sanitizedNamespace := SanitizeNamespace(namespace)
-
-	for _, op := range operations {
-		if op.isDelete {
-			// Build DELETE query
-			var whereClauses []string
-			for i, pk := range pkeys {
-				sanitizedPk := pgx.Identifier([]string{pk}).Sanitize()
-				whereClauses = append(whereClauses, fmt.Sprintf("%s = $%d", sanitizedPk, i+1))
-			}
-			deleteQuery := fmt.Sprintf(
-				"DELETE FROM %s WHERE %s",
-				sanitizedNamespace, strings.Join(whereClauses, " AND "),
-			)
-			batch.Queue(deleteQuery, op.pkValues...)
-		} else {
-			// Build column list and values for INSERT/UPDATE
-			var columns []string
-			var values []interface{}
-
-			// Add primary keys first
-			for i, pk := range pkeys {
-				columns = append(columns, pk)
-				values = append(values, op.pkValues[i])
-			}
-
-			// Add other columns
-			for col, val := range op.data {
-				if !slices.Contains(pkeys, col) {
-					columns = append(columns, col)
-					values = append(values, val)
-				}
-			}
-
-			// Build upsert query
-			upsertQuery := buildUpsertQuery(namespace, pkeys, columns)
-			batch.Queue(upsertQuery, values...)
-		}
-	}
-
-	// Execute batch
-	br := c.c.SendBatch(ctx, batch)
-	defer br.Close()
-
-	// Process results
-	for i := 0; i < len(operations); i++ {
-		_, err := br.Exec()
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				slog.Error(fmt.Sprintf("Failed to execute update %d: %v", i, err))
-				if operations[i].isDelete {
-					slog.Debug("Failed delete operation", "pkValues", operations[i].pkValues)
-				} else {
-					slog.Debug("Failed insert/update operation")
-					for key, value := range operations[i].data {
-						slog.Debug("Operation field", "key", key, "value", value, "type", fmt.Sprintf("%T", value))
-					}
-				}
-			}
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
+	if err := c.executePostgresWrites(ctx, namespace, metadata.PrimaryKey, operations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteUpdatesResponse{}), nil
