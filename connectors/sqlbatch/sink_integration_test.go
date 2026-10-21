@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/adiom-data/dsync/connectors/sqlbatch/dialects"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
+	"github.com/microsoft/go-mssqldb/msdsn"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -244,6 +245,11 @@ func TestSQLServerSinkLive(t *testing.T) {
 	if connectionURL == "" {
 		t.Skip("SQLSERVER_TEST_URL is not set")
 	}
+	dsn, err := msdsn.Parse(connectionURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dialect := dialects.SQLServer{GuidConversion: dsn.Encoding.GuidConversion}
 	ctx := context.Background()
 	db, err := sql.Open("sqlserver", connectionURL)
 	if err != nil {
@@ -269,7 +275,7 @@ func TestSQLServerSinkLive(t *testing.T) {
 		}
 	}
 
-	c := &conn{c: db, dialect: dialects.SQLServer{}}
+	c := &conn{c: db, dialect: dialect}
 	if _, err := c.WriteData(ctx, connect.NewRequest(&adiomv1.WriteDataRequest{
 		Namespace: "dbo.sqlbatch_live_items",
 		Data: [][]byte{

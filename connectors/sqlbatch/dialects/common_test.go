@@ -50,16 +50,27 @@ func TestTemporalValuesRejectNonRFC3339(t *testing.T) {
 }
 
 func TestSQLServerUniqueIdentifierFromBinaryValue(t *testing.T) {
-	got, err := (dialects.SQLServer{}).ConvertJSONValue(
-		dialects.ColumnMetadata{Name: "id", DatabaseType: "uniqueidentifier"},
-		[]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := mssql.UniqueIdentifier{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
-	if got != want {
-		t.Fatalf("uniqueidentifier = %#v, want %#v", got, want)
+	data := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	for _, test := range []struct {
+		name           string
+		guidConversion bool
+		want           mssql.UniqueIdentifier
+	}{
+		{name: "disabled", want: mssql.UniqueIdentifier{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}},
+		{name: "enabled", guidConversion: true, want: mssql.UniqueIdentifier{3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := (dialects.SQLServer{GuidConversion: test.guidConversion}).ConvertJSONValue(
+				dialects.ColumnMetadata{Name: "id", DatabaseType: "uniqueidentifier"},
+				data,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Fatalf("uniqueidentifier = %#v, want %#v", got, test.want)
+			}
+		})
 	}
 }
 

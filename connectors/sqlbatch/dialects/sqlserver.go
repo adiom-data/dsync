@@ -94,7 +94,7 @@ func (d SQLServer) InspectTable(ctx context.Context, db *sql.DB, namespace strin
 	return ScanTableMetadata(rows)
 }
 
-func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error) {
+func (d SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error) {
 	if sqlServerExactNumericType(column.DatabaseType) {
 		var err error
 		value, err = normalizeExactNumericExponent(value)
@@ -117,7 +117,17 @@ func (SQLServer) ConvertJSONValue(column ColumnMetadata, value any) (any, error)
 				return nil, fmt.Errorf("uniqueidentifier column %q has %d bytes, expected 16", column.Name, len(data))
 			}
 			var identifier mssql.UniqueIdentifier
-			copy(identifier[:], data)
+			if d.GuidConversion {
+				// UniqueIdentifier.Value converts canonical bytes to TDS byte order,
+				// while the driver's GUID conversion converts them once more. Scan
+				// here so those two conversions cancel and the server receives the
+				// same UUID represented by the BSON subtype 4 bytes.
+				if err := identifier.Scan(data); err != nil {
+					return nil, fmt.Errorf("convert uniqueidentifier column %q: %w", column.Name, err)
+				}
+			} else {
+				copy(identifier[:], data)
+			}
 			value = identifier
 		}
 	}
