@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,15 +56,59 @@ type conn struct {
 	forceDelete chan struct{} // Used for testing only
 }
 
-func encodeResumeToken(epoch int64, token []byte) []byte {
-	res, _ := bson.Marshal(bson.M{"a": epoch, "b": token})
-	return res
+func encodeResumeToken(epoch int64, token []byte) ([]byte, error) {
+	return bson.Marshal(struct {
+		Epoch int64       `bson:"a"`
+		Token bson.Binary `bson:"b"`
+	}{
+		Epoch: epoch,
+		Token: bson.Binary{Data: token},
+	})
 }
 
-func decodeResumeToken(input []byte) (int64, []byte) {
-	var s bson.M
-	_ = bson.Unmarshal(input, &s)
-	return s["a"].(int64), s["b"].(bson.Binary).Data
+func decodeResumeToken(input []byte) (int64, []byte, error) {
+	raw := bson.Raw(input)
+	if err := raw.Validate(); err != nil {
+		return 0, nil, fmt.Errorf("invalid resume cursor BSON: %w", err)
+	}
+
+	epochValue, err := raw.LookupErr("a")
+	if err != nil {
+		return 0, nil, fmt.Errorf("resume cursor is missing epoch: %w", err)
+	}
+	epoch, ok := epochValue.Int64OK()
+	if epoch32, isInt32 := epochValue.Int32OK(); isInt32 {
+		epoch, ok = int64(epoch32), true
+	}
+	if !ok || epoch < 0 || epoch > math.MaxUint32 {
+		return 0, nil, fmt.Errorf("resume cursor epoch must be an integer between 0 and %d", uint64(math.MaxUint32))
+	}
+
+	tokenValue, err := raw.LookupErr("b")
+	if err != nil {
+		return 0, nil, fmt.Errorf("resume cursor is missing token map: %w", err)
+	}
+	_, token, ok := tokenValue.BinaryOK()
+	if !ok {
+		// Older versions encoded an empty []byte as BSON null. Accept that one
+		// representation so persisted empty-token cursors remain resumable.
+		if tokenValue.Type == bson.TypeNull {
+			return epoch, []byte{}, nil
+		}
+		return 0, nil, fmt.Errorf("resume cursor token map must be BSON binary")
+	}
+	return epoch, token, nil
+}
+
+// Missing namespace tokens intentionally fall back to the plan timestamp.
+// The epoch is validated by decodeResumeToken before reaching this helper.
+func resumeChangeStreamOptions(epoch int64, token bson.Raw) *moptions.ChangeStreamOptionsBuilder {
+	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
+	if token != nil {
+		return opts.SetResumeAfter(token)
+	}
+	ts := bson.Timestamp{T: uint32(epoch)}
+	return opts.SetStartAtOperationTime(&ts)
 }
 
 // GeneratePlan implements adiomv1connect.ConnectorServiceHandler.
@@ -129,6 +174,8 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 
 	//create resume token for each task
 	wg := sync.WaitGroup{}
+	var cleanupErr error
+	var cleanupErrOnce sync.Once
 	for _, nsTask := range nsTasks {
 		wg.Add(1)
 		go func(ns iface.Namespace) {
@@ -137,12 +184,18 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 			resumeToken, err := getLatestResumeToken(ctx, c.client, loc, c.connectorSettings.WithDelete)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Failed to get latest resume token for namespace %v: %v", ns, err))
+				if errors.Is(err, errDummyRecordCleanup) {
+					cleanupErrOnce.Do(func() { cleanupErr = err })
+				}
 				return
 			}
 			tokenMap.AddToken(loc, resumeToken)
 		}(nsTask)
 	}
 	wg.Wait()
+	if cleanupErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, cleanupErr)
+	}
 	slog.Debug(fmt.Sprintf("Read Plan Resume token map: %v", tokenMap.Map))
 	//serialize the resume token map
 	resumeToken, err := tokenMap.encodeMap()
@@ -152,7 +205,10 @@ func (c *conn) GeneratePlan(ctx context.Context, r *connect.Request[adiomv1.Gene
 	}
 
 	epoch := time.Now().Unix()
-	encodedResumeToken := encodeResumeToken(epoch, resumeToken)
+	encodedResumeToken, err := encodeResumeToken(epoch, resumeToken)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to encode resume cursor: %w", err))
+	}
 
 	return connect.NewResponse(&adiomv1.GeneratePlanResponse{
 		Partitions:        partitions,
@@ -171,11 +227,14 @@ func (c *conn) GetInfo(ctx context.Context, r *connect.Request[adiomv1.GetInfoRe
 // StreamLSN implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamLSNRequest], s *connect.ServerStream[adiomv1.StreamLSNResponse]) error {
 	tokenMap := NewTokenMap()
-	readPlanStartAt, resumeToken := decodeResumeToken(r.Msg.GetCursor())
-	err := tokenMap.decodeMap(resumeToken)
+	readPlanStartAt, resumeToken, err := decodeResumeToken(r.Msg.GetCursor())
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	err = tokenMap.decodeMap(resumeToken)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
-		return connect.NewError(connect.CodeInternal, err)
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", tokenMap.Map))
 
@@ -194,6 +253,19 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 
 	var sendMutex sync.Mutex
 	var wg sync.WaitGroup
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := make(chan error, len(namespaces))
+	reportError := func(err error) {
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		select {
+		case errCh <- err:
+			cancel()
+		default:
+		}
+	}
 	lsnTracker := NewMultiNsLSNTracker()
 	for _, namespace := range namespaces {
 		ns := iface.Namespace{Db: namespace.Db, Col: namespace.Col}
@@ -204,54 +276,54 @@ func (c *conn) StreamLSN(ctx context.Context, r *connect.Request[adiomv1.StreamL
 			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
 			slog.Info(fmt.Sprintf("Connector %s is starting to track LSN for namespace %s", loc.Database, loc.Collection))
 
-			token, err := tokenMap.GetToken(loc)
+			token, _ := tokenMap.GetToken(loc) // Missing tokens intentionally use the plan timestamp below.
+			opts := resumeChangeStreamOptions(readPlanStartAt, token)
+			changeStream, err := createChangeStream(streamCtx, c.client, loc, opts, c.connectorSettings.WithDelete)
 			if err != nil {
-				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
-			}
-			var opts *moptions.ChangeStreamOptionsBuilder
-			if token != nil {
-				//set the change stream options to start from the resume token
-				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
-			} else { //we need to start from the read plan creation time to be safe
-				// create timestamp from read plan start time
-				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
-				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
-				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
-			}
-			changeStream, err := createChangeStream(ctx, c.client, loc, opts, c.connectorSettings.WithDelete)
-			if err != nil {
-				if errors.Is(ctx.Err(), context.Canceled) {
-					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))
-				} else {
-					slog.Error(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v", loc.Database, loc.Collection, err))
-				}
+				reportError(fmt.Errorf("failed to create LSN change stream for %s.%s: %w", loc.Database, loc.Collection, err))
 				return
 			}
-			defer changeStream.Close(ctx)
+			defer changeStream.Close(streamCtx)
 
-			for changeStream.Next(ctx) {
+			for changeStream.Next(streamCtx) {
 				lsnTracker.IncrementLSN(ns)
 
 				if changeStream.RemainingBatchLength() == 0 {
 					tokenMap.AddToken(loc, changeStream.ResumeToken())
-					encodedToken, _ := tokenMap.encodeMap()
+					encodedToken, err := tokenMap.encodeMap()
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode LSN token map: %w", err))
+						return
+					}
+					nextCursor, err := encodeResumeToken(readPlanStartAt, encodedToken)
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode LSN cursor: %w", err))
+						return
+					}
 					sendMutex.Lock()
-					_ = s.Send(&adiomv1.StreamLSNResponse{
+					err = s.Send(&adiomv1.StreamLSNResponse{
 						Lsn:        uint64(lsnTracker.GetGlobalLSN()) + c.deletesCount.Load(),
-						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?,
+						NextCursor: nextCursor,
 					})
 					sendMutex.Unlock()
+					if err != nil {
+						reportError(fmt.Errorf("failed to send LSN update: %w", err))
+						return
+					}
 				}
 			}
-			if changeStream.Err() != nil {
-				if !errors.Is(changeStream.Err(), context.Canceled) {
-					slog.Error(fmt.Sprintf("Change stream error: %v", changeStream.Err()))
-				}
+			if err := changeStream.Err(); err != nil {
+				reportError(fmt.Errorf("LSN change stream for %s.%s failed: %w", loc.Database, loc.Collection, err))
 			}
 		}()
 	}
 
 	wg.Wait()
+	select {
+	case err := <-errCh:
+		return connect.NewError(connect.CodeInternal, err)
+	default:
+	}
 	return nil
 }
 
@@ -345,11 +417,14 @@ func checkForDeletes(ctx context.Context, client *mongo.Client, witnessClient *m
 // StreamUpdates implements adiomv1connect.ConnectorServiceHandler.
 func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.StreamUpdatesRequest], s *connect.ServerStream[adiomv1.StreamUpdatesResponse]) error {
 	tokenMap := NewTokenMap()
-	readPlanStartAt, resumeToken := decodeResumeToken(r.Msg.GetCursor())
-	err := tokenMap.decodeMap(resumeToken)
+	readPlanStartAt, resumeToken, err := decodeResumeToken(r.Msg.GetCursor())
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	err = tokenMap.decodeMap(resumeToken)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Failed to deserialize the resume token map: %v", err))
-		return connect.NewError(connect.CodeInternal, err)
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	slog.Debug(fmt.Sprintf("Initial Deserialized resume token map: %v", tokenMap.Map))
 
@@ -367,6 +442,19 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 	}
 
 	var sendMutex sync.Mutex
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := make(chan error, len(namespaces)+1)
+	reportError := func(err error) {
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		select {
+		case errCh <- err:
+			cancel()
+		default:
+		}
+	}
 
 	if c.connectorSettings.EmulateDeletes {
 		var nss []iface.Namespace
@@ -380,22 +468,32 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			runDelete := func() {
 				// check for deletes
 				slog.Debug("Checking for deletes")
-				updatesMap := checkForDeletes(ctx, c.client, c.witnessMongoClient, nss)
+				updatesMap := checkForDeletes(streamCtx, c.client, c.witnessMongoClient, nss)
 				for loc, updates := range updatesMap {
 					c.deletesCount.Add(uint64(len(updates)))
-					encodedToken, _ := tokenMap.encodeMap()
+					encodedToken, err := tokenMap.encodeMap()
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode emulated-delete token map: %w", err))
+						return
+					}
+					nextCursor, err := encodeResumeToken(readPlanStartAt, encodedToken)
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode emulated-delete cursor: %w", err))
+						return
+					}
 					sendMutex.Lock()
-					err := s.Send(&adiomv1.StreamUpdatesResponse{
+					err = s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
 						Namespace:  fmt.Sprintf("%v.%v", loc.Database, loc.Collection),
-						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken),
+						NextCursor: nextCursor,
 					})
 					sendMutex.Unlock()
 					if err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
 						}
-						slog.Error(fmt.Sprintf("failed to send updates: %v", err))
+						reportError(fmt.Errorf("failed to send emulated deletes: %w", err))
+						return
 					}
 				}
 				ticker.Reset(c.connectorSettings.DeletesCheckInterval)
@@ -403,7 +501,7 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 
 			for {
 				select {
-				case <-ctx.Done():
+				case <-streamCtx.Done():
 					return
 				case <-c.forceDelete:
 					runDelete()
@@ -421,34 +519,18 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 			defer wg.Done()
 			//get task location and retrieve resume token
 			loc := iface.Location{Database: ns.Db, Collection: ns.Col}
-			token, err := tokenMap.GetToken(loc)
+			token, _ := tokenMap.GetToken(loc) // Missing tokens intentionally use the plan timestamp below.
+			opts := resumeChangeStreamOptions(readPlanStartAt, token)
+			changeStream, err := createChangeStream(streamCtx, c.client, loc, opts, c.connectorSettings.WithDelete)
 			if err != nil {
-				slog.Error(fmt.Sprintf("Failed to get resume token for location %v: %v", loc, err))
-			}
-			var opts *moptions.ChangeStreamOptionsBuilder
-			if token != nil {
-				//set the change stream options to start from the resume token
-				opts = moptions.ChangeStream().SetResumeAfter(token).SetFullDocument(moptions.UpdateLookup)
-			} else { //we need to start from the read plan creation time to be safe
-				// create timestamp from read plan start time
-				ts := bson.Timestamp{T: uint32(readPlanStartAt)}
-				slog.Debug(fmt.Sprintf("Starting change stream for %v at timestamp %v", ns, ts))
-				opts = moptions.ChangeStream().SetStartAtOperationTime(&ts).SetFullDocument(moptions.UpdateLookup)
-			}
-			changeStream, err := createChangeStream(ctx, c.client, loc, opts, c.connectorSettings.WithDelete)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					slog.Debug(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v, but the context was cancelled", loc.Database, loc.Collection, err))
-				} else {
-					slog.Error(fmt.Sprintf("Failed to create change stream for namespace %s.%s: %v", loc.Database, loc.Collection, err))
-				}
+				reportError(fmt.Errorf("failed to create update change stream for %s.%s: %w", loc.Database, loc.Collection, err))
 				return
 			}
-			defer changeStream.Close(ctx)
+			defer changeStream.Close(streamCtx)
 
 			var updates []*adiomv1.Update
 
-			for changeStream.Next(ctx) {
+			for changeStream.Next(streamCtx) {
 				var change mongoconn.MongoUpdate
 				if err := changeStream.Decode(&change); err != nil {
 					slog.Error(fmt.Sprintf("Failed to decode change stream event: %v", err))
@@ -468,31 +550,44 @@ func (c *conn) StreamUpdates(ctx context.Context, r *connect.Request[adiomv1.Str
 
 				if changeStream.RemainingBatchLength() == 0 {
 					tokenMap.AddToken(loc, changeStream.ResumeToken())
-					encodedToken, _ := tokenMap.encodeMap()
+					encodedToken, err := tokenMap.encodeMap()
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode update token map: %w", err))
+						return
+					}
+					nextCursor, err := encodeResumeToken(readPlanStartAt, encodedToken)
+					if err != nil {
+						reportError(fmt.Errorf("failed to encode update cursor: %w", err))
+						return
+					}
 					sendMutex.Lock()
-					err := s.Send(&adiomv1.StreamUpdatesResponse{
+					err = s.Send(&adiomv1.StreamUpdatesResponse{
 						Updates:    updates,
 						Namespace:  fmt.Sprintf("%v.%v", ns.Db, ns.Col),
-						NextCursor: encodeResumeToken(readPlanStartAt, encodedToken), // TODO: does the ts never change?
+						NextCursor: nextCursor,
 					})
 					sendMutex.Unlock()
 					if err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
 						}
-						slog.Error(fmt.Sprintf("failed to send updates: %v", err))
+						reportError(fmt.Errorf("failed to send updates for %s.%s: %w", loc.Database, loc.Collection, err))
+						return
 					}
 					updates = nil
 				}
 			}
-			if changeStream.Err() != nil {
-				if !errors.Is(changeStream.Err(), context.Canceled) {
-					slog.Error(fmt.Sprintf("Change stream error: %v", changeStream.Err()))
-				}
+			if err := changeStream.Err(); err != nil {
+				reportError(fmt.Errorf("update change stream for %s.%s failed: %w", loc.Database, loc.Collection, err))
 			}
 		}()
 	}
 	wg.Wait()
+	select {
+	case err := <-errCh:
+		return connect.NewError(connect.CodeInternal, err)
+	default:
+	}
 	return nil
 }
 

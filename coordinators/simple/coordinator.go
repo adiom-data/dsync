@@ -29,6 +29,7 @@ type Simple struct {
 	s          iface.Statestore
 
 	flowMutex sync.Mutex
+	flowErr   error
 
 	connectors    map[iface.ConnectorID]ConnectorDetailsWithEp
 	mu_connectors sync.RWMutex // to make the map thread-safe
@@ -328,7 +329,14 @@ func (c *Simple) FlowStart(fid iface.FlowID) error {
 		case <-c.ctx.Done():
 			slog.Debug("Context cancelled. Flow ID: " + fmt.Sprintf("%v", fid))
 		}
-		slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is done")
+		c.flowMutex.Lock()
+		flowErr := c.flowErr
+		c.flowMutex.Unlock()
+		if flowErr != nil {
+			slog.Error("Flow failed", "flow_id", fid, "error", flowErr)
+		} else {
+			slog.Info("Flow with ID: " + fmt.Sprintf("%v", fid) + " is done")
+		}
 		close(flowDet.flowDone)
 	}()
 
@@ -345,7 +353,9 @@ func (c *Simple) WaitForFlowDone(flowId iface.FlowID) error {
 	// Wait for the flow to be done
 	<-flowDet.flowDone //TODO (AK, 6/2024): should we just return the channel?
 
-	return nil
+	c.flowMutex.Lock()
+	defer c.flowMutex.Unlock()
+	return c.flowErr
 }
 
 func (c *Simple) FlowStop(fid iface.FlowID) {
@@ -382,6 +392,11 @@ func (c *Simple) FlowDestroy(fid iface.FlowID) {
 }
 
 func (c *Simple) NotifyError(err error) {
+	c.flowMutex.Lock()
+	if c.flowErr == nil {
+		c.flowErr = err
+	}
+	c.flowMutex.Unlock()
 	c.flowCancel()
 }
 
