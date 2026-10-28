@@ -9,11 +9,13 @@ package cosmos
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/adiom-data/dsync/protocol/iface"
 	"github.com/mitchellh/hashstructure"
@@ -25,6 +27,10 @@ import (
 const (
 	progressReportingIntervalSec = 10
 )
+
+// Cleanup failures are fatal to planning: continuing could copy the dummy
+// document, and falling back would discard an already obtained resume token.
+var errDummyRecordCleanup = errors.New("failed to remove resume-token dummy record")
 
 type ReaderProgress struct {
 	initialSyncDocs    atomic.Uint64
@@ -46,7 +52,7 @@ func generateConnectorID(connectionString string) iface.ConnectorID {
 	return iface.ConnectorID(strconv.FormatUint(id, 16))
 }
 
-func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location, withDelete bool) (bson.Raw, error) {
+func getLatestResumeToken(ctx context.Context, client *mongo.Client, location iface.Location, withDelete bool) (resumeToken bson.Raw, retErr error) {
 	slog.Debug(fmt.Sprintf("Getting latest resume token for location: %v\n", location))
 	opts := moptions.ChangeStream().SetFullDocument(moptions.UpdateLookup)
 	changeStream, err := createChangeStream(ctx, client, location, opts, withDelete)
@@ -56,49 +62,52 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	defer changeStream.Close(ctx)
 
 	// we need ANY event to get the resume token that we can use to extract the cluster time
-	var id interface{}
 	col := client.Database(location.Database).Collection(location.Collection)
 
 	cmdResult := client.Database(location.Database).RunCommand(ctx, bson.D{{"customAction", "GetCollection"}, {"collection", location.Collection}})
 	if cmdResult.Err() != nil {
 		return nil, fmt.Errorf("Error retrieving possible shardKeyDefinition %v", cmdResult.Err())
 	}
-	var m map[string]interface{}
-	if err := cmdResult.Decode(&m); err != nil {
-		return nil, fmt.Errorf("Error decoding possible shardKeyDefinition %v", cmdResult.Err())
+	var collectionInfo bson.Raw
+	if err := cmdResult.Decode(&collectionInfo); err != nil {
+		return nil, fmt.Errorf("error decoding possible shardKeyDefinition: %w", err)
 	}
-	dummyInsertFilter := bson.M{}
-	if shardKeyDefinition, ok := m["shardKeyDefinition"]; ok {
-		if shardKeyDefinitionMap, ok := shardKeyDefinition.(map[string]interface{}); ok {
-			for k := range shardKeyDefinitionMap {
-				if k == "_id" {
-					continue
-				}
-				dummyInsertFilter[k] = ""
-			}
-		}
+	shardKeyFields, err := extractShardKeyFields(collectionInfo)
+	if err != nil {
+		return nil, err
 	}
+	dummyInsertFilter := makeDummyDocument(shardKeyFields)
 	slog.Debug("Dummy Insert", "filter", dummyInsertFilter)
 
 	result, err := col.InsertOne(ctx, dummyInsertFilter)
 	if err != nil {
-		if err.(mongo.WriteException).WriteErrors[0].Code == 13 { //unauthorized
+		if isUnauthorizedWrite(err) {
 			slog.Warn(fmt.Sprintf("Not authorized to insert dummy record for %v, skipping resume token retrieval - is the namespace read-only?", location))
 			return nil, nil
 		}
-		slog.Error(fmt.Sprintf("Error inserting dummy record: %v", err.Error()))
-		return nil, fmt.Errorf("failed to insert dummy record")
+		return nil, fmt.Errorf("failed to insert dummy record: %w", err)
 	}
 
-	id = result.InsertedID
-	//get the resume token from the change stream event, then delete the inserted document
-	changeStream.Next(ctx)
-	resumeToken := changeStream.ResumeToken()
+	deleteFilter := makeDummyDeleteFilter(result.InsertedID, dummyInsertFilter, shardKeyFields)
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		if _, deleteErr := col.DeleteOne(cleanupCtx, deleteFilter); deleteErr != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("%w for %s.%s: %w", errDummyRecordCleanup, location.Database, location.Collection, deleteErr))
+		}
+	}()
+
+	// Get the resume token from the change stream event. The deferred cleanup
+	// includes the partition-key values Cosmos requires when deleting it.
+	if !changeStream.Next(ctx) {
+		if err := changeStream.Err(); err != nil {
+			return nil, fmt.Errorf("failed while waiting for dummy-record change event: %w", err)
+		}
+		return nil, fmt.Errorf("change stream ended before the dummy-record event")
+	}
+	resumeToken = changeStream.ResumeToken()
 	if resumeToken == nil {
 		return nil, fmt.Errorf("failed to get resume token from change stream")
-	}
-	if _, err := col.DeleteOne(ctx, bson.M{"_id": id}); err != nil {
-		return nil, err
 	}
 
 	//print Rid for debugging purposes as we've seen Cosmos giving Rid mismatch errors
@@ -112,17 +121,79 @@ func getLatestResumeToken(ctx context.Context, client *mongo.Client, location if
 	return resumeToken, nil
 }
 
+func extractShardKeyFields(collectionInfo bson.Raw) ([]string, error) {
+	value, err := collectionInfo.LookupErr("shardKeyDefinition")
+	if err != nil {
+		// Unpartitioned collections may omit the field entirely.
+		return nil, nil
+	}
+	definition, ok := value.DocumentOK()
+	if !ok {
+		return nil, fmt.Errorf("shardKeyDefinition must be a BSON document, got %s", value.Type)
+	}
+	elements, err := definition.Elements()
+	if err != nil {
+		return nil, fmt.Errorf("invalid shardKeyDefinition: %w", err)
+	}
+	fields := make([]string, 0, len(elements))
+	for _, element := range elements {
+		if element.Key() != "_id" {
+			fields = append(fields, element.Key())
+		}
+	}
+	return fields, nil
+}
+
+func makeDummyDocument(shardKeyFields []string) bson.M {
+	document := make(bson.M, len(shardKeyFields))
+	for _, field := range shardKeyFields {
+		document[field] = ""
+	}
+	return document
+}
+
+func makeDummyDeleteFilter(id interface{}, document bson.M, shardKeyFields []string) bson.M {
+	filter := make(bson.M, len(shardKeyFields)+1)
+	filter["_id"] = id
+	for _, field := range shardKeyFields {
+		filter[field] = document[field]
+	}
+	return filter
+}
+
+func isUnauthorizedWrite(err error) bool {
+	var writeException mongo.WriteException
+	if errors.As(err, &writeException) {
+		for _, writeErr := range writeException.WriteErrors {
+			if writeErr.Code == 13 {
+				return true
+			}
+		}
+	}
+	var commandError mongo.CommandError
+	return errors.As(err, &commandError) && commandError.Code == 13
+}
+
 // extractRidFromResumeToken extracts the Cosmos Resource Id (collection Id) from the resume token
 func extractRidFromResumeToken(resumeToken bson.Raw) (string, error) {
-	data := resumeToken.Lookup("_data").Value[5:] //Skip the first 5 bytes because it's some Cosmic garbage
-
-	var keyJsonMap map[string]interface{}
-	err := json.Unmarshal(data, &keyJsonMap)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse resume token from JSON: %v", err)
+	if err := resumeToken.Validate(); err != nil {
+		return "", fmt.Errorf("invalid resume token BSON: %w", err)
+	}
+	_, data, ok := resumeToken.Lookup("_data").BinaryOK()
+	if !ok {
+		return "", fmt.Errorf("resume token _data must be BSON binary")
+	}
+	var payload struct {
+		Rid string `json:"Rid"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return "", fmt.Errorf("failed to parse resume token from JSON: %w", err)
+	}
+	if payload.Rid == "" {
+		return "", fmt.Errorf("resume token is missing Rid")
 	}
 
-	return fmt.Sprintf("%v", keyJsonMap["Rid"]), nil
+	return payload.Rid, nil
 }
 
 // create a find query for a task

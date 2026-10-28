@@ -720,23 +720,34 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		}
 		c.progressTracker.UpdateSyncState(iface.ChangeStreamSyncState)
 
+		checkpointCtx, stopCheckpoints := context.WithCancel(c.flowCtx)
+		checkpointsDone := make(chan struct{})
 		go func() {
+			defer close(checkpointsDone)
 			ticker := time.NewTicker(c.settings.ResumeTokenUpdateInterval)
 			defer ticker.Stop()
 			for {
 				select {
-				case <-c.flowCtx.Done():
-					return
-				case <-changeStreamDone:
+				case <-checkpointCtx.Done():
 					return
 				case <-ticker.C:
 					c.resumeTokenMutex.RLock()
 					resumeToken := c.resumeToken
 					c.resumeTokenMutex.RUnlock()
 					// send a barrier message with the updated resume token
-					dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: resumeToken}
+					select {
+					case <-checkpointCtx.Done():
+						return
+					case dataChannel <- iface.DataMessage{MutationType: iface.MutationType_Barrier, BarrierType: iface.BarrierType_CdcResumeTokenUpdate, BarrierCdcResumeToken: resumeToken}:
+					}
 				}
 			}
+		}()
+		defer func() {
+			// Join the checkpoint sender before changeStreamDone closes, so the
+			// completion routine can safely close the shared data channel.
+			stopCheckpoints()
+			<-checkpointsDone
 		}()
 
 		var lsn int64
@@ -752,6 +763,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed to stream updates: %v", err))
+				c.coord.NotifyError(fmt.Errorf("stream updates failed: %w", err))
+				c.flowCancelFunc()
 			}
 			return
 		}
@@ -876,6 +889,8 @@ func (c *connector) StartReadToChannel(flowId iface.FlowID, options iface.Connec
 		if res.Err() != nil {
 			if !errors.Is(res.Err(), context.Canceled) {
 				slog.Error(fmt.Sprintf("Failed during stream updates: %v", res.Err()))
+				c.coord.NotifyError(fmt.Errorf("stream updates failed: %w", res.Err()))
+				c.flowCancelFunc()
 			}
 		}
 	}()
