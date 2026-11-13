@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func GetUpdateCursor(ctx context.Context, c *sql.DB, mapping *Mapping) (updateCursor, error) {
+func GetUpdateCursor(ctx context.Context, c *sql.DB, mapping *Mapping, dialect SQLDialect) (updateCursor, error) {
 	eg, ctx := errgroup.WithContext(ctx)
 	newUpdateCursor := updateCursor{
 		Cursor: make([]any, len(mapping.Changes)),
@@ -35,9 +35,13 @@ func GetUpdateCursor(ctx context.Context, c *sql.DB, mapping *Mapping) (updateCu
 			if len(cols) != 1 {
 				return fmt.Errorf("error expected exactly 1 column for cursor")
 			}
+			columnTypes, err := rows.ColumnTypes()
+			if err != nil {
+				return fmt.Errorf("error getting column types: %w", err)
+			}
 			// Only want the first item
 			if rows.Next() {
-				res, err := ScanRow(rows, len(cols))
+				res, err := scanRowWithTypes(cols, columnTypes, rows, dialect)
 				if err != nil {
 					return fmt.Errorf("error scanning row: %w", err)
 				}
@@ -162,11 +166,16 @@ func Poller(ctx context.Context, cursor updateCursor, mapping *Mapping, c *sql.D
 							_ = rows.Close()
 							return fmt.Errorf("error expected at least 3 columns for changes")
 						}
+						columnTypes, err := rows.ColumnTypes()
+						if err != nil {
+							_ = rows.Close()
+							return fmt.Errorf("error getting column types: %w", err)
+						}
 
 						var count int
 						for rows.Next() {
 							count += 1
-							res, err := ScanRow(rows, len(cols))
+							res, err := scanRowWithTypes(cols, columnTypes, rows, dialect)
 							if err != nil {
 								_ = rows.Close()
 								return fmt.Errorf("error scanning row: %w", err)
@@ -404,9 +413,14 @@ func Poller(ctx context.Context, cursor updateCursor, mapping *Mapping, c *sql.D
 						_ = rows.Close()
 						return fmt.Errorf("err getting columns: %w", err)
 					}
+					columnTypes, err := rows.ColumnTypes()
+					if err != nil {
+						_ = rows.Close()
+						return fmt.Errorf("err getting column types: %w", err)
+					}
 					results := make([]*adiomv1.Update, 0, len(request.Keys))
 					for rows.Next() {
-						m, err := ParseRow(cols, rows, mapping)
+						m, err := ParseRow(cols, columnTypes, rows, mapping, dialect)
 						if err != nil {
 							_ = rows.Close()
 							return fmt.Errorf("err in parse row: %w", err)
