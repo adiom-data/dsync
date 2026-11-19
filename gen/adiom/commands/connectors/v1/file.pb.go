@@ -94,16 +94,16 @@ var File_adiom_commands_connectors_v1_file_proto protoreflect.FileDescriptor
 
 const file_adiom_commands_connectors_v1_file_proto_rawDesc = "" +
 	"\n" +
-	"'adiom/commands/connectors/v1/file.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\"\xbf\x04\n" +
+	"'adiom/commands/connectors/v1/file.proto\x12\x1cadiom.commands.connectors.v1\x1a\x1ccommandargs/v1/options.proto\"\xea\x04\n" +
 	"\tFileFlags\x12X\n" +
 	"\x06format\x18\x01 \x01(\tB@\x82\xb5\x18<\x125Output format for stored files (only 'csv' supported)\x1a\x03csvR\x06format\x12>\n" +
 	"\tdelimiter\x18\x02 \x01(\tB \x82\xb5\x18\x1c\x12\x17CSV delimiter character\x1a\x01,R\tdelimiter\x12m\n" +
 	"\n" +
 	"batch_size\x18\x03 \x01(\x05BN\x82\xb5\x18J\n" +
 	"\n" +
-	"batch-size\x125Number of records to read per batch when listing data\x1a\x0510000R\tbatchSize\x12\xe1\x01\n" +
-	"\vinfer_types\x18\x04 \x01(\bB\xbf\x01\x82\xb5\x18\xba\x01\n" +
-	"\vinfer-types\x12\xa4\x01When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every value as a string\x1a\x04trueR\n" +
+	"batch-size\x125Number of records to read per batch when listing data\x1a\x0510000R\tbatchSize\x12\x8c\x02\n" +
+	"\vinfer_types\x18\x04 \x01(\bB\xea\x01\x82\xb5\x18\xe5\x01\n" +
+	"\vinfer-types\x12\xcf\x01When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every non-empty value as a string (empty cells are always omitted)\x1a\x04trueR\n" +
 	"inferTypes:E\x82\xb5\x18A\n" +
 	"\x04file\"9file:///path/to/dir OR file:///path/to/file.csv [options]BKZIgithub.com/adiom-data/dsync/gen/adiom/commands/connectors/v1;connectorsv1b\x06proto3"
 

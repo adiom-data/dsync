@@ -23,7 +23,7 @@ func FileFlagsCommandFlags() []cli.Flag {
 		},
 		&cli.BoolFlag{
 			Name:  "infer-types",
-			Usage: "When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every value as a string",
+			Usage: "When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every non-empty value as a string (empty cells are always omitted)",
 			Value: true,
 		},
 	}

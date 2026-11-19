@@ -18,6 +18,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
@@ -533,8 +534,10 @@ func TestRoundTripJSON(t *testing.T) {
 	assert.JSONEq(t, `{"id":"a1","n":12345678901234567890,"f":1.5,"b":true,"obj":{"z":[1,{"y":"w"}]},"s":"x,y"}`, string(got[0]))
 	assert.JSONEq(t, `{"id":"a2","extra":"later"}`, string(got[1]))
 
-	var check map[string]any
+	// JSONEq compares numbers as float64; check the exact token too.
+	var check map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(got[0], &check))
+	assert.Equal(t, "12345678901234567890", string(check["n"]))
 }
 
 func TestRoundTrip_DocumentedLossyCases(t *testing.T) {
@@ -637,4 +640,141 @@ func TestReadRaggedRows(t *testing.T) {
 		require.Error(t, lastErr, "batch %d", batch)
 		assert.Contains(t, lastErr.Error(), "has 3 fields but the header has 2")
 	}
+}
+
+func TestRoundTripBSON_AmbiguousObjectIDs(t *testing.T) {
+	// ObjectIDs whose hex looks like a number: all digits, or digits around an "e".
+	hexes := []string{"123456789012345678901234", "12345678901234567890e123", "000000000000000000000001"}
+	conn, dir := newSink(t)
+	for i, h := range hexes {
+		oid, err := bson.ObjectIDFromHex(h)
+		require.NoError(t, err)
+		writeBSON(t, conn, "oids", bson.D{{"_id", i}, {"ref", oid}})
+	}
+	teardown(conn)
+	got := readFileBSON(t, filepath.Join(dir, "oids.csv"))
+	require.Len(t, got, len(hexes))
+	for i, h := range hexes {
+		v := got[i].Lookup("ref")
+		require.Equal(t, bson.TypeObjectID, v.Type, h)
+		assert.Equal(t, h, v.ObjectID().Hex())
+	}
+}
+
+func TestRoundTripBSON_DBPointerNamespaceNeedsEscaping(t *testing.T) {
+	oid := bson.NewObjectID()
+	conn, dir := newSink(t)
+	in := []bson.D{
+		{{"_id", 1}, {"p", bson.DBPointer{DB: "db.coll", Pointer: oid}}},
+		{{"_id", 2}, {"p", bson.DBPointer{DB: `we"ird\ns`, Pointer: oid}}},
+		{{"_id", 3}, {"nested", bson.D{{"a", bson.A{bson.DBPointer{DB: `q"`, Pointer: oid}, "x"}}}}},
+	}
+	for _, d := range in {
+		writeBSON(t, conn, "dbp", d)
+	}
+	teardown(conn)
+	got := readFileBSON(t, filepath.Join(dir, "dbp.csv"))
+	require.Len(t, got, len(in))
+	for i, d := range in {
+		want, err := bson.Marshal(d)
+		require.NoError(t, err)
+		assertSameFields(t, bson.Raw(want), got[i])
+	}
+}
+
+func TestInferBSON_TrailingContentAfterJSONStaysString(t *testing.T) {
+	d := &rowDecoder{inferTypes: true}
+	for _, cell := range []string{`[1],"extra":2`, `{"a":1},"b":2`, `[1] [2]`} {
+		v, err := d.inferBSON(cell)
+		require.NoError(t, err)
+		assert.Equal(t, cell, v, cell)
+	}
+}
+
+func TestInferJSON_NumbersOutsideFloat64Range(t *testing.T) {
+	d := &rowDecoder{inferTypes: true}
+	assert.Equal(t, "1e400", string(d.inferJSON("1e400")))
+	assert.Equal(t, "-1.5e-400", string(d.inferJSON("-1.5e-400")))
+	// BSON has to produce a double, so out-of-range stays a string there.
+	v, err := d.inferBSON("1e400")
+	require.NoError(t, err)
+	assert.Equal(t, "1e400", v)
+
+	conn, dir := newSink(t)
+	writeJSON(t, conn, "big", `{"id":"a","n":1e400}`)
+	teardown(conn)
+	got := readAll(t, ConnectorSettings{Uri: "file://" + filepath.Join(dir, "big.csv")}, adiomv1.DataType_DATA_TYPE_JSON_ID)
+	require.Len(t, got, 1)
+	var check map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(got[0], &check))
+	assert.Equal(t, "1e400", string(check["n"]))
+}
+
+func TestReadBOMBeforeQuotedHeader(t *testing.T) {
+	p := writeCSVFixture(t, "\ufeff\"id\",\"name\"\n1,a\n2,b\n3,c\n")
+	docs := readAll(t, ConnectorSettings{Uri: "file://" + p, BatchSize: 1}, adiomv1.DataType_DATA_TYPE_JSON_ID)
+	require.Len(t, docs, 3)
+	assert.JSONEq(t, `{"id":1,"name":"a"}`, string(docs[0]))
+	assert.JSONEq(t, `{"id":2,"name":"b"}`, string(docs[1]))
+	assert.JSONEq(t, `{"id":3,"name":"c"}`, string(docs[2]))
+}
+
+func TestWriteCSV_JSONIDMixedIdentifierSpellings(t *testing.T) {
+	conn, dir := newSink(t)
+	writeJSON(t, conn, "mixed", `{"_id":"a","x":1}`, `{"id":"b","x":2}`, `{"id":"c","_id":"extra"}`)
+	teardown(conn)
+	p := filepath.Join(dir, "mixed.csv")
+	assert.Equal(t, []string{"id", "x", "_id"}, readCSVFile(t, p)[0])
+	got := readAll(t, ConnectorSettings{Uri: "file://" + p}, adiomv1.DataType_DATA_TYPE_JSON_ID)
+	require.Len(t, got, 3)
+	assert.JSONEq(t, `{"id":"a","x":1}`, string(got[0]))
+	assert.JSONEq(t, `{"id":"b","x":2}`, string(got[1]))
+	assert.JSONEq(t, `{"id":"c","_id":"extra"}`, string(got[2]))
+}
+
+func TestNewConn_RejectsInvalidDelimiters(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []rune{'"', '\r', '\n', utf8.RuneError, -1} {
+		_, err := NewConn(ConnectorSettings{Uri: "file://" + dir, Delimiter: d})
+		assert.ErrorIs(t, err, ErrInvalidDelimiter, "%q", d)
+	}
+	for _, d := range []rune{',', ';', '\t', '|'} {
+		_, err := NewConn(ConnectorSettings{Uri: "file://" + dir, Delimiter: d})
+		assert.NoError(t, err, "%q", d)
+	}
+}
+
+func TestWriteCSV_RewriteWithLongFileName(t *testing.T) {
+	conn, dir := newSink(t)
+	ns := strings.Repeat("n", 250) // 254-byte basename with ".csv"
+	writeBSON(t, conn, ns, bson.D{{"_id", 1}, {"a", 1}}, bson.D{{"_id", 2}, {"b", 2}})
+	teardown(conn)
+	assert.Equal(t, []string{"_id", "a", "b"}, readCSVFile(t, filepath.Join(dir, ns+".csv"))[0])
+}
+
+func TestTeardown_RetriesFailedRewrite(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions do not apply to root")
+	}
+	conn, dir := newSink(t)
+	writeBSON(t, conn, "retry", bson.D{{"_id", 1}, {"a", 1}}, bson.D{{"_id", 2}, {"b", 2}})
+
+	// Make the rewrite fail: the temp file cannot be created in a read-only directory.
+	require.NoError(t, os.Chmod(dir, 0o555))
+	teardown(conn)
+	require.NoError(t, os.Chmod(dir, 0o755))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "no temp file is left behind")
+
+	// Writes to a namespace that is waiting for a retry are refused, not lost.
+	b, _ := bson.Marshal(bson.D{{"_id", 3}})
+	_, err = conn.WriteData(context.Background(), connect.NewRequest(&adiomv1.WriteDataRequest{
+		Namespace: "retry", Data: [][]byte{b}, Type: adiomv1.DataType_DATA_TYPE_MONGO_BSON,
+	}))
+	assert.Error(t, err)
+
+	teardown(conn) // retry succeeds
+	p := filepath.Join(dir, "retry.csv")
+	assert.Equal(t, [][]string{{"_id", "a", "b"}, {"1", "1", ""}, {"2", "", "2"}}, readCSVFile(t, p))
 }

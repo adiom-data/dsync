@@ -149,11 +149,46 @@ func extJSONValue(val bson.RawValue) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !json.Valid(out) {
+		// The driver writes a DBPointer namespace into "$ref" without JSON
+		// escaping. Spell DBPointers out as plain {"$dbPointer": ...} documents,
+		// whose strings are escaped and which parse back as DBPointers.
+		out, err = bson.MarshalExtJSON(bson.D{{Key: extJSONField, Value: spellDBPointers(val)}}, false, false)
+		if err != nil {
+			return "", err
+		}
+	}
 	var wrapper map[string]json.RawMessage
 	if err := json.Unmarshal(out, &wrapper); err != nil {
 		return "", err
 	}
 	return string(wrapper[extJSONField]), nil
+}
+
+// spellDBPointers returns val with every DBPointer, at any depth, replaced by
+// its Extended JSON form as an ordinary document.
+func spellDBPointers(val bson.RawValue) any {
+	switch val.Type {
+	case bson.TypeDBPointer:
+		ns, oid := val.DBPointer()
+		return bson.D{{Key: "$dbPointer", Value: bson.D{{Key: "$ref", Value: ns}, {Key: "$id", Value: oid}}}}
+	case bson.TypeEmbeddedDocument:
+		elems, _ := val.Document().Elements()
+		doc := make(bson.D, 0, len(elems))
+		for _, e := range elems {
+			doc = append(doc, bson.E{Key: e.Key(), Value: spellDBPointers(e.Value())})
+		}
+		return doc
+	case bson.TypeArray:
+		vals, _ := val.Array().Values()
+		arr := make(bson.A, 0, len(vals))
+		for _, v := range vals {
+			arr = append(arr, spellDBPointers(v))
+		}
+		return arr
+	default:
+		return val
+	}
 }
 
 func formatDouble(f float64) string {
@@ -176,6 +211,15 @@ func encodeJSONDocument(data []byte) (encodedDoc, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return nil, fmt.Errorf("failed to parse input data as JSON: %w", err)
+	}
+	// A JSON_ID document identified by "_id" alone keeps its identifier in the
+	// "id" column, so a namespace mixing both spellings has one identifier column.
+	// With both keys present, "_id" stays an ordinary field.
+	if _, hasID := fields[jsonIDField]; !hasID {
+		if v, ok := fields[idField]; ok {
+			fields[jsonIDField] = v
+			delete(fields, idField)
+		}
 	}
 	doc := make(encodedDoc, len(fields))
 	for key, raw := range fields {
@@ -311,6 +355,13 @@ func (d *rowDecoder) inferBSON(cell string) (any, error) {
 	case "-Infinity":
 		return math.Inf(-1), nil
 	}
+	// Before numbers: an ObjectID's hex can be all digits, or digits around a
+	// single "e". The writer never produces numbers in this form.
+	if objectIDPattern.MatchString(cell) {
+		if oid, err := bson.ObjectIDFromHex(cell); err == nil {
+			return oid, nil
+		}
+	}
 	if intPattern.MatchString(cell) {
 		n, err := strconv.ParseInt(cell, 10, 64)
 		if err != nil {
@@ -327,11 +378,6 @@ func (d *rowDecoder) inferBSON(cell string) (any, error) {
 		}
 		return cell, nil
 	}
-	if objectIDPattern.MatchString(cell) {
-		if oid, err := bson.ObjectIDFromHex(cell); err == nil {
-			return oid, nil
-		}
-	}
 	if m := legacyObjectIDPattern.FindStringSubmatch(cell); m != nil {
 		if oid, err := bson.ObjectIDFromHex(m[1]); err == nil {
 			return oid, nil
@@ -342,7 +388,9 @@ func (d *rowDecoder) inferBSON(cell string) (any, error) {
 			return bson.NewDateTimeFromTime(t), nil
 		}
 	}
-	if cell[0] == '{' || cell[0] == '[' {
+	// json.Valid first: the cell must be one complete value, or wrapping it
+	// could splice extra fields into the wrapper (e.g. `[1],"x":2`).
+	if (cell[0] == '{' || cell[0] == '[') && json.Valid([]byte(cell)) {
 		var wrapper bson.Raw
 		if err := bson.UnmarshalExtJSON([]byte(`{"`+extJSONField+`":`+cell+`}`), false, &wrapper); err == nil {
 			return wrapper.Lookup(extJSONField), nil
@@ -395,9 +443,7 @@ func (d *rowDecoder) inferJSON(cell string) []byte {
 		case intPattern.MatchString(cell):
 			return []byte(cell) // JSON numbers have no range limit
 		case floatPattern.MatchString(cell):
-			if _, err := strconv.ParseFloat(cell, 64); err == nil {
-				return []byte(cell)
-			}
+			return []byte(cell) // valid JSON number syntax; no float64 range limit
 		case cell[0] == '{' || cell[0] == '[':
 			if json.Valid([]byte(cell)) {
 				var buf bytes.Buffer

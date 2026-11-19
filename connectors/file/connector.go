@@ -9,6 +9,8 @@
 package file
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -22,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
@@ -49,8 +52,9 @@ type ConnectorSettings struct {
 	Format    string
 	Delimiter rune
 	BatchSize int
-	// DisableTypeInference loads every CSV value as a string instead of
-	// inferring numbers, booleans, JSON values, ObjectIDs and dates.
+	// DisableTypeInference loads every non-empty CSV value as a string instead
+	// of inferring numbers, booleans, JSON values, ObjectIDs and dates. Empty
+	// cells are omitted either way.
 	DisableTypeInference bool
 }
 
@@ -74,7 +78,12 @@ type csvFileWriter struct {
 	// the file. When later documents add columns, the file is rewritten with the
 	// full header on Teardown.
 	writtenHeaderLen int
+	// closed is set once the file is flushed and closed by finalize; a failed
+	// rewrite can then be retried by a later Teardown.
+	closed bool
 }
+
+const utf8BOM = "\ufeff"
 
 func (c *connector) fileExtension() string {
 	return "." + strings.ToLower(c.settings.Format)
@@ -100,6 +109,11 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 
 	if settings.Delimiter == 0 {
 		settings.Delimiter = DefaultDelimiter
+	}
+	// Same rules as encoding/csv, checked up front so that nothing is written
+	// with a delimiter the reader would reject.
+	if d := settings.Delimiter; d == '"' || d == '\r' || d == '\n' || !utf8.ValidRune(d) || d == utf8.RuneError {
+		return nil, fmt.Errorf("%w: got %q", ErrInvalidDelimiter, d)
 	}
 
 	if settings.BatchSize <= 0 {
@@ -310,7 +324,19 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		}
 	}
 
-	reader := csv.NewReader(file)
+	// The first read skips a UTF-8 BOM (e.g. from Excel) before the CSV reader
+	// sees it, so a quoted first column name still parses. The skipped bytes are
+	// counted in the offset of the next page.
+	input := bufio.NewReader(file)
+	offset := cursor.ByteOffset
+	if cursor.Header == nil {
+		if b, err := input.Peek(len(utf8BOM)); err == nil && bytes.Equal(b, []byte(utf8BOM)) {
+			_, _ = input.Discard(len(utf8BOM))
+			offset += int64(len(utf8BOM))
+		}
+	}
+
+	reader := csv.NewReader(input)
 	reader.Comma = c.settings.Delimiter
 	// Row widths are checked against the header below (not against the first row
 	// of the page): short rows are padded, longer rows are rejected.
@@ -330,9 +356,6 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 				}), nil
 			}
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV header from %q: %w", cursor.Path, err))
-		}
-		if len(header) > 0 {
-			header[0] = strings.TrimPrefix(header[0], "\ufeff") // UTF-8 BOM, e.g. from Excel
 		}
 	}
 
@@ -373,7 +396,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	if !hitEOF {
 		nextCursor, _ = json.Marshal(listDataCursor{
 			Path:       cursor.Path,
-			ByteOffset: cursor.ByteOffset + reader.InputOffset(),
+			ByteOffset: offset + reader.InputOffset(),
 			Header:     header,
 		})
 	}
@@ -429,6 +452,9 @@ func (c *connector) writeCSV(namespace string, idColumn string, docs []encodedDo
 	defer c.writeMutex.Unlock()
 
 	writer, ok := c.writers[namespace]
+	if ok && writer.closed {
+		return fmt.Errorf("CSV file %q for namespace %q was already finalized", writer.path, namespace)
+	}
 	if !ok {
 		path := namespaceToPath(c.settings.Path, namespace, c.fileExtension())
 
@@ -514,15 +540,20 @@ func writeRecord(w *csv.Writer, raw io.Writer, rec []string) error {
 
 // finalize flushes and closes the file, rewriting it when columns were added
 // after the header line was written so that every row has the full header.
+// The original file is only replaced once the rewrite has succeeded, so a
+// failed rewrite can be retried by calling finalize again.
 func (w *csvFileWriter) finalize(delimiter rune) error {
-	w.writer.Flush()
-	flushErr := w.writer.Error()
-	closeErr := w.file.Close()
-	if flushErr != nil {
-		return flushErr
-	}
-	if closeErr != nil {
-		return closeErr
+	if !w.closed {
+		w.writer.Flush()
+		flushErr := w.writer.Error()
+		closeErr := w.file.Close()
+		if flushErr != nil {
+			return flushErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		w.closed = true
 	}
 	if len(w.header) == w.writtenHeaderLen {
 		return nil
@@ -542,7 +573,7 @@ func (w *csvFileWriter) finalize(delimiter rune) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(w.path), filepath.Base(w.path)+".tmp-*")
+	tmp, err := os.CreateTemp(filepath.Dir(w.path), ".dsync-csv-*") // short: the CSV name may be near the length limit
 	if err != nil {
 		return err
 	}
@@ -612,9 +643,12 @@ func (c *connector) Teardown() {
 
 	for ns, writer := range c.writers {
 		if err := writer.finalize(c.settings.Delimiter); err != nil {
+			// Keep the writer (with its full header) so that a later Teardown can
+			// retry, e.g. after disk space is freed.
 			slog.Error("failed to finalize CSV file; it may be missing columns in the header or have rows of uneven length",
 				"namespace", ns, "path", writer.path, "err", err)
+			continue
 		}
+		delete(c.writers, ns)
 	}
-	c.writers = make(map[string]*csvFileWriter)
 }
