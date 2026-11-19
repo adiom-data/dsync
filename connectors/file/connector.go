@@ -111,8 +111,9 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 		settings.Delimiter = DefaultDelimiter
 	}
 	// Same rules as encoding/csv, checked up front so that nothing is written
-	// with a delimiter the reader would reject.
-	if d := settings.Delimiter; d == '"' || d == '\r' || d == '\n' || !utf8.ValidRune(d) || d == utf8.RuneError {
+	// with a delimiter the reader would reject. U+FEFF is also rejected: the
+	// reader strips it as a BOM at the start of the file.
+	if d := settings.Delimiter; d == '"' || d == '\r' || d == '\n' || d == '\ufeff' || !utf8.ValidRune(d) || d == utf8.RuneError {
 		return nil, fmt.Errorf("%w: got %q", ErrInvalidDelimiter, d)
 	}
 

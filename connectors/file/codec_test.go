@@ -734,7 +734,7 @@ func TestWriteCSV_JSONIDMixedIdentifierSpellings(t *testing.T) {
 
 func TestNewConn_RejectsInvalidDelimiters(t *testing.T) {
 	dir := t.TempDir()
-	for _, d := range []rune{'"', '\r', '\n', utf8.RuneError, -1} {
+	for _, d := range []rune{'"', '\r', '\n', '\ufeff', utf8.RuneError, -1} {
 		_, err := NewConn(ConnectorSettings{Uri: "file://" + dir, Delimiter: d})
 		assert.ErrorIs(t, err, ErrInvalidDelimiter, "%q", d)
 	}
