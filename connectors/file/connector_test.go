@@ -152,9 +152,9 @@ func TestListData_ValidCSV_JSON(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, json.Unmarshal(data[0], &doc))
-	assert.Equal(t, "1", doc["id"])
+	assert.Equal(t, float64(1), doc["id"])
 	assert.Equal(t, "Alice", doc["name"])
-	assert.Equal(t, "30", doc["age"])
+	assert.Equal(t, float64(30), doc["age"])
 }
 
 func TestListData_ValidCSV_BSON(t *testing.T) {
@@ -178,7 +178,8 @@ func TestListData_ValidCSV_BSON(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, bson.Unmarshal(data[0], &doc))
-	assert.Equal(t, "1", doc["id"])
+	assert.Equal(t, int32(1), doc["_id"], "the id column becomes _id for BSON")
+	assert.NotContains(t, doc, "id")
 	assert.Equal(t, "Alice", doc["name"])
 }
 
@@ -202,11 +203,13 @@ func TestListData_EmptyValues(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, json.Unmarshal(data[0], &doc))
-	assert.Equal(t, "", doc["age"])
+	assert.NotContains(t, doc, "age", "empty cells are omitted")
 
+	doc = nil
 	require.NoError(t, json.Unmarshal(data[1], &doc))
-	assert.Equal(t, "", doc["name"])
-	assert.Equal(t, "", doc["email"])
+	assert.NotContains(t, doc, "name")
+	assert.NotContains(t, doc, "email")
+	assert.Equal(t, float64(25), doc["age"])
 }
 
 func TestListData_HeaderOnly(t *testing.T) {
@@ -246,7 +249,7 @@ func TestListData_SingleRow(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, json.Unmarshal(data[0], &doc))
-	assert.Equal(t, "100", doc["id"])
+	assert.Equal(t, float64(100), doc["id"])
 }
 
 func TestListData_NestedDirectory(t *testing.T) {
@@ -292,7 +295,7 @@ func TestListData_CustomDelimiter(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, json.Unmarshal(data[0], &doc))
-	assert.Equal(t, "1", doc["id"])
+	assert.Equal(t, float64(1), doc["id"])
 	assert.Equal(t, "Item1", doc["name"])
 	assert.Equal(t, "Value1", doc["value"])
 }
@@ -462,7 +465,8 @@ func TestWriteData_BSON(t *testing.T) {
 
 	var doc map[string]interface{}
 	require.NoError(t, json.Unmarshal(resp.Msg.GetData()[0], &doc))
-	assert.Equal(t, "1", doc["id"])
+	// A string _id that looks like a number comes back as a number with type inference.
+	assert.Equal(t, float64(1), doc["id"])
 }
 
 func TestWriteData_NestedNamespace(t *testing.T) {
@@ -580,11 +584,10 @@ func TestWriteData_BothIdAndUnderscoreId(t *testing.T) {
 
 	var readDoc map[string]interface{}
 	require.NoError(t, json.Unmarshal(resp.Msg.GetData()[0], &readDoc))
-	assert.Equal(t, "explicit-id", readDoc["id"], "id field should take precedence over _id")
+	assert.Equal(t, "explicit-id", readDoc["id"], "id is the identifier for JSON_ID")
 	assert.Equal(t, "Test", readDoc["name"])
-	// _id should not appear as a separate column since it maps to id
-	_, hasUnderscoreId := readDoc["_id"]
-	assert.False(t, hasUnderscoreId, "_id should not be a separate column")
+	// _id is kept as an ordinary column instead of being dropped
+	assert.Equal(t, "underscore-id", readDoc["_id"])
 }
 
 func TestWriteUpdates_Unimplemented(t *testing.T) {
@@ -616,8 +619,6 @@ func TestStreamLSN_Unimplemented(t *testing.T) {
 	err = conn.StreamLSN(context.Background(), connect.NewRequest(&adiomv1.StreamLSNRequest{}), nil)
 	require.Error(t, err, "StreamLSN should return unimplemented error for file connector")
 }
-
-
 
 func TestUnevenRows(t *testing.T) {
 	conn, err := NewConn(ConnectorSettings{
@@ -727,9 +728,9 @@ func TestListData_BatchSize_SmallerThanFile(t *testing.T) {
 			var firstDoc, lastDoc map[string]interface{}
 			require.NoError(t, json.Unmarshal(allData[0], &firstDoc))
 			require.NoError(t, json.Unmarshal(allData[9], &lastDoc))
-			assert.Equal(t, "1", firstDoc["id"])
+			assert.Equal(t, float64(1), firstDoc["id"])
 			assert.Equal(t, "Item1", firstDoc["name"])
-			assert.Equal(t, "10", lastDoc["id"])
+			assert.Equal(t, float64(10), lastDoc["id"])
 			assert.Equal(t, "Item10", lastDoc["name"])
 		})
 	}
@@ -781,7 +782,7 @@ func TestListData_BatchSize_DataIntegrity(t *testing.T) {
 	require.Len(t, allData, 5)
 
 	// Verify each record
-	expectedIDs := []string{"1", "2", "3", "4", "5"}
+	expectedIDs := []float64{1, 2, 3, 4, 5}
 	expectedValues := []string{"A", "B", "C", "D", "E"}
 
 	for i, data := range allData {

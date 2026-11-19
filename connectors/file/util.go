@@ -7,14 +7,10 @@
 package file
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
-
-	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // parseFileConnectionString extracts the file path from a file:// URI.
@@ -88,28 +84,4 @@ func countCSVRows(r io.Reader) (int, error) {
 	}
 
 	return count, nil
-}
-
-// convertFromData converts raw bytes to a map based on the data type.
-func convertFromData(data []byte, dataType adiomv1.DataType) (map[string]interface{}, error) {
-	switch dataType {
-	case adiomv1.DataType_DATA_TYPE_JSON_ID:
-		var doc map[string]interface{}
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("failed to parse input data as JSON: %w", err)
-		}
-		return doc, nil
-	case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-		var doc map[string]interface{}
-		if err := bson.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("failed to parse input data as BSON: %w", err)
-		}
-		if idVal, ok := doc["_id"]; ok {
-			doc["id"] = idVal
-			delete(doc, "_id")
-		}
-		return doc, nil
-	default:
-		return nil, fmt.Errorf("%w: got %v", ErrUnsupportedType, dataType)
-	}
 }

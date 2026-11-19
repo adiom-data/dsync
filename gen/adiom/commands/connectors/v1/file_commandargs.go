@@ -21,6 +21,11 @@ func FileFlagsCommandFlags() []cli.Flag {
 			Usage: "Number of records to read per batch when listing data",
 			Value: 10000,
 		},
+		&cli.BoolFlag{
+			Name:  "infer-types",
+			Usage: "When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every value as a string",
+			Value: true,
+		},
 	}
 }
 
@@ -29,6 +34,7 @@ func ParseFileFlags(c *cli.Context) (*FileFlags, error) {
 	cfg.Format = c.String("format")
 	cfg.Delimiter = c.String("delimiter")
 	cfg.BatchSize = int32(c.Int("batch-size"))
+	cfg.InferTypes = c.Bool("infer-types")
 	return cfg, nil
 }
 

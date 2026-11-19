@@ -695,6 +695,8 @@ func fileSettingsFromFlags(f *connectorsv1.FileFlags, uri string) (fileconnector
 		Uri:       uri,
 		Format:    f.Format,
 		BatchSize: int(f.BatchSize),
+		// Inference is on unless --infer-types=false.
+		DisableTypeInference: !f.InferTypes,
 	}
 	if len(f.Delimiter) == 1 {
 		s.Delimiter = rune(f.Delimiter[0])
