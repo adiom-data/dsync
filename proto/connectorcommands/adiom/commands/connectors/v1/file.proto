@@ -23,4 +23,9 @@ message FileFlags {
     usage: "Number of records to read per batch when listing data"
     default: "10000"
   }];
+  bool infer_types = 4 [(commandargs.v1.flag) = {
+    name: "infer-types"
+    usage: "When reading CSV, infer value types (numbers, booleans, JSON documents/arrays, and for BSON ObjectIDs and ISO-8601 dates) instead of loading every non-empty value as a string (empty cells are always omitted)"
+    default: "true"
+  }];
 }

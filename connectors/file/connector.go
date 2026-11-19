@@ -9,6 +9,8 @@
 package file
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -22,11 +24,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	adiomv1 "github.com/adiom-data/dsync/gen/adiom/v1"
 	"github.com/adiom-data/dsync/gen/adiom/v1/adiomv1connect"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var (
@@ -35,6 +37,7 @@ var (
 	ErrUnsupportedFormat = errors.New("unsupported format: file connector currently only supports 'csv' format")
 	ErrMissingIDColumn   = errors.New("CSV file must have an 'id' column as the document identifier")
 	ErrInvalidDelimiter  = errors.New("invalid delimiter: must be a single character (e.g., ',' or ';')")
+	ErrDuplicateColumn   = errors.New("CSV header has a duplicate column name")
 )
 
 const (
@@ -49,6 +52,10 @@ type ConnectorSettings struct {
 	Format    string
 	Delimiter rune
 	BatchSize int
+	// DisableTypeInference loads every non-empty CSV value as a string instead
+	// of inferring numbers, booleans, JSON values, ObjectIDs and dates. Empty
+	// cells are omitted either way.
+	DisableTypeInference bool
 }
 
 type connector struct {
@@ -62,11 +69,21 @@ type connector struct {
 }
 
 type csvFileWriter struct {
+	path      string
 	file      *os.File
 	writer    *csv.Writer
 	header    []string
 	headerSet map[string]bool
+	// writtenHeaderLen is the number of columns in the header line at the top of
+	// the file. When later documents add columns, the file is rewritten with the
+	// full header on Teardown.
+	writtenHeaderLen int
+	// closed is set once the file is flushed and closed by finalize; a failed
+	// rewrite can then be retried by a later Teardown.
+	closed bool
 }
+
+const utf8BOM = "\ufeff"
 
 func (c *connector) fileExtension() string {
 	return "." + strings.ToLower(c.settings.Format)
@@ -92,6 +109,12 @@ func NewConn(settings ConnectorSettings) (adiomv1connect.ConnectorServiceHandler
 
 	if settings.Delimiter == 0 {
 		settings.Delimiter = DefaultDelimiter
+	}
+	// Same rules as encoding/csv, checked up front so that nothing is written
+	// with a delimiter the reader would reject. U+FEFF is also rejected: the
+	// reader strips it as a BOM at the start of the file.
+	if d := settings.Delimiter; d == '"' || d == '\r' || d == '\n' || d == '\ufeff' || !utf8.ValidRune(d) || d == utf8.RuneError {
+		return nil, fmt.Errorf("%w: got %q", ErrInvalidDelimiter, d)
 	}
 
 	if settings.BatchSize <= 0 {
@@ -302,8 +325,23 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		}
 	}
 
-	reader := csv.NewReader(file)
+	// The first read skips a UTF-8 BOM (e.g. from Excel) before the CSV reader
+	// sees it, so a quoted first column name still parses. The skipped bytes are
+	// counted in the offset of the next page.
+	input := bufio.NewReader(file)
+	offset := cursor.ByteOffset
+	if cursor.Header == nil {
+		if b, err := input.Peek(len(utf8BOM)); err == nil && bytes.Equal(b, []byte(utf8BOM)) {
+			_, _ = input.Discard(len(utf8BOM))
+			offset += int64(len(utf8BOM))
+		}
+	}
+
+	reader := csv.NewReader(input)
 	reader.Comma = c.settings.Delimiter
+	// Row widths are checked against the header below (not against the first row
+	// of the page): short rows are padded, longer rows are rejected.
+	reader.FieldsPerRecord = -1
 
 	// For initial request, read header from file
 	// For pagination, use cached header (file is already positioned past header)
@@ -322,6 +360,11 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 		}
 	}
 
+	decoder, err := newRowDecoder(header, req.Msg.GetType(), !c.settings.DisableTypeInference)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (file %q)", err, cursor.Path))
+	}
+
 	// Read batch
 	var data [][]byte
 	rowsRead := 0
@@ -336,30 +379,16 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to read CSV row from %q: %w", cursor.Path, err))
 		}
 		rowsRead++
-
-		doc := make(map[string]interface{})
-		for i, col := range header {
-			if i < len(row) {
-				doc[col] = row[i]
-			}
+		if len(row) > len(header) {
+			line, _ := reader.FieldPos(0)
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("CSV row in %q (line %d of this read) has %d fields but the header has %d", cursor.Path, line, len(row), len(header)))
 		}
 
-		switch req.Msg.GetType() {
-		case adiomv1.DataType_DATA_TYPE_JSON_ID:
-			jsonDoc, err := json.Marshal(doc)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to JSON in file %q: %w", cursor.Path, err))
-			}
-			data = append(data, jsonDoc)
-		case adiomv1.DataType_DATA_TYPE_MONGO_BSON:
-			bsonDoc, err := bson.Marshal(doc)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row to BSON in file %q: %w", cursor.Path, err))
-			}
-			data = append(data, bsonDoc)
-		default:
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w: requested type %v", ErrUnsupportedType, req.Msg.GetType()))
+		doc, err := decoder.decode(row)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to convert CSV row in file %q: %w", cursor.Path, err))
 		}
+		data = append(data, doc)
 	}
 
 	// Build next cursor if there's more data
@@ -368,7 +397,7 @@ func (c *connector) ListData(ctx context.Context, req *connect.Request[adiomv1.L
 	if !hitEOF {
 		nextCursor, _ = json.Marshal(listDataCursor{
 			Path:       cursor.Path,
-			ByteOffset: cursor.ByteOffset + reader.InputOffset(),
+			ByteOffset: offset + reader.InputOffset(),
 			Header:     header,
 		})
 	}
@@ -399,28 +428,34 @@ func (c *connector) WriteData(ctx context.Context, req *connect.Request[adiomv1.
 		namespace = "default"
 	}
 
-	docs := make([]map[string]interface{}, 0, len(req.Msg.GetData()))
+	docs := make([]encodedDoc, 0, len(req.Msg.GetData()))
 	for _, data := range req.Msg.GetData() {
-		doc, err := convertFromData(data, req.Msg.GetType())
+		doc, err := encodeDocument(data, req.Msg.GetType())
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		docs = append(docs, doc)
 	}
 
-	if err := c.writeCSV(namespace, docs); err != nil {
+	if err := c.writeCSV(namespace, idColumnFor(req.Msg.GetType()), docs); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&adiomv1.WriteDataResponse{}), nil
 }
 
-// XXX: this ignores _id if id is present
-func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) error {
+// writeCSV appends documents to the namespace's CSV file. The identifier column
+// comes first, followed by the first document's keys in sorted order. Keys that
+// first appear in later documents become new columns at the end; rows written
+// before that are padded when the file is finalized on Teardown.
+func (c *connector) writeCSV(namespace string, idColumn string, docs []encodedDoc) error {
 	c.writeMutex.Lock()
 	defer c.writeMutex.Unlock()
 
 	writer, ok := c.writers[namespace]
+	if ok && writer.closed {
+		return fmt.Errorf("CSV file %q for namespace %q was already finalized", writer.path, namespace)
+	}
 	if !ok {
 		path := namespaceToPath(c.settings.Path, namespace, c.fileExtension())
 
@@ -437,71 +472,51 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 		csvWriter.Comma = c.settings.Delimiter
 
 		writer = &csvFileWriter{
-			file:   file,
-			writer: csvWriter,
-			header: nil,
+			path:      path,
+			file:      file,
+			writer:    csvWriter,
+			headerSet: map[string]bool{},
 		}
 		c.writers[namespace] = writer
 	}
 
 	for _, doc := range docs {
-		if writer.header == nil {
-			header := make([]string, 0, len(doc))
-			hasID := false
-			for k := range doc {
-				if k == "id" || k == "_id" {
-					hasID = true
-					continue
-				}
-				header = append(header, k)
-			}
-			sort.Strings(header)
-			if hasID {
-				writer.header = append([]string{"id"}, header...)
-			} else {
-				writer.header = header
-			}
-			// Build header set for fast lookup
-			writer.headerSet = make(map[string]bool, len(writer.header))
-			for _, col := range writer.header {
-				writer.headerSet[col] = true
-			}
-			if err := writer.writer.Write(writer.header); err != nil {
-				return fmt.Errorf("failed to write CSV header for namespace %q: %w", namespace, err)
+		var newKeys []string
+		for k := range doc {
+			if !writer.headerSet[k] && k != idColumn {
+				newKeys = append(newKeys, k)
 			}
 		}
+		sort.Strings(newKeys)
+		if _, hasID := doc[idColumn]; hasID && !writer.headerSet[idColumn] {
+			newKeys = append([]string{idColumn}, newKeys...)
+		}
+		for _, k := range newKeys {
+			writer.header = append(writer.header, k)
+			writer.headerSet[k] = true
+		}
 
-		// Check for extra keys not in header
-		for k := range doc {
-			normalizedKey := k
-			if k == "_id" {
-				normalizedKey = "id"
+		if len(writer.header) == 0 {
+			// An empty document has no CSV representation (blank lines are skipped by readers).
+			slog.Warn("skipping empty document: it has no fields to write as a CSV row", "namespace", namespace)
+			continue
+		}
+
+		if writer.writtenHeaderLen == 0 {
+			if err := writeRecord(writer.writer, writer.file, writer.header); err != nil {
+				return fmt.Errorf("failed to write CSV header for namespace %q: %w", namespace, err)
 			}
-			if writer.headerSet[normalizedKey] == false {
-				slog.Warn("document has key not in CSV header, data will be lost",
-					"namespace", namespace,
-					"key", k,
-					"header", writer.header)
-			}
+			writer.writtenHeaderLen = len(writer.header)
+		} else if len(newKeys) > 0 {
+			slog.Debug("new CSV columns found; the file will be rewritten with the full header at the end",
+				"namespace", namespace, "columns", newKeys)
 		}
 
 		row := make([]string, len(writer.header))
 		for i, col := range writer.header {
-			var val interface{}
-			if col == "id" {
-				if v, ok := doc["id"]; ok {
-					val = v
-				} else if v, ok := doc["_id"]; ok {
-					val = v
-				}
-			} else {
-				val = doc[col]
-			}
-			if val != nil {
-				row[i] = fmt.Sprintf("%v", val)
-			}
+			row[i] = doc[col]
 		}
-		if err := writer.writer.Write(row); err != nil {
+		if err := writeRecord(writer.writer, writer.file, row); err != nil {
 			return fmt.Errorf("failed to write CSV row for namespace %q: %w", namespace, err)
 		}
 	}
@@ -509,6 +524,116 @@ func (c *connector) writeCSV(namespace string, docs []map[string]interface{}) er
 	writer.writer.Flush()
 	return writer.writer.Error()
 }
+
+// writeRecord writes one CSV record. csv.Writer writes a record made of a single
+// empty field as a blank line, which readers skip; write it as "" instead.
+func writeRecord(w *csv.Writer, raw io.Writer, rec []string) error {
+	if len(rec) == 1 && rec[0] == "" {
+		w.Flush()
+		if err := w.Error(); err != nil {
+			return err
+		}
+		_, err := io.WriteString(raw, "\"\"\n")
+		return err
+	}
+	return w.Write(rec)
+}
+
+// finalize flushes and closes the file, rewriting it when columns were added
+// after the header line was written so that every row has the full header.
+// The original file is only replaced once the rewrite has succeeded, so a
+// failed rewrite can be retried by calling finalize again.
+func (w *csvFileWriter) finalize(delimiter rune) error {
+	if !w.closed {
+		w.writer.Flush()
+		flushErr := w.writer.Error()
+		closeErr := w.file.Close()
+		if flushErr != nil {
+			return flushErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		w.closed = true
+	}
+	if len(w.header) == w.writtenHeaderLen {
+		return nil
+	}
+
+	slog.Info("rewriting CSV file with the full header", "path", w.path,
+		"columns", len(w.header), "addedColumns", w.header[w.writtenHeaderLen:])
+
+	src, err := os.Open(w.path) //nolint:gosec // G304: path is intentionally user-provided for file connector
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	info, err := src.Stat()
+	if err != nil {
+		return err
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(w.path), ".dsync-csv-*") // short: the CSV name may be near the length limit
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		if tmpPath != "" {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	reader := csv.NewReader(src)
+	reader.Comma = delimiter
+	reader.FieldsPerRecord = -1 // rows written before a column was added are shorter
+	reader.ReuseRecord = true
+	out := csv.NewWriter(tmp)
+	out.Comma = delimiter
+
+	if _, err := reader.Read(); err != nil { // old header
+		return fmt.Errorf("failed to read CSV header: %w", err)
+	}
+	if err := writeRecord(out, tmp, w.header); err != nil {
+		return err
+	}
+	row := make([]string, len(w.header))
+	for {
+		rec, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read CSV row: %w", err)
+		}
+		if len(rec) > len(w.header) {
+			return fmt.Errorf("CSV row has %d fields, more than the %d header columns", len(rec), len(w.header))
+		}
+		n := copy(row, rec)
+		clear(row[n:])
+		if err := writeRecord(out, tmp, row); err != nil {
+			return err
+		}
+	}
+	out.Flush()
+	if err := out.Error(); err != nil {
+		return err
+	}
+	if err := tmp.Chmod(info.Mode().Perm()); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, w.path); err != nil {
+		return err
+	}
+	tmpPath = ""
+	return nil
+}
+
 func (c *connector) WriteUpdates(context.Context, *connect.Request[adiomv1.WriteUpdatesRequest]) (*connect.Response[adiomv1.WriteUpdatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("updates not supported by file connector"))
 }
@@ -518,10 +643,13 @@ func (c *connector) Teardown() {
 	defer c.writeMutex.Unlock()
 
 	for ns, writer := range c.writers {
-		writer.writer.Flush()
-		if err := writer.file.Close(); err != nil {
-			slog.Warn("failed to close CSV file", "namespace", ns, "err", err)
+		if err := writer.finalize(c.settings.Delimiter); err != nil {
+			// Keep the writer (with its full header) so that a later Teardown can
+			// retry, e.g. after disk space is freed.
+			slog.Error("failed to finalize CSV file; it may be missing columns in the header or have rows of uneven length",
+				"namespace", ns, "path", writer.path, "err", err)
+			continue
 		}
+		delete(c.writers, ns)
 	}
-	c.writers = make(map[string]*csvFileWriter)
 }
